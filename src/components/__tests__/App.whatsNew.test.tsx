@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -173,6 +173,133 @@ describe("App: What's new", () => {
 
       expect(await screen.findByRole('heading', { name: section, level: 1 })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: section })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('keyboard, focus and screen readers, end to end (My-Prompt-Manager-d1g.8)', () => {
+    /** Where each number key leads with the 2.0.0 Release notes: "Type // on a Platform" has no destination, so no number */
+    it.each([
+      ['1', 'the editor on a new Prompt, the keyboard in its title field', async () => {
+        expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
+        await waitFor(() => { expect(screen.getByLabelText(/title/i)).toHaveFocus(); });
+        expect(screen.getByLabelText(/title/i)).toHaveValue('');
+      }],
+      ['2', 'the Library, the keyboard in its search field', async () => {
+        expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+        await waitFor(() => { expect(screen.getByRole('searchbox', { name: 'Search prompts' })).toHaveFocus(); });
+      }],
+      ['3', 'the Library (Pinned prompts)', () => {
+        expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
+      }],
+      ['5', 'the Analytics Section (Tidy up)', async () => {
+        expect(await screen.findByRole('heading', { name: 'Analytics', level: 1 })).toBeInTheDocument();
+      }],
+      ['7', 'the Categories Section (Undo a Category deletion)', async () => {
+        expect(await screen.findByRole('heading', { name: 'Categories', level: 1 })).toBeInTheDocument();
+      }],
+      ['8', 'the Settings Section (Fix the icon yourself)', async () => {
+        expect(await screen.findByRole('heading', { name: 'Settings', level: 1 })).toBeInTheDocument();
+      }]
+    ])('number keys open the Feature tiles in display order: %s opens %s', async (key, _destination, expectDestination) => {
+      const user = userEvent.setup();
+      const sheet = await openWithWhatsNew();
+      vi.mocked(markReleaseSeen).mockClear();
+
+      await user.keyboard(key);
+
+      expect(markReleaseSeen).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(markReleaseSeen).mock.calls[0]?.[0]).toBe('2.0.0');
+      await waitForElementToBeRemoved(sheet);
+      await expectDestination();
+    });
+
+    it('number keys open the Feature tiles in display order: a number beyond the count (9) does nothing', async () => {
+      const user = userEvent.setup();
+      const sheet = await openWithWhatsNew();
+      vi.mocked(markReleaseSeen).mockClear();
+
+      await user.keyboard('9');
+
+      expect(sheet).toBeInTheDocument();
+      expect(sheet).toHaveClass('animate-whats-new-sheet-in');
+      expect(markReleaseSeen).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'Got it' })).toHaveFocus();
+    });
+
+    it('Enter on a focused Feature tile opens it, once, with the keyboard in the editor title field', async () => {
+      const user = userEvent.setup();
+      const sheet = await openWithWhatsNew();
+      vi.mocked(markReleaseSeen).mockClear();
+      // From Got it, Tab wraps to the first tile: the hero
+      await user.tab();
+      expect(screen.getByRole('button', { name: /^Fill-in variables/ })).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+
+      expect(markReleaseSeen).toHaveBeenCalledTimes(1);
+      await waitForElementToBeRemoved(sheet);
+      expect(screen.getByTestId('editor-sheet')).toBeInTheDocument();
+      await waitFor(() => { expect(screen.getByLabelText(/title/i)).toHaveFocus(); });
+    });
+
+    it('Enter on Got it closes, opens nothing, and gives the keyboard back to the page', async () => {
+      const user = userEvent.setup();
+      const sheet = await openWithWhatsNew();
+      vi.mocked(markReleaseSeen).mockClear();
+      const gotIt = screen.getByRole('button', { name: 'Got it' });
+      const targets: EventTarget[] = [];
+      document.addEventListener('keydown', (event) => { targets.push(event.target as EventTarget); }, { once: true });
+
+      await user.keyboard('{Enter}');
+
+      // The Enter landed on Got it itself
+      expect(targets).toEqual([gotIt]);
+      expect(markReleaseSeen).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(markReleaseSeen).mock.calls[0]?.[0]).toBe('2.0.0');
+      await waitForElementToBeRemoved(sheet);
+      expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: 'Library' })).toHaveAttribute('aria-selected', 'true');
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('keeps the keyboard inside while open: Tab and Shift+Tab cycle through the 8 Feature tiles and Got it only', async () => {
+      const user = userEvent.setup();
+      const sheet = await openWithWhatsNew();
+      const gotIt = screen.getByRole('button', { name: 'Got it' });
+      const visited: (string | null)[] = [];
+
+      for (let step = 0; step < 9; step++) {
+        await user.tab();
+        expect(sheet).toContainElement(document.activeElement as HTMLElement);
+        visited.push(document.activeElement?.getAttribute('data-whats-new-tile-index') ?? null);
+      }
+      expect(visited).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', null]);
+      expect(gotIt).toHaveFocus();
+
+      await user.tab({ shift: true });
+      expect(document.activeElement).toHaveAttribute('data-whats-new-tile-index', '8');
+      await user.tab();
+      expect(gotIt).toHaveFocus();
+    });
+
+    it('is heard as a modal dialog named "What\u2019s new", its tiles a list, each Feature tile named by its title and description', async () => {
+      const sheet = await openWithWhatsNew();
+
+      expect(sheet).toHaveAttribute('aria-modal', 'true');
+      const list = within(sheet).getByRole('list');
+      expect(within(list).getAllByRole('listitem')).toHaveLength(15);
+      expect(within(sheet).getByRole('button', { name: /^Search with ⌘K / })).toHaveAttribute('aria-keyshortcuts', '2');
+      const hero = within(sheet).getByRole('button', { name: /^Fill-in variables / });
+      expect(hero).toHaveAccessibleDescription('Write a launch email for audience in a tone voice.');
+      // Critical fixes: no button, no tab stop, read "Fixed: {title}"
+      const fixes = sheet.querySelectorAll<HTMLElement>('[data-whats-new-tile="critical-fix"]');
+      expect(fixes).toHaveLength(6);
+      for (const tile of fixes) {
+        expect(tile.tagName).toBe('DIV');
+        expect(tile).not.toHaveAttribute('tabindex');
+        expect(tile.textContent).toMatch(/^Fixed: /);
+      }
     });
   });
 

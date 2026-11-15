@@ -28,12 +28,19 @@ export interface WhatsNewSheetProps {
  */
 const OWN_ENTER = 'button, a[href], input, select, textarea, [role="button"], [contenteditable="true"]';
 
+/** A key that presses the Feature tile of its number: 1 to 9, from the top row or the keypad */
+const TILE_NUMBER = /^[1-9]$/;
+
+/** Where a digit is typed, not a tile number. The sheet holds no field today; a future one keeps its digits */
+const TEXT_FIELD = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])';
+
 /**
  * What's new (Atelier 1C): the bottom sheet that rises over the Library and lists the Release notes
  * of a Release. A backdrop, the sheet with its handle, the pill "New in {version}", the title, a
  * scrolling body for the tile grid and a footer with Got it. It keeps the keyboard while open
  * (useModalFocus): the focus starts on Got it, Tab stays inside, and it returns to the opener on close.
- * Escape, Enter outside a tile, the backdrop and Got it close it. It knows nothing of Debug mode or
+ * Escape, Enter outside a tile, the backdrop and Got it close it; the digits 1 to 9 press the Feature
+ * tile of that number, which closes it and opens the tile's destination. It knows nothing of Debug mode or
  * of storage: the caller decides what closing means.
  */
 const WhatsNewSheet: FC<WhatsNewSheetProps> = ({ version, children, open, onClose }) => {
@@ -55,12 +62,23 @@ const WhatsNewSheet: FC<WhatsNewSheetProps> = ({ version, children, open, onClos
   });
 
   // Enter closes, unless it lands on a control of its own (a tile button of the grid), whose
-  // native activation it keeps. On Got it, Enter closes as 'enter', once: its click is prevented
+  // native activation it keeps. On Got it, Enter closes as 'enter', once: its click is prevented.
+  // A digit from 1 to 9 presses the Feature tile of that number (data-whats-new-tile-index), as a
+  // click would: the sheet does not know where a tile leads, the tile does
   useEffect(() => {
     if (!open) {return;}
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented) {return;}
+      if (event.isComposing || event.defaultPrevented) {return;}
       const target = event.target instanceof Element ? event.target : null;
+      if (TILE_NUMBER.test(event.key)) {
+        if (event.metaKey || event.ctrlKey || event.altKey || target?.closest(TEXT_FIELD)) {return;}
+        const tile = panelRef.current?.querySelector(`[data-whats-new-tile-index="${event.key}"]`);
+        if (!(tile instanceof HTMLElement)) {return;}
+        event.preventDefault();
+        tile.click();
+        return;
+      }
+      if (event.key !== 'Enter') {return;}
       const control = target?.closest(OWN_ENTER);
       if (control && control !== gotItRef.current) {return;}
       event.preventDefault();

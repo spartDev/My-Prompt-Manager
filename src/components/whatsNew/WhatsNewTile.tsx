@@ -28,8 +28,8 @@ const PRESSABLE = 'group cursor-pointer transition-tile hover:bg-accent-selected
 const VARIABLE_PILL =
   'inline-flex px-[9px] py-px rounded-full bg-accent-selected text-accent font-bold transition-colors duration-(--duration-color) group-hover:bg-card';
 
-const Example: FC<{ example: string }> = ({ example }) => (
-  <span className="block text-sm leading-[1.7] text-primary">
+const Example: FC<{ example: string; id?: string }> = ({ example, id }) => (
+  <span id={id} className="block text-sm leading-[1.7] text-primary">
     {parseExample(example).map((segment, index) =>
       segment.kind === 'variable' ? (
         // The pieces of a sentence never move: the index is a stable key
@@ -45,10 +45,17 @@ const Example: FC<{ example: string }> = ({ example }) => (
   </span>
 );
 
+/**
+ * The Fixed pill of a Critical fix. A screen reader reads the tile as "Fixed: {title}", the colon
+ * heard and not seen, so the pill is not taken for the first word of the title
+ */
 const FixedPill: FC = () => (
-  <span className="inline-flex items-center shrink-0 px-2 py-0.5 rounded-full bg-success-subtle text-success text-[11px] leading-[1.3] font-bold">
-    Fixed
-  </span>
+  <>
+    <span className="inline-flex items-center shrink-0 px-2 py-0.5 rounded-full bg-success-subtle text-success text-[11px] leading-[1.3] font-bold">
+      Fixed
+    </span>
+    <span className="sr-only">: </span>
+  </>
 );
 
 const IconSquare: FC<{ item: FeatureItem }> = ({ item }) => (
@@ -57,10 +64,14 @@ const IconSquare: FC<{ item: FeatureItem }> = ({ item }) => (
   </span>
 );
 
-/** The ids of the title and the description, which name a Feature button; a plain tile has none */
+/**
+ * The ids of the title and the description, which name a Feature button, and of the hero's example,
+ * which describes it; a plain tile has none
+ */
 interface TextIds {
   title?: string;
   description?: string;
+  example?: string;
 }
 
 const Description: FC<{ text: string; hero: boolean; id?: string }> = ({ text, hero, id }) => (
@@ -73,7 +84,7 @@ const content = (item: ReleaseNoteItem, hero: boolean, ids: TextIds): ReactNode 
   if (item.kind === 'feature' && hero) {
     return (
       <>
-        {item.example && <Example example={item.example} />}
+        {item.example && <Example example={item.example} id={ids.example} />}
         <span className="flex flex-col gap-0.5">
           <span id={ids.title} className="block text-[15px] leading-[1.3] font-bold text-primary">
             {item.title}
@@ -98,8 +109,9 @@ const content = (item: ReleaseNoteItem, hero: boolean, ids: TextIds): ReactNode 
 
 /**
  * One tile of What's new. A Feature with a destination is a button named by its title then its
- * description (aria-labelledby, so the two are read as two phrases); a Feature without one (it lives on Platforms) and a Critical fix are plain tiles that
- * take no focus.
+ * description (aria-labelledby, so the two are read as two phrases), described by the hero's example,
+ * and carrying its number key (aria-keyshortcuts); a Feature without one (it lives on Platforms) and
+ * a Critical fix are plain tiles that take no focus, a Critical fix read as "Fixed: {title}".
  */
 export const WhatsNewTile: FC<WhatsNewTileProps> = ({ item, hero = false, position, tileNumber, onOpen }) => {
   const isHero = hero && item.kind === 'feature';
@@ -109,7 +121,8 @@ export const WhatsNewTile: FC<WhatsNewTileProps> = ({ item, hero = false, positi
 
   if (item.kind === 'feature' && item.destination !== undefined) {
     const { destination } = item;
-    const ids = { title: `${id}-title`, description: `${id}-description` };
+    const ids = { title: `${id}-title`, description: `${id}-description`, example: `${id}-example` };
+    const hasExample = isHero && Boolean(item.example);
     return (
       <button
         type="button"
@@ -117,8 +130,12 @@ export const WhatsNewTile: FC<WhatsNewTileProps> = ({ item, hero = false, positi
         style={style}
         data-whats-new-tile={kind}
         data-whats-new-tile-index={tileNumber}
-        // Named by the title and the description alone: the hero's example illustrates, it does not name
+        // Its number key in the sheet, announced with the name
+        aria-keyshortcuts={tileNumber === undefined ? undefined : String(tileNumber)}
+        // Named by the title and the description alone; the hero's example illustrates, so it is the
+        // button's description, heard after the name (aria-labelledby replaces the content it holds)
         aria-labelledby={`${ids.title} ${ids.description}`}
+        aria-describedby={hasExample ? ids.example : undefined}
         onClick={() => {
           onOpen(destination, item);
         }}

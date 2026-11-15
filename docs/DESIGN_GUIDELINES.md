@@ -775,6 +775,8 @@ The tiles of the What's new sheet (Atelier 1C 'Whats new'), in a `grid grid-cols
 | Fixed pill (Critical fix) | `px-2 py-0.5 rounded-full bg-success-subtle text-success text-[11px] font-bold`, in place of the icon square |
 
 Their tokens: `--radius-tile` (18px), `--radius-tile-icon` (11px), `--shadow-tile-icon` (`0 4px 10px -6px`, on `--shadow-tint-40`), `--animate-tile-rise` (the `card-rise` keyframes over 550ms on `--ease-rise`), and the `transition-tile` utility of `popup.css` (scale 300ms on the spring, fill 200ms). Under reduced motion the tiles rise together, near instant. A plain tile (a Feature without destination, a Critical fix) has no hover and no press: it does nothing.
+
+A screen reader hears the grid as a list. A Feature tile that opens something is named by its title then its description (`aria-labelledby`); the hero's example sentence is its description (`aria-describedby`), each Variable read as a word. A Critical fix is read "Fixed: {title}", the colon an `sr-only` span after the pill.
 <!-- end What's new tiles -->
 
 ### Badges & Pills
@@ -1431,6 +1433,15 @@ All interactive elements MUST have appropriate ARIA labels:
 - **Enter/Space:** Activate buttons and toggles
 - **Escape:** Close modals and dropdowns
 - **Arrow keys:** Navigate within menus and lists
+
+**What's new** (`src/components/whatsNew/WhatsNewSheet.tsx`) adds keys of its own while it is open:
+
+| Key | Does |
+|---|---|
+| `1`…`9` | Presses the Feature tile of that number, as a click would: What's new closes and the tile's destination opens. The Feature tiles that open something are numbered from 1 in display order, the hero first (`data-whats-new-tile-index`, announced through `aria-keyshortcuts`); a Critical fix and a Feature without destination have no number. A number beyond the count does nothing, and so does a digit typed with Cmd, Ctrl or Alt or in a text field |
+| `Enter` | On a focused Feature tile, opens it (the button's own activation); anywhere else, Got it included, closes |
+| `Escape` | Closes |
+| `Tab` / `Shift+Tab` | Cycle through the Feature tiles and Got it, inside the sheet. The focus starts on Got it and goes back where it was on close, unless the destination takes it: the editor's title field, the Library's search field |
 
 **Example:**
 ```tsx
