@@ -249,6 +249,20 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual(['override', 'override']);
   });
 
+  it('takes a read that throws at the call, as on an orphaned page, for a failed read', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    vi.mocked(chrome.storage.local.get).mockImplementationOnce(() => { throw new Error('Extension context invalidated'); });
+    expect(() => pageShow(true)).not.toThrow();
+    await flush();
+
+    expect(repair.positioning).toEqual(PICK);
+    expect(sent()).toEqual(['override', 'override']);
+  });
+
   it('sends the first placement again after the repair is loaded again', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
     await repair.load();

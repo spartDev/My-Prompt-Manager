@@ -230,8 +230,15 @@ export class PlacementRepair {
 
   private sendAgain(reason: string): void {
     const changesBefore = this.changes;
-    // Read here, not by readIconPlacementRepairs: a read that fails must not pass for "no repair"
-    chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY).then((result) => {
+    // Read here, not by readIconPlacementRepairs: a read that fails must not pass for "no repair".
+    // An orphaned page (the extension reloaded) throws at the call: taken as a failed read.
+    let read: Promise<Record<string, unknown>>;
+    try {
+      read = chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY);
+    } catch (err) {
+      read = Promise.reject(err);
+    }
+    read.then((result) => {
       this.sent = null;
       if (this.changes !== changesBefore) {
         // A storage event during the read is newer than the read, and was followed
