@@ -1,19 +1,16 @@
 /**
  * E2E: when What's new shows, in the real extension (My-Prompt-Manager-d1g.10)
  *
- * The extension runs as built, at the version of its manifest (1.9.0), with the What's new record
- * (`whatsNew`) and Debug mode (`promptLibrarySettings.debugMode`) seeded in storage. Each opening of
- * the popup is a new page, as when the user closes the popup and opens it again.
+ * The extension runs as built, with the What's new record (`whatsNew`) and Debug mode
+ * (`promptLibrarySettings.debugMode`) seeded in storage. Each opening of the popup is a new page, as
+ * when the user closes the popup and opens it again.
  *
- * What the build cannot reach: the registry has Release notes for 2.0.0 only, and 1.9.0 has none, so
- * in normal mode the sheet never shows here. The update that shows it, its close and the reopen that
- * does not show it again are proven against the same storage module by the integration tests:
- * src/components/__tests__/App.whatsNew.test.tsx ("marks the Release seen before the exit ends",
- * "closed with Got it, is not shown at the next opening of the popup") and
- * src/hooks/__tests__/useWhatsNew.test.ts ("does not come back after closing, even after a restart").
- * Here: the normal cases the build reaches (an update to a Release without notes, a first install)
- * show nothing and write nothing, and Debug mode shows the newest notes at every opening and leaves
- * the record as it was.
+ * Two builds. dist/ is at the repository's manifest version (1.9.0), which has no Release notes:
+ * there an update to it and a first install show nothing, and Debug mode shows the newest notes at
+ * every opening and leaves the record as it was. The registry has Release notes for 2.0.0 only, so
+ * the update that shows What's new runs on dist-e2e-whats-new/, the same build with its manifest
+ * version set to 2.0.0 (fixtures/whats-new-build.ts): the sheet shows, a close writes the Last seen
+ * Release, and the next opening shows nothing.
  */
 
 import { readFileSync } from 'node:fs';
@@ -23,12 +20,13 @@ import type { BrowserContext, Page, Worker } from '@playwright/test';
 
 import { SITE_SETTINGS_KEY } from '../../src/services/siteSettings';
 import { WHATS_NEW_KEY } from '../../src/whatsNew/storage';
-import { type ExtensionStorage, expect, test } from './fixtures/extension';
+import { createStorageController, type ExtensionStorage, expect, test } from './fixtures/extension';
+import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from './fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from './utils/storage';
 
 const WHATS_NEW = /what.s new/i;
 
-/** The installed Release: the manifest version, 1.9.0 */
+/** The installed Release of dist/: the repository's manifest version, 1.9.0 */
 const INSTALLED = (JSON.parse(readFileSync(path.resolve(process.cwd(), 'manifest.json'), 'utf-8')) as { version: string }).version;
 
 /** Time for the popup to read storage and decide, once the Library shows, before "not shown" is asserted */
@@ -132,4 +130,90 @@ test.describe("What's new in the real extension", () => {
 
     expect(await storedRecord(storage)).toEqual(record);
   });
+});
+
+/**
+ * The storage of the 2.0.0 build, once its service worker has recorded the first install Chrome
+ * gives it on load. Waiting for that write first means it cannot land over the seed of the test
+ */
+const storageAfterInstall = async (context: BrowserContext, extensionId: string): Promise<ExtensionStorage> => {
+  const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
+  if (worker === undefined) {
+    throw new Error('The service worker of the 2.0.0 build is not running');
+  }
+  const storage = createStorageController(worker);
+  await expect
+    .poll(async () => storedRecord(storage))
+    .toEqual({ installedVersion: WHATS_NEW_UPDATE_VERSION });
+  await storage.reset();
+  return storage;
+};
+
+test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Release that has Release notes`, () => {
+  test.use({ extensionPath: WHATS_NEW_UPDATE_EXTENSION_PATH });
+
+  /** An update from 1.9.0: installed then, never closed What's new since */
+  const UPDATED_FROM_1_9 = { installedVersion: '1.9.0' };
+
+  test('update case: the sheet shows, Got it writes the Last seen Release, and the next opening shows nothing', async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId);
+    await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
+
+    const first = await openPopup(context, extensionId);
+    const sheet = first.getByRole('dialog', { name: WHATS_NEW });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText(`New in ${WHATS_NEW_UPDATE_VERSION}`, { exact: true })).toBeVisible();
+    await expect(sheet.getByRole('button', { name: 'Got it' })).toBeFocused();
+    // Not written while the sheet shows: only a close marks the Release seen
+    expect(await storedRecord(storage)).toEqual(UPDATED_FROM_1_9);
+
+    await sheet.getByRole('button', { name: 'Got it' }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect.poll(async () => storedRecord(storage)).toEqual({ ...UPDATED_FROM_1_9, lastSeenVersion: WHATS_NEW_UPDATE_VERSION });
+    await first.close();
+
+    const second = await openPopup(context, extensionId);
+    await expectLibraryWithoutWhatsNew(second);
+    await second.close();
+
+    expect(await storedRecord(storage)).toEqual({ ...UPDATED_FROM_1_9, lastSeenVersion: WHATS_NEW_UPDATE_VERSION });
+  });
+
+  test('update case, closed without an action: the popup closed while the sheet shows, the next opening shows it again', async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId);
+    await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
+
+    const first = await openPopup(context, extensionId);
+    await expect(first.getByRole('dialog', { name: WHATS_NEW })).toBeVisible();
+    await first.close();
+    expect(await storedRecord(storage)).toEqual(UPDATED_FROM_1_9);
+
+    const second = await openPopup(context, extensionId);
+    await expect(second.getByRole('dialog', { name: WHATS_NEW })).toBeVisible();
+    await second.close();
+  });
+
+  for (const close of ['Escape', 'the backdrop'] as const) {
+    test(`update case: a close by ${close} writes the Last seen Release too, and the next opening shows nothing`, async ({ context, extensionId }) => {
+      const storage = await storageAfterInstall(context, extensionId);
+      await seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9 });
+
+      const first = await openPopup(context, extensionId);
+      const sheet = first.getByRole('dialog', { name: WHATS_NEW });
+      await expect(sheet).toBeVisible();
+      if (close === 'Escape') {
+        await first.keyboard.press('Escape');
+      } else {
+        // The backdrop shows above the sheet only: its top-left corner
+        await first.getByTestId('whats-new-backdrop').click({ position: { x: 8, y: 8 } });
+      }
+      await expect(sheet).toHaveCount(0);
+      await expect.poll(async () => storedRecord(storage)).toEqual({ ...UPDATED_FROM_1_9, lastSeenVersion: WHATS_NEW_UPDATE_VERSION });
+      await first.close();
+
+      const second = await openPopup(context, extensionId);
+      await expectLibraryWithoutWhatsNew(second);
+      await second.close();
+    });
+  }
 });

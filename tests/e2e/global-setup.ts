@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { buildCustomSiteExtension } from './fixtures/custom-site-build';
+import { buildWhatsNewUpdateExtension } from './fixtures/whats-new-build';
 
 function globalSetup(): void {
   execSync('npm run build', { stdio: 'inherit' });
@@ -13,6 +14,7 @@ function globalSetup(): void {
   }
 
   buildCustomSiteExtension(distPath);
+  buildWhatsNewUpdateExtension(distPath);
 }
 
 export default globalSetup;

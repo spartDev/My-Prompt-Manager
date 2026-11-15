@@ -22,13 +22,29 @@ export const CUSTOM_SITE_URL = `https://${CUSTOM_SITE_HOSTNAME}/`;
 
 export const CUSTOM_SITE_EXTENSION_PATH = path.resolve(process.cwd(), 'dist-e2e-custom-site');
 
+/** A manifest as the test builds edit it: only the fields they touch are typed */
+export interface TestBuildManifest {
+  version: string;
+  host_permissions?: string[];
+}
+
+/**
+ * Copies the build in `dist` to `target`, replacing what was there, and rewrites the copy's
+ * manifest with `edit`. Everything else runs as built. Shared by every test-only build.
+ */
+export function copyDistWithManifest(dist: string, target: string, edit: (manifest: TestBuildManifest) => TestBuildManifest): void {
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.cpSync(dist, target, { recursive: true });
+
+  const manifestPath = path.join(target, 'manifest.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as TestBuildManifest;
+  fs.writeFileSync(manifestPath, JSON.stringify(edit(manifest), null, 2));
+}
+
 /** Copies the build in `dist` to CUSTOM_SITE_EXTENSION_PATH and grants the test origin there */
 export function buildCustomSiteExtension(dist: string): void {
-  fs.rmSync(CUSTOM_SITE_EXTENSION_PATH, { recursive: true, force: true });
-  fs.cpSync(dist, CUSTOM_SITE_EXTENSION_PATH, { recursive: true });
-
-  const manifestPath = path.join(CUSTOM_SITE_EXTENSION_PATH, 'manifest.json');
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as { host_permissions?: string[] };
-  manifest.host_permissions = [...(manifest.host_permissions ?? []), `https://${CUSTOM_SITE_HOSTNAME}/*`];
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  copyDistWithManifest(dist, CUSTOM_SITE_EXTENSION_PATH, (manifest) => ({
+    ...manifest,
+    host_permissions: [...(manifest.host_permissions ?? []), `https://${CUSTOM_SITE_HOSTNAME}/*`]
+  }));
 }
