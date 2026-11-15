@@ -176,17 +176,26 @@ STUB
 
 for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool"; done
 
-# ln and mkdir: the real commands, but with the fault term-at-lock (or
+# perl, ln and mkdir: the real commands, but with the fault term-at-lock (or
 # term-at-reap), the one that creates the claim lock (or the removal lock)
 # sends TERM to the launcher once it is created; with term-at-lock-refused,
-# the one refused the claim lock sends TERM.
-for tool in ln mkdir; do
+# the one refused the claim lock sends TERM. With dir-at-lock, an older
+# launcher takes its directory lock just before the claim lock is made and
+# frees it (rmdir, which fails on a directory not empty) just after.
+REAL_MKDIR=$(command -v mkdir)
+for tool in perl ln mkdir; do
     real=$(command -v "$tool")
     cat > "$BIN/$tool" <<STUB
 #!/bin/sh
+for last in "\$@"; do :; done
+older=""
+if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/dir-at-lock" ]; then
+    older=1
+    $REAL_MKDIR "\$LOCK" 2>/dev/null || older=""
+fi
 $real "\$@"
 rc=\$?
-for last in "\$@"; do :; done
+[ -n "\$older" ] && rmdir "\$LOCK" 2>/dev/null
 if [ "\$rc" -ne 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock-refused" ]; then
     kill -TERM "\$PPID"
 fi
@@ -382,6 +391,14 @@ with_claims 'claim_issues A'
 expect_eq "exit code" 1 $?
 if grep -q "Another launch is claiming tickets (lock $LOCK, held by $$)" "$STATE/out"; then pass; else fail "the error does not name the live holder"; fi
 rm -f "$LOCK" "$LOCK.reap"
+
+setup "an older launcher's lock taken and freed while the lock is made" A='|open'
+touch "$STATE/dir-at-lock"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_untouched A
+expect_no_lock
 
 setup "the lock directory of an older launcher is kept" A='|open'
 mkdir "$LOCK"

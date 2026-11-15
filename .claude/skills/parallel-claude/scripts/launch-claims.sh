@@ -137,19 +137,11 @@ pid_alive() {
     kill -0 "$1" 2>/dev/null || ps -p "$1" >/dev/null 2>&1
 }
 
-# Create a lock for this shell. ln -s makes the link and its target, this
-# pid, in one step. The directory lock of an older launcher counts as held;
-# should one appear between the check and ln, ln puts the link inside it,
-# which is taken back.
+# Create a lock for this shell: a symlink to this pid, made in one step.
+# perl's symlink() fails on any existing path, the directory lock of an older
+# launcher included; ln -s would put the link inside that directory instead.
 link_lock() {
-    if [ -d "$1" ] && [ ! -L "$1" ]; then
-        return 1
-    fi
-    if ln -s "$$" "$1" 2>/dev/null; then
-        [ "$(readlink "$1" 2>/dev/null)" = "$$" ] && return 0
-        rm -f "$1/$$"
-    fi
-    return 1
+    perl -e 'symlink($ARGV[0], $ARGV[1]) or exit 1' "$$" "$1" 2>/dev/null
 }
 
 # The pid a lock names when that process no longer runs; fails otherwise.
@@ -196,6 +188,10 @@ take_claim_lock() {
 claim_issues() {
     local lock holder reaper
     lock="$(git -C "$REPO_DIR" rev-parse --path-format=absolute --git-common-dir)/claude-parallel-claim.lock"
+    if ! command -v perl >/dev/null; then
+        print_error "perl is needed to take the claim lock. Nothing was launched."
+        return 1
+    fi
     # Interrupted from here to finish_launch: roll back, then stop. Set before
     # the lock is taken, so no interrupt falls between the lock and its trap.
     LAUNCH_LOCK="$lock"
