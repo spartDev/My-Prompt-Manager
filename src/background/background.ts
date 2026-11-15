@@ -1431,7 +1431,8 @@ async function handleStartElementPicker(
       sendResponse({ success: false, error: PICKER_STOPPED });
       return;
     }
-    // Superseded: the picker is active in the tab, under the later start that stores its session
+    // Superseded: the picker is active in the tab, under the later start that stores its session.
+    // Should that start then fail to store it, it ends the picker and answers the failure itself.
     sendResponse({ success: true, tabId: targetTabId });
   } catch (error) {
     Logger.error("Error starting element picker", toError(error), {
@@ -1565,9 +1566,9 @@ async function handleStopElementPicker(
 // Clean up on window close
 chrome.windows.onRemoved.addListener((windowId) => {
   void (async () => {
-    // Whether it is the picker window is in storage, so the stop marks the starts in flight once
-    // that is read: a start made in that read is stopped with the window. Marked any earlier, a
-    // start in flight at the close could store its session before the mark and outlive the stop.
+    // Whether it is the picker window is in storage, so the stop marks the starts in flight only
+    // once that is read: marked any earlier, a closing window of any kind would stop them. A start
+    // made during that read is stopped with the picker window.
     if (!(await pickerWindow.forgetIf(windowId))) {
       return;
     }
