@@ -307,6 +307,8 @@ rounded-xl   /* 12px / 0.75rem  - Cards, inputs, modals */
 rounded-full /* 9999px          - Pills, badges, toggle knobs */
 rounded-group /* 20px (--radius-group) - the card of a Settings group, the Analytics cards */
 rounded-hero  /* 24px (--radius-hero) - the Analytics hero, with shadow-hero */
+rounded-tile  /* 18px (--radius-tile) - a What's new tile */
+rounded-tile-icon /* 11px (--radius-tile-icon) - the icon square of a What's new Feature tile */
 ```
 
 ### Usage Patterns
@@ -351,7 +353,7 @@ rounded-hero  /* 24px (--radius-hero) - the Analytics hero, with shadow-hero */
 
 ### Shadow Scale
 
-Tailwind's shapes and alphas, tinted violet in light (`rgba(45, 25, 90, α)`) and black at α × 1.6 in dark, through `--shadow-tint-5`, `-10` and `-25` in `src/theme/tokens.css`:
+Tailwind's shapes and alphas, tinted violet in light (`rgba(45, 25, 90, α)`) and black at α × 1.6 in dark, through `--shadow-tint-5`, `-10`, `-25` and `-40` in `src/theme/tokens.css`:
 
 ```css
 shadow-xs   /* 0 1px 2px 0, tint 5           */
@@ -362,6 +364,7 @@ shadow-xl   /* 0 20px 25px -5px, tint 10     */
 shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 shadow-puck /* 0 2px 6px -2px, tint 25 - the puck of a segmented control */
 shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
+shadow-tile-icon /* 0 4px 10px -6px, tint 40 - the icon square of a What's new Feature tile */
 ```
 
 ### Custom Shadows
@@ -758,6 +761,22 @@ A row is a button only where pressing it does something: Most used rows open the
 
 The full-page view keeps its content to a 1100px column (`lg:px-[max(2rem,calc(50vw-550px))]` on the header and on the scroll container). Under `lg` it is one column in the tab's order; from `lg` up Most used sits at the left of Top platform, Top category and Tidy up, and from `md` up the last four cards pair up. Cards are 10px apart (`mt-2.5`, `gap-x-2.5`).
 
+<!-- What's new tiles (My-Prompt-Manager-d1g.6) -->
+#### What's new tiles
+
+The tiles of the What's new sheet (Atelier 1C 'Whats new'), in a `grid grid-cols-2 gap-2`, drawn by `src/components/whatsNew/`:
+
+| Piece | Classes |
+|---|---|
+| Tile | `flex flex-col gap-2 p-[13px] rounded-tile bg-subtle text-left animate-tile-rise`, its delay `MOTION.tileDelay + position × MOTION.tileStagger` (180ms, 250ms, 320ms…) |
+| Feature tile that opens something | a `<button>`, plus `transition-tile hover:bg-accent-selected active:scale-[.97] focus-primary` |
+| Hero | full width (`col-span-2`): the example in `text-sm leading-[1.7] text-primary`, each Variable a `px-[9px] py-px rounded-full bg-accent-selected text-accent font-bold` pill that turns `group-hover:bg-card` on the hovered hero (which takes `bg-accent-selected` too); then a `flex flex-col gap-0.5` column of the title `text-[15px] font-bold` and the description `text-[12.5px] leading-[1.4] text-secondary`, 2px apart |
+| Feature icon square | `min-w-8 h-8 px-1 rounded-tile-icon bg-card text-accent shadow-tile-icon`, a 17px glyph; the title `text-[13.5px] leading-[1.2] font-bold`, the description `text-xs leading-[1.4] text-secondary`. The `search` icon is a ⌘K key chip inside the square: `h-5 px-1 rounded-md bg-subtle border border-strong text-primary text-[11px] font-bold` |
+| Fixed pill (Critical fix) | `px-2 py-0.5 rounded-full bg-success-subtle text-success text-[11px] font-bold`, in place of the icon square |
+
+Their tokens: `--radius-tile` (18px), `--radius-tile-icon` (11px), `--shadow-tile-icon` (`0 4px 10px -6px`, on `--shadow-tint-40`), `--animate-tile-rise` (the `card-rise` keyframes over 550ms on `--ease-rise`), and the `transition-tile` utility of `popup.css` (scale 300ms on the spring, fill 200ms). Under reduced motion the tiles rise together, near instant. A plain tile (a Feature without destination, a Critical fix) has no hover and no press: it does nothing.
+<!-- end What's new tiles -->
+
 ### Badges & Pills
 
 #### Category Badge
@@ -1048,6 +1067,9 @@ duration or a curve: it uses a class, and a timer reads `MOTION`.
 | `animate-toast-mark` | `pop` 450ms, ease-spring, 80ms delay | the round of the Notification |
 | `transition-save` (`src/popup.css`) | background and color 300ms, scale 250ms ease-spring | the Save button, which slides to the success color on "Saved" |
 | `transition-chip` (`src/popup.css`) | background, border and color 250ms, scale 250ms ease-spring | the Category chips and "New category" |
+| `--ease-rise` (`EASE.rise`) | `cubic-bezier(0.34, 1.3, 0.64, 1)` | a What's new tile rising: a softer spring than `ease-spring` |
+| `animate-tile-rise` (`MOTION.tileRise`, `tileDelay`, `tileStagger`) | `card-rise` 550ms, ease-rise | a What's new tile rising 12px with a fade, at 180ms then 70ms apart; together and near instant under reduced motion |
+| `transition-tile` (`src/popup.css`, `MOTION.tilePress`) | scale 300ms ease-spring, background 200ms | a What's new Feature tile: hover fill, and `active:scale-[.97]` when pressed |
 
 Presses are `active:scale-92` on a chip and `active:scale-94` on Save, carried by the spring of their
 transition. Only a new element pops: a list keyed by a stable value (the name of a Variable) keeps

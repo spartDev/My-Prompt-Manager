@@ -260,6 +260,28 @@ body {
   }
 }
 
+/* --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+   A Feature tile springs when pressed (scale) and changes its fill on hover. Its rise is
+   animate-tile-rise in theme/tokens.css; under reduced motion both are near instant and the tiles
+   rise together, with no cascade */
+@utility transition-tile {
+  transition:
+    scale 300ms var(--ease-spring),
+    background-color 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tile-rise {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+
+  .transition-tile {
+    transition-duration: 1ms;
+  }
+}
+/* --- end What's new tiles --- */
+
 /* --- What's new sheet (My-Prompt-Manager-d1g.5) ---
    Got it presses on a spring (the mockup's transform .3s ease-spring) and darkens on hover. Under
    prefers-reduced-motion the sheet, its backdrop and the press are near instant */

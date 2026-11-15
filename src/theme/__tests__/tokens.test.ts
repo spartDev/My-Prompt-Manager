@@ -268,3 +268,30 @@ describe('Color tokens', () => {
   });
 
 });
+
+// --- What's new tiles (My-Prompt-Manager-d1g.6) ---
+describe("What's new tiles tokens", () => {
+  it('the tile radii, the icon square shadow and the rise compile to their classes', async () => {
+    const classes = ['rounded-tile', 'rounded-tile-icon', 'shadow-tile-icon', 'animate-tile-rise', 'transition-tile'];
+    const css = await buildCss(classes);
+    const { light, dark } = await readTokens();
+
+    expect(ruleFor(css, 'rounded-tile')).toContain('var(--radius-tile)');
+    expect(ruleFor(css, 'rounded-tile-icon')).toContain('var(--radius-tile-icon)');
+    expect(ruleFor(css, 'shadow-tile-icon')).toMatch(/var\(--shadow-tint-40\)/);
+    expect(ruleFor(css, 'animate-tile-rise')).toContain('var(--animate-tile-rise)');
+    expect(ruleFor(css, 'transition-tile')).toContain('var(--ease-spring)');
+    expect([light['--radius-tile'], light['--radius-tile-icon']]).toEqual(['18px', '11px']);
+    expect(light['--shadow-tint-40']).toBe('rgba(45, 25, 90, 0.4)');
+    expect(dark['--shadow-tint-40'], 'black at alpha x 1.6 in dark').toBe('rgba(0, 0, 0, 0.64)');
+  });
+
+  it('a hero variable pill (text-accent on bg-accent-selected) is readable, in light and dark', async () => {
+    const { light, dark } = await readTokens();
+
+    for (const mode of [light, dark]) {
+      expect(getContrastRatio(mode['--text-color-accent'], mode['--background-color-accent-selected'])).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+// --- end What's new tiles ---

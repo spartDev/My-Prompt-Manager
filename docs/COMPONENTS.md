@@ -80,6 +80,16 @@ Which component does which job in the popup and the side panel, and the conventi
 
 `DailyUseChart` and `TimeOfDayChart` (`src/components/analytics/charts/`) are the two charts of the full-page view, both drawn by `PillBarChart`: plain elements, no chart library. A pill bar per entry in the accent (`bg-accent`), sized against the busiest and growing from the bottom like the hero's, axis labels in `text-tertiary` (Daily use names every seventh day back from today), a muted band and a `ChartTooltip` in the hero's dark pill on hover, data from `useUsageStats`, and an `aria-label` that says what the bars show. Everything else on both surfaces is plain elements too: the weekday bars of `StatsHero`, and the ranked rows of `MostUsedCard` and `RankedRows` (`RankRowContent`), computed by `src/services/usageInsights.ts`. The row counts are in `src/components/analytics/constants.ts`: 3 Most used rows in the tab, 10 in the full-page view, 6 per Platforms or Categories card.
 
+<!-- What's new tiles (My-Prompt-Manager-d1g.6) -->
+### What's new tiles
+
+| Component | Job |
+|-----------|-----|
+| `src/components/whatsNew/WhatsNewGrid.tsx` | The two-column grid of a Release's notes (`items`, `onOpen(destination, item)`): the hero (the first Feature, full width), the other Features, then the Critical fixes; no hero without a Feature; with an odd number of tiles under the hero, the last spans both columns. `placeTiles` computes that order. The Feature tiles that open something carry `data-whats-new-tile-index`, from 1 for the hero, in display order, for the number keys of the sheet |
+| `src/components/whatsNew/WhatsNewTile.tsx` | One tile: the hero (example sentence, each `{{word}}` a pill, then title and description), a Feature (icon square, title, description) or a Critical fix (the Fixed pill in place of the icon). A Feature with a destination is a `<button>` named by its title and description; a Feature without one and a Critical fix are plain tiles that take no focus. Each rises `MOTION.tileStagger` after the one before, all at once under reduced motion |
+| `src/components/icons/WhatsNewIcons.tsx` | `WhatsNewIconGlyph`: one glyph per key of the closed set `WhatsNewIcon` (`src/whatsNew/types.ts`), `search` as its ⌘K key chip, hidden from screen readers |
+<!-- end What's new tiles -->
+
 ---
 
 ## Conventions
