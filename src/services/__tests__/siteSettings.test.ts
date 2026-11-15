@@ -374,7 +374,8 @@ describe('changeSiteSettings', () => {
       platformChoices: { 'chatgpt.com': false },
       customSites: [],
       debugMode: false,
-      enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com')
+      enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com'),
+      enabledSitesWritten: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com')
     });
   });
 

@@ -114,6 +114,13 @@ function isCustomSite(site: unknown): site is CustomSite {
   );
 }
 
+/** The hostnames of a stored list, or null when the value is not a list */
+function hostnamesOf(value: unknown): string[] | null {
+  return Array.isArray(value)
+    ? value.filter((site): site is string => typeof site === 'string' && site.length > 0)
+    : null;
+}
+
 /**
  * Whether a stored value holds the list of the Platforms that were on, as the releases before the
  * Platform choices stored it, and no Platform choices
@@ -123,11 +130,33 @@ function isEnabledListStore(stored: unknown): stored is Record<string, unknown> 
 }
 
 /**
+ * The list of the Platforms that were on, when a release before the Platform choices changed it
+ * after this release stored it (a rollback): that release saves the whole object back, keeping the
+ * Platform choices this release wrote as they were and changing only the list. Told by the copy of
+ * the list this release writes beside it (`storedShape`), which that release keeps unchanged.
+ */
+function listRewrittenByEarlierRelease(stored: Record<string, unknown>): string[] | null {
+  const list = hostnamesOf(stored.enabledSites);
+  const written = hostnamesOf(stored.enabledSitesWritten);
+  if (!isRecord(stored.platformChoices) || list === null || written === null) {
+    return null;
+  }
+  const same = list.length === written.length && list.every((hostname) => written.includes(hostname));
+  return same ? null : list;
+}
+
+/** Whether the upgrade pass has a store to write back: a list of an earlier release, or one it rewrote */
+function needsUpgrade(stored: unknown): boolean {
+  return isEnabledListStore(stored) || (isRecord(stored) && listRewrittenByEarlierRelease(stored) !== null);
+}
+
+/**
  * The Site settings a stored value stands for. A value that is not an object gives the defaults;
  * a field that is missing or of the wrong type takes its default; an entry of a list or of the
  * Platform choices that is not what it holds is left out. A store of an earlier release that holds
  * the list of the Platforms that were on gives the Platform choices that list stands for, and
- * Platform choices win over such a list. Fields the Site settings no longer have are ignored.
+ * Platform choices win over such a list, unless an earlier release changed the list after this one
+ * wrote it (`listRewrittenByEarlierRelease`). Fields the Site settings no longer have are ignored.
  */
 export function parseSiteSettings(stored: unknown): SiteSettings {
   const defaults = defaultSiteSettings();
@@ -138,10 +167,14 @@ export function parseSiteSettings(stored: unknown): SiteSettings {
   let platformChoices = defaults.platformChoices;
   if (isRecord(stored.platformChoices)) {
     platformChoices = parsePlatformChoices(stored.platformChoices);
+    // The switches an earlier release made after a rollback win over the choices it carried through;
+    // a Platform it did not know keeps its choice
+    const rewritten = listRewrittenByEarlierRelease(stored);
+    if (rewritten !== null) {
+      platformChoices = { ...platformChoices, ...choicesOfEnabledList(rewritten) };
+    }
   } else if (isEnabledListStore(stored)) {
-    platformChoices = choicesOfEnabledList(
-      stored.enabledSites.filter((site): site is string => typeof site === 'string' && site.length > 0)
-    );
+    platformChoices = choicesOfEnabledList(hostnamesOf(stored.enabledSites) ?? []);
   }
 
   return {
@@ -217,12 +250,14 @@ export async function readSiteSettings(): Promise<SiteSettings> {
 
 /**
  * What storage holds for the Site settings: the Site settings, and beside them the list of the
- * Platforms that are on, which no reader of this release uses (the Platform choices win) but which
- * a release before the Platform choices reads, so a rollback to it keeps the Platforms the user
- * turned off off. Can go once no rollback to v1.9.0 or earlier is possible.
+ * Platforms that are on, which a release before the Platform choices reads, so a rollback to it
+ * keeps the Platforms the user turned off off, with a copy of that list that such a release keeps
+ * unchanged, so the switches it makes are seen on the next update (`listRewrittenByEarlierRelease`).
+ * Both can go once no rollback to v1.9.0 or earlier is possible.
  */
-function storedShape(settings: SiteSettings): SiteSettings & { enabledSites: string[] } {
-  return { ...settings, enabledSites: enabledPlatforms(settings) };
+function storedShape(settings: SiteSettings): SiteSettings & { enabledSites: string[]; enabledSitesWritten: string[] } {
+  const enabledSites = enabledPlatforms(settings);
+  return { ...settings, enabledSites, enabledSitesWritten: [...enabledSites] };
 }
 
 /** One change the user makes to the Site settings */
@@ -373,15 +408,15 @@ export async function changeSiteSettings(change: SiteSettingsChange): Promise<Si
 
 /**
  * The upgrade of stored data for the Site settings: a store an earlier release wrote with the list
- * of the Platforms that were on is written back as the Platform choices that list stands for, under
- * the Site settings lock. Resolves with whether it wrote. Writes nothing on any other store, so it
+ * of the Platforms that were on, or one whose list it changed after a rollback, is written back as
+ * the Platform choices it stands for, under the Site settings lock. Resolves with whether it wrote. Writes nothing on any other store, so it
  * is safe to run any number of times; sends nothing, since what the extension works on is the same
  * before and after. Rejects when storage cannot be read or written, leaving the store as it was.
  */
 export function upgradeStoredSiteSettings(): Promise<boolean> {
   return withSiteSettingsLock(async () => {
     const stored = (await chrome.storage.local.get([SITE_SETTINGS_KEY]))[SITE_SETTINGS_KEY];
-    if (!isEnabledListStore(stored)) {
+    if (!needsUpgrade(stored)) {
       return false;
     }
     await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: storedShape(parseSiteSettings(stored)) });

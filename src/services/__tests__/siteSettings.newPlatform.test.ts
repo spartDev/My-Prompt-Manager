@@ -125,8 +125,47 @@ describe('upgradeStoredSiteSettings', () => {
       ),
       customSites: [customSite],
       debugMode: true,
-      // For a rollback to an earlier release, which reads only this list
-      enabledSites: ['claude.ai', 'gemini.google.com']
+      // For a rollback to an earlier release, which reads only this list, and the copy that tells its changes
+      enabledSites: ['claude.ai', 'gemini.google.com'],
+      enabledSitesWritten: ['claude.ai', 'gemini.google.com']
+    });
+  });
+
+  describe('after a rollback to a release before the Platform choices, which saves the whole object back', () => {
+    // What v1.9.0 does: it changes the list and keeps every other field as it was, the Platform choices included
+    const switchInEarlierRelease = async (enabledSites: string[]) => {
+      const before = (await stored()) as Record<string, unknown>;
+      await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: { ...before, enabledSites } });
+    };
+
+    it('keeps off a Platform the user turned off there, and on a Platform they turned on, once updated again', async () => {
+      await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: false });
+      const onBefore = enabledPlatforms(await readSiteSettings());
+
+      // There: Gemini off, ChatGPT back on
+      await switchInEarlierRelease([...onBefore.filter((hostname) => hostname !== 'gemini.google.com'), 'chatgpt.com']);
+
+      const settings = await readSiteSettings();
+      expect(isHostnameEnabled(settings, 'gemini.google.com')).toBe(false);
+      expect(isHostnameEnabled(settings, 'chatgpt.com')).toBe(true);
+
+      expect(await upgradeStoredSiteSettings()).toBe(true);
+      expect(await readSiteSettings()).toEqual(settings);
+      expect(await upgradeStoredSiteSettings()).toBe(false);
+    });
+
+    it('keeps the choice for a Platform that release does not know', async () => {
+      shipNewPlatform();
+      await changeSiteSettings({ type: 'setPlatformEnabled', hostname: NEW_PLATFORM.hostname, enabled: false });
+      release.added = [];
+
+      // Back in the earlier release, which has no row for the new Platform: Claude off
+      await switchInEarlierRelease(getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'claude.ai'));
+      shipNewPlatform();
+      const settings = await readSiteSettings();
+
+      expect(isHostnameEnabled(settings, NEW_PLATFORM.hostname)).toBe(false);
+      expect(isHostnameEnabled(settings, 'claude.ai')).toBe(false);
     });
   });
 
