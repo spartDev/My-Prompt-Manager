@@ -192,6 +192,28 @@ describe('background: the picker window of a Custom site, across a service worke
       .toEqual({ success: false, error: 'No active picker session' });
   });
 
+  it('leaves a start in flight alone when a window other than the picker window closes', async () => {
+    const listener = await startServiceWorker();
+    expect(await send(listener, { type: 'OPEN_PICKER_WINDOW', data: { tabId: PAGE_TAB.id } })).toEqual({ success: true });
+    const onWindowRemoved = vi.mocked(getChromeMock().windows.onRemoved.addListener).mock.calls.at(-1)?.[0];
+    let answerActivation: () => void = () => undefined;
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) =>
+      (message as { type?: string }).type === 'ACTIVATE_ELEMENT_PICKER'
+        ? new Promise((resolve) => { answerActivation = () => { resolve(undefined); }; })
+        : Promise.resolve(undefined));
+
+    const started = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: PAGE_TAB.id } }, { tab: { id: 99, windowId: PICKER_WINDOW_ID } as chrome.tabs.Tab });
+    await vi.waitFor(() => { expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(PAGE_TAB.id, expect.objectContaining({ type: 'ACTIVATE_ELEMENT_PICKER' })); });
+    // Another browser window closes while the page activates the picker; its closing is handled first
+    onWindowRemoved?.(PICKER_WINDOW_ID + 1);
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    answerActivation();
+
+    expect(await started).toEqual({ success: true, tabId: PAGE_TAB.id });
+    expect((await chrome.storage.session.get('pickerWindow')).pickerWindow).toEqual({ windowId: PICKER_WINDOW_ID, originalTabId: PAGE_TAB.id });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: '#send' } }, { tab: PAGE_TAB })).toEqual({ success: true });
+  });
+
   it('does not write back the picker window when it closes while a pick brings it to the front', async () => {
     await openPicker();
     const listener = await startServiceWorker();

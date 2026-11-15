@@ -161,7 +161,7 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
       await storeRepairs({ 'claude.ai': { status: 'overlay' } });
       (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
         query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
-      render(<SiteIntegrationSection {...defaultProps} interfaceMode={interfaceMode} enabledSites={['claude.ai']} />);
+      render(<SiteIntegrationSection {...defaultProps} interfaceMode={interfaceMode} enabledPlatforms={['claude.ai']} />);
 
       await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
       await waitFor(() => { expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'START_ELEMENT_PICKER' })); });
@@ -197,7 +197,7 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
     (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
       query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
     (chrome.runtime.sendMessage as unknown as Mock).mockResolvedValue({ success: false, error: 'The tab is not on this platform' });
-    render(<SiteIntegrationSection {...defaultProps} interfaceMode="popup" enabledSites={['claude.ai']} />);
+    render(<SiteIntegrationSection {...defaultProps} interfaceMode="popup" enabledPlatforms={['claude.ai']} />);
 
     await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
 
