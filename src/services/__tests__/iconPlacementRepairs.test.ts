@@ -295,6 +295,15 @@ describe('the placements of several tabs of a Platform', () => {
     expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': {} });
   });
 
+  it('keeps the tabs of one Platform when a tab of another reports', async () => {
+    await pickInTab1();
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'chatgpt.com', placement: 'overlay', tabId: 3 });
+    await report(2, 'toolbar');
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
   it('counts no other tab for a report that names none', async () => {
     await pickInTab1();
 

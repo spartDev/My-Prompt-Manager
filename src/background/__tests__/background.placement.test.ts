@@ -176,6 +176,20 @@ describe('background: the icon placement of each tab of a Platform', () => {
     expect(await storedRepairs()).toEqual({});
   });
 
+  it('forgets a replaced tab whose placement could not be moved', async () => {
+    const listener = await startServiceWorker();
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    await pickInClaudeTab(listener);
+
+    vi.mocked(chrome.tabs.get).mockResolvedValue({ ...CLAUDE_TAB, id: 42 } as never);
+    vi.mocked(chrome.storage.session.set).mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'));
+    tabEvent('onReplaced', 42, CLAUDE_TAB.id);
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
+    // The old id is gone all the same: the pick no tab is known to need is dropped
+    expect(await storedRepairs()).toEqual({});
+  });
+
   it('forgets a replaced tab whose new page is not on the Platform', async () => {
     const listener = await startServiceWorker();
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
