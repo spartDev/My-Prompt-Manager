@@ -185,21 +185,35 @@ export function headerUrl(url: string): string {
 }
 
 /**
- * A message with every address in it as headerUrl writes it. Playwright's navigation errors name
- * the address they failed at, normalized as `new URL()` writes it (a space as %20, a slash after
- * the host), so an address ends at a space, a double quote or an angle bracket, and a closing parenthesis
- * it does not open is the message's (`(https://a/b)`).
+ * A message with every address in it as headerUrl writes it. The requested address is replaced
+ * first, as typed and as `new URL()` normalizes it (Playwright prints it normalized: a space as
+ * %20, a slash after the host), whatever its scheme. Then any http(s) or file address, which ends
+ * at a space, a double quote or an angle bracket; a closing parenthesis at its end stays the
+ * message's when the message opened one before it (`(https://a/b)`).
  */
-export const redactUrls = (message: string): string =>
-  message.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match) => {
-    let url = match;
-    let tail = '';
-    while (url.endsWith(')') && url.split(')').length > url.split('(').length) {
-      url = url.slice(0, -1);
-      tail = `)${tail}`;
+export function redactUrls(message: string, requested = ''): string {
+  const typed = requested.trim();
+  const forms = new Set<string>();
+  if (typed.includes(':')) {
+    forms.add(typed);
+    try {
+      forms.add(new URL(typed).toString());
+    } catch {
+      // Not an address: only the typed form
     }
-    return `${headerUrl(url)}${tail}`;
+  }
+  let redacted = message;
+  // Longest first, so a form that holds another is replaced whole
+  for (const form of [...forms].sort((a, b) => b.length - a.length)) {
+    redacted = redacted.split(form).join(headerUrl(typed));
+  }
+  return redacted.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match: string, offset: number, whole: string) => {
+    const before = whole.slice(0, offset);
+    const opened = before.split('(').length - before.split(')').length;
+    const url = opened > 0 && match.endsWith(')') && match.split(')').length > match.split('(').length ? match.slice(0, -1) : match;
+    return `${headerUrl(url)}${match.slice(url.length)}`;
   });
+}
 
 export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
@@ -356,7 +370,7 @@ async function main(): Promise<number> {
     if (result.outcome === 'no-editor') {
       process.stdout.write(`  ${result.id}: no editor at ${headerUrl(result.url)} (signed out?), fixture kept as it was\n`);
     } else if (result.outcome === 'error') {
-      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message)}), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message, result.url)}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
       process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}: the run fails\n`);
     } else {

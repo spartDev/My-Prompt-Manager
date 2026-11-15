@@ -48,6 +48,8 @@ describe('ElementPicker: the page unloading', () => {
     picker.activate();
 
     window.history.pushState(null, '', '#/chat/2');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
 
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ type: 'PICKER_CANCELLED' });
     expect(document.getElementById('mpm-element-picker-overlay')).not.toBeNull();

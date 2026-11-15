@@ -274,6 +274,23 @@ describe('redactUrls', () => {
     expect(redactUrls('failed (https://a.example/b?x=1)')).toBe('failed (https://a.example/b)');
     expect(redactUrls('see <https://a.example/b?x=1>.')).toBe('see <https://a.example/b>.');
     expect(redactUrls('Timeout 30000ms exceeded.')).toBe('Timeout 30000ms exceeded.');
+    expect(redactUrls('net::ERR_ABORTED at https://x.example/c?t=SECRET)')).toBe('net::ERR_ABORTED at https://x.example/c');
+  });
+
+  it.each([
+    ['localhost:8080/claude.html?token=SECRET'],
+    ['data:text/html,<p>SECRET</p>'],
+    ['chrome-extension://abc/p.html?t=SECRET']
+  ])('writes a requested address of another scheme (%j) as a stand-in, typed or normalized', (requested) => {
+    const message = `page.goto: Navigation to "${requested}" is interrupted by another navigation to "${new URL(requested).toString()}"`;
+
+    const redacted = redactUrls(message, requested);
+
+    expect(redacted).toBe('page.goto: Navigation to "<stand-in>" is interrupted by another navigation to "<stand-in>"');
+  });
+
+  it('leaves a message alone when the requested value is no address', () => {
+    expect(redactUrls('net::ERR_NAME_NOT_RESOLVED', 'e')).toBe('net::ERR_NAME_NOT_RESOLVED');
   });
 });
 
