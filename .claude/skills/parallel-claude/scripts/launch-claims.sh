@@ -138,9 +138,13 @@ pid_alive() {
 }
 
 # Create a lock for this shell. ln -s makes the link and its target, this
-# pid, in one step; when the path is a directory (the lock of an older
-# launcher), ln puts the link inside it instead, which is taken back.
+# pid, in one step. The directory lock of an older launcher counts as held;
+# should one appear between the check and ln, ln puts the link inside it,
+# which is taken back.
 link_lock() {
+    if [ -d "$1" ] && [ ! -L "$1" ]; then
+        return 1
+    fi
     if ln -s "$$" "$1" 2>/dev/null; then
         [ "$(readlink "$1" 2>/dev/null)" = "$$" ] && return 0
         rm -f "$1/$$"
@@ -201,15 +205,17 @@ claim_issues() {
         LAUNCH_LOCK=""
         free_reap_lock
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
-        if [ -L "$lock.reap" ] || [ -e "$lock.reap" ]; then
+        # A claim lock that is not stale is the cause, whatever .reap holds
+        if ! dead_holder "$lock" >/dev/null \
+            || { [ ! -L "$lock.reap" ] && [ ! -e "$lock.reap" ]; }; then
+            print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
+        else
             if reaper=$(dead_holder "$lock.reap"); then
                 print_error "The removal lock $lock.reap was left by launch $reaper, which no longer runs. Remove it, then launch again."
             else
                 reaper=$(readlink "$lock.reap" 2>/dev/null) || reaper="unknown"
                 print_error "Another launch is removing a stale claim lock ($lock.reap, held by $reaper). Wait for it, or remove $lock.reap if no launch is running."
             fi
-        else
-            print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."
         fi
         return 1
     fi

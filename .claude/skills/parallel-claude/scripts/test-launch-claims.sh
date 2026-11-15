@@ -178,7 +178,8 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 
 # ln and mkdir: the real commands, but with the fault term-at-lock (or
 # term-at-reap), the one that creates the claim lock (or the removal lock)
-# sends TERM to the launcher once it is created.
+# sends TERM to the launcher once it is created; with term-at-lock-refused,
+# the one refused the claim lock sends TERM.
 for tool in ln mkdir; do
     real=$(command -v "$tool")
     cat > "$BIN/$tool" <<STUB
@@ -186,6 +187,9 @@ for tool in ln mkdir; do
 $real "\$@"
 rc=\$?
 for last in "\$@"; do :; done
+if [ "\$rc" -ne 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock-refused" ]; then
+    kill -TERM "\$PPID"
+fi
 if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ]; then
     if { [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock" ]; } \\
         || { [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/term-at-reap" ]; }; then
@@ -358,7 +362,26 @@ expect_eq "exit code" 130 $?
 expect_owner A '|open'
 expect_untouched A
 if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
+expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
 rm -f "$LOCK"
+
+setup "TERM while another launch holds the lock leaves its lock" A='|open'
+ln -s "$$" "$LOCK"
+touch "$STATE/term-at-lock-refused"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+expect_eq "lock holder" "$$" "$(readlink "$LOCK")"
+rm -f "$LOCK"
+
+setup "a live lock is named before a stale removal lock" A='|open'
+ln -s "$$" "$LOCK"
+ln -s "$(dead_pid)" "$LOCK.reap"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+if grep -q "Another launch is claiming tickets (lock $LOCK, held by $$)" "$STATE/out"; then pass; else fail "the error does not name the live holder"; fi
+rm -f "$LOCK" "$LOCK.reap"
 
 setup "the lock directory of an older launcher is kept" A='|open'
 mkdir "$LOCK"
