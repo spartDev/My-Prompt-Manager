@@ -122,11 +122,19 @@ export async function readIconPlacementRepairs(): Promise<IconPlacementRepairs> 
   }
 }
 
+// Shared with the other contexts through the Web Locks API. Clear All Data takes it last, after
+// the Site settings lock (StorageManager.clearAllData), so a repair waiting in the service worker
+// is written to the cleared store, or before the clear and cleared with it, never back over it.
 const repairsLock = new AsyncMutex({ scope: 'IconPlacementRepairs' });
+
+/** Runs an operation while no context can change the repairs */
+export function withIconPlacementRepairsLock<T>(operation: () => Promise<T>): Promise<T> {
+  return repairsLock.withLock(ICON_PLACEMENT_REPAIRS_KEY, operation);
+}
 
 /** Applies a change to what storage holds, under the lock; writes only when something changed */
 export function changeIconPlacementRepairs(change: IconPlacementRepairChange): Promise<IconPlacementRepairs> {
-  return repairsLock.withLock(ICON_PLACEMENT_REPAIRS_KEY, async () => {
+  return withIconPlacementRepairsLock(async () => {
     // A read that fails throws here: a write over storage it could not read would lose the other Platforms
     const result = await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY);
     const repairs = parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY]);

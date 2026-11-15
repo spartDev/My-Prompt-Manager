@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
@@ -12,6 +12,7 @@ import {
   repairablePlatformHostname,
   repairForHostnames
 } from '../iconPlacementRepairs';
+import { StorageManager } from '../storage';
 
 const PICK: CustomSitePositioning = { mode: 'custom', placement: 'before', selector: 'button[aria-label="Send"]' };
 
@@ -83,6 +84,29 @@ describe('storage', () => {
     await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay' });
 
     expect(await readIconPlacementRepairs()).toEqual({ 'chatgpt.com': { status: 'overlay' }, 'claude.ai': { status: 'overlay' } });
+  });
+
+  it('does not write the repairs back after Clear All Data asked for while a change was reading them', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay' } } });
+    // The service worker has read the repairs and is paused before it writes, as in another context
+    const get = vi.mocked(chrome.storage.local.get);
+    const readNow = get.getMockImplementation() as unknown as (keys: unknown) => Promise<Record<string, unknown>>;
+    let resume!: () => void;
+    const paused = new Promise<void>((resolve) => { resume = resolve; });
+    get.mockImplementationOnce((async (keys: unknown) => {
+      const result = await readNow(keys);
+      await paused;
+      return result;
+    }) as never);
+
+    const changed = changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+    const cleared = StorageManager.getInstance().clearAllData();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    resume();
+    await Promise.all([changed, cleared]);
+
+    // Clear All Data waited for the change to finish, then cleared what it wrote
+    expect(await chrome.storage.local.get(null)).toEqual({});
   });
 
   it('two changes at once lose neither', async () => {

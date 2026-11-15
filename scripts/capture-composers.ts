@@ -27,7 +27,7 @@ import { type BrowserContext, chromium, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
 
-import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer } from './composers/sanitize';
+import { composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf } from './composers/sanitize';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_OUT = path.join(ROOT, 'tests', 'fixtures', 'composers');
@@ -139,6 +139,12 @@ export function parseCaptureArgs(argv: readonly string[], env: NodeJS.ProcessEnv
 const urlOf = (id: string, platform: PlatformDefinition, options: CaptureOptions): string =>
   options.urls[id] ?? `https://${platform.hostname}${START_PATHS[id] ?? '/'}`;
 
+/** What a Platform's fixture keeps: what its editor selectors and its anchor chain read */
+export const rulesFor = (platform: PlatformDefinition) => {
+  const chain = platform.iconPlacement;
+  return sanitizeRulesOf([...platform.selectors, ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])]);
+};
+
 type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
   | { id: string; outcome: 'no-editor'; url: string };
@@ -202,8 +208,7 @@ async function capture(page: Page, id: string, platform: PlatformDefinition, opt
   if (!root) {
     return { id, outcome: 'no-editor', url };
   }
-  const chain = platform.iconPlacement;
-  sanitizeComposer(root, chain ? classNamesOf([chain.composer, ...chain.anchors.map(({ find }) => find)]) : []);
+  sanitizeComposer(root, rulesFor(platform));
   const file = path.join(options.out, `${id}.html`);
   writeFileSync(file, composerFixture(root, {
     platformName: platform.displayName,

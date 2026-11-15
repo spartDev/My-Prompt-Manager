@@ -1,8 +1,9 @@
 /**
- * Turns a Platform's live composer into a fixture of tests/fixtures/composers: the structure and
- * the attributes an anchor chain can name (test ids, ARIA labels, roles, types, custom elements,
- * the class names the chain itself names),
- * without what the user wrote or anything that identifies them.
+ * Turns a Platform's live composer into a fixture of tests/fixtures/composers: the structure, and
+ * of the attributes only an allowlist: what an element is (contenteditable, role, type), its test
+ * ids, and what the Platform's own selectors read (sanitizeRulesOf). Text, comments, links, media
+ * and SVG content go, and so does any attribute nobody reads, so a fixture holds nothing the user
+ * wrote and nothing that names them (data-user-id, an ARIA label with their name).
  *
  * DOM code with no Node or browser global, so `npm run composers:capture` runs it on jsdom and
  * the unit tests on happy-dom.
@@ -14,23 +15,34 @@ export const EDITOR_MARKER = 'data-mpm-capture-editor';
 /** Elements dropped with their content: they carry no composer structure */
 const DROPPED_ELEMENTS = new Set(['script', 'style', 'link', 'noscript', 'template', 'iframe', 'img', 'picture', 'video', 'canvas']);
 
-/** Attributes dropped everywhere: looks, links, values, and texts that may name the user */
-const DROPPED_ATTRIBUTES = new Set(['style', 'href', 'src', 'srcset', 'alt', 'title', 'value', 'nonce', 'integrity', 'action']);
-
-/** The attributes an SVG keeps: what a chain may name it by */
-const SVG_ATTRIBUTES = /^(aria-|data-testid$|role$)/;
-
 /** The generic wrappers folded into their one child; anything else (form, fieldset, custom elements) stays */
 const FOLDED_TAGS = new Set(['div', 'span']);
 
 const VOID_ELEMENTS = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input', 'source', 'track', 'wbr']);
 
-/** An id written by a framework (React's :r1:, Radix's radix-…) rather than chosen by the Platform */
-const isGeneratedId = (id: string): boolean =>
-  id.includes(':') || /\d{4,}/.test(id) || /^(radix|headlessui|mui|react)/i.test(id) || /^[a-z]*[-_]?[0-9a-f]{8,}$/i.test(id);
+/**
+ * Attributes kept with any value: what an element is (contenteditable, role, type) and the test
+ * ids a Platform writes for its own tests. None carries what the user wrote or who they are.
+ */
+const STRUCTURAL_ATTRIBUTES = new Set(['contenteditable', 'role', 'type', 'data-testid']);
 
-/** A value that may carry an address or an e-mail, whatever attribute it is in */
-const looksPersonal = (value: string): boolean => /https?:|@|\/\//i.test(value);
+/** A value condition of an attribute selector: `[aria-label*="dictate" i]` */
+interface ValueCondition {
+  operator: string;
+  value: string;
+  ignoreCase: boolean;
+}
+
+/**
+ * What a sanitized composer keeps, read from the selectors a Platform finds its editor and its
+ * anchors by: everything else is dropped (an allowlist). An attribute a selector names with a value
+ * keeps its value only where it meets one of those conditions; one named without a value keeps its
+ * name with an empty value.
+ */
+export interface SanitizeRules {
+  classes: ReadonlySet<string>;
+  attributes: ReadonlyMap<string, readonly ValueCondition[]>;
+}
 
 /**
  * The class names a Platform's chain names (`.fai-ChatInput`): kept wherever they are, since the
@@ -40,31 +52,75 @@ export function classNamesOf(selectors: readonly string[]): string[] {
   return [...new Set(selectors.flatMap((selector) => Array.from(selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g), (match) => match[1])))];
 }
 
-function sanitizeAttributes(element: Element, isEditor: boolean, keptClasses: ReadonlySet<string>): void {
-  const isSvg = element.tagName.toLowerCase() === 'svg' || element.closest('svg') !== null;
+const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
+const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
+
+/** The rules for a Platform, from its editor selectors and its anchor chain */
+export function sanitizeRulesOf(selectors: readonly string[]): SanitizeRules {
+  const attributes = new Map<string, ValueCondition[]>();
+  const condition = (name: string, found?: ValueCondition) => {
+    const conditions = attributes.get(name) ?? [];
+    if (found) {
+      conditions.push(found);
+    }
+    attributes.set(name, conditions);
+  };
+  for (const selector of selectors) {
+    for (const [, name, operator, double, single, bare, flag] of selector.matchAll(ATTRIBUTE_SELECTOR)) {
+      const value = double ?? single ?? bare;
+      condition(name.toLowerCase(), operator && value !== undefined ? { operator, value, ignoreCase: flag?.toLowerCase() === 'i' } : undefined);
+    }
+    // An id in a selector (#userInput) is a condition on the id attribute
+    for (const [, id] of selector.replace(ATTRIBUTE_SELECTOR, '').matchAll(ID_SELECTOR)) {
+      condition('id', { operator: '=', value: id, ignoreCase: false });
+    }
+  }
+  return { classes: new Set(classNamesOf(selectors)), attributes };
+}
+
+function meets(actual: string, { operator, value, ignoreCase }: ValueCondition): boolean {
+  const have = ignoreCase ? actual.toLowerCase() : actual;
+  const want = ignoreCase ? value.toLowerCase() : value;
+  switch (operator) {
+    case '=': return have === want;
+    case '*=': return want !== '' && have.includes(want);
+    case '^=': return want !== '' && have.startsWith(want);
+    case '$=': return want !== '' && have.endsWith(want);
+    case '~=': return have.split(/\s+/).includes(want);
+    case '|=': return have === want || have.startsWith(`${want}-`);
+    default: return false;
+  }
+}
+
+function sanitizeAttributes(element: Element, isEditor: boolean, rules: SanitizeRules): void {
   for (const { name, value } of Array.from(element.attributes)) {
     const lower = name.toLowerCase();
-    if (lower === 'class' && !isEditor && !isSvg) {
-      const kept = value.split(/\s+/).filter((token) => keptClasses.has(token));
-      if (kept.length > 0) {
-        element.setAttribute(name, kept.join(' '));
-        continue;
-      }
+    if (lower === EDITOR_MARKER || STRUCTURAL_ATTRIBUTES.has(lower)) {
+      continue;
     }
-    const drop =
-      lower === EDITOR_MARKER ? false
-      : isSvg ? !SVG_ATTRIBUTES.test(lower)
-      : lower === 'class' ? !isEditor
-      : lower === 'id' ? isGeneratedId(value)
-      : lower.startsWith('on') || DROPPED_ATTRIBUTES.has(lower) || looksPersonal(value);
-    if (drop) {
+    if (lower === 'class') {
+      // The editor keeps its classes: some Platforms find it by them (.ProseMirror)
+      const kept = isEditor ? value : value.split(/\s+/).filter((token) => rules.classes.has(token)).join(' ');
+      if (kept) {
+        element.setAttribute(name, kept);
+      } else {
+        element.removeAttribute(name);
+      }
+      continue;
+    }
+    const conditions = rules.attributes.get(lower);
+    if (conditions === undefined) {
+      element.removeAttribute(name);
+    } else if (conditions.length === 0) {
+      element.setAttribute(name, '');
+    } else if (!conditions.some((condition) => meets(value, condition))) {
       element.removeAttribute(name);
     }
   }
 }
 
 /** Removes text, comments, dropped elements and attributes, and SVG content, below and on this element */
-function strip(node: Node, isInsideSvg: boolean, keptClasses: ReadonlySet<string>): void {
+function strip(node: Node, isInsideSvg: boolean, rules: SanitizeRules): void {
   for (const child of Array.from(node.childNodes)) {
     if (child.nodeType !== 1) {
       // Text, comments, processing instructions: what the user wrote and what the page says
@@ -77,8 +133,8 @@ function strip(node: Node, isInsideSvg: boolean, keptClasses: ReadonlySet<string
       element.remove();
       continue;
     }
-    sanitizeAttributes(element, element.hasAttribute(EDITOR_MARKER), keptClasses);
-    strip(element, tag === 'svg', keptClasses);
+    sanitizeAttributes(element, element.hasAttribute(EDITOR_MARKER), rules);
+    strip(element, tag === 'svg', rules);
   }
 }
 
@@ -97,12 +153,12 @@ function fold(element: Element, isRoot: boolean): void {
  * Sanitizes a composer in place: the root (the element the chain's composer selector found) is
  * kept as it is, even when it could fold, so the selector still finds it.
  *
- * @param keptClasses - The class names the Platform's chain names (classNamesOf)
+ * @param rules - What the Platform's selectors read (sanitizeRulesOf); with none, only the
+ *   structural attributes stay
  */
-export function sanitizeComposer(root: Element, keptClasses: readonly string[] = []): void {
-  const kept = new Set(keptClasses);
-  sanitizeAttributes(root, root.hasAttribute(EDITOR_MARKER), kept);
-  strip(root, root.tagName.toLowerCase() === 'svg', kept);
+export function sanitizeComposer(root: Element, rules: SanitizeRules = sanitizeRulesOf([])): void {
+  sanitizeAttributes(root, root.hasAttribute(EDITOR_MARKER), rules);
+  strip(root, root.tagName.toLowerCase() === 'svg', rules);
   fold(root, true);
 }
 
@@ -156,8 +212,9 @@ export function composerFixture(root: Element, header: FixtureHeader): string {
   return [
     '<!--',
     `  ${header.platformName} composer, captured from ${header.url} on ${header.date} by npm run composers:capture.${origin}`,
-    '  Sanitized: text, classes (but the editor\'s), generated ids, styles, links and SVG content removed;',
-    '  wrappers with no attribute and one child folded into that child.',
+    '  Sanitized: text, links, media and SVG content removed; of the attributes, only contenteditable, role,',
+    '  type, test ids and what the Platform\'s selectors read are kept; wrappers with no attribute and one',
+    '  child folded into that child.',
     '-->',
     serializeComposer(root),
     ''

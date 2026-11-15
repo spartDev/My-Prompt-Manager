@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { parseCaptureArgs } from '../capture-composers';
-import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, serializeComposer } from '../composers/sanitize';
+import { parseCaptureArgs, rulesFor } from '../capture-composers';
+import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
 const FIXTURES = path.resolve(__dirname, '../../tests/fixtures/composers');
 
@@ -21,7 +21,7 @@ describe('sanitizeComposer', () => {
     document.body.innerHTML = '';
   });
 
-  it('keeps the structure and what a chain names, and removes what the user wrote and how the page looks', () => {
+  it('keeps the structure and what the selectors read, and removes what the user wrote and how the page looks', () => {
     const composer = composerOf(`
       <form class="w-full" style="color:red" action="https://chatgpt.com/backend">
         <div class="flex"><div class="grow">
@@ -35,14 +35,14 @@ describe('sanitizeComposer', () => {
         </div>
       </form>`);
 
-    sanitizeComposer(composer);
+    sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS.chatgpt));
 
     expect(serializeComposer(composer)).toBe([
       '<form>',
-      `  <div ${EDITOR_MARKER} contenteditable="true" role="textbox" id="prompt-textarea" class="ProseMirror" aria-label="Ask"><p></p></div>`.replace(` ${EDITOR_MARKER}`, ''),
+      '  <div contenteditable="true" role="textbox" class="ProseMirror"><p></p></div>',
       '  <div data-testid="composer-trailing-actions">',
       '    <button type="button" aria-label="Dictate">',
-      '      <svg aria-hidden="true"></svg>',
+      '      <svg></svg>',
       '    </button>',
       '    <a></a>',
       '  </div>',
@@ -50,10 +50,55 @@ describe('sanitizeComposer', () => {
     ].join('\n'));
   });
 
+  it('keeps only the attributes the selectors read: nothing that names the user', () => {
+    const composer = composerOf(`
+      <form data-user-id="12345" data-account-name="Alice">
+        <button type="button" aria-label="Alice's profile" data-user-id="12345"></button>
+        <button type="button" aria-label="Start dictation" aria-haspopup="menu"></button>
+      </form>`);
+
+    sanitizeComposer(composer, sanitizeRulesOf(['form', 'button[aria-label*="dictation" i]']));
+
+    expect(serializeComposer(composer)).toBe([
+      '<form>',
+      '  <button type="button"></button>',
+      '  <button type="button" aria-label="Start dictation"></button>',
+      '</form>'
+    ].join('\n'));
+  });
+
+  it('keeps an attribute a selector names without a value, but not its value', () => {
+    const composer = composerOf('<div><span data-lexical-editor="alice-draft" contenteditable="true"></span></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[data-lexical-editor]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span data-lexical-editor contenteditable="true"></span>\n</div>');
+  });
+
+  it('reads every kind of attribute condition, ids included', () => {
+    const rules = sanitizeRulesOf(['span[id="m365-chat-editor-target-element"]', '#userInput', 'textarea[placeholder^="Ask"]', 'div[data-x$=\'end\']']);
+    const composer = composerOf(
+      '<div><span id="m365-chat-editor-target-element"></span><span id="radix-12"></span><textarea id="userInput" placeholder="Ask anything"></textarea>'
+      + '<textarea placeholder="Alice, ask anything"></textarea><div data-x="the-end"></div></div>'
+    );
+
+    sanitizeComposer(composer, rules);
+
+    expect(serializeComposer(composer)).toBe([
+      '<div>',
+      '  <span id="m365-chat-editor-target-element"></span>',
+      '  <span></span>',
+      '  <textarea id="userInput" placeholder="Ask anything"></textarea>',
+      '  <textarea></textarea>',
+      '  <div data-x="the-end"></div>',
+      '</div>'
+    ].join('\n'));
+  });
+
   it('never folds the composer itself, so its selector still finds it', () => {
     const composer = composerOf('<div><div data-testid="toolbar"><button aria-label="Send"></button></div></div>');
 
-    sanitizeComposer(composer);
+    sanitizeComposer(composer, sanitizeRulesOf(['button[aria-label="Send"]']));
 
     expect(serializeComposer(composer)).toBe([
       '<div>',
@@ -64,29 +109,13 @@ describe('sanitizeComposer', () => {
     ].join('\n'));
   });
 
-  it('keeps ids a Platform chose, and drops the ones a framework generated', () => {
-    const composer = composerOf('<div><span id="m365-chat-editor-target-element"></span><span id="radix-12"></span><span id="r_4f9c2a7e01"></span><span id="field-20251115"></span></div>');
-
-    sanitizeComposer(composer);
-
-    expect(serializeComposer(composer)).toBe([
-      '<div>',
-      '  <span id="m365-chat-editor-target-element"></span>',
-      '  <span></span>',
-      '  <span></span>',
-      '  <span></span>',
-      '</div>'
-    ].join('\n'));
-  });
-
   it.each(Object.keys(SUPPORTED_PLATFORMS))('leaves the %s fixture as it is: its chain resolves just the same once sanitized again', (platformId) => {
-    const html = readFileSync(path.join(FIXTURES, `${platformId}.html`), 'utf8').replace(/<!--[\s\S]*?-->/, '').trim();
-    const composer = composerOf(html);
+    // Parsed, not cut with a pattern: the header comment is a node the composer is not part of
+    const composer = composerOf(readFileSync(path.join(FIXTURES, `${platformId}.html`), 'utf8'));
     const editor = composer.querySelector('[contenteditable="true"], textarea') as HTMLElement;
     editor.setAttribute(EDITOR_MARKER, '');
-    const chain = SUPPORTED_PLATFORMS[platformId].iconPlacement;
 
-    sanitizeComposer(composer, classNamesOf([chain?.composer ?? '', ...(chain?.anchors.map(({ find }) => find) ?? [])]));
+    sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS[platformId]));
     const fixture = composerFixture(composer, { platformName: 'X', url: 'https://x/', date: '2026-11-15', composerFound: true });
     document.body.innerHTML = fixture;
     const captured = document.querySelector<HTMLElement>('[contenteditable="true"], textarea') as HTMLElement;
@@ -98,7 +127,7 @@ describe('sanitizeComposer', () => {
   it('keeps the class names the chain names, and only those', () => {
     const composer = composerOf('<div class="fai-ChatInput ___hashed1 x9"><div class="fai-ChatInput__actions flex"><button type="submit"></button></div></div>');
 
-    sanitizeComposer(composer, classNamesOf(['.fai-ChatInput', '.fai-ChatInput__actions', 'button[type="submit"]']));
+    sanitizeComposer(composer, sanitizeRulesOf(['.fai-ChatInput', '.fai-ChatInput__actions', 'button[type="submit"]']));
 
     expect(serializeComposer(composer)).toBe([
       '<div class="fai-ChatInput">',
