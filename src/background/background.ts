@@ -777,6 +777,11 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   forgetPlacementTab(tabId, null);
 });
 
+// A tab whose page Chrome swapped (a prerender, a discard) gets a new id: the old one is gone
+chrome.tabs.onReplaced.addListener((_addedTabId, removedTabId) => {
+  forgetPlacementTab(removedTabId, null);
+});
+
 // A tab that leaves a Platform no longer keeps its icon placement repair
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.url !== undefined) {

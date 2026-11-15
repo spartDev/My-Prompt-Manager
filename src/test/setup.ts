@@ -374,6 +374,9 @@ const mockChrome = {
     },
     onRemoved: {
       addListener: vi.fn()
+    },
+    onReplaced: {
+      addListener: vi.fn()
     }
   },
   scripting: {

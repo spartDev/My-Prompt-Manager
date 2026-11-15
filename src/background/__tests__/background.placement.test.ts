@@ -121,7 +121,7 @@ describe('background: the icon placement of each tab of a Platform', () => {
   const report = (listener: MessageListener, tab: chrome.tabs.Tab, placement: string) =>
     send(listener, { type: 'ICON_PLACEMENT_REPORTED', data: { placement } }, { tab });
   /** Runs every listener the service worker registered for this tab event */
-  const tabEvent = (event: 'onRemoved' | 'onUpdated', ...args: unknown[]) => {
+  const tabEvent = (event: 'onRemoved' | 'onUpdated' | 'onReplaced', ...args: unknown[]) => {
     for (const [listener] of vi.mocked(getChromeMock().tabs[event].addListener).mock.calls) {
       (listener as (...eventArgs: unknown[]) => void)(...args);
     }
@@ -143,6 +143,18 @@ describe('background: the icon placement of each tab of a Platform', () => {
     tabEvent('onRemoved', CLAUDE_TAB.id, {});
     await new Promise((resolve) => { setTimeout(resolve, 20); });
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toEqual({});
+  });
+
+  it('forgets a tab whose page Chrome replaced, under its old id', async () => {
+    const listener = await startServiceWorker();
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    await pickInClaudeTab(listener);
+
+    // The tab's page is swapped: the new id reports again itself
+    tabEvent('onReplaced', 42, CLAUDE_TAB.id);
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
     expect(await storedRepairs()).toEqual({});
   });
 

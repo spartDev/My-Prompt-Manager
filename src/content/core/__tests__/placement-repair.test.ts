@@ -1,7 +1,7 @@
 /**
  * The placement reports a content script sends the service worker (src/content/core/placement-repair.ts):
- * only when storage says otherwise, but always when an override must be dropped, and again after a
- * report the service worker did not save, unless it refused it for good.
+ * when they differ from the last one this tab delivered, again after a report the service worker did
+ * not save (unless it refused it for good), and again when the service worker may have forgotten it.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,6 +36,16 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual([]);
   });
 
+  /** Storage changes as the service worker writes them, with the event the content script follows */
+  const storageChange = (repairs: unknown) => {
+    for (const [listener] of vi.mocked(chrome.storage.onChanged.addListener).mock.calls) {
+      (listener as (changes: Record<string, chrome.storage.StorageChange>, area: string) => void)(
+        { [ICON_PLACEMENT_REPAIRS_KEY]: { newValue: repairs } },
+        'local'
+      );
+    }
+  };
+
   it('sends the toolbar report that drops an override stored with no status, as after a late pick', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { override: PICK } } });
     await repair.load();
@@ -45,8 +55,82 @@ describe('PlacementRepair.report', () => {
     await flush();
     repair.report('toolbar');
 
-    expect(repair.positioning).toBeNull();
     expect(sent()).toEqual(['toolbar']);
+  });
+
+  it('keeps the pick when its icon is in the Toolbar, for when the chain fails in this tab', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+
+    repair.report('toolbar');
+
+    // Another tab still needs it, so storage keeps it and sends no change: this tab keeps it too
+    expect(repair.positioning).toEqual(PICK);
+  });
+
+  it('sends its own placement though storage already has that status from another tab', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await repair.load();
+
+    // Another tab of the Platform reports the overlay, then the user picks there
+    storageChange({ 'claude.ai': { status: 'overlay' } });
+    repair.report('overlay');
+    await flush();
+    storageChange({ 'claude.ai': { status: 'override', override: PICK } });
+    repair.report('override');
+
+    // The service worker counts this tab only from its own reports
+    expect(sent()).toEqual(['overlay', 'override']);
+  });
+
+  it('sends its Toolbar again when a pick is stored with no status, so the service worker drops it', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay' } } });
+    await repair.load();
+    repair.report('toolbar');
+    await flush();
+
+    // The overlay tab moved to the Toolbar and the pick came after: an override with no status
+    storageChange({ 'claude.ai': { override: PICK } });
+    repair.report('toolbar');
+
+    expect(sent()).toEqual(['toolbar', 'toolbar']);
+  });
+
+  it('sends its placement again once storage dropped the repair it was counted for', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await repair.load();
+    repair.report('overlay');
+    await flush();
+
+    // Clear All Data
+    storageChange({});
+    repair.report('overlay');
+
+    expect(sent()).toEqual(['overlay', 'overlay']);
+  });
+
+  /** happy-dom's PageTransitionEvent drops `persisted`: the event is built with it */
+  const pageShow = (persisted: boolean) => window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted }));
+
+  it('sends its placement again when the page comes back from the back/forward cache', async () => {
+    const onOverrideChange = vi.fn();
+    repair = new PlacementRepair('claude.ai', onOverrideChange);
+    await repair.load();
+    repair.report('overlay');
+    await flush();
+
+    pageShow(false);
+    repair.report('overlay');
+    expect(onOverrideChange).not.toHaveBeenCalled();
+
+    pageShow(true);
+    repair.report('overlay');
+    repair.dispose();
+
+    // The service worker forgot the tab when it left the Platform; the icon is placed again
+    expect(onOverrideChange).toHaveBeenCalledTimes(1);
+    expect(sent()).toEqual(['overlay', 'overlay']);
   });
 
   it('sends the first placement of the page when the Platform has a repair, though storage says the same', async () => {

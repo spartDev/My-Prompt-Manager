@@ -184,6 +184,42 @@ describe('the placements of several tabs of a Platform', () => {
     expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
   });
 
+  it('drops the pick when the tab that needed it closes while another has the icon in its Toolbar', async () => {
+    await report(2, 'toolbar');
+    await pickInTab1();
+
+    await forgetIconPlacementTab(1);
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('shows the override once the tab whose icon was on the Anchored overlay closes', async () => {
+    await pickInTab1();
+    await report(2, 'overlay');
+
+    await forgetIconPlacementTab(2);
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
+  it('keeps the pick for the next tab when the last tab of the Platform closes', async () => {
+    await pickInTab1();
+
+    await forgetIconPlacementTab(1);
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
+  it('creates no repair from a Toolbar report once storage lost it, though another tab is off the Toolbar', async () => {
+    await pickInTab1();
+    // Clear All Data empties the repairs, not the tabs' placements
+    await chrome.storage.local.clear();
+
+    await report(2, 'toolbar');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
   it('counts no other tab for a report that names none', async () => {
     await pickInTab1();
 

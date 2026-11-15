@@ -1254,8 +1254,8 @@ export class PromptLibraryInjector {
     if (!this.state.isSiteEnabled || !editor?.isConnected) {
       return;
     }
-    // The chain resolves in this tab, so the pick is not for this page: placing again would only
-    // report the Toolbar, which drops the pick just made in a tab where the chain finds nothing
+    // The chain resolves in this tab, and comes before the pick: placing again would only put the
+    // icon back in the same Toolbar
     const current = this.placement.current;
     if (current?.kind === 'toolbar' && current.icon.isConnected) {
       return;

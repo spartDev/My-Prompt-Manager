@@ -201,8 +201,8 @@ test.describe('Repairing the icon placement of a Platform from Settings', () => 
     expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
     await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
 
-    // The other tab re-renders its toolbar, once then twice: each time it places the icon in its
-    // toolbar again and tells the service worker so, which keeps the pick the first tab needs
+    // The other tab re-renders its toolbar, once then twice, and places the icon in it each time:
+    // the service worker already counts its Toolbar, and keeps the pick the first tab needs
     for (const placement of [1, 2]) {
       const before = await other.locator(ICON_ROOT).elementHandle();
       await other.evaluate(() => { (window as Window & { renderToolbar?: (prefix: string) => void }).renderToolbar?.(''); });
@@ -212,6 +212,14 @@ test.describe('Repairing the icon placement of a Platform from Settings', () => 
       expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
       await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
     }
+
+    // The other tab reloads: a page load on a Platform with a repair reports its placement, here its
+    // Toolbar, and the service worker keeps the pick the first tab still needs
+    await other.reload({ waitUntil: 'domcontentloaded' });
+    await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+    await claude.waitForTimeout(500);
+    expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
+    await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
 
     await settings.bringToFront();
     await expect(claudeRow(settings).getByTestId('site-placement')).toHaveAttribute('data-status', 'override');

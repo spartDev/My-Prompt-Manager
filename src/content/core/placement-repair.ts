@@ -3,13 +3,14 @@
  * keeps the override the user picked for this Platform in memory, follows its changes in
  * storage, finds the element it names, and tells the service worker how the icon was placed.
  *
- * A report is sent only when it differs from what storage holds, so a Platform whose chain
- * resolves and that has no repair costs one storage read per page load and no message. Three
- * exceptions: while the Platform has a repair, the first placement of each page load is sent, so
- * the service worker knows how each tab placed the icon (a Toolbar in one tab does not drop a
- * repair another tab needs); a Toolbar report is always sent while an override is held, since only
- * the service worker's write drops it; and a report the service worker did not save is sent again
- * on the next placement, unless it refused it for good.
+ * The service worker keeps how each tab last placed the icon, so a Toolbar in one tab does not drop
+ * a repair another tab needs. A report is sent when it differs from the last one this tab delivered,
+ * so a Platform whose chain resolves and that has no repair costs one storage read per page load and
+ * no message. The tab's placement is sent again, whatever it is: at the first placement of a page
+ * load while the Platform has a repair; after a report the service worker did not save, unless it
+ * refused it for good; when storage drops the Platform's repair, or holds an override with no status
+ * (a pick stored after the chain resolved); and when the page comes back from the back/forward cache,
+ * since the service worker forgot the tab when it left.
  */
 
 import {
@@ -28,8 +29,8 @@ export const PLACEMENT_REPORT_MESSAGE = 'ICON_PLACEMENT_REPORTED';
 
 export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
-  /** How storage says the icon was last placed on this Platform; null when a report was not delivered */
-  private stored: PlacementReport | null = 'toolbar';
+  /** The placement the service worker holds for this tab; null when it may hold none, or another */
+  private sent: PlacementReport | null = 'toolbar';
   private listening = false;
   private readonly hostname: string;
   private readonly onOverrideChange: () => void;
@@ -52,10 +53,12 @@ export class PlacementRepair {
   async load(): Promise<void> {
     const repair = (await readIconPlacementRepairs())[this.hostname];
     this.override = repair?.override ?? null;
-    // With a repair, the first placement is reported whatever it is: the service worker counts this tab
-    this.stored = repair ? null : 'toolbar';
+    // With a repair, the first placement is reported whatever it is: the service worker counts this tab.
+    // Without one, a Toolbar needs no report: the service worker counts no tab's Toolbar for nothing.
+    this.sent = repair ? null : 'toolbar';
     if (!this.listening) {
       chrome.storage.onChanged.addListener(this.handleStorageChange);
+      window.addEventListener('pageshow', this.handlePageShow);
       this.listening = true;
     }
   }
@@ -64,6 +67,7 @@ export class PlacementRepair {
   dispose(): void {
     if (this.listening) {
       chrome.storage.onChanged.removeListener(this.handleStorageChange);
+      window.removeEventListener('pageshow', this.handlePageShow);
       this.listening = false;
     }
   }
@@ -105,28 +109,24 @@ export class PlacementRepair {
   }
 
   /**
-   * Tells the service worker how the icon was placed, when storage says otherwise. A placement in
-   * the Toolbar drops the override at once here, and is always sent while one is held: storage may
-   * hold an override with no status (a pick that came after the chain resolved), which only the
-   * service worker's write removes.
+   * Tells the service worker how the icon was placed in this tab, when it differs from the last
+   * report delivered. A placement in the Toolbar keeps the override here: the service worker drops
+   * it, and storage says so, only when no other tab of the Platform still needs it; the chain comes
+   * before the override, so it is not used while the Toolbar is found.
    */
   report(placement: PlacementReport): void {
-    const dropsOverride = placement === 'toolbar' && this.override !== null;
-    if (dropsOverride) {
-      info('The anchor chain of this Platform resolves again, the element picked for the icon is dropped', {
-        hostname: this.hostname
-      });
-      this.override = null;
-    }
-    if (placement === this.stored && !dropsOverride) {
+    if (placement === this.sent) {
       return;
     }
-    this.stored = placement;
+    if (placement === 'toolbar' && this.override !== null) {
+      info('The anchor chain of this Platform resolves again in this tab', { hostname: this.hostname });
+    }
+    this.sent = placement;
     debug('Icon placement reported', { hostname: this.hostname, placement });
     const notSaved = (reason: string) => {
       // The next placement reports again, whatever it is
-      if (this.stored === placement) {
-        this.stored = null;
+      if (this.sent === placement) {
+        this.sent = null;
       }
       debug('Icon placement report not saved', { placement, reason });
     };
@@ -152,12 +152,25 @@ export class PlacementRepair {
       return;
     }
     const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
-    this.stored = repair?.status ?? 'toolbar';
+    // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
+    // All Data), or an override waits for a status: the next placement says how this tab placed the icon
+    if ((!repair && this.sent !== 'toolbar') || (repair && !repair.status)) {
+      this.sent = null;
+    }
     const override = repair?.override ?? null;
     if (JSON.stringify(override) === JSON.stringify(this.override)) {
       return;
     }
     this.override = override;
+    this.onOverrideChange();
+  };
+
+  /** Back from the back/forward cache: the service worker forgot this tab when it left the Platform */
+  private readonly handlePageShow = (event: PageTransitionEvent): void => {
+    if (!event.persisted) {
+      return;
+    }
+    this.sent = null;
     this.onOverrideChange();
   };
 }
