@@ -22,7 +22,11 @@ export const tileRiseDelay = (position: number): string | undefined =>
   prefersReducedMotion() ? undefined : `${String(MOTION.tileDelay + position * MOTION.tileStagger)}ms`;
 
 const TILE = 'flex flex-col gap-2 w-full h-full p-[13px] rounded-tile bg-subtle text-left animate-tile-rise';
-const PRESSABLE = 'cursor-pointer transition-tile hover:bg-accent-selected active:scale-[.97] focus-primary';
+const PRESSABLE = 'group cursor-pointer transition-tile hover:bg-accent-selected active:scale-[.97] focus-primary';
+
+/** A {{word}} of the hero example. On the hovered hero (bg-accent-selected too) it turns to bg-card, so it stays a pill */
+const VARIABLE_PILL =
+  'inline-flex px-[9px] py-px rounded-full bg-accent-selected text-accent font-bold transition-colors duration-(--duration-color) group-hover:bg-card';
 
 const Example: FC<{ example: string }> = ({ example }) => (
   <span className="block text-sm leading-[1.7] text-primary">
@@ -30,7 +34,7 @@ const Example: FC<{ example: string }> = ({ example }) => (
       segment.kind === 'variable' ? (
         // The pieces of a sentence never move: the index is a stable key
         // biome-ignore lint/suspicious/noArrayIndexKey: segments of a fixed sentence
-        <span key={index} className="inline-flex px-[9px] py-px rounded-full bg-accent-selected text-accent font-bold">
+        <span key={index} className={VARIABLE_PILL}>
           {segment.name}
         </span>
       ) : (
@@ -48,18 +52,18 @@ const FixedPill: FC = () => (
 );
 
 const IconSquare: FC<{ item: FeatureItem }> = ({ item }) => (
-  <span className="flex items-center justify-center shrink-0 min-w-8 h-8 rounded-tile-icon bg-card text-accent shadow-tile-icon">
+  <span className="flex items-center justify-center shrink-0 min-w-8 h-8 px-1 rounded-tile-icon bg-card text-accent shadow-tile-icon">
     <WhatsNewIconGlyph icon={item.icon} />
   </span>
 );
 
-/** The ids of the title and the description, which name a Feature button */
+/** The ids of the title and the description, which name a Feature button; a plain tile has none */
 interface TextIds {
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
 }
 
-const Description: FC<{ text: string; hero: boolean; id: string }> = ({ text, hero, id }) => (
+const Description: FC<{ text: string; hero: boolean; id?: string }> = ({ text, hero, id }) => (
   <span id={id} className={`block ${hero ? 'text-[12.5px]' : 'text-xs'} leading-[1.4] text-secondary`}>
     {text}
   </span>
@@ -70,10 +74,12 @@ const content = (item: ReleaseNoteItem, hero: boolean, ids: TextIds): ReactNode 
     return (
       <>
         {item.example && <Example example={item.example} />}
-        <span id={ids.title} className="block text-[15px] leading-[1.3] font-bold text-primary">
-          {item.title}
+        <span className="flex flex-col gap-0.5">
+          <span id={ids.title} className="block text-[15px] leading-[1.3] font-bold text-primary">
+            {item.title}
+          </span>
+          <Description id={ids.description} text={item.description} hero />
         </span>
-        <Description id={ids.description} text={item.description} hero />
       </>
     );
   }
@@ -100,10 +106,10 @@ export const WhatsNewTile: FC<WhatsNewTileProps> = ({ item, hero = false, positi
   const style: CSSProperties = { animationDelay: tileRiseDelay(position) };
   const kind = isHero ? 'hero' : item.kind;
   const id = useId();
-  const ids: TextIds = { title: `${id}-title`, description: `${id}-description` };
 
   if (item.kind === 'feature' && item.destination !== undefined) {
     const { destination } = item;
+    const ids = { title: `${id}-title`, description: `${id}-description` };
     return (
       <button
         type="button"
@@ -124,7 +130,7 @@ export const WhatsNewTile: FC<WhatsNewTileProps> = ({ item, hero = false, positi
 
   return (
     <div className={TILE} style={style} data-whats-new-tile={kind}>
-      {content(item, isHero, ids)}
+      {content(item, isHero, {})}
     </div>
   );
 };

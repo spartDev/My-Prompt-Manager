@@ -159,6 +159,28 @@ describe('WhatsNewGrid', () => {
     ]);
   });
 
+  it('a hero Feature without destination is a plain tile with no number: the next Feature that opens something is tile 1', async () => {
+    const { onOpen } = renderGrid([feature('Platforms only', { destination: undefined }), feature('A'), fix('X')]);
+
+    const heroTile = document.querySelector<HTMLElement>('[data-whats-new-tile="hero"]');
+    expect(heroTile?.tagName).toBe('DIV');
+    expect(heroTile).not.toHaveAttribute('data-whats-new-tile-index');
+    expect(heroTile).not.toHaveAttribute('tabindex');
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'A A description' })).toHaveAttribute('data-whats-new-tile-index', '1');
+
+    await userEvent.click(screen.getByText('Platforms only'));
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('keys each cell by its place too, so two items with one title both render', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { cells } = renderGrid([feature('Same'), feature('Same'), feature('Same')]);
+
+    expect(cells).toHaveLength(3);
+    expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+  });
+
   it('animation delays: 180ms, 250ms, 320ms... per tile index', () => {
     renderGrid([feature('A'), feature('B'), fix('X'), feature('C', { destination: undefined }), fix('Y')]);
 

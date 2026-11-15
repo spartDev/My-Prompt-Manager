@@ -69,9 +69,13 @@ const GLYPHS: Record<Exclude<WhatsNewIcon, 'search'>, ReactNode> = {
 /** The glyph of a Feature tile's icon square, hidden from screen readers: the tile's text names it */
 export const WhatsNewIconGlyph: FC<WhatsNewIconGlyphProps> = ({ icon, className = 'w-[17px] h-[17px]' }) => {
   if (icon === 'search') {
-    // The search shortcut as a key chip, as the mockup draws it, rather than a magnifier
+    // The search shortcut as a key chip inside the icon square, as the mockup draws it, rather than a magnifier
     return (
-      <span aria-hidden="true" data-icon-glyph="kbd" className="text-[11px] leading-none font-extrabold tracking-tight">
+      <span
+        aria-hidden="true"
+        data-icon-glyph="kbd"
+        className="inline-flex items-center h-5 px-1 rounded-md bg-subtle border border-strong text-primary text-[11px] leading-none font-bold"
+      >
         ⌘K
       </span>
     );

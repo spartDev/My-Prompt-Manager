@@ -44,7 +44,7 @@ export const placeTiles = (items: readonly ReleaseNoteItem[]): PlacedTile[] => {
 export const WhatsNewGrid: FC<WhatsNewGridProps> = ({ items, onOpen }) => (
   <ul className="grid grid-cols-2 gap-2" data-whats-new-grid="">
     {placeTiles(items).map((tile, position) => (
-      <li key={`${tile.item.kind}-${tile.item.title}`} className={tile.wide ? 'col-span-2' : undefined}>
+      <li key={`${String(position)}-${tile.item.kind}-${tile.item.title}`} className={tile.wide ? 'col-span-2' : undefined}>
         <WhatsNewTile item={tile.item} hero={tile.hero} position={position} tileNumber={tile.tileNumber} onOpen={onOpen} />
       </li>
     ))}

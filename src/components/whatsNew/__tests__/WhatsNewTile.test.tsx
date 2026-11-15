@@ -33,6 +33,28 @@ describe('WhatsNewTile', () => {
     expect(button.querySelector('[data-icon-glyph]')).toBeNull();
   });
 
+  it('hero hovered: each Variable pill turns to bg-card, so it stays apart from the tile, which takes bg-accent-selected', () => {
+    render(<WhatsNewTile item={hero} hero position={0} onOpen={vi.fn()} />);
+
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('group', 'hover:bg-accent-selected');
+    for (const pill of [screen.getByText('topic'), screen.getByText('audience')]) {
+      expect(pill).toHaveClass('bg-accent-selected', 'group-hover:bg-card', 'duration-(--duration-color)');
+      expect(pill).not.toHaveClass('group-hover:bg-accent-selected');
+    }
+  });
+
+  it('hero: the title and the description sit 2px apart in their own column, under the example', () => {
+    render(<WhatsNewTile item={hero} hero position={0} onOpen={vi.fn()} />);
+
+    const title = screen.getByText('Fill in Variables');
+    const column = title.parentElement;
+    expect(column).toHaveClass('flex', 'flex-col', 'gap-0.5');
+    expect(column?.children).toHaveLength(2);
+    expect(column?.children[1]).toHaveTextContent('Type each value once, then insert.');
+    expect(column?.parentElement).toBe(screen.getByRole('button'));
+  });
+
   it('hero without an example: the title and the description only', () => {
     render(<WhatsNewTile item={{ ...hero, example: undefined }} hero position={0} onOpen={vi.fn()} />);
 
@@ -51,6 +73,17 @@ describe('WhatsNewTile', () => {
 
     await userEvent.click(button);
     expect(onOpen).toHaveBeenCalledWith('categories', item);
+  });
+
+  it('the search icon is the ⌘K key chip inside the white square', () => {
+    const item: FeatureItem = { ...hero, example: undefined, icon: 'search', destination: 'library-search' };
+    render(<WhatsNewTile item={item} position={1} onOpen={vi.fn()} />);
+
+    const chip = screen.getByRole('button').querySelector('[data-icon-glyph="kbd"]');
+    expect(chip).toHaveTextContent('⌘K');
+    expect(chip).toHaveAttribute('aria-hidden', 'true');
+    expect(chip).toHaveClass('h-5', 'px-1', 'rounded-md', 'bg-subtle', 'border', 'border-strong', 'text-primary', 'text-[11px]');
+    expect(chip?.parentElement).toHaveClass('bg-card', 'rounded-tile-icon');
   });
 
   it('a Feature without destination: the same look, not a button, no focus', () => {
