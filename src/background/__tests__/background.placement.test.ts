@@ -768,6 +768,34 @@ describe('background: a pick cancelled in one tab', () => {
     expect(await chrome.storage.session.get(null)).toEqual({});
   });
 
+  it('keeps the session of a start already storing it when the cancel of an earlier picker comes', async () => {
+    const listener = await startServiceWorker();
+    await startOnTab(listener);
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    const earlier = ((await chrome.storage.session.get(key))[key] as { attempt?: string }).attempt;
+    // The next session write waits until the test says
+    let releaseWrite: () => void = () => undefined;
+    let writing = false;
+    const realSet = vi.mocked(chrome.storage.session.set).getMockImplementation() as (items: Record<string, unknown>) => Promise<void>;
+    vi.mocked(chrome.storage.session.set).mockImplementationOnce(((items: Record<string, unknown>) => {
+      writing = true;
+      return new Promise<void>((resolve) => { releaseWrite = () => { void realSet(items).then(resolve); }; });
+    }) as never);
+    vi.mocked(chrome.tabs.sendMessage).mockClear();
+
+    // The page took the later activation after the Escape on the earlier picker; the later start is
+    // storing its session when the cancel comes
+    const later = startOnTab(listener);
+    await vi.waitFor(() => { expect(writing).toBe(true); });
+    const cancelled = send(listener, { type: 'PICKER_CANCELLED', attempt: earlier }, { tab: CLAUDE_TAB });
+    releaseWrite();
+
+    expect(await later).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await cancelled).toEqual({ success: true });
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' }));
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+
   // Guards the cancel's step: its read and its removal are one step, so a start cannot store in between
   it('keeps the session of a start that stores while a cancel reads the session (one step)', async () => {
     const listener = await startServiceWorker();
