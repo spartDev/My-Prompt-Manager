@@ -164,12 +164,28 @@ describe("What's new: keyboard, focus, screen readers and reduced motion", () =>
       expect(onOpen).not.toHaveBeenCalled();
     });
 
-    it('while the exit plays (open false), a digit does nothing', () => {
-      const { onOpen } = renderSheet({ open: false });
+    // The key handler is off while the exit plays (its `if (!open)` guard). A digit alone cannot
+    // show it: leaving, the sheet drops its panel ref, so no tile is found for the digit anyway.
+    // Enter reaches the same handler with no such second stop, so it is what proves the guard
+    it('while the exit plays (open false), a digit does nothing: the key handler is off, Enter included', () => {
+      const onClose = vi.fn<(reason: WhatsNewCloseReason) => void>();
+      const onOpen = vi.fn();
+      const sheetAt = (open: boolean) => (
+        <WhatsNewSheet version="2.0.0" open={open} onClose={onClose}>
+          <WhatsNewGrid items={ITEMS} onOpen={onOpen} />
+        </WhatsNewSheet>
+      );
+      const { rerender } = render(sheetAt(true));
+      // The exit starts: same sheet, same tiles, now closed
+      rerender(sheetAt(false));
 
-      fireEvent.keyDown(document, { key: '1' });
+      const digitHandled = !fireEvent.keyDown(document, { key: '1' });
+      const enterHandled = !fireEvent.keyDown(document, { key: 'Enter' });
 
       expect(onOpen).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      expect(digitHandled).toBe(false);
+      expect(enterHandled).toBe(false);
     });
 
     it('each numbered tile announces its key (aria-keyshortcuts)', () => {
