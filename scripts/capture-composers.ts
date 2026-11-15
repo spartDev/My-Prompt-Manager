@@ -176,9 +176,24 @@ export function headerUrl(url: string): string {
   }
 }
 
-type CaptureResult =
+export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
-  | { id: string; outcome: 'no-editor'; url: string };
+  | { id: string; outcome: 'no-editor'; url: string }
+  | { id: string; outcome: 'error'; url: string; message: string };
+
+/**
+ * The exit code of a capture run: non-zero when a requested Platform was not captured (signed
+ * out, a selector that drifted, a page that failed), even when others were and their chains pass,
+ * so a stale fixture never passes for a fresh one; else the chain tests' code when they ran.
+ *
+ * @param testsStatus - The chain tests' exit code; undefined when they did not run
+ */
+export function captureExitCode(results: readonly CaptureResult[], testsStatus?: number | null): number {
+  if (testsStatus !== undefined && testsStatus !== 0) {
+    return testsStatus ?? 1;
+  }
+  return results.length > 0 && results.every((result) => result.outcome === 'captured') ? 0 : 1;
+}
 
 /** Tried after a Platform's own selectors, in this order */
 const GENERIC_EDITORS = ['[contenteditable="true"][role="textbox"]', '[contenteditable="true"]', 'textarea'];
@@ -296,7 +311,12 @@ async function main(): Promise<number> {
   try {
     const page = await context.newPage();
     for (const id of ids) {
-      results.push(await capture(page, id, SUPPORTED_PLATFORMS[id], options));
+      results.push(await capture(page, id, SUPPORTED_PLATFORMS[id], options).catch((err: unknown) => ({
+        id,
+        outcome: 'error' as const,
+        url: urlOf(id, SUPPORTED_PLATFORMS[id], options),
+        message: err instanceof Error ? err.message.split('\n')[0] : String(err)
+      })));
     }
   } finally {
     await context.close();
@@ -305,6 +325,8 @@ async function main(): Promise<number> {
   for (const result of results) {
     if (result.outcome === 'no-editor') {
       process.stdout.write(`  ${result.id}: no editor at ${result.url} (signed out?), fixture kept as it was\n`);
+    } else if (result.outcome === 'error') {
+      process.stdout.write(`  ${result.id}: capture failed at ${result.url} (${result.message}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
       process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}\n`);
     } else {
@@ -314,8 +336,12 @@ async function main(): Promise<number> {
   process.stdout.write('Review the diff for anything that names you (an ARIA label can) before committing.\n');
 
   const captured = results.filter((result) => result.outcome === 'captured').map((result) => result.id);
+  const notCaptured = results.filter((result) => result.outcome !== 'captured').map((result) => result.id);
+  if (notCaptured.length > 0) {
+    process.stdout.write(`Not captured: ${notCaptured.join(', ')}. Their fixtures may be stale: the run fails.\n`);
+  }
   if (!options.runTests || captured.length === 0) {
-    return captured.length > 0 ? 0 : 1;
+    return captureExitCode(results);
   }
   // The chains, run on what was just captured: a test that fails names the Platform whose chain no longer resolves
   const tests = spawnSync('npx', ['vitest', 'run', CHAINS_TEST], {
@@ -323,7 +349,7 @@ async function main(): Promise<number> {
     stdio: 'inherit',
     env: { ...process.env, [CAPTURED_DIR_ENV]: options.out, [CAPTURED_IDS_ENV]: captured.join(',') }
   });
-  return tests.status ?? 1;
+  return captureExitCode(results, tests.status);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

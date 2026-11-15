@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { headerUrl, parseCaptureArgs, rulesFor } from '../capture-composers';
+import { type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, rulesFor } from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -240,6 +240,35 @@ describe('parseCaptureArgs', () => {
     [['--fast'], 'Unknown option --fast']
   ])('refuses %j', (argv, message) => {
     expect(() => parseCaptureArgs(argv, {})).toThrow(message);
+  });
+});
+
+describe('captureExitCode', () => {
+  const captured = (id: string): CaptureResult => ({ id, outcome: 'captured', composerFound: true, file: `/fx/${id}.html` });
+  const signedOut: CaptureResult = { id: 'gemini', outcome: 'no-editor', url: 'https://gemini.google.com/' };
+  const failed: CaptureResult = { id: 'mistral', outcome: 'error', url: 'https://chat.mistral.ai/', message: 'net::ERR_NAME_NOT_RESOLVED' };
+
+  it('succeeds when every requested Platform was captured and the chain tests pass, or did not run', () => {
+    expect(captureExitCode([captured('claude'), captured('chatgpt')], 0)).toBe(0);
+    expect(captureExitCode([captured('claude'), captured('chatgpt')])).toBe(0);
+  });
+
+  it.each([
+    ['with the chain tests passing on the captured ones', 0],
+    ['with --no-test', undefined]
+  ])('fails when one Platform had no editor and another was captured, %s', (_case, testsStatus) => {
+    expect(captureExitCode([captured('claude'), signedOut], testsStatus)).toBe(1);
+  });
+
+  it('fails when a capture failed', () => {
+    expect(captureExitCode([captured('claude'), failed], 0)).toBe(1);
+  });
+
+  it('fails with the chain tests\' code when they fail, and when nothing was captured', () => {
+    expect(captureExitCode([captured('claude')], 3)).toBe(3);
+    expect(captureExitCode([captured('claude')], null)).toBe(1);
+    expect(captureExitCode([signedOut])).toBe(1);
+    expect(captureExitCode([])).toBe(1);
   });
 });
 
