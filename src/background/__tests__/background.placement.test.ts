@@ -718,6 +718,56 @@ describe('background: a pick cancelled in one tab', () => {
     expect((await chrome.storage.session.get(key))[key]).toMatchObject({ attempt: activations[1] });
   });
 
+  it('forgets a session kept between two starts in flight when the cancel stops the later one', async () => {
+    const listener = await startServiceWorker();
+    // The first and third activations are answered only when the test says; the second at once
+    const held = new Map<number, () => void>();
+    const activations: Array<string | undefined> = [];
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) => {
+      const { type, attempt } = message as { type?: string; attempt?: string };
+      if (type !== 'ACTIVATE_ELEMENT_PICKER') {
+        return Promise.resolve(undefined);
+      }
+      activations.push(attempt);
+      const index = activations.length;
+      return index === 2
+        ? Promise.resolve(undefined)
+        : new Promise((resolve) => { held.set(index, () => { resolve(undefined); }); });
+    });
+    const first = startOnTab(listener);
+    await vi.waitFor(() => { expect(activations).toHaveLength(1); });
+    expect(await startOnTab(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const third = startOnTab(listener);
+    await vi.waitFor(() => { expect(activations).toHaveLength(3); });
+
+    // The page took the first activation, then Escape, then the second and third: it holds the third,
+    // which the cancel stops; the second start's session has no picker left
+    expect(await send(listener, { type: 'PICKER_CANCELLED', attempt: activations[0] }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    held.get(1)?.();
+    held.get(3)?.();
+
+    expect(await first).toMatchObject({ success: false });
+    expect(await third).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  it('forgets a session stored before the service worker restarted when the page cancels a start made after it', async () => {
+    // Two starts before the restart: the session's activation is not the first one sent
+    const beforeRestart = await startServiceWorker();
+    expect(await startOnTab(beforeRestart)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await startOnTab(beforeRestart)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+
+    const afterRestart = await startServiceWorker();
+    const held = holdTabActivations();
+    const later = startOnTab(afterRestart);
+    await vi.waitFor(() => { expect(held).toHaveLength(1); });
+    expect(await send(afterRestart, { type: 'PICKER_CANCELLED', attempt: held[0]?.attempt }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    held[0]?.answer();
+
+    expect(await later).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
   // Guards the cancel's step: its read and its removal are one step, so a start cannot store in between
   it('keeps the session of a start that stores while a cancel reads the session (one step)', async () => {
     const listener = await startServiceWorker();

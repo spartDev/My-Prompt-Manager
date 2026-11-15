@@ -94,8 +94,8 @@ const pickerStarts = new Set<PickerStart>();
 let pickerActivationsSent = 0;
 
 /**
- * The stamp of an activation sent now: above every one sent before, including those of a session
- * stored before the service worker restarted, since it follows the clock
+ * The stamp of an activation sent now: above every one this service worker sent before, and above
+ * those of a session stored before it restarted as long as the clock was not set back meanwhile
  */
 function nextPickerActivation(): number {
   pickerActivationsSent = Math.max(Date.now(), pickerActivationsSent + 1);
@@ -146,11 +146,11 @@ const pickerSessions = {
     return changePickerSessions(() => chrome.storage.session.remove(pickerSessionKey(tabId)));
   },
   /**
-   * Removes the tab's session as its picker is cancelled, read and removed in one step. The page
-   * held no picker at the cancel, so the session goes if it is the cancelled start's, or of an
-   * activation sent no later than the cancelled one (`activation`, known while that start is in
-   * flight); a session of a later activation is kept, its picker is the one the page holds now.
-   * With no start named, the session goes whichever it is.
+   * Removes the tab's session as its picker is cancelled, read and removed in one step. The session
+   * goes if it is the cancelled start's, or of an activation sent no later than `activation`, the
+   * latest one among the starts in flight the cancel stopped, which each end their own picker. A
+   * session of a later activation is kept: its picker is the one the page holds now. With no start
+   * named, the session goes whichever it is.
    */
   cancel(tabId: number, attempt: string | undefined, activation: number | undefined): Promise<void> {
     return changePickerSessions(async () => {
@@ -1585,19 +1585,21 @@ async function handlePickerCancelled(
   // A start in flight in the tab would bring the picker back after the cancel: it stores nothing,
   // and ends its picker by its attempt. A start whose tab is not known yet is not one of them:
   // every caller names the tab.
-  let cancelledActivation: number | undefined;
+  // The latest activation sent among the starts it stops: each of them ends its own picker, so a
+  // session of an activation sent no later has no picker left either
+  let latestStopped: number | undefined;
   for (const start of pickerStarts) {
     if (start.tabId === tabId) {
       start.stopped = true;
-      if (start.attempt === attempt) {
-        cancelledActivation = start.activation;
+      if (start.activation > 0) {
+        latestStopped = Math.max(latestStopped ?? 0, start.activation);
       }
     }
   }
   try {
     // Not the session of a later start: it may have stored its own since, and its picker is the
     // one the page holds
-    await pickerSessions.cancel(tabId, attempt, cancelledActivation);
+    await pickerSessions.cancel(tabId, attempt, latestStopped);
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error cancelling element picker", toError(error), {
