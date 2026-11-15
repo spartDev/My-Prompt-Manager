@@ -143,6 +143,14 @@ describe('isPlatformEnabled', () => {
     expect(isPlatformEnabled(settings, 'old-platform.example.com')).toBe(true);
   });
 
+  it('follows the choice for a linked Platform when the user never switched this one', () => {
+    // As for a Platform linked to Copilot in a later release: one switch turns them together
+    const settings = parseSiteSettings({ platformChoices: { 'copilot.microsoft.com': false } });
+
+    expect(isPlatformEnabled(settings, 'm365.cloud.microsoft')).toBe(false);
+    expect(isPlatformEnabled(parseSiteSettings({ platformChoices: { 'm365.cloud.microsoft': false } }), 'copilot.microsoft.com')).toBe(false);
+  });
+
   it('is the default of a Platform the user never switched', () => {
     for (const hostname of getAllSupportedHostnames()) {
       expect(isPlatformEnabled(defaultSiteSettings(), hostname)).toBe(getDefaultEnabledPlatforms().includes(hostname));

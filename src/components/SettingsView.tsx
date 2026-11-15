@@ -447,7 +447,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
           />
 
           <SiteIntegrationSection
-            enabledSites={enabledPlatforms(settings)}
+            enabledPlatforms={enabledPlatforms(settings)}
             customSites={settings.customSites}
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}

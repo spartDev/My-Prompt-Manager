@@ -158,15 +158,29 @@ export function enabledCustomSite(settings: SiteSettings, hostname: string): Cus
   return settings.customSites.find((site) => site.hostname === hostname && site.enabled) ?? null;
 }
 
+/** The choice of the user for a hostname, own entries only: `constructor` must not read what every object inherits */
+function choiceOf(settings: SiteSettings, hostname: string): boolean | undefined {
+  return Object.hasOwn(settings.platformChoices, hostname) ? settings.platformChoices[hostname] : undefined;
+}
+
 /**
- * Whether a Platform is on: as the user turned it, or, when the user never switched it, as the
- * Platform is by default. A hostname that is no Platform and that the user never turned on is off.
+ * Whether a Platform is on: as the user turned it; when the user never switched it, as they turned
+ * a Platform linked to it, since one switch turns them together (a Platform linked to Copilot in a
+ * later release stays off for a user who turned Copilot off); else as the Platform is by default.
+ * A hostname that is no Platform and that the user never turned on is off.
  */
 export function isPlatformEnabled(settings: SiteSettings, hostname: string): boolean {
-  // Own entries only: a hostname such as `constructor` must not read what every object inherits
-  return Object.hasOwn(settings.platformChoices, hostname)
-    ? settings.platformChoices[hostname]
-    : getPlatformByHostname(hostname)?.defaultEnabled ?? false;
+  const own = choiceOf(settings, hostname);
+  if (own !== undefined) {
+    return own;
+  }
+  for (const linked of getLinkedPlatformHostnames(hostname)) {
+    const choice = choiceOf(settings, linked);
+    if (choice !== undefined) {
+      return choice;
+    }
+  }
+  return getPlatformByHostname(hostname)?.defaultEnabled ?? false;
 }
 
 /**
