@@ -4,6 +4,7 @@ import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
   applyIconPlacementRepairChange,
   changeIconPlacementRepairs,
+  forgetIconPlacementTab,
   ICON_PLACEMENT_REPAIRS_KEY,
   type IconPlacementRepairs,
   overrideFromPick,
@@ -123,6 +124,80 @@ describe('storage', () => {
     ]);
 
     expect(await readIconPlacementRepairs()).toEqual({ 'claude.ai': { status: 'overlay', override: PICK } });
+  });
+});
+
+describe('the placements of several tabs of a Platform', () => {
+  // Tab 1 is on a variant of the UI the chain does not know; tab 2 on the one it knows
+  const report = (tabId: number, placement: 'toolbar' | 'overlay' | 'override') =>
+    changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement, tabId });
+  const pickInTab1 = async () => {
+    await report(1, 'overlay');
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+    await report(1, 'override');
+  };
+
+  it('keeps the pick when another tab places the icon in its Toolbar, once or again', async () => {
+    await report(2, 'toolbar');
+    await pickInTab1();
+
+    await report(2, 'toolbar');
+    await report(2, 'toolbar');
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
+  it('shows the Anchored overlay while one tab has the icon there, and the override once none does', async () => {
+    await pickInTab1();
+
+    await report(2, 'overlay');
+    expect((await readIconPlacementRepairs())['claude.ai']?.status).toBe('overlay');
+
+    await report(2, 'override');
+    expect((await readIconPlacementRepairs())['claude.ai']?.status).toBe('override');
+  });
+
+  it('drops the pick once every tab places the icon in its Toolbar', async () => {
+    await pickInTab1();
+    await report(2, 'toolbar');
+
+    await report(1, 'toolbar');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('drops the pick on the Toolbar of a tab once the tab that needed it closed', async () => {
+    await pickInTab1();
+    await forgetIconPlacementTab(1);
+
+    await report(2, 'toolbar');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('keeps the placement of a tab still on the Platform it is forgotten for leaving', async () => {
+    await pickInTab1();
+    await forgetIconPlacementTab(1, 'claude.ai');
+
+    await report(2, 'toolbar');
+
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+  });
+
+  it('counts no other tab for a report that names none', async () => {
+    await pickInTab1();
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'toolbar' });
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('counts only the tabs of the same Platform', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'chatgpt.com', placement: 'overlay', tabId: 3 });
+    await pickInTab1();
+    await report(1, 'toolbar');
+
+    expect(await readIconPlacementRepairs()).toEqual({ 'chatgpt.com': { status: 'overlay' } });
   });
 });
 

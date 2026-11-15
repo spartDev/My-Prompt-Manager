@@ -49,6 +49,18 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual(['toolbar']);
   });
 
+  it('sends the first placement of the page when the Platform has a repair, though storage says the same', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+
+    repair.report('override');
+    await flush();
+    repair.report('override');
+
+    // Once: the service worker now knows this tab's placement
+    expect(sent()).toEqual(['override']);
+  });
+
   it('sends a report again when the service worker did not save the one before', async () => {
     await repair.load();
     vi.mocked(chrome.runtime.sendMessage).mockResolvedValueOnce({ success: false, error: 'Storage refused' } as never);

@@ -116,6 +116,52 @@ describe('background: placing the icon of a built-in Platform', () => {
   });
 });
 
+describe('background: the icon placement of each tab of a Platform', () => {
+  const OTHER_CLAUDE_TAB = { id: 8, windowId: 3, url: 'https://claude.ai/chat/1', active: false } as chrome.tabs.Tab;
+  const report = (listener: MessageListener, tab: chrome.tabs.Tab, placement: string) =>
+    send(listener, { type: 'ICON_PLACEMENT_REPORTED', data: { placement } }, { tab });
+  /** Runs every listener the service worker registered for this tab event */
+  const tabEvent = (event: 'onRemoved' | 'onUpdated', ...args: unknown[]) => {
+    for (const [listener] of vi.mocked(getChromeMock().tabs[event].addListener).mock.calls) {
+      (listener as (...eventArgs: unknown[]) => void)(...args);
+    }
+  };
+  /** The pick stored for Claude in the first tab, whose toolbar changed; the other tab's toolbar is found */
+  const pickInClaudeTab = async (listener: MessageListener) => {
+    await report(listener, CLAUDE_TAB, 'overlay');
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay', override: { mode: 'custom', placement: 'before', selector: SEND_BUTTON } } } });
+    await report(listener, CLAUDE_TAB, 'override');
+  };
+
+  it('keeps the pick while the tab that needs it is open, and drops it once that tab closed', async () => {
+    const listener = await startServiceWorker();
+    await pickInClaudeTab(listener);
+
+    expect(await report(listener, OTHER_CLAUDE_TAB, 'toolbar')).toEqual({ success: true });
+    expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
+
+    tabEvent('onRemoved', CLAUDE_TAB.id, {});
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toEqual({});
+  });
+
+  it('forgets a tab that leaves the Platform, not one that moves within it', async () => {
+    const listener = await startServiceWorker();
+    await pickInClaudeTab(listener);
+
+    tabEvent('onUpdated', CLAUDE_TAB.id, { url: 'https://claude.ai/chat/2' }, { ...CLAUDE_TAB, url: 'https://claude.ai/chat/2' });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
+
+    tabEvent('onUpdated', CLAUDE_TAB.id, { url: 'https://example.com/' }, { ...CLAUDE_TAB, url: 'https://example.com/' });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toEqual({});
+  });
+});
+
 describe('background: the picker window of a Custom site, across a service worker restart', () => {
   const PAGE_TAB = { id: 11, windowId: 3, url: 'https://example.com/chat', active: true } as chrome.tabs.Tab;
   const PICKER_WINDOW_ID = 42;

@@ -4,10 +4,12 @@
  * storage, finds the element it names, and tells the service worker how the icon was placed.
  *
  * A report is sent only when it differs from what storage holds, so a Platform whose chain
- * resolves costs one storage read per page load and no message. Two exceptions: a Toolbar report
- * is always sent while an override is held, since only the service worker's write drops it; and a
- * report the service worker did not save is sent again on the next placement, unless it refused it
- * for good.
+ * resolves and that has no repair costs one storage read per page load and no message. Three
+ * exceptions: while the Platform has a repair, the first placement of each page load is sent, so
+ * the service worker knows how each tab placed the icon (a Toolbar in one tab does not drop a
+ * repair another tab needs); a Toolbar report is always sent while an override is held, since only
+ * the service worker's write drops it; and a report the service worker did not save is sent again
+ * on the next placement, unless it refused it for good.
  */
 
 import {
@@ -50,7 +52,8 @@ export class PlacementRepair {
   async load(): Promise<void> {
     const repair = (await readIconPlacementRepairs())[this.hostname];
     this.override = repair?.override ?? null;
-    this.stored = repair?.status ?? 'toolbar';
+    // With a repair, the first placement is reported whatever it is: the service worker counts this tab
+    this.stored = repair ? null : 'toolbar';
     if (!this.listening) {
       chrome.storage.onChanged.addListener(this.handleStorageChange);
       this.listening = true;

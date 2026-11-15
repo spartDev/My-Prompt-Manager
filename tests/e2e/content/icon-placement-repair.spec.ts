@@ -200,5 +200,21 @@ test.describe('Repairing the icon placement of a Platform from Settings', () => 
     await claude.waitForTimeout(500);
     expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
     await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    // The other tab re-renders its toolbar, once then twice: each time it places the icon in its
+    // toolbar again and tells the service worker so, which keeps the pick the first tab needs
+    for (const placement of [1, 2]) {
+      const before = await other.locator(ICON_ROOT).elementHandle();
+      await other.evaluate(() => { (window as Window & { renderToolbar?: (prefix: string) => void }).renderToolbar?.(''); });
+      await expect.poll(() => before?.evaluate((element) => element.isConnected), { message: `placement ${placement} of the other tab` }).toBe(false);
+      await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+      await claude.waitForTimeout(500);
+      expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
+      await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
+    }
+
+    await settings.bringToFront();
+    await expect(claudeRow(settings).getByTestId('site-placement')).toHaveAttribute('data-status', 'override');
+    await expect(claudeRow(settings).getByRole('button', { name: 'Place again' })).toBeVisible();
   });
 });

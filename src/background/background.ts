@@ -5,6 +5,7 @@
 
 import {
   changeIconPlacementRepairs,
+  forgetIconPlacementTab,
   overrideFromPick,
   type PlacementReport,
   type PlacementReportResponse,
@@ -773,7 +774,26 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 chrome.tabs.onRemoved.addListener((tabId) => {
   injector.cleanup(tabId);
   forgetPickerSession(tabId);
+  forgetPlacementTab(tabId, null);
 });
+
+// A tab that leaves a Platform no longer keeps its icon placement repair
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.url !== undefined) {
+    forgetPlacementTab(tabId, repairablePlatformHostname(changeInfo.url));
+  }
+});
+
+/** Forgets the icon placement of a tab, but on the Platform it is on now */
+function forgetPlacementTab(tabId: number, keepHostname: string | null): void {
+  forgetIconPlacementTab(tabId, keepHostname).catch((error: unknown) => {
+    Logger.warn("Could not forget the icon placement of a tab", {
+      component: "Background",
+      tabId,
+      error: getErrorMessage(error),
+    });
+  });
+}
 
 // Inject when extension icon is clicked (activeTab permission)
 chrome.action.onClicked.addListener((tab) => {
@@ -986,7 +1006,7 @@ async function handleIconPlacementReported(
     return;
   }
   try {
-    await changeIconPlacementRepairs({ type: "reportPlacement", hostname, placement });
+    await changeIconPlacementRepairs({ type: "reportPlacement", hostname, placement, tabId: sender.tab?.id });
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Failed to record the icon placement", toError(error), {

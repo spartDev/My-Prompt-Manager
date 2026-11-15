@@ -9,7 +9,8 @@
  * 2. The user picks an element of the Platform with the Element picker: the service worker stores
  *    it as the Platform's override, the content script places the icon there and reports `override`.
  * 3. Once a release fixes the chain, the content script finds its anchor again and reports
- *    `toolbar`: the Platform's entry, override included, is dropped.
+ *    `toolbar`: the Platform's entry, override included, is dropped, unless another tab of the
+ *    Platform still has the icon on the overlay or the override (another variant of its UI).
  *
  * Kept under a key of its own, apart from the Site settings, and written only by the service
  * worker, under a lock shared by the extension's contexts. The module imports neither
@@ -45,8 +46,56 @@ export interface PlatformPlacementRepair {
 export type IconPlacementRepairs = Record<string, PlatformPlacementRepair>;
 
 export type IconPlacementRepairChange =
-  | { type: 'reportPlacement'; hostname: string; placement: PlacementReport }
+  | {
+      type: 'reportPlacement';
+      hostname: string;
+      placement: PlacementReport;
+      /** The tab that placed the icon: its placement is kept, so another tab's Toolbar does not drop a repair it needs */
+      tabId?: number;
+    }
   | { type: 'setOverride'; hostname: string; positioning: CustomSitePositioning };
+
+/**
+ * The `chrome.storage.session` key of each tab's last placement, by hostname of the Platform, then
+ * by tab id. Session storage: it survives a service worker restart and goes with the browser session.
+ */
+export const ICON_PLACEMENT_TABS_KEY = 'iconPlacementTabs';
+
+type PlacementTabs = Record<string, Record<string, PlacementReport>>;
+
+function parsePlacementTabs(value: unknown): PlacementTabs {
+  const tabs: PlacementTabs = {};
+  if (!isRecord(value)) {
+    return tabs;
+  }
+  for (const [hostname, byTab] of Object.entries(value)) {
+    if (!isRecord(byTab)) {
+      continue;
+    }
+    const kept: Record<string, PlacementReport> = {};
+    for (const [tabId, placement] of Object.entries(byTab)) {
+      if (placement === 'toolbar' || placement === 'overlay' || placement === 'override') {
+        kept[tabId] = placement;
+      }
+    }
+    tabs[hostname] = kept;
+  }
+  return tabs;
+}
+
+/** The status the placements of these tabs call for: the overlay first, then the override; null when all are in the Toolbar */
+function statusOf(placements: Iterable<PlacementReport>): RepairStatus | null {
+  let status: RepairStatus | null = null;
+  for (const placement of placements) {
+    if (placement === 'overlay') {
+      return 'overlay';
+    }
+    if (placement === 'override') {
+      status = 'override';
+    }
+  }
+  return status;
+}
 
 const PLACEMENTS: ReadonlyArray<CustomSitePositioning['placement']> = ['before', 'after', 'inside-start', 'inside-end'];
 
@@ -98,24 +147,32 @@ export function parseIconPlacementRepairs(value: unknown): IconPlacementRepairs 
 /**
  * The repairs after a change. Pure: the same repairs come back, unchanged, when the change
  * changes nothing, so the caller can skip the write.
+ *
+ * @param others - For a placement report, the status the other tabs of the Platform call for
+ *   (statusOf their last placements), null when none is off the Toolbar
  */
-export function applyIconPlacementRepairChange(repairs: IconPlacementRepairs, change: IconPlacementRepairChange): IconPlacementRepairs {
+export function applyIconPlacementRepairChange(
+  repairs: IconPlacementRepairs,
+  change: IconPlacementRepairChange,
+  others: RepairStatus | null = null
+): IconPlacementRepairs {
   const current = repairs[change.hostname];
   if (change.type === 'setOverride') {
     return { ...repairs, [change.hostname]: { ...current, override: change.positioning } };
   }
-  if (change.placement === 'toolbar') {
-    // The chain resolves again: the fallback is over, and the override with it
+  const status = change.placement === 'toolbar' ? others : statusOf([change.placement, ...(others ? [others] : [])]);
+  if (!status) {
+    // The chain resolves again in every tab known: the fallback is over, and the override with it
     if (!current) {
       return repairs;
     }
     const { [change.hostname]: _dropped, ...rest } = repairs;
     return rest;
   }
-  if (current?.status === change.placement) {
+  if (current?.status === status) {
     return repairs;
   }
-  return { ...repairs, [change.hostname]: { ...current, status: change.placement } };
+  return { ...repairs, [change.hostname]: { ...current, status } };
 }
 
 /** Reads the repairs from storage; none when storage cannot be read */
@@ -138,13 +195,53 @@ export function withIconPlacementRepairsLock<T>(operation: () => Promise<T>): Pr
   return repairsLock.withLock(ICON_PLACEMENT_REPAIRS_KEY, operation);
 }
 
+/**
+ * Records a tab's placement and returns the status the Platform's other tabs call for. Called
+ * under the lock. A report with no tab records nothing, and counts no other tab.
+ */
+async function recordTabPlacement(hostname: string, placement: PlacementReport, tabId: number | undefined): Promise<RepairStatus | null> {
+  if (tabId === undefined) {
+    return null;
+  }
+  const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+  const byTab = tabs[hostname] ?? {};
+  const others = statusOf(Object.entries(byTab).filter(([id]) => id !== String(tabId)).map(([, other]) => other));
+  if (byTab[String(tabId)] !== placement) {
+    await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: { ...tabs, [hostname]: { ...byTab, [String(tabId)]: placement } } });
+  }
+  return others;
+}
+
+/**
+ * Forgets the placement of a tab that closed, or left the Platform for another site: it no longer
+ * keeps a repair. The repairs themselves are left as they are.
+ *
+ * @param keepHostname - The Platform the tab is on now, whose placement it reports again itself
+ */
+export function forgetIconPlacementTab(tabId: number, keepHostname: string | null = null): Promise<void> {
+  return withIconPlacementRepairsLock(async () => {
+    const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+    let changed = false;
+    for (const [hostname, byTab] of Object.entries(tabs)) {
+      if (hostname !== keepHostname && String(tabId) in byTab) {
+        delete byTab[String(tabId)];
+        changed = true;
+      }
+    }
+    if (changed) {
+      await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
+    }
+  });
+}
+
 /** Applies a change to what storage holds, under the lock; writes only when something changed */
 export function changeIconPlacementRepairs(change: IconPlacementRepairChange): Promise<IconPlacementRepairs> {
   return withIconPlacementRepairsLock(async () => {
     // A read that fails throws here: a write over storage it could not read would lose the other Platforms
     const result = await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY);
     const repairs = parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY]);
-    const next = applyIconPlacementRepairChange(repairs, change);
+    const others = change.type === 'reportPlacement' ? await recordTabPlacement(change.hostname, change.placement, change.tabId) : null;
+    const next = applyIconPlacementRepairChange(repairs, change, others);
     if (next !== repairs) {
       await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: next });
     }
