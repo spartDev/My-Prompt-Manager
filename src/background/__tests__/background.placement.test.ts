@@ -156,7 +156,7 @@ describe('background: the picker window of a Custom site, across a service worke
     onWindowRemoved?.(PICKER_WINDOW_ID);
 
     await vi.waitFor(async () => {
-      expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(PAGE_TAB.id, { type: 'DEACTIVATE_ELEMENT_PICKER', source: 'background' });
+      expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(PAGE_TAB.id, { type: 'DEACTIVATE_ELEMENT_PICKER', source: 'background', attempt: expect.any(String) });
       expect(await chrome.storage.session.get(null)).toEqual({});
     });
   });
@@ -283,8 +283,84 @@ describe('background: a picker that could not be activated leaves no session', (
 
     expect(response).toEqual({ success: false, error: 'Session storage quota exceeded' });
     expect(messages.filter((type) => type.endsWith('_ELEMENT_PICKER'))).toEqual(['ACTIVATE_ELEMENT_PICKER', 'DEACTIVATE_ELEMENT_PICKER']);
+    // It ends its own activation, not one a start since made in the same tab
+    const [activation, deactivation] = pickerMessages();
+    expect(deactivation?.attempt).toBe(activation?.attempt);
     expect(await chrome.storage.session.get(null)).toEqual({});
   });
+
+  it('ends only its own activation when stopped, so a start made after the stop in the same tab keeps its picker', async () => {
+    const listener = await startServiceWorker();
+    const answer = holdActivations();
+
+    const stoppedStart = startOn(listener);
+    await vi.waitFor(() => { expect(pickerMessages()).toHaveLength(1); });
+    expect(await send(listener, { type: 'STOP_ELEMENT_PICKER' })).toEqual({ success: true });
+    const laterStart = startOn(listener);
+    await answer(0, true);
+    await answer(1, true);
+
+    expect(await stoppedStart).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(await laterStart).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const [stoppedActivation, laterActivation, deactivation] = pickerMessages();
+    expect(deactivation).toMatchObject({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: stoppedActivation?.attempt });
+    expect(deactivation?.attempt).not.toBe(laterActivation?.attempt);
+    const stored = (await chrome.storage.session.get(`pickerSession:${CLAUDE_TAB.id}`))[`pickerSession:${CLAUDE_TAB.id}`];
+    expect(stored).toMatchObject({ attempt: laterActivation?.attempt });
+  });
+
+  it('stores no session for a start that activates while the stop reads the sessions', async () => {
+    const listener = await startServiceWorker();
+    const answer = holdActivations();
+    // The stop's read of the sessions answers only once the start activated and asked to store its own
+    let releaseRead: () => void = () => undefined;
+    let reading = false;
+    const realGet = vi.mocked(chrome.storage.session.get).getMockImplementation() as (keys?: unknown) => Promise<Record<string, unknown>>;
+    vi.mocked(chrome.storage.session.get).mockImplementation(((keys?: unknown) => {
+      const result = realGet(keys);
+      if (reading || keys !== null) {
+        return result;
+      }
+      reading = true;
+      return new Promise((resolve) => { releaseRead = () => { resolve(result); }; });
+    }) as never);
+
+    const started = startOn(listener);
+    await vi.waitFor(() => { expect(pickerMessages()).toHaveLength(1); });
+    const stopped = send(listener, { type: 'STOP_ELEMENT_PICKER' });
+    await vi.waitFor(() => { expect(reading).toBe(true); });
+    await answer(0, true);
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    releaseRead();
+
+    expect(await stopped).toEqual({ success: true });
+    expect(await started).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(pickerMessages().map(({ type }) => type)).toEqual(['ACTIVATE_ELEMENT_PICKER', 'DEACTIVATE_ELEMENT_PICKER']);
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  it('sends no activation for a start stopped before it activates', async () => {
+    const listener = await startServiceWorker();
+    vi.mocked(chrome.tabs.sendMessage).mockResolvedValue(undefined);
+    // The content script is being injected when the stop comes
+    let finishInjection: () => void = () => undefined;
+    vi.mocked(chrome.scripting.executeScript).mockImplementationOnce(() =>
+      new Promise((resolve) => { finishInjection = () => { resolve([{ result: true }] as never); }; }));
+
+    const started = startOn(listener);
+    await vi.waitFor(() => { expect(chrome.scripting.executeScript).toHaveBeenCalled(); });
+    expect(await send(listener, { type: 'STOP_ELEMENT_PICKER' })).toEqual({ success: true });
+    finishInjection();
+
+    expect(await started).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(pickerMessages()).toEqual([]);
+    expect(await chrome.storage.session.get(null)).toEqual({});
+  });
+
+  /** The ACTIVATE and DEACTIVATE messages sent to the tab, in order */
+  const pickerMessages = () => vi.mocked(chrome.tabs.sendMessage).mock.calls
+    .map(([, message]) => message as { type?: string; attempt?: string })
+    .filter((message) => message.type?.endsWith('_ELEMENT_PICKER'));
 
   /** The activation of the picker in the tab: answered when the test says, for each START in turn */
   const holdActivations = () => {
@@ -403,6 +479,10 @@ describe('background: a picker that could not be activated leaves no session', (
     releaseDeactivate();
 
     expect(await stopped).toEqual({ success: true });
+    // The stop ends the activation it saw, not the one of the start since
+    const [firstActivation, deactivation, secondActivation] = pickerMessages();
+    expect(deactivation).toMatchObject({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: firstActivation?.attempt });
+    expect(secondActivation?.attempt).not.toBe(firstActivation?.attempt);
     expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
   });
 

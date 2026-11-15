@@ -55,3 +55,38 @@ describe('ElementPicker: the page unloading', () => {
     expect(document.getElementById('mpm-element-picker-overlay')).not.toBeNull();
   });
 });
+
+describe('ElementPicker: a deactivation that names a start', () => {
+  const picker = new ElementPicker();
+  const overlay = () => document.getElementById('mpm-element-picker-overlay');
+
+  afterEach(() => {
+    picker.deactivate();
+  });
+
+  it('leaves the picker of a later start active when it names an earlier one', () => {
+    picker.activate('earlier');
+    picker.activate('later');
+
+    picker.deactivate('earlier');
+
+    expect(overlay()).not.toBeNull();
+  });
+
+  it('closes the picker when it names the start that activated it last', () => {
+    picker.activate('earlier');
+    picker.activate('later');
+
+    picker.deactivate('later');
+
+    expect(overlay()).toBeNull();
+  });
+
+  it('closes the picker when it names no start', () => {
+    picker.activate('earlier');
+
+    picker.deactivate();
+
+    expect(overlay()).toBeNull();
+  });
+});

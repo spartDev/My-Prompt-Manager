@@ -1246,9 +1246,12 @@ async function handleOpenPickerWindow(
 /** The answer to a start a stop ended while it activated */
 const PICKER_STOPPED = "The element picker was stopped";
 
-/** Ends the picker of a tab; a tab that closed has none to end */
-function deactivatePicker(tabId: number): Promise<unknown> {
-  return chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background" }).catch(() => undefined);
+/**
+ * Ends the picker a start activated in its tab, and only that one: the page has one picker per
+ * tab, and a start since may have activated it again. A tab that closed has none to end.
+ */
+function deactivatePicker(tabId: number, attempt: string | undefined): Promise<unknown> {
+  return chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background", attempt }).catch(() => undefined);
 }
 
 /**
@@ -1266,6 +1269,8 @@ async function handleStartElementPicker(
 ) {
   const start: PickerStart = { stopped: false };
   pickerStarts.add(start);
+  // Names this start's activation in the page, and its session
+  const attempt = crypto.randomUUID();
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1358,11 +1363,19 @@ async function handleStartElementPicker(
       return;
     }
 
+    // A start stopped before it activates sends nothing: an activation sent after the stop could
+    // reach the page after the one of a start since, and take its place
+    if (start.stopped) {
+      sendResponse({ success: false, error: PICKER_STOPPED });
+      return;
+    }
+
     // Now send the message to activate element picker
     try {
       await chrome.tabs.sendMessage(targetTabId, {
         type: "ACTIVATE_ELEMENT_PICKER",
         source: "background",
+        attempt,
       });
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
@@ -1385,16 +1398,16 @@ async function handleStartElementPicker(
         tabId: targetTabId,
         windowId: sender.tab?.windowId || 0,
         ...(repairHostname !== undefined ? { repairHostname } : {}),
-        attempt: crypto.randomUUID(),
+        attempt,
       }, start);
     } catch (error) {
       // A picker with no session would take a pick nobody keeps
-      await deactivatePicker(targetTabId);
+      await deactivatePicker(targetTabId, attempt);
       throw error;
     }
     if (!stored) {
       // Stopped while it activated: the stop could not reach this picker, so it ends here
-      await deactivatePicker(targetTabId);
+      await deactivatePicker(targetTabId, attempt);
       sendResponse({ success: false, error: PICKER_STOPPED });
       return;
     }
@@ -1512,15 +1525,9 @@ async function handleStopElementPicker(
   try {
     // Clear all active sessions: those held now, unless a start replaced one meanwhile
     sessions = await pickerSessions.snapshot();
-    for (const tabId of sessions.keys()) {
-      await chrome.tabs
-        .sendMessage(tabId, {
-          type: "DEACTIVATE_ELEMENT_PICKER",
-          source: "background",
-        })
-        .catch(() => {
-          // Tab might be closed, ignore error
-        });
+    // Each picker as the snapshot saw it: one a start activated since in the same tab goes on
+    for (const session of sessions.values()) {
+      await deactivatePicker(session.tabId, session.attempt);
     }
 
     await pickerSessions.removeUnchanged(sessions);

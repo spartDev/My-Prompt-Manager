@@ -74,7 +74,8 @@ const SENSITIVE_DOMAINS = [
   /citibank\./i
 ];
 
-type ElementPickerMessage = { source?: string; type?: string };
+/** `attempt` names the start of the service worker an activation came from; a deactivation that names one ends only that activation */
+type ElementPickerMessage = { source?: string; type?: string; attempt?: string };
 type RuntimeMessageListener = Parameters<typeof chrome.runtime.onMessage.addListener>[0];
 
 interface ElementPickerListeners {
@@ -87,6 +88,8 @@ interface ElementPickerListeners {
 
 export class ElementPicker {
   private isActive = false;
+  /** The start of the service worker this activation came from, if any */
+  private attempt: string | undefined;
   private overlay: HTMLDivElement | null = null;
   private highlightBox: HTMLDivElement | null = null;
   private infoBox: HTMLDivElement | null = null;
@@ -377,7 +380,9 @@ export class ElementPicker {
   /**
    * Activate the element picker
    */
-  activate(): void {
+  activate(attempt?: string): void {
+    // A start that activates the picker again takes it over: its deactivation is now the one that ends it
+    this.attempt = attempt;
     if (this.isActive) {return;}
     
     info('[ElementPicker] Activating element picker mode');
@@ -401,8 +406,10 @@ export class ElementPicker {
   /**
    * Deactivate the element picker
    */
-  deactivate(): void {
+  deactivate(attempt?: string): void {
     if (!this.isActive) {return;}
+    // A deactivation sent for an earlier start leaves the picker of a later one active
+    if (attempt !== undefined && attempt !== this.attempt) {return;}
     
     info('[ElementPicker] Deactivating element picker mode');
     this.isActive = false;
@@ -705,10 +712,10 @@ export class ElementPicker {
     
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
-        this.activate();
+        this.activate(message.attempt);
         break;
       case 'DEACTIVATE_ELEMENT_PICKER':
-        this.deactivate();
+        this.deactivate(message.attempt);
         break;
     }
   }
@@ -1027,16 +1034,16 @@ export function getElementPicker(): ElementPicker {
 }
 
 // Listen for activation messages
-chrome.runtime.onMessage.addListener((message: { source?: string; type?: string }) => {
+chrome.runtime.onMessage.addListener((message: ElementPickerMessage) => {
   if (message.source === 'background') {
     const picker = getElementPicker();
     
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
-        picker.activate();
+        picker.activate(message.attempt);
         break;
       case 'DEACTIVATE_ELEMENT_PICKER':
-        picker.deactivate();
+        picker.deactivate(message.attempt);
         break;
     }
   }
