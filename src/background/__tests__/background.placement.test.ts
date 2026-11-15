@@ -227,7 +227,7 @@ describe('background: a picker that could not be activated leaves no session', (
     ['the content script cannot be injected', () => {
       vi.mocked(chrome.scripting.executeScript).mockRejectedValue(new Error('Cannot access contents of the page'));
     }]
-  ])('forgets the session when %s', async (_case, fail) => {
+  ])('stores no session when %s', async (_case, fail) => {
     const listener = await startServiceWorker();
     fail();
 
