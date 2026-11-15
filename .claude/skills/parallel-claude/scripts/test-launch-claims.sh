@@ -184,8 +184,9 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # frees it (rmdir, which fails on a directory not empty) just after, once.
 # With held-at-lock, another launch holds the claim lock during the attempt
 # and frees it just after, once. With
-# alive-at-reap, the one that creates the removal lock makes the ps stub
-# report every process alive from then on, as when a dead pid is reused. With
+# alive-at-reap, the one that creates the removal lock makes kill -0 report
+# every process alive from then on (see kill_stub), as when a dead pid is
+# reused. With
 # fail-lock, perl and ln fail to create the claim lock, as on a read-only
 # git directory.
 REAL_MKDIR=$(command -v mkdir)
@@ -227,13 +228,14 @@ fi
 exit "\$rc"
 STUB
 done
-# ps: the real one, unless the fault alive-at-reap has fired
-cat > "$BIN/ps" <<STUB
-#!/bin/sh
-[ -n "\${STATE:-}" ] && [ -e "\$STATE/all-alive" ] && exit 0
-exec $(command -v ps) "\$@"
-STUB
+# ps: lists no process, so a holder only ps could see is not taken for alive
+printf '#!/bin/sh\nexit 1\n' > "$BIN/ps"
 chmod +x "$BIN/ps"
+
+# kill, a function that wins over the builtin in a with_claims snippet:
+# every process is alive once the fault alive-at-reap has fired
+# shellcheck disable=SC2016
+kill_stub='kill() { if [ -e "$STATE/all-alive" ]; then return 0; fi; builtin kill "$@"; }'
 
 # The launchers run under the bash that runs this test: /bin/bash 3.2 on macOS
 # when started as /bin/bash test-launch-claims.sh
@@ -370,7 +372,8 @@ setup "a stale lock whose pid runs again by the removal is kept" A='|open'
 dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
 touch "$STATE/alive-at-reap"
-with_claims 'claim_issues A'
+with_claims "$kill_stub"'
+claim_issues A'
 expect_eq "exit code" 1 $?
 expect_owner A '|open'
 expect_untouched A
@@ -384,6 +387,15 @@ with_claims 'claim_issues A'
 expect_eq "exit code" 1 $?
 expect_owner A '|open'
 if grep -q "Could not take the claim lock $LOCK: another launch held it and has just freed it, or its directory cannot be written" "$STATE/out"; then pass; else fail "the error does not say the lock could not be taken"; fi
+
+setup "the lock of another user's launch is kept" A='|open'
+# pid 1 runs as root: kill -0 answers EPERM, and the ps stub lists nothing
+ln -s 1 "$LOCK"
+with_claims 'claim_issues A'
+expect_eq "exit code" 1 $?
+expect_owner A '|open'
+expect_eq "lock holder" 1 "$(readlink "$LOCK")"
+rm -f "$LOCK"
 
 setup "the lock of a launch that runs is kept" A='|open'
 ln -s "$$" "$LOCK"

@@ -130,15 +130,18 @@ finish_launch() {
     free_claim_lock
 }
 
-# Whether a process runs; kill -0 fails on another user's process, ps does not.
-# Only processes of this host and pid namespace are seen: a repository shared
-# with a container or another machine must not run launches from both sides.
-# A holder no probe can answer for counts as alive.
+# Whether a process may run: only "No such process" (ESRCH) from kill -0
+# counts as gone, so another user's process (EPERM) or any other answer counts
+# as alive. Only processes of this host and pid namespace are seen: a
+# repository shared with a container or another machine must not run
+# launches from both sides.
 pid_alive() {
-    kill -0 "$1" 2>/dev/null && return 0
-    [ -d "/proc/$1" ] && return 0
-    command -v ps >/dev/null || return 0
-    ps -p "$1" >/dev/null 2>&1
+    local err
+    err=$(LC_ALL=C kill -0 "$1" 2>&1) && return 0
+    case "$err" in
+        *"No such process"*) return 1 ;;
+    esac
+    return 0
 }
 
 # Create a lock for this shell: a symlink to this pid, made in one step.
