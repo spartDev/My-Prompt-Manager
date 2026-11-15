@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, redactUrls, rulesFor } from '../capture-composers';
+import { addressAsPrinted, type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, redactUrls, rulesFor } from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -243,6 +243,19 @@ describe('parseCaptureArgs', () => {
   });
 });
 
+describe('addressAsPrinted', () => {
+  it.each([
+    ['https://x.example?t=1', 'https://x.example/?t=1'],
+    ['file:///Users/alice/My Docs/claude.html', 'file:///Users/alice/My%20Docs/claude.html'],
+    ['localhost/My Docs/c.html', 'http://localhost/My Docs/c.html'],
+    ['localhost:9/My Docs/c?q=my SECRET', 'http://localhost:9/My Docs/c?q=my%20SECRET'],
+    ['127.0.0.10:9/a', 'http://127.0.0.10:9/a'],
+    ['HTTP://LOCALHOST:9/A b', 'http://localhost:9/A%20b']
+  ])('writes %j as page.goto prints it: %j', (requested, printed) => {
+    expect(addressAsPrinted(requested)).toBe(printed);
+  });
+});
+
 describe('redactUrls', () => {
   // The address as new URL() writes it: the form of the browser's own addresses, and of the requested one once parsed
   const printed = (requested: string): string => new URL(requested.trim()).toString();
@@ -289,12 +302,16 @@ describe('redactUrls', () => {
   });
 
   it.each([
-    ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
+    // Messages as page.goto printed them (playwright-core 1.65, headless Chromium)
+    ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My%20Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
     ['https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c'],
     ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html'],
     ['localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My%20Docs/c.html'],
-    ['localhost:8080/a?q=my SECRET', 'Navigation to "http://localhost:8080/a?q=my SECRET" is interrupted by another navigation to "http://localhost:8080/login"', 'Navigation to "http://localhost:8080/a" is interrupted by another navigation to "http://localhost:8080/login"']
-  ])('writes the requested %j as Playwright prints it, as passed', (requested, message, written) => {
+    ['localhost:8080/a?q=my SECRET', 'Navigation to "http://localhost:8080/a?q=my%20SECRET" is interrupted by another navigation to "http://localhost:8080/login"', 'Navigation to "http://localhost:8080/a" is interrupted by another navigation to "http://localhost:8080/login"'],
+    ['localhost:9/My Docs/c?q=my SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My Docs/c?q=my%20SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My%20Docs/c'],
+    ['localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My%20Docs/c'],
+    ['127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My%20Docs/c']
+  ])('writes the requested %j as page.goto prints it', (requested, message, written) => {
     expect(redactUrls(message, requested)).toBe(written);
   });
 

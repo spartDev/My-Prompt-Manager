@@ -208,24 +208,38 @@ function redactAddress(match: string, opened: number): string {
 }
 
 /**
- * A message with every address in it as headerUrl writes it. Playwright prints the requested
- * address as it was passed, http:// put before a bare localhost (`net::ERR_… at <url>`), so it is
- * replaced first, as passed and as `new URL()` writes it, whatever its scheme and whatever it holds (a space in a file path), but
- * only as a whole address, never inside a longer one. Then any other http(s) or file address (the
+ * The address as page.goto prints it in its errors (Playwright's Frame.goto): as `new URL()`
+ * writes it when it parses, else as passed; then http:// before one that starts with localhost
+ * or 127.0.0.1.
+ */
+export function addressAsPrinted(requested: string): string {
+  let resolved = requested;
+  try {
+    resolved = new URL(requested).toString();
+  } catch {
+    // Not an address new URL() parses: as passed
+  }
+  return resolved.startsWith('localhost') || resolved.startsWith('127.0.0.1') ? `http://${resolved}` : resolved;
+}
+
+/**
+ * A message with every address in it as headerUrl writes it. The requested address is replaced
+ * first, as page.goto prints it (addressAsPrinted), as typed and as `new URL()` writes the
+ * printed form, whatever its scheme and whatever it holds (a space in a path), but only as a
+ * whole address, never inside a longer one. Then any other http(s) or file address (the
  * browser's own, in "interrupted by another navigation to"), up to a space, a double quote or an
  * angle bracket; trailing punctuation, and a closing parenthesis the message opened, stay the
  * message's.
  */
 export function redactUrls(message: string, requested = ''): string {
   const typed = requested.trim();
-  // As page.goto completes it: a bare localhost or 127.0.0.1 gets http://
-  const address = /^(?:localhost|127\.0\.0\.1)(?:[:/?#]|$)/i.test(typed) ? `http://${typed}` : typed;
+  const printed = addressAsPrinted(typed);
   const forms = new Set<string>();
-  if (address.includes(':')) {
-    forms.add(address);
+  if (printed.includes(':')) {
+    forms.add(printed);
     forms.add(typed);
     try {
-      forms.add(new URL(address).toString());
+      forms.add(new URL(printed).toString());
     } catch {
       // Not an address: only the forms as written
     }
@@ -233,7 +247,7 @@ export function redactUrls(message: string, requested = ''): string {
   let redacted = message;
   // Longest first, so a form that holds another is replaced whole
   for (const form of [...forms].sort((a, b) => b.length - a.length)) {
-    redacted = redacted.replace(new RegExp(`${BEFORE_ADDRESS}${escapeRegExp(form)}${AFTER_ADDRESS}`, 'g'), () => headerUrl(address));
+    redacted = redacted.replace(new RegExp(`${BEFORE_ADDRESS}${escapeRegExp(form)}${AFTER_ADDRESS}`, 'g'), () => headerUrl(printed));
   }
   return redacted.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match: string, offset: number, whole: string) => {
     const before = whole.slice(0, offset);
