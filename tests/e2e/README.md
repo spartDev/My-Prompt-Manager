@@ -13,6 +13,7 @@ tests/e2e/
 ├── smoke/              # Basic smoke tests
 ├── sidepanel/          # Component-specific tests
 ├── content/            # Content script tests
+├── whats-new/          # What's new sheet tests and proof screenshots
 └── user-journeys/      # End-to-end user workflow tests
 ```
 
