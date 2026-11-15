@@ -2,8 +2,10 @@
  * Turns a Platform's live composer into a fixture of tests/fixtures/composers: the structure, and
  * of the attributes only an allowlist: what an element is (contenteditable, role, type), its test
  * ids, and what the Platform's own selectors read (sanitizeRulesOf). Text, comments, links, media
- * and SVG content go, and so does any attribute nobody reads, so a fixture holds nothing the user
- * wrote and nothing that names them (data-user-id, an ARIA label with their name).
+ * and SVG content go, and so does any attribute nobody reads. An attribute a selector reads by its
+ * value gets a value written from the selector, never the page's, so a fixture holds nothing the
+ * user wrote and nothing that names them (data-user-id, `placeholder="Message Alice"`), and any
+ * value still kept that looks like an address or an e-mail is dropped as well.
  *
  * DOM code with no Node or browser global, so `npm run composers:capture` runs it on jsdom and
  * the unit tests on happy-dom.
@@ -26,6 +28,9 @@ const VOID_ELEMENTS = new Set(['area', 'br', 'col', 'embed', 'hr', 'img', 'input
  */
 const STRUCTURAL_ATTRIBUTES = new Set(['contenteditable', 'role', 'type', 'data-testid']);
 
+/** A value that may carry an address or an e-mail, whatever attribute it is in */
+const looksPersonal = (value: string): boolean => /https?:|@|\/\//i.test(value);
+
 /** A value condition of an attribute selector: `[aria-label*="dictate" i]` */
 interface ValueCondition {
   operator: string;
@@ -33,15 +38,23 @@ interface ValueCondition {
   ignoreCase: boolean;
 }
 
+/** How the selectors read one attribute */
+interface AttributeRule {
+  /** A selector names it with no value (`[data-lexical-editor]`): kept, with an empty value */
+  bare: boolean;
+  /** The values selectors look for in it */
+  conditions: ValueCondition[];
+}
+
 /**
  * What a sanitized composer keeps, read from the selectors a Platform finds its editor and its
- * anchors by: everything else is dropped (an allowlist). An attribute a selector names with a value
- * keeps its value only where it meets one of those conditions; one named without a value keeps its
- * name with an empty value.
+ * anchors by: everything else is dropped (an allowlist). An attribute whose value meets one of its
+ * conditions is written with the selector's value, the least that still meets them (`Message` for
+ * `[placeholder*="Message"]`), never the page's; one named without a value keeps an empty value.
  */
 export interface SanitizeRules {
   classes: ReadonlySet<string>;
-  attributes: ReadonlyMap<string, readonly ValueCondition[]>;
+  attributes: ReadonlyMap<string, AttributeRule>;
 }
 
 /**
@@ -57,13 +70,15 @@ const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
 
 /** The rules for a Platform, from its editor selectors and its anchor chain */
 export function sanitizeRulesOf(selectors: readonly string[]): SanitizeRules {
-  const attributes = new Map<string, ValueCondition[]>();
+  const attributes = new Map<string, AttributeRule>();
   const condition = (name: string, found?: ValueCondition) => {
-    const conditions = attributes.get(name) ?? [];
+    const rule = attributes.get(name) ?? { bare: false, conditions: [] };
     if (found) {
-      conditions.push(found);
+      rule.conditions.push(found);
+    } else {
+      rule.bare = true;
     }
-    attributes.set(name, conditions);
+    attributes.set(name, rule);
   };
   for (const selector of selectors) {
     for (const [, name, operator, double, single, bare, flag] of selector.matchAll(ATTRIBUTE_SELECTOR)) {
@@ -92,29 +107,40 @@ function meets(actual: string, { operator, value, ignoreCase }: ValueCondition):
   }
 }
 
+/**
+ * The value written for an attribute: of the selector values the live one meets, the first that
+ * meets all those conditions by itself, else them joined (`^="Send"` and `$="message"`). Null when
+ * the live value meets none, or when no written value meets them all.
+ */
+function selectorValue(actual: string, conditions: readonly ValueCondition[]): string | null {
+  const met = conditions.filter((condition) => meets(actual, condition));
+  if (met.length === 0) {
+    return null;
+  }
+  const candidates = [...met.map(({ value }) => value), met.map(({ value }) => value).join(' ')];
+  return candidates.find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
+}
+
 function sanitizeAttributes(element: Element, isEditor: boolean, rules: SanitizeRules): void {
   for (const { name, value } of Array.from(element.attributes)) {
     const lower = name.toLowerCase();
-    if (lower === EDITOR_MARKER || STRUCTURAL_ATTRIBUTES.has(lower)) {
+    if (lower === EDITOR_MARKER) {
       continue;
     }
-    if (lower === 'class') {
+    let kept: string | null;
+    if (STRUCTURAL_ATTRIBUTES.has(lower)) {
+      kept = value;
+    } else if (lower === 'class') {
       // The editor keeps its classes: some Platforms find it by them (.ProseMirror)
-      const kept = isEditor ? value : value.split(/\s+/).filter((token) => rules.classes.has(token)).join(' ');
-      if (kept) {
-        element.setAttribute(name, kept);
-      } else {
-        element.removeAttribute(name);
-      }
-      continue;
+      kept = value.split(/\s+/).filter((token) => token && !looksPersonal(token) && (isEditor || rules.classes.has(token))).join(' ') || null;
+    } else {
+      const rule = rules.attributes.get(lower);
+      kept = rule ? selectorValue(value, rule.conditions) ?? (rule.bare ? '' : null) : null;
     }
-    const conditions = rules.attributes.get(lower);
-    if (conditions === undefined) {
+    if (kept === null || looksPersonal(kept)) {
       element.removeAttribute(name);
-    } else if (conditions.length === 0) {
-      element.setAttribute(name, '');
-    } else if (!conditions.some((condition) => meets(value, condition))) {
-      element.removeAttribute(name);
+    } else if (kept !== value) {
+      element.setAttribute(name, kept);
     }
   }
 }
@@ -213,8 +239,8 @@ export function composerFixture(root: Element, header: FixtureHeader): string {
     '<!--',
     `  ${header.platformName} composer, captured from ${header.url} on ${header.date} by npm run composers:capture.${origin}`,
     '  Sanitized: text, links, media and SVG content removed; of the attributes, only contenteditable, role,',
-    '  type, test ids and what the Platform\'s selectors read are kept; wrappers with no attribute and one',
-    '  child folded into that child.',
+    '  type, test ids and what the Platform\'s selectors read are kept, the last with the selector\'s value;',
+    '  wrappers with no attribute and one child folded into that child.',
     '-->',
     serializeComposer(root),
     ''

@@ -42,7 +42,7 @@ describe('sanitizeComposer', () => {
       '<form>',
       '  <div contenteditable="true" role="textbox" class="ProseMirror"><p></p></div>',
       '  <div data-testid="composer-trailing-actions">',
-      '    <button type="button" aria-label="Dictate">',
+      '    <button type="button" aria-label="dictate">',
       '      <svg></svg>',
       '    </button>',
       '    <a></a>',
@@ -63,9 +63,46 @@ describe('sanitizeComposer', () => {
     expect(serializeComposer(composer)).toBe([
       '<form>',
       '  <button type="button"></button>',
-      '  <button type="button" aria-label="Start dictation"></button>',
+      '  <button type="button" aria-label="dictation"></button>',
       '</form>'
     ].join('\n'));
+  });
+
+  it('writes the selector\'s value, not the page\'s: what the user typed in a placeholder is gone, the selector still matches', () => {
+    const composer = composerOf('<form><textarea placeholder="Message Alice"></textarea></form>');
+
+    sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS.chatgpt));
+
+    expect(serializeComposer(composer)).toBe('<form>\n  <textarea placeholder="Message"></textarea>\n</form>');
+    expect(composer.querySelector('textarea[placeholder*="Message"]')).not.toBeNull();
+  });
+
+  it('writes a value that meets every condition the live one met', () => {
+    const composer = composerOf('<div><button aria-label="Send message to Alice"></button></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[aria-label^="Send"]', '[aria-label*="message"]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <button aria-label="Send message"></button>\n</div>');
+  });
+
+  it.each([
+    ['an e-mail in a test id', '<div><button data-testid="alice@example.com"></button></div>', []],
+    ['an address in a test id', '<div><button data-testid="https://example.com/u/alice"></button></div>', []],
+    ['an e-mail in the editor\'s classes', `<div><div ${EDITOR_MARKER} contenteditable="true" class="ProseMirror alice@example.com"></div></div>`, []]
+  ] as const)('drops %s', (_case, html, selectors) => {
+    const composer = composerOf(html);
+
+    sanitizeComposer(composer, sanitizeRulesOf(selectors));
+
+    expect(serializeComposer(composer)).not.toMatch(/alice|example/);
+  });
+
+  it('keeps an attribute a selector names both bare and with a value, whatever its value', () => {
+    const composer = composerOf('<div><span data-mode="alice-draft"></span><span data-mode="compact"></span></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[data-mode]', '[data-mode="compact"]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span data-mode></span>\n  <span data-mode="compact"></span>\n</div>');
   });
 
   it('keeps an attribute a selector names without a value, but not its value', () => {
@@ -89,9 +126,9 @@ describe('sanitizeComposer', () => {
       '<div>',
       '  <span id="m365-chat-editor-target-element"></span>',
       '  <span></span>',
-      '  <textarea id="userInput" placeholder="Ask anything"></textarea>',
+      '  <textarea id="userInput" placeholder="Ask"></textarea>',
       '  <textarea></textarea>',
-      '  <div data-x="the-end"></div>',
+      '  <div data-x="end"></div>',
       '</div>'
     ].join('\n'));
   });
