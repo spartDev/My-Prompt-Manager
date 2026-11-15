@@ -198,8 +198,10 @@ export function parseSiteSettings(stored: unknown): SiteSettings {
 
   return {
     platformChoices: withoutOtherHosts(platformChoices),
+    // A Custom site at a host a later release made a Platform's (copilot.cloud.microsoft, added by
+    // hand while the extension did nothing there) gives way to the Platform: its switch decides
     customSites: Array.isArray(stored.customSites)
-      ? stored.customSites.filter(isCustomSite)
+      ? stored.customSites.filter(isCustomSite).filter((site) => getPlatformByHostname(site.hostname) === undefined)
       : defaults.customSites,
     debugMode: typeof stored.debugMode === 'boolean' ? stored.debugMode : defaults.debugMode
   };

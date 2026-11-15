@@ -203,6 +203,17 @@ describe('isPlatformEnabled', () => {
     expect(isHostnameEnabled(afterOn, 'copilot.cloud.microsoft')).toBe(true);
   });
 
+  it('drops a Custom site added at copilot.cloud.microsoft before it was a host of M365 Copilot, so the Copilot switch decides there', () => {
+    const settings = parseSiteSettings({
+      platformChoices: { 'copilot.microsoft.com': false, 'm365.cloud.microsoft': false },
+      customSites: [customSite({ hostname: 'copilot.cloud.microsoft' }), customSite({ hostname: 'on.example.com' })]
+    });
+
+    expect(settings.customSites.map((site) => site.hostname)).toEqual(['on.example.com']);
+    expect(isHostnameEnabled(settings, 'copilot.cloud.microsoft')).toBe(false);
+    expect(enabledHostnames(settings)).not.toContain('copilot.cloud.microsoft');
+  });
+
   it('is the default of a Platform the user never switched', () => {
     for (const hostname of getAllSupportedHostnames()) {
       expect(isPlatformEnabled(defaultSiteSettings(), hostname)).toBe(getDefaultEnabledPlatforms().includes(hostname));
