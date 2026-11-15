@@ -700,19 +700,41 @@ const pickerWindow = {
     };
   },
   /** Changes some of its fields; the changes run one after the other, so none is lost or undone */
-  update(change: Partial<PickerWindow>): Promise<void> {
-    const run = pickerWindowUpdates.then(async () => {
-      const next = { ...(await pickerWindow.read()), ...change };
-      if (next.windowId === null && next.originalTabId === null) {
-        await chrome.storage.session.remove(PICKER_WINDOW_KEY);
-        return;
-      }
-      await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+  async update(change: Partial<PickerWindow>): Promise<void> {
+    await changePickerWindow(() => change);
+  },
+  /**
+   * Forgets the picker window if it is this one, in one change: a window opened since keeps its
+   * record. True when it was this one.
+   */
+  async forgetIf(windowId: number): Promise<boolean> {
+    let matched = false;
+    await changePickerWindow((current) => {
+      matched = current.windowId === windowId;
+      return matched ? NO_PICKER_WINDOW : null;
     });
-    pickerWindowUpdates = run.catch(() => undefined);
-    return run;
+    return matched;
   },
 };
+
+/** Runs a change of the picker window after the ones before it; a change that returns null writes nothing */
+function changePickerWindow(change: (current: PickerWindow) => Partial<PickerWindow> | null): Promise<void> {
+  const run = pickerWindowUpdates.then(async () => {
+    const current = await pickerWindow.read();
+    const fields = change(current);
+    if (fields === null) {
+      return;
+    }
+    const next = { ...current, ...fields };
+    if (next.windowId === null && next.originalTabId === null) {
+      await chrome.storage.session.remove(PICKER_WINDOW_KEY);
+      return;
+    }
+    await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+  });
+  pickerWindowUpdates = run.catch(() => undefined);
+  return run;
+}
 
 // Message types for element picker and injection
 interface BackgroundMessage {
@@ -1394,10 +1416,9 @@ async function handleStopElementPicker(
 // Clean up on window close
 chrome.windows.onRemoved.addListener((windowId) => {
   void (async () => {
-    if ((await pickerWindow.read()).windowId !== windowId) {
+    if (!(await pickerWindow.forgetIf(windowId))) {
       return;
     }
-    await pickerWindow.update(NO_PICKER_WINDOW);
     // Stop any active picker sessions
     await handleStopElementPicker(
       undefined,

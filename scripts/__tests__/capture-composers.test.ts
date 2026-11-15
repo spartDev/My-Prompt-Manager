@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, rulesFor } from '../capture-composers';
+import { type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, redactUrls, rulesFor } from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -240,6 +240,16 @@ describe('parseCaptureArgs', () => {
     [['--fast'], 'Unknown option --fast']
   ])('refuses %j', (argv, message) => {
     expect(() => parseCaptureArgs(argv, {})).toThrow(message);
+  });
+});
+
+describe('redactUrls', () => {
+  it('writes the address in a navigation error without its query, fragment or credentials', () => {
+    expect(redactUrls('page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://user:pw@chat.example.com/c/1?token=abc#x'))
+      .toBe('page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://chat.example.com/c/1');
+    expect(redactUrls('net::ERR_FILE_NOT_FOUND at file:///Users/alice/stand-ins/claude.html'))
+      .toBe('net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html');
+    expect(redactUrls('Timeout 30000ms exceeded.')).toBe('Timeout 30000ms exceeded.');
   });
 });
 

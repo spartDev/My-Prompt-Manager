@@ -180,4 +180,19 @@ describe('background: the picker window of a Custom site, across a service worke
       expect(await chrome.storage.session.get(null)).toEqual({});
     });
   });
+
+  it('keeps a picker window opened since when an older one closes', async () => {
+    await openPicker();
+    const listener = await startServiceWorker();
+    const onWindowRemoved = vi.mocked(getChromeMock().windows.onRemoved.addListener).mock.calls.at(-1)?.[0];
+    vi.mocked(chrome.windows.create).mockResolvedValue({ id: 43 } as never);
+
+    // A new picker window opens as the old one closes
+    const reopened = send(listener, { type: 'OPEN_PICKER_WINDOW', data: { tabId: PAGE_TAB.id } });
+    onWindowRemoved?.(PICKER_WINDOW_ID);
+    await reopened;
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+
+    expect((await chrome.storage.session.get('pickerWindow')).pickerWindow).toEqual({ windowId: 43, originalTabId: PAGE_TAB.id });
+  });
 });

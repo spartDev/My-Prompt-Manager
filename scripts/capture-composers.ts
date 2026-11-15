@@ -184,6 +184,9 @@ export function headerUrl(url: string): string {
   }
 }
 
+/** A message with every address in it as headerUrl writes it: Playwright's navigation errors name the address they failed at */
+export const redactUrls = (message: string): string => message.replace(/\b(?:https?|file):\/\/[^\s'"<>()]+/gi, (url) => headerUrl(url));
+
 export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
   | { id: string; outcome: 'no-editor'; url: string }
@@ -339,7 +342,7 @@ async function main(): Promise<number> {
     if (result.outcome === 'no-editor') {
       process.stdout.write(`  ${result.id}: no editor at ${headerUrl(result.url)} (signed out?), fixture kept as it was\n`);
     } else if (result.outcome === 'error') {
-      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${result.message}), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message)}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
       process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}: the run fails\n`);
     } else {
