@@ -585,5 +585,32 @@ describe('background: a pick cancelled in one tab', () => {
     expect(chrome.tabs.sendMessage).not.toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' }));
     expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
   });
-});
 
+  it('stops a start still activating in that tab, and only there', async () => {
+    Object.assign(getChromeMock().tabs, {
+      get: vi.fn(async (tabId: number) => (tabId === OTHER_TAB.id ? OTHER_TAB : CLAUDE_TAB)),
+      update: vi.fn().mockResolvedValue(CLAUDE_TAB)
+    });
+    const listener = await startServiceWorker();
+    await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    // A new start in each tab, its activation answered only when the test says
+    const answers = new Map<number, () => void>();
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((tabId: number, message: unknown) =>
+      (message as { type?: string }).type === 'ACTIVATE_ELEMENT_PICKER'
+        ? new Promise((resolve) => { answers.set(tabId, () => { resolve(undefined); }); })
+        : Promise.resolve(undefined));
+    const restarted = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    const otherStart = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: OTHER_TAB.id, repairHostname: 'claude.ai' } });
+    await vi.waitFor(() => { expect(answers.size).toBe(2); });
+
+    // The user presses Escape on the picker of the first tab before the new start activates there
+    expect(await send(listener, { type: 'PICKER_CANCELLED' }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    answers.get(CLAUDE_TAB.id)?.();
+    answers.get(OTHER_TAB.id)?.();
+
+    expect(await restarted).toEqual({ success: false, error: 'The element picker was stopped' });
+    expect(await otherStart).toEqual({ success: true, tabId: OTHER_TAB.id });
+    expect(chrome.tabs.sendMessage).toHaveBeenLastCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' }));
+    expect(Object.keys(await chrome.storage.session.get(null))).toEqual([`pickerSession:${OTHER_TAB.id}`]);
+  });
+});

@@ -73,6 +73,8 @@ async function readPickerSessions(): Promise<Map<number, PickerSession>> {
  */
 interface PickerStart {
   stopped: boolean;
+  /** The tab it activates the picker in, once known: a cancel there stops it too */
+  tabId?: number;
   /** The order its activation was sent in, among all starts; 0 until then */
   activation: number;
 }
@@ -1341,6 +1343,7 @@ async function handleStartElementPicker(
       });
       return;
     }
+    start.tabId = targetTabId;
 
     // Get the tab details
     const tab = await chrome.tabs.get(targetTabId);
@@ -1540,6 +1543,12 @@ async function handlePickerCancelled(
   tabId: number,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
+  // A start in flight in the tab would bring the picker back after the cancel: it stores nothing
+  for (const start of pickerStarts) {
+    if (start.tabId === tabId) {
+      start.stopped = true;
+    }
+  }
   try {
     await pickerSessions.delete(tabId);
     sendResponse({ success: true });
