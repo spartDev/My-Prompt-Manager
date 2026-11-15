@@ -21,7 +21,8 @@ LAUNCH_CLAIMS=()
 # The claim lock this launch takes or holds: a symlink whose target is the pid
 # of its holder, so it is created with its holder in one step.
 LAUNCH_LOCK=""
-# The lock that guards the removal of a stale claim lock, while this launch holds it.
+# The lock that guards the removal of a stale claim lock, a symlink to its
+# holder's pid like the claim lock, while this launch takes or holds it.
 LAUNCH_REAP=""
 # The tmux session this launch started, stopped before its claims are given back.
 LAUNCH_SESSION=""
@@ -98,10 +99,15 @@ free_claim_lock() {
         rm -f "$LAUNCH_LOCK"
     fi
     LAUNCH_LOCK=""
-    if [ -n "$LAUNCH_REAP" ]; then
-        rmdir "$LAUNCH_REAP" 2>/dev/null || true
-        LAUNCH_REAP=""
+    free_reap_lock
+}
+
+# Free the removal lock if this launch holds it.
+free_reap_lock() {
+    if [ -n "$LAUNCH_REAP" ] && [ "$(readlink "$LAUNCH_REAP" 2>/dev/null)" = "$$" ]; then
+        rm -f "$LAUNCH_REAP"
     fi
+    LAUNCH_REAP=""
 }
 
 # Roll a launch back: stop the tmux session it started, so no pane keeps
@@ -129,36 +135,53 @@ pid_alive() {
     kill -0 "$1" 2>/dev/null || ps -p "$1" >/dev/null 2>&1
 }
 
-# Create the claim lock for this shell. ln -s makes the link and its target,
-# this pid, in one step; when the path is a directory (the lock of an older
+# Create a lock for this shell. ln -s makes the link and its target, this
+# pid, in one step; when the path is a directory (the lock of an older
 # launcher), ln puts the link inside it instead, which is taken back.
-link_claim_lock() {
-    if ln -s "$$" "$LAUNCH_LOCK" 2>/dev/null; then
-        [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$$" ] && return 0
-        rm -f "$LAUNCH_LOCK/$$"
+link_lock() {
+    if ln -s "$$" "$1" 2>/dev/null; then
+        [ "$(readlink "$1" 2>/dev/null)" = "$$" ] && return 0
+        rm -f "$1/$$"
     fi
     return 1
+}
+
+# The pid a lock names when that process no longer runs; fails otherwise.
+dead_holder() {
+    local holder
+    holder=$(readlink "$1" 2>/dev/null) || return 1
+    case "$holder" in ""|*[!0-9]*) return 1 ;; esac
+    pid_alive "$holder" && return 1
+    echo "$holder"
+}
+
+# Remove a lock still held by the dead pid read before, and say so.
+remove_dead_lock() { # <lock> <pid> <what>
+    if [ "$(readlink "$1" 2>/dev/null)" = "$2" ]; then
+        rm -f "$1"
+        print_warning "Removed the $3 of launch $2, which no longer runs"
+    fi
 }
 
 # Take the claim lock; a lock whose holder no longer runs (a launch killed
 # with SIGKILL) is removed first. The removal happens under a second lock and
 # only while the holder read is still the one in place, so two launches that
 # find the same stale lock never remove the lock one of them has just taken.
+# A removal lock left by a launch killed while removing is removed in turn.
 take_claim_lock() {
-    local holder
-    link_claim_lock && return 0
-    holder=$(readlink "$LAUNCH_LOCK" 2>/dev/null) || holder=""
-    case "$holder" in ""|*[!0-9]*) return 1 ;; esac
-    pid_alive "$holder" && return 1
-    mkdir "$LAUNCH_LOCK.reap" 2>/dev/null || return 1
+    local holder reaper
+    link_lock "$LAUNCH_LOCK" && return 0
+    holder=$(dead_holder "$LAUNCH_LOCK") || return 1
+    # Named before it is taken, so an interrupt while it is taken still frees it
     LAUNCH_REAP="$LAUNCH_LOCK.reap"
-    if [ "$(readlink "$LAUNCH_LOCK" 2>/dev/null)" = "$holder" ]; then
-        rm -f "$LAUNCH_LOCK"
-        print_warning "Removed the claim lock of launch $holder, which no longer runs"
+    if ! link_lock "$LAUNCH_REAP"; then
+        reaper=$(dead_holder "$LAUNCH_REAP") || return 1
+        remove_dead_lock "$LAUNCH_REAP" "$reaper" "removal lock"
+        link_lock "$LAUNCH_REAP" || return 1
     fi
-    rmdir "$LAUNCH_REAP" 2>/dev/null || true
-    LAUNCH_REAP=""
-    link_claim_lock
+    remove_dead_lock "$LAUNCH_LOCK" "$holder" "claim lock"
+    free_reap_lock
+    link_lock "$LAUNCH_LOCK"
 }
 
 # Take the lock (flock is not on macOS) and claim the tickets. On success the
@@ -175,8 +198,9 @@ claim_issues() {
     if ! take_claim_lock; then
         trap - INT TERM
         LAUNCH_LOCK=""
+        free_reap_lock
         holder=$(readlink "$lock" 2>/dev/null) || holder="unknown"
-        if [ -d "$lock.reap" ]; then
+        if [ -L "$lock.reap" ] || [ -e "$lock.reap" ]; then
             print_error "Another launch is removing a stale claim lock ($lock.reap). Wait for it, or remove $lock.reap if no launch is running."
         else
             print_error "Another launch is claiming tickets (lock $lock, held by $holder). Wait for it, or remove the lock if no launch is running."

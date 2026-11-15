@@ -36,8 +36,10 @@ expect_eq() { # <what> <expected> <actual>
 expect_owner() { # <id> <assignee|status>
     expect_eq "$1 owner" "$2" "$(cat "$STATE/issues/$1")"
 }
+# The locks are symlinks to a pid, which -e alone does not see
 expect_no_lock() {
-    if [ -e "$LOCK" ]; then fail "the claim lock is still there"; else pass; fi
+    if [ -L "$LOCK" ] || [ -e "$LOCK" ]; then fail "the claim lock is still there"; else pass; fi
+    if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
 }
 # No write to the ticket but claim attempts: no "update <id> --assignee/--status", no "unclaim <id>"
 expect_untouched() { # <id>
@@ -174,16 +176,20 @@ STUB
 
 for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool"; done
 
-# ln and mkdir: the real commands, but with the fault term-at-lock, the one
-# that creates the claim lock sends TERM to the launcher once it is created.
+# ln and mkdir: the real commands, but with the fault term-at-lock (or
+# term-at-reap), the one that creates the claim lock (or the removal lock)
+# sends TERM to the launcher once it is created.
 for tool in ln mkdir; do
     cat > "$BIN/$tool" <<STUB
 #!/bin/sh
 /bin/$tool "\$@"
 rc=\$?
 for last in "\$@"; do :; done
-if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock" ]; then
-    kill -TERM "\$PPID"
+if [ "\$rc" -eq 0 ] && [ -n "\${LOCK:-}" ]; then
+    if { [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/term-at-lock" ]; } \\
+        || { [ "\$last" = "\$LOCK.reap" ] && [ -e "\$STATE/term-at-reap" ]; }; then
+        kill -TERM "\$PPID"
+    fi
 fi
 exit "\$rc"
 STUB
@@ -313,13 +319,32 @@ rm -f "$LOCK"
 
 setup "a stale lock another launch is removing is left to it" A='|open'
 ln -s "$dead" "$LOCK"
-mkdir "$LOCK.reap"
+ln -s "$$" "$LOCK.reap"
 with_claims 'claim_issues A'
 expect_eq "exit code" 1 $?
 expect_owner A '|open'
 expect_eq "lock holder" "$dead" "$(readlink "$LOCK")"
-if [ -d "$LOCK.reap" ]; then pass; else fail "the removal lock of the other launch is gone"; fi
-rm -f "$LOCK"; rmdir "$LOCK.reap"
+expect_eq "removal lock holder" "$$" "$(readlink "$LOCK.reap")"
+rm -f "$LOCK" "$LOCK.reap"
+
+setup "a removal lock of a launch that no longer runs is removed" A='|open'
+ln -s "$dead" "$LOCK"
+ln -s "$dead" "$LOCK.reap"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Removed the removal lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale removal lock"; fi
+expect_no_lock
+
+setup "TERM as the removal lock is taken" A='|open'
+ln -s "$dead" "$LOCK"
+touch "$STATE/term-at-reap"
+with_claims 'claim_issues A; echo "not stopped"'
+expect_eq "exit code" 130 $?
+expect_owner A '|open'
+expect_untouched A
+if [ -L "$LOCK.reap" ] || [ -e "$LOCK.reap" ]; then fail "the removal lock is still there"; else pass; fi
+rm -f "$LOCK"
 
 setup "the lock directory of an older launcher is kept" A='|open'
 mkdir "$LOCK"
@@ -419,6 +444,8 @@ for launcher in "${LAUNCHERS[@]}"; do
     if [ -f "$STATE/panes" ]; then fail "the session still runs"; else pass; fi
     expect_no_lock
 
+    # dev-workflow.sh, run by /bin/bash 3.2, dies on this INT and its EXIT trap
+    # rolls back; the case above is the one that needs the INT trap
     setup "$name: INT during setup" A='|open' B='me|open'
     touch "$STATE/int-at-new-session"
     launch "$launcher" A B
