@@ -239,21 +239,105 @@ describe('background: a picker that could not be activated leaves no session', (
     });
   });
 
-  it('keeps the session of a newer start when an older start on the same tab fails after it', async () => {
+  /** The activation of the picker in the tab: answered when the test says, for each START in turn */
+  const holdActivations = () => {
+    const answers: Array<(ok: boolean) => void> = [];
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) => {
+      if ((message as { type?: string }).type !== 'ACTIVATE_ELEMENT_PICKER') {
+        return Promise.resolve(undefined);
+      }
+      return new Promise((resolve, reject) => {
+        answers.push((ok) => { if (ok) { resolve(undefined); } else { reject(new Error('Could not establish connection')); } });
+      });
+    });
+    return async (index: number, ok: boolean) => {
+      await vi.waitFor(() => { expect(answers.length).toBeGreaterThan(index); });
+      answers[index]?.(ok);
+    };
+  };
+  const startOn = (listener: MessageListener) =>
+    send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+  it('keeps the session of a newer start when an older start on the same tab fails', async () => {
     const listener = await startServiceWorker();
-    let failFirst: (error: Error) => void = () => undefined;
-    vi.mocked(chrome.tabs.sendMessage)
-      .mockImplementationOnce(() => new Promise((_resolve, reject) => { failFirst = reject; }))
-      .mockResolvedValueOnce(undefined);
+    const answer = holdActivations();
 
-    const first = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
-    await vi.waitFor(() => { expect(chrome.tabs.sendMessage).toHaveBeenCalledTimes(1); });
-    expect(await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }))
-      .toEqual({ success: true, tabId: CLAUDE_TAB.id });
-    failFirst(new Error('Could not establish connection'));
-    expect(await first).toMatchObject({ success: false });
+    const older = startOn(listener);
+    const newer = startOn(listener);
+    await answer(0, false);
+    await answer(1, true);
+
+    expect(await older).toMatchObject({ success: false });
+    expect(await newer).toEqual({ success: true, tabId: CLAUDE_TAB.id });
     await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
 
+  it('keeps the session of an older start, whose picker is active, when a newer start on the same tab fails', async () => {
+    const listener = await startServiceWorker();
+    const answer = holdActivations();
+
+    const older = startOn(listener);
+    const newer = startOn(listener);
+    await answer(0, true);
+    await answer(1, false);
+
+    expect(await older).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await newer).toMatchObject({ success: false });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+    expect(await storedRepairs()).toEqual({ 'claude.ai': { override: { mode: 'custom', placement: 'before', selector: SEND_BUTTON } } });
+  });
+
+  it('keeps the session of a start that lands while the stop deactivates the pickers', async () => {
+    const listener = await startServiceWorker();
+    await startOn(listener);
+    let releaseDeactivate: () => void = () => undefined;
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation((_tabId: number, message: unknown) =>
+      (message as { type?: string }).type === 'DEACTIVATE_ELEMENT_PICKER'
+        ? new Promise((resolve) => { releaseDeactivate = () => { resolve(undefined); }; })
+        : Promise.resolve(undefined));
+
+    const stopped = send(listener, { type: 'STOP_ELEMENT_PICKER' });
+    await vi.waitFor(() => { expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' })); });
+    expect(await startOn(listener)).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    releaseDeactivate();
+
+    expect(await stopped).toEqual({ success: true });
+    expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
+  });
+
+  it('keeps the session of a start that lands while the stop reads what to remove', async () => {
+    const listener = await startServiceWorker();
+    await startOn(listener);
+    // The stop reads the sessions to remove; that read answers only once a new start was sent
+    let releaseRead: () => void = () => undefined;
+    let deactivating = false;
+    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+      if ((message as { type?: string }).type === 'DEACTIVATE_ELEMENT_PICKER') {
+        deactivating = true;
+      }
+      return undefined;
+    });
+    const realGet = vi.mocked(chrome.storage.session.get).getMockImplementation();
+    vi.mocked(chrome.storage.session.get).mockImplementation(((keys?: unknown) => {
+      const result = (realGet as (keys?: unknown) => Promise<Record<string, unknown>>)(keys);
+      if (!deactivating || keys !== null) {
+        return result;
+      }
+      deactivating = false;
+      return new Promise((resolve) => { releaseRead = () => { resolve(result); }; });
+    }) as never);
+
+    const stopped = send(listener, { type: 'STOP_ELEMENT_PICKER' });
+    await vi.waitFor(() => { expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(CLAUDE_TAB.id, expect.objectContaining({ type: 'DEACTIVATE_ELEMENT_PICKER' })); });
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    const restarted = startOn(listener);
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    releaseRead();
+
+    expect(await stopped).toEqual({ success: true });
+    expect(await restarted).toEqual({ success: true, tabId: CLAUDE_TAB.id });
     expect(await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: SEND_BUTTON } }, { tab: CLAUDE_TAB })).toEqual({ success: true });
   });
 });
