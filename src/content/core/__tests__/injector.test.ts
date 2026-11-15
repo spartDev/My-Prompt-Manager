@@ -372,6 +372,11 @@ describe('PromptLibraryInjector', () => {
         const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
         const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
         expect(keydown).toBeDefined();
+        // In the capture phase, each of the slash's events: a Platform's slash menu may stop them at its editor
+        for (const type of ['keydown', 'beforeinput', 'input']) {
+          const call = eventManagerInstance.addTrackedEventListener.mock.calls.find((listened: any[]) => listened[0] === document && listened[1] === type && listened[2] === keydown[2]);
+          expect(call?.[3], type).toBe(true);
+        }
 
         const typeSlashes = (field: HTMLTextAreaElement): void => {
           field.value = 'Draft //';

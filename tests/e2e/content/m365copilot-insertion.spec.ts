@@ -12,7 +12,7 @@
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
 import { undoButton } from '../fixtures/insertion-flow';
-import { choosePrompt, enterKeys, openPlatform, promptsButton } from '../fixtures/platform-pages';
+import { choosePrompt, enterKeys, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const REVIEW = {
@@ -53,6 +53,28 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     expect(await page.evaluate(() => (window as Window & { __placementBeforeToolbar?: string | null }).__placementBeforeToolbar)).toBe('overlay');
     await expect(button).toHaveAttribute('data-mpm-anchor', '0');
     expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
+  });
+
+  test('typing // opens the Prompt selector next to Copilot\'s own slash menu, which closes with the //', async ({ context }) => {
+    const page = await openPlatform(context, 'm365copilot-editor');
+    await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await page.keyboard.type('/');
+    // The first slash opens Copilot's menu, which then keeps the keys typed to itself
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
+    // The extension has read the field after the first slash (a timer set after its own runs after
+    // it): the second slash is heard on its own, as when the user pauses between the two
+    await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 0); }));
+    await page.keyboard.type('/');
+
+    await expect(promptSelector(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone' }).toBe('');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
+
+    await promptRow(page, REVIEW.id).click();
+    await expect(promptSelector(page)).toBeHidden();
+    await expect.poll(() => page.evaluate(readEditor), { message: 'the Prompt, once' }).toBe(REVIEW.content);
   });
 
   test('a Prompt is inserted once, line for line, without sending, and Undo empties the field again', async ({ context }) => {

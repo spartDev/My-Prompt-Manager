@@ -40,6 +40,8 @@ export type NotificationType = 'error' | 'warn' | 'info';
 export interface EventListenerEntry {
   event: string;
   handler: EventListener;
+  /** Listening in the capture phase: removing the listener needs it too */
+  capture?: boolean;
 }
 
 export interface InsertionManagerOptions {

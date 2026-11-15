@@ -19,6 +19,14 @@ export const MODIFIER_KEYS: ReadonlySet<string> = new Set([
 /** The two characters that open the Prompt selector when typed in the input field. */
 export const SELECTOR_TRIGGER = '//';
 
+/**
+ * Characters an editor puts in its markup that the user neither typed nor sees, such as the
+ * zero-width space Lexical keeps beside the caret: not text of the field for the `//`.
+ */
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/g;
+
+const visible = (text: string): string => text.replace(INVISIBLE, '');
+
 const BLOCK_TAGS = new Set([
   'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DD', 'DIV', 'DL', 'DT', 'FIGCAPTION', 'FIGURE', 'FOOTER',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'OL', 'P', 'PRE', 'SECTION',
@@ -146,10 +154,11 @@ export function textAround(field: HTMLElement, range: Range): { before: string; 
  * start of the field, or right after a space or a line break. The `//` of `https://` opens nothing.
  */
 export function endsWithSelectorTrigger(before: string): boolean {
-  if (!before.endsWith(SELECTOR_TRIGGER)) {
+  const seen = visible(before);
+  if (!seen.endsWith(SELECTOR_TRIGGER)) {
     return false;
   }
-  const preceding = before.charAt(before.length - SELECTOR_TRIGGER.length - 1);
+  const preceding = seen.charAt(seen.length - SELECTOR_TRIGGER.length - 1);
   return preceding === '' || /\s/.test(preceding);
 }
 
@@ -161,13 +170,16 @@ export function endsWithSelectorTrigger(before: string): boolean {
  */
 export function removeTypedTrigger(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
-  if (before === null || !before.endsWith(SELECTOR_TRIGGER)) {
+  if (before === null || !visible(before).endsWith(SELECTOR_TRIGGER)) {
     return false;
   }
   const document = field.ownerDocument;
   const canExec = typeof document.execCommand === 'function';
 
   if (isTextControl(field)) {
+    if (!before.endsWith(SELECTOR_TRIGGER)) {
+      return false;
+    }
     const caret = field.selectionStart ?? 0;
     const start = caret - SELECTOR_TRIGGER.length;
     const original = field.value;
@@ -192,22 +204,26 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   // whose own handler puts the // back, or changes the rest of the draft, did not take the removal.
   // Two things the removal itself changes are not differences: the browser turns a space left
   // at the end of a line into a non-breaking one, and the one line break before a // that ended
-  // the field becomes the break that keeps the last line open, which is not read as a line
+  // the field becomes the break that keeps the last line open, which is not read as a line.
+  // Neither is a character the user does not see, which an editor may add or drop as it pleases
   const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
-  const original = plainTextOf(field);
-  const expected = spaces(original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length));
+  const original = visible(plainTextOf(field));
+  const typed = visible(before);
+  const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
   // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
-  const endedField = original.length === before.length;
+  const endedField = original.length === typed.length;
   const removed = (): boolean => {
-    const now = spaces(plainTextOf(field));
+    const now = spaces(visible(plainTextOf(field)));
     return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
   };
 
   if (canExec && typeof selection.modify === 'function') {
-    for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {
+    // Back over the two slashes, and over a character the user does not see between them or
+    // after them (Lexical's zero-width space)
+    for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && visible(selection.toString()).length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
-    if (selection.toString() === SELECTOR_TRIGGER && document.execCommand('delete')) {
+    if (visible(selection.toString()) === SELECTOR_TRIGGER && document.execCommand('delete')) {
       return removed();
     }
     if (!selection.isCollapsed) {

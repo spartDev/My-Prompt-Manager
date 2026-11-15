@@ -410,9 +410,11 @@ export class PromptLibraryInjector {
         this.openFromTyping(field);
       }, 0);
     };
-    this.eventManager.addTrackedEventListener(document, 'keydown', onSlash);
-    this.eventManager.addTrackedEventListener(document, 'beforeinput', onSlash);
-    this.eventManager.addTrackedEventListener(document, 'input', onSlash);
+    // In the capture phase: a Platform's own slash menu (Microsoft 365 Copilot opens one on a /)
+    // may stop the slash's events at its editor, before they reach the document
+    this.eventManager.addTrackedEventListener(document, 'keydown', onSlash, true);
+    this.eventManager.addTrackedEventListener(document, 'beforeinput', onSlash, true);
+    this.eventManager.addTrackedEventListener(document, 'input', onSlash, true);
   }
 
   /**

@@ -13,15 +13,23 @@ export class EventManager {
     this.listeners = new Map();
   }
 
-  addTrackedEventListener(element: EventTarget, event: string, handler: EventListener): void {
-    element.addEventListener(event, handler);
+  /**
+   * @param capture - Listens in the capture phase: the listener hears the event before the page's
+   *   own handlers below `element`, even one that stops it there
+   */
+  addTrackedEventListener(element: EventTarget, event: string, handler: EventListener, capture = false): void {
+    if (capture) {
+      element.addEventListener(event, handler, true);
+    } else {
+      element.addEventListener(event, handler);
+    }
     
     if (!this.listeners.has(element)) {
       this.listeners.set(element, []);
     }
     const elementListeners = this.listeners.get(element);
     if (elementListeners) {
-      elementListeners.push({ event, handler });
+      elementListeners.push(capture ? { event, handler, capture } : { event, handler });
     }
   }
 
@@ -34,8 +42,12 @@ export class EventManager {
     if (!elementListeners) {
       return;
     }
-    elementListeners.forEach(({ event, handler }) => {
-      element.removeEventListener(event, handler);
+    elementListeners.forEach(({ event, handler, capture }) => {
+      if (capture) {
+        element.removeEventListener(event, handler, true);
+      } else {
+        element.removeEventListener(event, handler);
+      }
     });
     this.listeners.delete(element);
   }
@@ -45,9 +57,13 @@ export class EventManager {
     let errorCount = 0;
     
     this.listeners.forEach((listeners, element) => {
-      listeners.forEach(({ event, handler }) => {
+      listeners.forEach(({ event, handler, capture }) => {
         try {
-          element.removeEventListener(event, handler);
+          if (capture) {
+            element.removeEventListener(event, handler, true);
+          } else {
+            element.removeEventListener(event, handler);
+          }
           removedCount++;
         } catch (err) {
           errorCount++;

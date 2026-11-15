@@ -43,7 +43,9 @@ describe('endsWithSelectorTrigger', () => {
     ['Summarize this //', 'after a space'],
     ['First line\n//', 'at the start of a new line'],
     ['Tab\t//', 'after a tab'],
-    ['A //', 'after a non-breaking space']
+    ['A //', 'after a non-breaking space'],
+    ['Hi /\u200B/', 'with a zero-width space an editor keeps between the slashes (Lexical, M365 Copilot)'],
+    ['Hi //\uFEFF', 'with a zero-width character after the slashes']
   ])('opens on %j: %s', (before) => {
     expect(endsWithSelectorTrigger(before)).toBe(true);
   });
@@ -55,7 +57,8 @@ describe('endsWithSelectorTrigger', () => {
     ['/', 'a single slash'],
     ['// ', 'something typed after it'],
     ['', 'an empty field'],
-    ['1//', 'right after a digit']
+    ['1//', 'right after a digit'],
+    ['a\u200B//', 'right after a letter, a zero-width space between']
   ])('does not open on %j: %s', (before) => {
     expect(endsWithSelectorTrigger(before)).toBe(false);
   });

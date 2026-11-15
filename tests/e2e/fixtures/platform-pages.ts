@@ -302,9 +302,12 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  *   deleting text): the editor takes its text from what its paragraph then shows.
  * - A Backspace key removes the last character.
  */
-const lexicalEditor = (field: string): string => /* html */ `
+const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
     <script>
       const editor = document.querySelector(${JSON.stringify(field)});
+      const slashMenu = ${String(slashMenu)};
+      // The slash menu while it is open (SLASH_MENU)
+      let menu = null;
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
@@ -368,10 +371,30 @@ const lexicalEditor = (field: string): string => /* html */ `
       /** Text arrives where the known selection is, in place of what is selected. */
       const write = (written) => {
         text = text.slice(0, known.start) + written + text.slice(known.end);
-        const caret = known.start + written.length;
+        let caret = known.start + written.length;
+        if (slashMenu && written === '/' && !menu) {
+          // A slash opens the menu, and a zero-width space goes after it while the menu is open
+          menu = document.createElement('div');
+          menu.setAttribute('role', 'listbox');
+          menu.setAttribute('data-e2e', 'slash-menu');
+          menu.textContent = 'Opened by you';
+          document.body.append(menu);
+          text = text.slice(0, caret) + '\u200B' + text.slice(caret);
+          caret += 1;
+        } else if (menu && !text.includes('/')) {
+          // The slash is gone: so is the menu, and its zero-width space
+          menu.remove();
+          menu = null;
+          caret -= (text.slice(0, caret).match(/\u200B/g) ?? []).length;
+          text = text.replace(/\u200B/g, '');
+        }
         draw();
         caretTo(caret);
       };
+      // While the menu is open, the keys and the text typed are its own: they stop at the editor
+      for (const type of ['keydown', 'beforeinput', 'input']) {
+        editor.addEventListener(type, (event) => { if (menu) { event.stopPropagation(); } });
+      }
       document.addEventListener('selectionchange', () => {
         const selection = document.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
@@ -423,6 +446,11 @@ const lexicalEditor = (field: string): string => /* html */ `
           ? offsetOf(selection.focusNode, selection.focusOffset)
           : null;
         text = lines.join('\\n');
+        if (menu && !text.includes('/')) {
+          menu.remove();
+          menu = null;
+          text = text.replace(/\\u200B/g, '');
+        }
         draw();
         caretTo(caret === null ? text.length : Math.min(caret, text.length));
       });
@@ -446,11 +474,16 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
 
 /**
  * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft: its composer
- * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button (LATE_TOOLBAR), and an editor that
- * behaves as Perplexity's Lexical editor does (lexicalEditor), assumed, not seen there.
+ * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button
+ * (LATE_TOOLBAR), and an editor that behaves as Perplexity's Lexical editor does (lexicalEditor),
+ * assumed, not seen there. And its own slash menu, seen on the live page on 2026-11-15: a slash
+ * opens a list of recent files, and the editor then holds a zero-width span beside the slashes.
+ * What else the menu does was not read; the stand-in takes the worst a menu may do: while it is
+ * open, the keys and the text typed stop at the editor, and a zero-width space sits after the
+ * slash that opened it. The menu closes once that slash is gone.
  */
 const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
-  .replace('</body>', `${lexicalEditor('[data-lexical-editor]')}${LATE_TOOLBAR}\n  </body>`);
+  .replace('</body>', `${lexicalEditor('[data-lexical-editor]', true)}${LATE_TOOLBAR}\n  </body>`);
 
 /**
  * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and

@@ -223,6 +223,7 @@ describe('icon placement override on a built-in Platform', () => {
   });
 
   it('moves the icon from the picked element into the toolbar once the Platform renders it, and drops the pick', async () => {
+    grace(1000);
     renameToolbar('', 'renamed-');
     await changeIconPlacementRepairs({
       type: 'setOverride',
@@ -234,9 +235,9 @@ describe('icon placement override on a built-in Platform', () => {
     await settle();
     expect(icon().getAttribute('data-mpm-placement')).toBe('override');
 
-    // At the element the user picked, the toolbar is looked for every SLOW_TOOLBAR_CHECK_MS
+    // Within the grace period: the Platform rendered its toolbar after its editor
     renameToolbar('renamed-', '');
-    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: IconPlacementController.SLOW_TOOLBAR_CHECK_MS * 3 });
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
     await settle();
 
     expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('composer-dictate');
