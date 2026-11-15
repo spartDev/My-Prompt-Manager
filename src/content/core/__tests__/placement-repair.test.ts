@@ -216,6 +216,39 @@ describe('PlacementRepair.report', () => {
     expect(repair.positioning).toBeNull();
   });
 
+  it('sends its placement after a back/forward cache restore whose read a storage event overtook', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    let answer: (value: unknown) => void = () => undefined;
+    vi.mocked(chrome.storage.local.get).mockImplementationOnce((() => new Promise((resolve) => { answer = resolve; })) as never);
+    pageShow(true);
+    // Another tab's report changes the status, not the pick, before the read answers
+    storageChange({ 'claude.ai': { status: 'override', override: PICK } });
+    answer({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay', override: PICK } } });
+    await flush();
+
+    // The service worker forgot the tab: it is counted again
+    expect(sent()).toEqual(['override', 'override']);
+  });
+
+  it('keeps its pick and sends its placement when the read of a back/forward cache restore fails', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('override');
+    await flush();
+
+    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('Extension context invalidated'));
+    pageShow(true);
+    await flush();
+
+    expect(repair.positioning).toEqual(PICK);
+    expect(sent()).toEqual(['override', 'override']);
+  });
+
   it('sends the first placement again after the repair is loaded again', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
     await repair.load();

@@ -230,16 +230,20 @@ export class PlacementRepair {
 
   private sendAgain(reason: string): void {
     const changesBefore = this.changes;
-    readIconPlacementRepairs().then((repairs) => {
+    // Read here, not by readIconPlacementRepairs: a read that fails must not pass for "no repair"
+    chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY).then((result) => {
       this.sent = null;
       if (this.changes !== changesBefore) {
         // A storage event during the read is newer than the read, and was followed
         this.reportPlaced();
         return;
       }
-      this.follow(repairs[this.hostname]);
+      this.follow(parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY])[this.hostname]);
     }, (err: unknown) => {
+      // The repair this page holds stands; its placement is sent on it
       debug('Icon placement repair not read again', { reason, error: String(err) });
+      this.sent = null;
+      this.reportPlaced();
     });
   }
 }
