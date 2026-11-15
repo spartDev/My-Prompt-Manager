@@ -241,21 +241,28 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
       return;
     }
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-
-    const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
-    let next = repairs;
-    for (const hostname of left) {
-      const remaining = Object.values(tabs[hostname] ?? {});
-      if (remaining.length > 0 && next[hostname]?.status) {
-        // The status the tabs still open call for, as if one of them had just reported
-        const status = statusOf(remaining);
-        next = applyIconPlacementRepairChange(next, { type: 'reportPlacement', hostname, placement: status ?? 'toolbar' }, status);
-      }
-    }
-    if (next !== repairs) {
-      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: next });
-    }
+    await settleStatus(tabs, left);
   });
+}
+
+/**
+ * Brings the status of these Platforms to what their known tabs call for, once a tab was forgotten
+ * or moved: as if one of them had just reported. Kept when no tab of the Platform is known, or when
+ * the repair has no status (an override waiting for one). Called under the lock.
+ */
+async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[]): Promise<void> {
+  const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
+  let next = repairs;
+  for (const hostname of hostnames) {
+    const remaining = Object.values(tabs[hostname] ?? {});
+    if (remaining.length > 0 && next[hostname]?.status) {
+      const status = statusOf(remaining);
+      next = applyIconPlacementRepairChange(next, { type: 'reportPlacement', hostname, placement: status ?? 'toolbar' }, status);
+    }
+  }
+  if (next !== repairs) {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: next });
+  }
 }
 
 /**
@@ -274,6 +281,8 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
     delete byTab[String(fromTabId)];
     byTab[String(toTabId)] ??= placement;
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
+    // The new id's own placement replaced the old one: the status follows the tabs known
+    await settleStatus(tabs, [hostname]);
   });
 }
 

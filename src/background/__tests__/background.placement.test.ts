@@ -184,6 +184,12 @@ describe('background: the icon placement of each tab of a Platform', () => {
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
     expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
 
+    // A change with no new URL (a title, a load status) is not a move
+    tabEvent('onUpdated', CLAUDE_TAB.id, { status: 'complete', title: 'Claude' }, CLAUDE_TAB);
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+    expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
+
     tabEvent('onUpdated', CLAUDE_TAB.id, { url: 'https://example.com/' }, { ...CLAUDE_TAB, url: 'https://example.com/' });
     await new Promise((resolve) => { setTimeout(resolve, 20); });
     await report(listener, OTHER_CLAUDE_TAB, 'toolbar');

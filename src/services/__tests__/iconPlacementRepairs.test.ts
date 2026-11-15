@@ -242,6 +242,27 @@ describe('the placements of several tabs of a Platform', () => {
     expect(await readIconPlacementRepairs()).toEqual({});
   });
 
+  it('drops the pick once a replaced tab\'s new id, already in its Toolbar, takes the old id\'s place', async () => {
+    await report(1, 'overlay');
+    // The new page reports before Chrome tells the swap: the old id still needs the overlay
+    await report(9, 'toolbar');
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'overlay' });
+
+    await moveIconPlacementTab(1, 9, 'claude.ai');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('keeps showing the Anchored overlay when a tab reports the override while another is on the overlay', async () => {
+    await pickInTab1();
+    await report(2, 'overlay');
+
+    await report(1, 'override');
+    await report(3, 'override');
+
+    expect((await readIconPlacementRepairs())['claude.ai']?.status).toBe('overlay');
+  });
+
   it('moves a replaced tab\'s placement on the Platform named only', async () => {
     await pickInTab1();
 
