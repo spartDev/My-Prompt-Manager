@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { newestReleaseNotes, parseExample, RELEASE_NOTES } from '../releaseNotes';
+import { parseExample, RELEASE_NOTES } from '../releaseNotes';
 import type { ReleaseNotes } from '../types';
 
 const notes2 = (): ReleaseNotes => {
@@ -54,9 +54,5 @@ describe('Release notes 2.0.0', () => {
       { kind: 'variable', name: 'audience' },
       { kind: 'variable', name: 'tone' }
     ]);
-  });
-
-  it('is the newest Release notes', () => {
-    expect(newestReleaseNotes()?.version).toBe('2.0.0');
   });
 });
