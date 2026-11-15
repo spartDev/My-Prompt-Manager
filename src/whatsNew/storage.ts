@@ -1,7 +1,8 @@
 /**
  * The What's new record: the Release the extension was first installed at, and the Last seen
- * Release. One `chrome.storage.local` key, apart from the Site settings, so resetting the
- * settings leaves it. This module is its only reader and writer.
+ * Release. One `chrome.storage.local` key, apart from the Site settings, so Reset settings leaves
+ * it; Clear All Data and the Reset Data of the error screen keep it too
+ * (`clearStorageKeepingWhatsNew`). This module is its only reader and writer.
  * Terms: CONTEXT.md, section "Releases".
  */
 
@@ -42,12 +43,34 @@ export const readWhatsNewRecord = async (): Promise<WhatsNewRecord> => {
   return parseWhatsNewRecord(result[WHATS_NEW_KEY]);
 };
 
-/** Shared by the popup, the side panel and the service worker */
+// Shared by the popup, the side panel and the service worker through the Web Locks API. Clear All
+// Data takes it last, innermost, after the icon placement repairs lock (StorageManager.clearAllData),
+// so a write waiting in another context lands before the clear or after it, never in the middle.
 const whatsNewLock = new AsyncMutex({ scope: 'WhatsNew' });
+
+/** Runs an operation while no context can change the What's new record */
+export function withWhatsNewLock<T>(operation: () => Promise<T>): Promise<T> {
+  return whatsNewLock.withLock(WHATS_NEW_KEY, operation);
+}
+
+/**
+ * Empties `chrome.storage.local` but for the What's new record, which Clear All Data and the Reset
+ * Data of the error screen leave, so What's new does not come back for a seen Release nor show on
+ * a first install. The stored value is read raw and written back as it was. Rejects, before
+ * clearing anything, when storage cannot be read. Takes no lock: the caller holds
+ * `withWhatsNewLock`.
+ */
+export async function clearStorageKeepingWhatsNew(): Promise<void> {
+  const kept: unknown = (await chrome.storage.local.get(WHATS_NEW_KEY))[WHATS_NEW_KEY];
+  await chrome.storage.local.clear();
+  if (kept !== undefined) {
+    await chrome.storage.local.set({ [WHATS_NEW_KEY]: kept });
+  }
+}
 
 /** Writes one field over what storage holds, keeping the other one. */
 const writeField = (field: keyof WhatsNewRecord, version: string): Promise<void> =>
-  whatsNewLock.withLock(async () => {
+  withWhatsNewLock(async () => {
     const record = await readWhatsNewRecord();
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: { ...record, [field]: version } });
   });

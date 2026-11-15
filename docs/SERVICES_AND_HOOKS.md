@@ -21,7 +21,7 @@ chrome.storage.local
 
 The popup, the side panel and the service worker each have their own `StorageManager` instance, and share the stored data. The content script reads Prompts with `readPrompts()` of `promptAdmission.ts`, and never writes them.
 
-One exception: the reset action of `src/components/ErrorBoundary.tsx` calls `chrome.storage.local.clear()` directly, outside `StorageManager` and its locks, so it is not serialized with other writes. `clearAllData()` of `StorageManager` is the serialized way to clear.
+One exception: the Reset Data action of `src/components/ErrorBoundary.tsx` clears storage directly with `clearStorageKeepingWhatsNew()` of `src/whatsNew/storage.ts`, under the What's new lock only, outside `StorageManager` and its locks, so it is not serialized with other writes; when the What's new record cannot be kept it falls back to `chrome.storage.local.clear()`. `clearAllData()` of `StorageManager` is the serialized way to clear. Both keep the `whatsNew` record and empty every other key.
 
 Other keys of `chrome.storage.local` belong to the code that owns them, which writes them directly:
 
@@ -33,7 +33,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `iconPlacementRepairs` | `src/services/iconPlacementRepairs.ts`; written by the service worker only |
 | `interfaceMode` | `src/components/SettingsView.tsx` |
 | `grantedPermissions` | `src/background/background.ts` |
-| `whatsNew` (the Release of the first install, the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer; the service worker records the first install, `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so a reset of the settings leaves it |
+| `whatsNew` (the Release of the first install, the Last seen Release) | `src/whatsNew/storage.ts`, the only reader and writer; the service worker records the first install, `markReleaseSeen` is the only writer of the Last seen Release and writes nothing in Debug mode. Outside the Site settings, so Reset settings leaves it; Clear All Data and the error screen's Reset Data keep it too (`clearStorageKeepingWhatsNew`), so What's new does not come back for a seen Release nor show after a first install |
 
 ---
 
@@ -63,8 +63,8 @@ Helpers the services lean on: `src/utils/asyncMutex.ts` (locks), `src/utils/stor
 `AsyncMutex` queues operations per key. `StorageManager` creates it with a `scope`, so `withLock(key, operation)` runs `navigator.locks.request('StorageManager:' + key, operation)`: the popup, the side panel and the service worker (same extension origin) exclude each other on the Prompts, Categories and settings keys. The operation's result or error comes back unchanged and the lock is released either way. Where the Web Locks API is missing, or refuses the request without running the operation (it throws, or rejects with a `SecurityError` in an opaque origin), the in-memory queue is used (tests, old browsers).
 
 - Nested keys are taken in the fixed order CATEGORIES → PROMPTS → SETTINGS, and nothing under a lock awaits another context.
-- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), both shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first and the icon placement repairs lock last, so a change waiting in another context cannot write either back after the clear. Nothing else takes them together with another lock.
-- Clear All Data takes all five, so a write from another context lands wholly before or after it.
+- The Site settings have a lock of their own, in `src/services/siteSettings.ts` (`withSiteSettingsLock`, scope `SiteSettings`), and so do the icon placement repairs, in `src/services/iconPlacementRepairs.ts` (`withIconPlacementRepairsLock`, scope `IconPlacementRepairs`), and so does the What's new record, in `src/whatsNew/storage.ts` (`withWhatsNewLock`, scope `WhatsNew`), all shared across contexts the same way. `clearAllData()` takes them after SETTINGS, the Site settings lock first, then the icon placement repairs lock, the What's new lock last (innermost), so a change waiting in another context cannot write any of them back after the clear. Nothing else takes them together with another lock.
+- Clear All Data takes all six, so a write from another context lands wholly before or after it.
 - Reads take no lock, except reading the Categories, which takes CATEGORIES only to write a missing default Category.
 - Settings writes take only the SETTINGS key, so a toggle never waits on a Prompt write.
 - `UsageTracker` keeps a plain in-memory `AsyncMutex`.
@@ -146,6 +146,6 @@ Components read the theme through `useThemeContext()` of `src/contexts/ThemeCont
 ## Adding a service or hook
 
 1. Write the Prompts, the Categories and the settings only through `StorageManager`; a new route that brings Prompt text into the Library goes through an Admission route. Another key belongs to the one module that owns it: add it to the table of owners above.
-2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
+2. Take locks in the order CATEGORIES → PROMPTS → SETTINGS (then the Site settings lock, then the icon placement repairs lock, then the What's new lock, which only `clearAllData()` nests), and await nothing from another context under a lock.
 3. Test it in the `__tests__/` folder next to it ([TESTING.md](./TESTING.md)).
 4. Add a row to the table of this page: one line on its job, no signature.

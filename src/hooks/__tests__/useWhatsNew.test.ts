@@ -77,12 +77,19 @@ describe('useWhatsNew', () => {
   it('close() hides the notes at once and marks the Release as seen', async () => {
     const { result } = await openExtension();
     expect(result.current.notes).toBe(V2_0);
+    vi.mocked(chrome.storage.local.get).mockClear();
 
     act(() => {
       result.current.close();
     });
 
     expect(result.current.notes).toBeNull();
+    // The storage work starts in the same tick as close(): only microtasks run (the lock's queue),
+    // no timer and no task, so the exit animation never delays it
+    for (let microtask = 0; microtask < 5; microtask++) {
+      await Promise.resolve();
+    }
+    expect(chrome.storage.local.get).toHaveBeenCalledWith([WHATS_NEW_KEY]);
     await waitFor(async () => {
       expect(await storedRecord()).toEqual({ lastSeenVersion: '2.0.0' });
     });

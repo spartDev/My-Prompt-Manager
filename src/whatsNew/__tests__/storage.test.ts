@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { changeSiteSettings, SITE_SETTINGS_KEY } from '../../services/siteSettings';
+import { StorageManager } from '../../services/storage';
 import {
   markReleaseSeen,
   parseWhatsNewRecord,
@@ -98,5 +100,74 @@ describe('What\'s new record: recordInstall', () => {
     await Promise.all([recordInstall('2.0.0'), markReleaseSeen('2.0.0', { debugMode: false })]);
 
     expect(await stored()).toEqual({ installedVersion: '2.0.0', lastSeenVersion: '2.0.0' });
+  });
+});
+
+describe("What's new record: kept across Clear All Data and Reset settings", () => {
+  const RECORD = { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' };
+  const OTHER_KEYS = {
+    prompts: [],
+    categories: [{ id: 'default', name: 'Uncategorized' }],
+    settings: { defaultCategory: 'Uncategorized', sortOrder: 'updatedAt' },
+    [SITE_SETTINGS_KEY]: { enabledSites: [], customSites: [], debugMode: true },
+    interfaceMode: 'sidepanel',
+    iconPlacementRepairs: {},
+    usageHistory: [],
+    toast_settings: { enabled: true }
+  };
+
+  it("Clear all data leaves the What's new record", async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: RECORD });
+
+    await StorageManager.getInstance().clearAllData();
+
+    // Both fields kept, every other key gone
+    expect(await chrome.storage.local.get(null)).toEqual({ [WHATS_NEW_KEY]: RECORD });
+  });
+
+  it("Clear all data leaves nothing when there is no What's new record", async () => {
+    await chrome.storage.local.set(OTHER_KEYS);
+
+    await StorageManager.getInstance().clearAllData();
+
+    expect(await chrome.storage.local.get(null)).toEqual({});
+  });
+
+  it('Clear all data keeps a record it cannot parse as it was', async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: 'corrupted' });
+
+    await StorageManager.getInstance().clearAllData();
+
+    expect(await chrome.storage.local.get(null)).toEqual({ [WHATS_NEW_KEY]: 'corrupted' });
+  });
+
+  it('Clear all data clears nothing when storage cannot be read', async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: RECORD });
+    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(StorageManager.getInstance().clearAllData()).rejects.toThrow();
+    expect(chrome.storage.local.clear).not.toHaveBeenCalled();
+  });
+
+  it('a Release marked seen while Clear all data runs is not lost', async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: { installedVersion: '1.9.0' } });
+
+    await Promise.all([StorageManager.getInstance().clearAllData(), markReleaseSeen('2.0.0', { debugMode: false })]);
+
+    expect(await chrome.storage.local.get(null)).toEqual({
+      [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' }
+    });
+  });
+
+  it("Reset settings leaves the What's new record", async () => {
+    await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: RECORD });
+
+    // What Settings' Reset settings does: the Site settings, the interface mode, the settings
+    await changeSiteSettings({ type: 'reset' });
+    await chrome.storage.local.set({ interfaceMode: 'popup' });
+    await StorageManager.getInstance().updateSettings({ theme: 'system', sortOrder: 'updatedAt' });
+
+    expect(await chrome.storage.local.get(SITE_SETTINGS_KEY)).toEqual({});
+    expect(await stored()).toEqual(RECORD);
   });
 });
