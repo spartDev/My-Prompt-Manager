@@ -15,6 +15,7 @@ import {
   enabledHostnames,
   isHostnameEnabled,
   readSiteSettings,
+  upgradeStoredSiteSettings,
 } from "../services/siteSettings";
 import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
@@ -1155,6 +1156,26 @@ async function upgradeStoredData(): Promise<void> {
 }
 
 /**
+ * Write the Site settings an earlier release stored as the list of the Platforms that were on, or
+ * whose list it changed after a rollback, back as the Platform choices, on extension update and again at every browser startup, like the pass
+ * above. Until it runs, every reader already reads the list as those choices: it only spares later
+ * releases from reading the old shape. A failure is logged here and never reaches the caller.
+ */
+async function upgradeSiteSettings(): Promise<void> {
+  try {
+    if (await upgradeStoredSiteSettings()) {
+      Logger.info("Stored the Site settings as Platform choices", { component: "Background" });
+    }
+  } catch (error) {
+    Logger.error(
+      "Error storing the Site settings as Platform choices",
+      toError(error),
+      { component: "Background", phase: "site_settings_upgrade" },
+    );
+  }
+}
+
+/**
  * Get the current interface mode from storage
  */
 async function getInterfaceMode(): Promise<InterfaceMode> {
@@ -1606,6 +1627,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
   if (details.reason === "update") {
     void upgradeStoredData();
+    void upgradeSiteSettings();
   }
 
   void (async () => {
@@ -1632,6 +1654,7 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onStartup.addListener(() => {
   // Retry the upgrade pass: one that failed or was cut short on update left stored data uncleaned
   void upgradeStoredData();
+  void upgradeSiteSettings();
 
   void (async () => {
     try {

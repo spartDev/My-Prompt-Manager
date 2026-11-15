@@ -174,8 +174,7 @@ export class PromptLibraryInjector {
 
       debug('Site enablement check completed', {
         hostname: this.state.hostname,
-        isSiteEnabled: this.state.isSiteEnabled,
-        enabledSites: this.state.settings.enabledSites
+        isSiteEnabled: this.state.isSiteEnabled
       });
 
       // ALWAYS setup message listener first - even for disabled sites

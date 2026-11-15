@@ -51,6 +51,16 @@ interface SiteSettings {
   customSites?: CustomSite[];
 }
 
+/**
+ * The Platforms turned on in the stored Site settings. Seeded as the list of the Platforms that were
+ * on, as a release before the Platform choices stored it, they are stored back as the Platform choices
+ * that list stands for, one for each Platform, on the first change (My-Prompt-Manager-dx8).
+ */
+const platformsTurnedOn = async (storage: ExtensionStorage): Promise<string[]> => {
+  const { promptLibrarySettings } = await storage.get<{ promptLibrarySettings?: { platformChoices?: Record<string, boolean> } }>('promptLibrarySettings');
+  return Object.entries(promptLibrarySettings?.platformChoices ?? {}).filter(([, on]) => on).map(([hostname]) => hostname).sort();
+};
+
 /** The popup is 400 x 500; the side panel is at least 320 px wide (docs/DESIGN_GUIDELINES.md) */
 const SURFACES = {
   popup: { width: 400, height: 500 },
@@ -117,8 +127,7 @@ test.describe('Site integration Settings on the tokens', () => {
 
       await claude.click();
       await expect(claude).toBeChecked();
-      await expect.poll(async () => (await storage.get<{ promptLibrarySettings: SiteSettings }>('promptLibrarySettings')).promptLibrarySettings.enabledSites)
-        .toEqual(['chatgpt.com', 'claude.ai']);
+      await expect.poll(() => platformsTurnedOn(storage)).toEqual(['chatgpt.com', 'claude.ai']);
 
       // Storage refuses every write from now on, as it does when the quota is reached
       await page.evaluate(() => {
@@ -129,8 +138,7 @@ test.describe('Site integration Settings on the tokens', () => {
       const notification = page.getByRole('alert').filter({ hasText: "Couldn't save the setting" });
       await expect(notification).toBeVisible();
       await expect(chatgpt).toBeChecked();
-      expect((await storage.get<{ promptLibrarySettings: SiteSettings }>('promptLibrarySettings')).promptLibrarySettings.enabledSites)
-        .toEqual(['chatgpt.com', 'claude.ai']);
+      expect(await platformsTurnedOn(storage)).toEqual(['chatgpt.com', 'claude.ai']);
       // The screenshot waits for the Notification to finish coming in, with the pointer off the switch
       await page.mouse.move(0, 0);
       await notification.evaluate((element) => Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished)));
@@ -165,7 +173,7 @@ test.describe('Site integration Settings on the tokens', () => {
 
       await claude.getByRole('switch').click();
       await expect(logo).toHaveCSS('opacity', '1');
-      await expect.poll(async () => ((await storage.get<{ promptLibrarySettings?: { enabledSites?: string[] } }>('promptLibrarySettings')).promptLibrarySettings?.enabledSites ?? []).includes('claude.ai')).toBe(true);
+      await expect.poll(async () => (await platformsTurnedOn(storage)).includes('claude.ai')).toBe(true);
 
       await card.evaluate(element => { element.scrollIntoView({ block: 'start' }); });
       await page.screenshot({ path: `${SCREENSHOT_DIR}/site-list-${theme}.png` });

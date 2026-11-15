@@ -47,7 +47,7 @@ export interface PlatformDefinition {
   displayName: string;
   /** Platform priority for strategy selection (higher = higher priority) */
   priority: number;
-  /** Whether this platform is enabled by default for new users */
+  /** Whether this platform is on for a user who never switched it (no Platform choice), existing users included */
   defaultEnabled: boolean;
   /** CSS selectors for finding input elements */
   selectors: string[];
@@ -302,8 +302,8 @@ validateLinkedPlatforms();
  */
 
 /**
- * Get list of default enabled platform hostnames
- * Used by background script and content script for consistent defaults
+ * The hostnames of the Platforms that are on by default, highest priority first: the Platforms on
+ * for a user with no Platform choice
  */
 export function getDefaultEnabledPlatforms(): string[] {
   return Object.values(SUPPORTED_PLATFORMS)

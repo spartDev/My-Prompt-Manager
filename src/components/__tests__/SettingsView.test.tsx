@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AdmissionRefusedError } from '../../services/promptAdmission';
+import { enabledPlatforms, parseSiteSettings } from '../../services/siteSettings';
 import { getChromeMockFunctions, getMockStorageManager, triggerChromeStorageChange } from '../../test/mocks';
 import { type Category, DEFAULT_SETTINGS, type Prompt } from '../../types';
 import SettingsView from '../SettingsView';
@@ -568,10 +569,10 @@ describe('SettingsView', () => {
       });
       const writes = siteSettingsWrites();
       expect(writes).toHaveLength(1);
-      const saved = (writes[0][0] as { promptLibrarySettings: { enabledSites: string[] } }).promptLibrarySettings;
-      expect(saved.enabledSites).toEqual(['chatgpt.com', 'claude.ai']);
+      const saved = (writes[0][0] as { promptLibrarySettings: unknown }).promptLibrarySettings;
+      expect(enabledPlatforms(parseSiteSettings(saved))).toEqual(['claude.ai', 'chatgpt.com']);
       expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
-      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: saved });
+      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: parseSiteSettings(saved) });
     });
 
     it('puts the switch back and says so when the save fails', async () => {
@@ -792,7 +793,7 @@ describe('SettingsView', () => {
         expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
         expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, {
           action: 'settingsUpdated',
-          settings: expect.objectContaining({ customSites: [], enabledSites: expect.arrayContaining(['chatgpt.com', 'claude.ai']) })
+          settings: { platformChoices: {}, customSites: [], debugMode: false }
         });
       });
     });
@@ -891,8 +892,8 @@ describe('SettingsView', () => {
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
       const saveCall = setCalls.find((call: any[]) => {
-        const sites: string[] | undefined = call[0]?.promptLibrarySettings?.enabledSites;
-        return call[0]?.promptLibrarySettings && !sites?.some((site) => site === 'chatgpt.com');
+        return call[0]?.promptLibrarySettings !== undefined
+          && !enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).some((hostname) => hostname === 'chatgpt.com');
       });
       expect(saveCall).toBeDefined();
     });
@@ -931,7 +932,8 @@ describe('SettingsView', () => {
     await waitFor(() => {
       const setCalls = (chromeMock.storage.local.set as Mock).mock.calls;
       const saveCall = setCalls.find(
-        (call: any[]) => call[0]?.promptLibrarySettings?.enabledSites?.some((site: string) => site === 'claude.ai')
+        (call: any[]) => call[0]?.promptLibrarySettings !== undefined
+          && enabledPlatforms(parseSiteSettings(call[0].promptLibrarySettings)).some((hostname) => hostname === 'claude.ai')
       );
       expect(saveCall).toBeDefined();
     });

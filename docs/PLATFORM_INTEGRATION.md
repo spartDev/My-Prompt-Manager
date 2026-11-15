@@ -16,7 +16,7 @@ This guide explains how to add support for new LLM platforms (like Gemini, Mistr
 
 ## 🚀 Quick Start (New Method)
 
-Adding a new platform is now incredibly simple! You only need to update **one file**.
+Adding a new platform mostly takes **one file**, `src/config/platforms.ts`. One test must follow: add the new hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in `src/services/__tests__/siteSettings.test.ts` (never to `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/siteSettings.ts`, which is frozen), or that test fails. The `add-platform` skill (`.claude/skills/add-platform/SKILL.md`) lists every step.
 
 ### Step 1: Add Platform Configuration
 
@@ -31,7 +31,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     hostname: 'your-ai-platform.com',
     displayName: 'Your AI Platform',
     priority: 70, // Lower than existing platforms
-    defaultEnabled: true, // Include in fresh installs
+    defaultEnabled: true, // On for every user who never switched it, existing users included
     selectors: [
       'textarea[placeholder*="Ask"]',
       'div[contenteditable="true"]',
@@ -75,7 +75,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai') |
 | `displayName` | string | ✅ | Human-readable name shown in UI |
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
-| `defaultEnabled` | boolean | ✅ | Include in default enabled platforms for new users |
+| `defaultEnabled` | boolean | ✅ | On for every user who never switched it, existing users included (the Site settings store the user's Platform choices) |
 | `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
 | `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |

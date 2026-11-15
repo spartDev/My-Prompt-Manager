@@ -68,12 +68,12 @@ vi.mock('../../utils/storage', () => ({
     return Promise.resolve(hostname === 'localhost' || hostname === 'test.com');
   }),
   getSettings: vi.fn().mockResolvedValue({
-    enabledSites: ['test.com', 'localhost'],
+    platformChoices: { 'test.com': true, localhost: true },
     customSites: [],
     debugMode: false
   }),
   getDefaultSettings: vi.fn().mockReturnValue({
-    enabledSites: ['test.com', 'localhost'],
+    platformChoices: { 'test.com': true, localhost: true },
     customSites: [],
     debugMode: false
   })

@@ -74,6 +74,10 @@ _Avoid_: Custom platform, user site
 Which Platforms and Custom sites the extension works on, each one turned on or off by the user, and the debug switch kept with them. Whether the extension opens as a popup or a side panel is not part of them.
 _Avoid_: Site integration settings, extension settings, site configuration
 
+**Platform choices**:
+What the user turned on or off in the Site settings, Platform by Platform. A Platform the user never switched has no choice and is on or off by default, so a Platform added in a later release is on for every user, and the choices the user made are kept.
+_Avoid_: enabled sites, enabled list
+
 **Prompt selector**:
 The list a user opens inside a Platform, from the Prompts button shown in its input area or by typing `//` in the input field, to choose a Prompt to insert. It lists All Prompts, the Pinned Prompts, the Recent Prompts, or the Prompts of one Category. `//` opens it only at the start of the field or after a space or a line break, so the `//` of a URL does not; the two characters are removed, and where they cannot be the selector stays closed.
 _Avoid_: Picker (the Element picker is the tool that picks where the button goes on a custom site), palette, popover
