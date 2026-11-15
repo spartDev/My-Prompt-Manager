@@ -153,7 +153,15 @@ export class PlacementRepair {
       }
       debug('Icon placement report not saved', { placement, reason });
     };
-    chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } })
+    let sending: Promise<PlacementReportResponse | undefined>;
+    try {
+      sending = chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } });
+    } catch (err) {
+      // An orphaned page (the extension reloaded) throws at the call
+      notSaved(String(err));
+      return;
+    }
+    sending
       .then((response: PlacementReportResponse | undefined) => {
         if (response?.success) {
           return;

@@ -6,6 +6,7 @@ import {
   changeIconPlacementRepairs,
   forgetIconPlacementTab,
   ICON_PLACEMENT_REPAIRS_KEY,
+  ICON_PLACEMENT_TABS_KEY,
   type IconPlacementRepairs,
   moveIconPlacementTab,
   overrideFromPick,
@@ -271,6 +272,18 @@ describe('the placements of several tabs of a Platform', () => {
     await report(2, 'toolbar');
 
     expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('counts no tab from what it did not write in session storage', async () => {
+    await pickInTab1();
+    // A placement it does not know, and a Platform whose tabs are not a record
+    await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: { 'claude.ai': { 1: 'override', 5: 'sideways' }, 'chatgpt.com': 'override' } });
+
+    await forgetIconPlacementTab(1);
+
+    // No tab of claude.ai is known any more: the pick is kept for the next one
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+    expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': {} });
   });
 
   it('counts no other tab for a report that names none', async () => {

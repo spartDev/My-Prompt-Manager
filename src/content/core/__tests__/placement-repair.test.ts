@@ -102,6 +102,20 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual(['toolbar', 'toolbar']);
   });
 
+  it('stays silent in its Toolbar when the repair is dropped, then stored again', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'overlay' } } });
+    await repair.load();
+    repair.report('toolbar');
+    await flush();
+
+    // The service worker still holds this tab's Toolbar
+    storageChange({});
+    storageChange({ 'claude.ai': { status: 'overlay' } });
+
+    expect(sent()).toEqual(['toolbar']);
+  });
+
   it('sends its placement again once storage dropped the repair it was counted for', async () => {
     vi.mocked(chrome.storage.onChanged.addListener).mockClear();
     await repair.load();
@@ -255,12 +269,18 @@ describe('PlacementRepair.report', () => {
     repair.report('override');
     await flush();
 
+    // Every extension API throws at the call there, the message included
     vi.mocked(chrome.storage.local.get).mockImplementationOnce(() => { throw new Error('Extension context invalidated'); });
+    vi.mocked(chrome.runtime.sendMessage).mockImplementationOnce(() => { throw new Error('Extension context invalidated'); });
     expect(() => pageShow(true)).not.toThrow();
     await flush();
 
     expect(repair.positioning).toEqual(PICK);
-    expect(sent()).toEqual(['override', 'override']);
+    expect(vi.mocked(chrome.runtime.sendMessage)).toHaveBeenCalledTimes(2);
+
+    // Not delivered: the next placement is sent again
+    repair.report('override');
+    expect(sent()).toEqual(['override', 'override', 'override']);
   });
 
   it('sends the first placement again after the repair is loaded again', async () => {
