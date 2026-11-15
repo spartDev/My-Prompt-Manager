@@ -119,9 +119,9 @@ create_worktree() {
 
     mkdir -p "$BASE_DIR"
 
-    if git -C "$REPO_DIR" worktree add "$worktree_path" -b "$branch_name" 2>/dev/null; then
+    if git -C "$REPO_DIR" worktree add "$worktree_path" -b "$branch_name" >/dev/null 2>&1; then
         print_status "Created worktree: $branch_name (new branch)" >&2
-    elif git -C "$REPO_DIR" worktree add "$worktree_path" "$branch_name" 2>/dev/null; then
+    elif git -C "$REPO_DIR" worktree add "$worktree_path" "$branch_name" >/dev/null 2>&1; then
         print_status "Created worktree: $branch_name (existing branch)" >&2
     else
         print_error "Failed to create worktree for $issue_id" >&2
@@ -216,12 +216,16 @@ launch_parallel() {
     # Escape single quotes in prompt for shell
     first_prompt="${first_prompt//\'/\'\\\'\'}"
 
+    # Panes are targeted by their ids (%N), whatever base-index and pane-base-index say
+    local -a pane_ids=()
+    local pane_id
     LAUNCH_SESSION="$SESSION"
-    if ! tmux new-session -d -s "$SESSION" -c "$first_path" \
-        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$first_prompt'; exec bash"; then
+    if ! pane_id=$(tmux new-session -d -P -F '#{pane_id}' -s "$SESSION" -c "$first_path" \
+        "echo -e '${GREEN}[$first_priority]${NC} $first_title ($first_issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$first_prompt'; exec bash"); then
         print_error "Could not start the tmux session for $first_issue. Nothing was launched."
         exit 1
     fi
+    pane_ids+=("$pane_id")
 
     # Add additional panes
     for ((i=1; i<count; i++)); do
@@ -236,17 +240,18 @@ launch_parallel() {
         prompt="${prompt//\'/\'\\\'\'}"
 
         # Layout: side by side, then the 3rd and 4th under the first two
-        local split=(-h -t "$SESSION")
+        local split=(-h -t "${pane_ids[0]}")
         if [ "$i" -eq 2 ]; then
-            split=(-v -t "$SESSION:0.0")
+            split=(-v -t "${pane_ids[0]}")
         elif [ "$i" -eq 3 ]; then
-            split=(-v -t "$SESSION:0.1")
+            split=(-v -t "${pane_ids[1]}")
         fi
-        if ! tmux split-window "${split[@]}" -c "$path" \
-            "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"; then
+        if ! pane_id=$(tmux split-window -P -F '#{pane_id}' "${split[@]}" -c "$path" \
+            "echo -e '${GREEN}[$priority]${NC} $title ($issue)'; echo ''; echo 'Starting Claude...'; sleep 1; claude --dangerously-skip-permissions '$prompt'; exec bash"); then
             print_error "Could not open the pane for $issue. Nothing was launched."
             exit 1
         fi
+        pane_ids+=("$pane_id")
     done
 
     # Balance layout

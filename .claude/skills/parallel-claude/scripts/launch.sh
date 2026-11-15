@@ -101,9 +101,9 @@ create_worktree() {
 
     mkdir -p "$BASE_DIR"
 
-    if git -C "$REPO_DIR" worktree add "$path" -b "$branch" 2>/dev/null; then
+    if git -C "$REPO_DIR" worktree add "$path" -b "$branch" >/dev/null 2>&1; then
         print_status "Created: $branch (new)" >&2
-    elif git -C "$REPO_DIR" worktree add "$path" "$branch" 2>/dev/null; then
+    elif git -C "$REPO_DIR" worktree add "$path" "$branch" >/dev/null 2>&1; then
         print_status "Created: $branch (existing)" >&2
     else
         print_error "Failed to create worktree: $issue_id" >&2

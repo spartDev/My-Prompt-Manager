@@ -104,24 +104,58 @@ esac
 exit 0
 STUB
 
-# tmux: counts the panes of the one session. Faults: fail-new-session,
-# fail-split-<n> (the n-th split fails), int-at-new-session (sends INT to the
-# launcher). new-session records whether the claim lock is held at that point.
+# tmux: counts the panes of the one session, numbered %1, %2... and printed by
+# -P. A pane opens only in a directory that exists, taken from -c or from the
+# "cd '<dir>'" its command starts with; each one is appended to $STATE/pane-dirs.
+# A -t target must be the session or a pane already open. Faults:
+# fail-new-session, fail-split-<n> (the n-th split fails), int-at-new-session
+# (sends INT to the launcher). new-session records whether the claim lock is
+# held at that point.
 cat > "$BIN/tmux" <<'STUB'
 #!/usr/bin/env bash
 echo "tmux $1" >> "$STATE/calls"
-case "$1" in
+sub="$1"; shift
+dir=""; target=""; print=""; last=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -c) dir="$2"; shift 2 ;;
+        -t|-s|-F) [ "$1" = "-t" ] && target="$2"; shift 2 ;;
+        -P) print=1; shift ;;
+        -*) shift ;;
+        *) last="$1"; shift ;;
+    esac
+done
+open_pane() {
+    if [ -z "$dir" ]; then
+        case "$last" in "cd '"*) dir="${last#cd \'}"; dir="${dir%%\'*}" ;; esac
+    fi
+    if [ -z "$dir" ] || [ ! -d "$dir" ]; then
+        echo "tmux: no such directory: '$dir'" >> "$STATE/calls"
+        exit 1
+    fi
+    echo "$dir" >> "$STATE/pane-dirs"
+    n=$(( $(cat "$STATE/panes" 2>/dev/null || echo 0) + 1 ))
+    echo "$n" > "$STATE/panes"
+    [ -n "$print" ] && echo "%$n"
+    exit 0
+}
+case "$sub" in
     new-session)
         if [ -d "$LOCK" ]; then echo held > "$STATE/lock-at-setup"; else echo free > "$STATE/lock-at-setup"; fi
         [ -e "$STATE/int-at-new-session" ] && kill -INT "$PPID"
         [ -e "$STATE/fail-new-session" ] && exit 1
-        echo 1 > "$STATE/panes"
+        open_pane
         ;;
     split-window)
         n=$(( $(cat "$STATE/splits" 2>/dev/null || echo 0) + 1 ))
         echo "$n" > "$STATE/splits"
         [ -e "$STATE/fail-split-$n" ] && exit 1
-        echo $(( $(cat "$STATE/panes") + 1 )) > "$STATE/panes"
+        case "$target" in
+            claude-parallel) ;;
+            %*) [ "${target#%}" -le "$(cat "$STATE/panes")" ] || { echo "tmux: no pane $target" >> "$STATE/calls"; exit 1; } ;;
+            *) echo "tmux: bad target '$target'" >> "$STATE/calls"; exit 1 ;;
+        esac
+        open_pane
         ;;
     list-panes)
         for ((i = 0; i < $(cat "$STATE/panes" 2>/dev/null || echo 0); i++)); do echo "%$i"; done
@@ -256,6 +290,16 @@ for launcher in "${LAUNCHERS[@]}"; do
     expect_owner B 'me|in_progress'
     expect_eq "lock during setup" held "$(cat "$STATE/lock-at-setup" 2>/dev/null)"
     expect_eq "panes" 2 "$(cat "$STATE/panes" 2>/dev/null)"
+    expect_eq "pane directories" "$HOME/.claude-worktrees/repo/task-A $HOME/.claude-worktrees/repo/task-B" \
+        "$(tr '\n' ' ' < "$STATE/pane-dirs" 2>/dev/null | sed 's/ $//')"
+    expect_no_lock
+
+    setup "$name: launch of four tickets" A='|open' B='|open' C='|open' D='|open'
+    launch "$launcher" A B C D
+    expect_eq "exit code" 0 $?
+    expect_eq "panes" 4 "$(cat "$STATE/panes" 2>/dev/null)"
+    expect_eq "pane directories" "$(for id in A B C D; do printf '%s ' "$HOME/.claude-worktrees/repo/task-$id"; done | sed 's/ $//')" \
+        "$(tr '\n' ' ' < "$STATE/pane-dirs" 2>/dev/null | sed 's/ $//')"
     expect_no_lock
 
     setup "$name: 2nd pane fails" A='|open' B='|open' C='pool|open'
