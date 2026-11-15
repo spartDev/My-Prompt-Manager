@@ -278,7 +278,6 @@ describe('redactUrls', () => {
   });
 
   it.each([
-    ['localhost:8080/claude.html?token=SECRET'],
     ['data:text/html,<p>SECRET</p>'],
     ['chrome-extension://abc/p.html?t=SECRET']
   ])('writes a requested address of another scheme (%j) as a stand-in, typed or normalized', (requested) => {
@@ -292,7 +291,9 @@ describe('redactUrls', () => {
   it.each([
     ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
     ['https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c'],
-    ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html']
+    ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html'],
+    ['localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My%20Docs/c.html'],
+    ['localhost:8080/a?q=my SECRET', 'Navigation to "http://localhost:8080/a?q=my SECRET" is interrupted by another navigation to "http://localhost:8080/login"', 'Navigation to "http://localhost:8080/a" is interrupted by another navigation to "http://localhost:8080/login"']
   ])('writes the requested %j as Playwright prints it, as passed', (requested, message, written) => {
     expect(redactUrls(message, requested)).toBe(written);
   });
