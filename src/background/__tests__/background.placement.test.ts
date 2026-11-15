@@ -105,6 +105,19 @@ describe('background: placing the icon of a built-in Platform', () => {
     expect(await storedRepairs()).toBeUndefined();
   });
 
+  it('records no placement from a prerendered page, which is not its tab\'s page yet', async () => {
+    const listener = await startServiceWorker();
+
+    const response = await send(
+      listener,
+      { type: 'ICON_PLACEMENT_REPORTED', data: { placement: 'overlay' } },
+      { tab: CLAUDE_TAB, documentLifecycle: 'prerender' }
+    );
+
+    expect(response).toEqual({ success: false, error: expect.any(String) });
+    expect(await storedRepairs()).toBeUndefined();
+  });
+
   it('answers a placement report it could not save without marking it permanent, so it is sent again', async () => {
     const listener = await startServiceWorker();
     vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'));

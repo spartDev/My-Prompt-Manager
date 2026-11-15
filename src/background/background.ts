@@ -1021,6 +1021,11 @@ async function handleIconPlacementReported(
   sender: chrome.runtime.MessageSender,
   sendResponse: (response: PlacementReportResponse) => void,
 ) {
+  // A prerendered page is not the tab's page yet: its sender tab is the page it may replace
+  if (sender.documentLifecycle === "prerender") {
+    sendResponse({ success: false, error: "Not the tab's page yet" });
+    return;
+  }
   const hostname = repairablePlatformHostname(sender.tab?.url);
   if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
     sendResponse({ success: false, error: "Not a placement report of a built-in platform", permanent: true });

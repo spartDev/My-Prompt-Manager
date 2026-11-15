@@ -180,18 +180,40 @@ describe('PlacementRepair.report', () => {
     expect(sent()).toEqual(['toolbar']);
   });
 
-  it('sends its placement again when the prerendered page it is in becomes the tab\'s page', async () => {
-    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: false, error: 'Not a placement report of a built-in platform', permanent: true } as never);
+  it('sends nothing from a prerendered page until it becomes the tab\'s page', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
-    await repair.load();
-    repair.report('override');
-    await flush();
+    Object.defineProperty(document, 'prerendering', { value: true, configurable: true });
+    try {
+      await repair.load();
+      repair.report('override');
+      await flush();
+      expect(sent()).toEqual([]);
+    } finally {
+      Object.defineProperty(document, 'prerendering', { value: false, configurable: true });
+    }
 
-    vi.mocked(chrome.runtime.sendMessage).mockResolvedValue({ success: true } as never);
     document.dispatchEvent(new Event('prerenderingchange'));
     await flush();
 
-    expect(sent()).toEqual(['override', 'override']);
+    expect(sent()).toEqual(['override']);
+  });
+
+  it('keeps a storage change made during the read of a back/forward cache restore', async () => {
+    vi.mocked(chrome.storage.onChanged.addListener).mockClear();
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await repair.load();
+    repair.report('toolbar');
+    await flush();
+
+    let answer: (value: unknown) => void = () => undefined;
+    vi.mocked(chrome.storage.local.get).mockImplementationOnce((() => new Promise((resolve) => { answer = resolve; })) as never);
+    pageShow(true);
+    // The pick is dropped before the read answers with what storage held before
+    storageChange({});
+    answer({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: PICK } } });
+    await flush();
+
+    expect(repair.positioning).toBeNull();
   });
 
   it('sends the first placement again after the repair is loaded again', async () => {

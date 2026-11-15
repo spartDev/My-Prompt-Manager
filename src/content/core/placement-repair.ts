@@ -136,6 +136,11 @@ export class PlacementRepair {
     if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
       return;
     }
+    if ((document as Document & { prerendering?: boolean }).prerendering) {
+      // Not the tab's page yet: the service worker would count it for the page it may replace.
+      // It is sent once the page is activated (prerenderingchange).
+      return;
+    }
     if (placement === 'toolbar' && this.override !== null) {
       info('The anchor chain of this Platform resolves again in this tab', { hostname: this.hostname });
     }
@@ -216,16 +221,22 @@ export class PlacementRepair {
   };
 
   /**
-   * A prerendered page the user navigated to: its reports were refused while it was not yet the
-   * tab's page, so its placement is sent again, on the repair read again.
+   * A prerendered page the user navigated to: it sent nothing while it was not the tab's page, so its
+   * placement is sent now, on the repair read again.
    */
   private readonly handlePrerenderingChange = (): void => {
     this.sendAgain('prerendered page activated');
   };
 
   private sendAgain(reason: string): void {
+    const changesBefore = this.changes;
     readIconPlacementRepairs().then((repairs) => {
       this.sent = null;
+      if (this.changes !== changesBefore) {
+        // A storage event during the read is newer than the read, and was followed
+        this.reportPlaced();
+        return;
+      }
       this.follow(repairs[this.hostname]);
     }, (err: unknown) => {
       debug('Icon placement repair not read again', { reason, error: String(err) });
