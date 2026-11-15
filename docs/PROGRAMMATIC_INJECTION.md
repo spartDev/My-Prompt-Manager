@@ -121,9 +121,9 @@ const granted = await chrome.permissions.request({
 // Settings determine injection eligibility
 const shouldInject = await this.shouldInjectForSite(hostname);
 
-// Check enabled sites and custom site configuration
-const enabledSites = settings.enabledSites || ['claude.ai', 'chatgpt.com', 'www.perplexity.ai'];
-const customSites = settings.customSites || [];
+// A Platform the user turned on, or never switched and on by default, or a Custom site that is on
+// (src/services/siteSettings.ts)
+const enabled = isHostnameEnabled(await readSiteSettings(), hostname);
 ```
 
 ## Implementation Details

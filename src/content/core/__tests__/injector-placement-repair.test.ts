@@ -76,7 +76,7 @@ vi.mock('../../utils/storage', () => ({
   getCategories: vi.fn().mockResolvedValue([]),
   getPrompts: vi.fn().mockResolvedValue([]),
   isSiteEnabled: vi.fn().mockResolvedValue(true),
-  getSettings: vi.fn().mockResolvedValue({ enabledSites: ['claude.ai'], customSites: [], debugMode: false })
+  getSettings: vi.fn().mockResolvedValue({ platformChoices: { 'claude.ai': true }, customSites: [], debugMode: false })
 }));
 
 vi.mock('../../utils/styles', () => ({ injectCSS: vi.fn(), isInjected: vi.fn() }));

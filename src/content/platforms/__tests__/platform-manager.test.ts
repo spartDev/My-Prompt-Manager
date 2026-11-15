@@ -24,12 +24,12 @@ vi.mock('../../utils/logger', () => ({
 // Mock Storage utilities
 vi.mock('../../utils/storage', () => ({
   getSettings: vi.fn().mockResolvedValue({
-    enabledSites: ['example.com'],
+    platformChoices: { 'example.com': true },
     customSites: [],
     debugMode: false
   }),
   getDefaultSettings: vi.fn().mockReturnValue({
-    enabledSites: ['example.com'],
+    platformChoices: { 'example.com': true },
     customSites: [],
     debugMode: false
   })

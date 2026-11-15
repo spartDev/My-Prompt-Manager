@@ -132,7 +132,7 @@ function importReducer(state: ImportState, action: ImportAction): ImportState {
 // Component
 // ============================================================================
 interface SiteIntegrationSectionProps {
-  enabledSites: string[];
+  enabledPlatforms: string[];
   customSites: CustomSite[];
   siteConfigs: Record<string, SiteConfig>;
   onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
@@ -162,7 +162,7 @@ const mapEncoderErrorToMessage = (error: ConfigurationEncoderError): string => {
 };
 
 const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
-  enabledSites,
+  enabledPlatforms,
   customSites,
   siteConfigs,
   onSiteToggle,
@@ -414,7 +414,7 @@ const SiteIntegrationSection: FC<SiteIntegrationSectionProps> = ({
       >
         <SupportedSitesList
           siteConfigs={siteConfigs}
-          enabledSites={enabledSites}
+          enabledPlatforms={enabledPlatforms}
           onSiteToggle={onSiteToggle}
           saving={saving}
           placementRepairs={placementRepairs}

@@ -6,6 +6,7 @@
 import { readPrompts } from "../../services/promptAdmission";
 import {
   defaultSiteSettings,
+  enabledPlatforms,
   isHostnameEnabled,
   readSiteSettings,
   type SiteSettings,
@@ -25,7 +26,7 @@ export async function getSettings(): Promise<SiteSettings> {
     const settings = await readSiteSettings();
 
     debug("Retrieved and validated settings from storage", {
-      enabledSitesCount: settings.enabledSites.length,
+      enabledPlatformsCount: enabledPlatforms(settings).length,
       customSitesCount: settings.customSites.length,
       debugMode: settings.debugMode,
     });

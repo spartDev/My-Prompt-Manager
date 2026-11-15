@@ -12,7 +12,7 @@ export interface SiteConfig {
 
 interface SupportedSitesListProps {
   siteConfigs: Record<string, SiteConfig>;
-  enabledSites: string[];
+  enabledPlatforms: string[];
   onSiteToggle: (hostname: string, enabled: boolean) => Promise<void> | void;
   saving?: boolean;
   /** How the icon was placed on the Platforms whose Toolbar was not found */
@@ -28,7 +28,7 @@ export const platformDomains = (hostname: string): string =>
 /** The Platforms, one row each, in the order of siteConfigs */
 const SupportedSitesList: FC<SupportedSitesListProps> = ({
   siteConfigs,
-  enabledSites,
+  enabledPlatforms,
   onSiteToggle,
   saving = false,
   placementRepairs = {},
@@ -37,7 +37,7 @@ const SupportedSitesList: FC<SupportedSitesListProps> = ({
 }) => (
   <>
     {Object.entries(siteConfigs).map(([hostname, config]) => {
-      const isEnabled = enabledSites.includes(hostname);
+      const isEnabled = enabledPlatforms.includes(hostname);
       // The switch covers the linked Platforms too (Copilot and M365 Copilot), so does the notice
       const repair = onPlaceIcon ? repairForHostnames(placementRepairs, getLinkedPlatformHostnames(hostname)) : null;
       return (
