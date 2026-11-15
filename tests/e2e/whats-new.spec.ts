@@ -126,6 +126,27 @@ test.describe("What's new in the real extension", () => {
     expect(await readRecord()).toEqual({ installedVersion: INSTALLED });
   });
 
+  test('keyboard: Tab from Got it reaches the scrolling body, which draws a solid focus ring', async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId, INSTALLED);
+    await seedPopup(storage, { [SITE_SETTINGS_KEY]: { enabledSites: [], customSites: [], debugMode: true } });
+
+    const popup = await openPopup(context, extensionId);
+    const sheet = popup.getByRole('dialog', { name: WHATS_NEW });
+    await expect(sheet.getByRole('button', { name: 'Got it' })).toBeFocused();
+
+    await popup.keyboard.press('Tab');
+
+    const body = sheet.getByRole('region', { name: 'Release notes' });
+    await expect(body).toBeFocused();
+    const outline = await body.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { style: style.outlineStyle, width: Number.parseFloat(style.outlineWidth) };
+    });
+    expect(outline.style).toBe('solid');
+    expect(outline.width).toBeGreaterThan(0);
+    await popup.close();
+  });
+
   test("Debug mode: What's new shows at each of two openings, closing leaves the record as it was, and Debug mode off gives the normal decision back", async ({ context, extensionId }) => {
     const storage = await storageAfterInstall(context, extensionId, INSTALLED);
     // A first install, which normal mode never shows: Debug mode shows it anyway

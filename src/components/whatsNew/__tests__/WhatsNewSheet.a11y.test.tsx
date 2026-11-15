@@ -283,13 +283,16 @@ describe("What's new: keyboard, focus, screen readers and reduced motion", () =>
       expect(visited).toEqual(['body', 'Got it', 'body', 'Got it']);
     });
 
-    it('the scrolling body is a region named by the title, with a visible focus ring for the keyboard', () => {
+    it('the scrolling body is the region "Release notes", a name of its own, with a focus ring for the keyboard', () => {
       renderSheet();
 
       const body = screen.getByTestId('whats-new-body');
       expect(body).toHaveAttribute('tabindex', '0');
-      expect(within(screen.getByRole('dialog')).getByRole('region', { name: /What.s new/ })).toBe(body);
+      expect(within(screen.getByRole('dialog')).getByRole('region', { name: 'Release notes' })).toBe(body);
+      expect(body).not.toHaveAccessibleName(/What.s new/);
       expect(body).toHaveClass('focus-visible:outline-2', 'focus-visible:outline-accent');
+      // focus:outline-none would set the outline style to none for focus-visible too: no ring drawn
+      expect(body).not.toHaveClass('focus:outline-none');
     });
   });
 

@@ -121,14 +121,16 @@ const WhatsNewSheet: FC<WhatsNewSheetProps> = ({ version, children, open, onClos
         <span aria-hidden="true" className="mt-2 mb-0.5 h-[5px] w-[38px] flex-none self-center rounded-[3px] bg-handle" />
 
         {/* The scrolling body takes the keyboard itself, so notes with no tile to focus (only
-            Critical fixes) still scroll with the arrow keys; named by the title, not an anonymous group */}
+            Critical fixes) still scroll with the arrow keys. Its own name, not the dialog's, so it is
+            not announced twice. No focus:outline-none: it would set the outline style to none for
+            focus-visible too, and no ring would be drawn */}
         <div
           role="region"
-          aria-labelledby={titleId}
+          aria-label="Release notes"
           // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrolling region must take the keyboard to scroll when nothing inside it can (WCAG 2.1.1)
           tabIndex={0}
           data-testid="whats-new-body"
-          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-3 focus:outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-2 pb-3 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
         >
           <div className="flex flex-col gap-1.5">
             {/* An information pill, not a chosen item: bg-accent-subtle, the dark mockup's own fill */}
