@@ -81,12 +81,12 @@ vi.mock('../../utils/storage', () => ({
     return Promise.resolve(hostname === 'localhost' || hostname === 'test.com');
   }),
   getSettings: vi.fn().mockResolvedValue({
-    enabledSites: ['test.com', 'localhost'],
+    platformChoices: { 'test.com': true, localhost: true },
     customSites: [],
     debugMode: false
   }),
   getDefaultSettings: vi.fn().mockReturnValue({
-    enabledSites: ['test.com', 'localhost'],
+    platformChoices: { 'test.com': true, localhost: true },
     customSites: [],
     debugMode: false
   })
@@ -709,7 +709,7 @@ describe('PromptLibraryInjector', () => {
 
       vi.mocked(isSiteEnabled).mockResolvedValue(false);
       vi.mocked(getSettings).mockResolvedValue({
-        enabledSites: [],
+        platformChoices: {},
         customSites: [],
         debugMode: false
       });
@@ -784,7 +784,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       const result = messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
+        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -916,7 +916,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } },
+        { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -934,7 +934,7 @@ describe('PromptLibraryInjector', () => {
       vi.mocked(isSiteEnabled)
         .mockImplementationOnce(() => new Promise(resolve => { setTimeout(() => { resolve(false); }, 40); }))
         .mockResolvedValue(true);
-      const update = { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } };
+      const update = { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } };
 
       messageCallback(update, {}, vi.fn());
       messageCallback(update, {}, vi.fn());
@@ -950,7 +950,7 @@ describe('PromptLibraryInjector', () => {
       // First disable the site
       vi.mocked(isSiteEnabled).mockResolvedValue(false);
       vi.mocked(getSettings).mockResolvedValue({
-        enabledSites: [],
+        platformChoices: {},
         customSites: [],
         debugMode: false
       });
@@ -968,7 +968,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       msgCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
+        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -1311,7 +1311,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: [], customSites: [], debugMode: false } },
+        { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } },
         {},
         sendResponse
       );
@@ -1348,7 +1348,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: true } },
+        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: true } },
         {},
         sendResponse
       );
@@ -1483,7 +1483,7 @@ describe('PromptLibraryInjector', () => {
 
       const sendResponse = vi.fn();
       messageCallback(
-        { action: 'settingsUpdated', settings: { enabledSites: ['localhost'], customSites: [], debugMode: false } },
+        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
         {},
         sendResponse
       );

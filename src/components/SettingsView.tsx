@@ -7,6 +7,7 @@ import { AdmissionRefusedError } from '../services/promptAdmission';
 import {
   changeSiteSettings,
   defaultSiteSettings,
+  enabledPlatforms,
   onSiteSettingsChanged,
   readSiteSettings,
   type SiteSettings,
@@ -46,11 +47,8 @@ interface SettingsViewProps {
 }
 
 const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toastSettings, onToastSettingsChange, onStorageRefused, focusImport = false, onImportFocused }) => {
-  const [settings, setSettings] = useState<Settings>({
-    enabledSites: [],
-    customSites: [],
-    debugMode: false
-  });
+  // Shown once loaded: the loading state replaces the whole view until then
+  const [settings, setSettings] = useState<Settings>(defaultSiteSettings);
 
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -449,7 +447,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
           />
 
           <SiteIntegrationSection
-            enabledSites={settings.enabledSites}
+            enabledSites={enabledPlatforms(settings)}
             customSites={settings.customSites}
             siteConfigs={siteConfigs}
             interfaceMode={interfaceMode}

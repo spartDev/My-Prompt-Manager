@@ -62,7 +62,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     hostname: 'your-ai-platform.com',            // Exact hostname
     displayName: 'Your AI Platform',             // Human-readable name
     priority: 70,                                 // 60-79 for new platforms
-    defaultEnabled: true,                         // Include in fresh installs
+    defaultEnabled: true,                         // On for every user who never switched it, existing users included
     selectors: [                                  // CSS selectors (most specific first)
       'textarea[data-testid="chat-input"]',
       'div[contenteditable="true"][role="textbox"]',
@@ -85,6 +85,8 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 ```
 
 > ℹ️ If you omit `brandColors`, the logo square falls back to the accent (`bg-accent-subtle text-accent`). Switched off, every site shows the same disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`): give the logo component a `disabled` prop that draws it in `currentColor` (see `src/components/icons/SiteIcons.tsx`).
+
+> ℹ️ `defaultEnabled: true` turns the new Platform on for every user on update, a user who switched other Platforms included: the Site settings store the user's Platform choices, and a Platform without one takes its default (`src/services/siteSettings.ts`). Never add the new hostname to `PLATFORMS_OF_THE_ENABLED_LIST` there: that frozen list says which Platforms an older store could hold, and a Platform on it that an older store left out is read as turned off. The test `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/__tests__/siteSettings.test.ts` fails once you add the Platform: add its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in that test.
 
 **Priority Guidelines:**
 - 100: Claude

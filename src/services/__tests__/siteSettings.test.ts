@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../../config/platforms';
+import { getAllSupportedHostnames, getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../../config/platforms';
 import { getChromeMock } from '../../test/mocks';
 import type { CustomSite } from '../../types';
 import {
@@ -9,8 +9,11 @@ import {
   defaultSiteSettings,
   enabledCustomSite,
   enabledHostnames,
+  enabledPlatforms,
   isHostnameEnabled,
+  isPlatformEnabled,
   onSiteSettingsChanged,
+  PLATFORMS_OF_THE_ENABLED_LIST,
   parseSiteSettings,
   readSiteSettings,
   SITE_SETTINGS_KEY,
@@ -32,25 +35,59 @@ describe('parseSiteSettings', () => {
     ['null', null],
     ['a string', 'enabled'],
     ['a list', ['claude.ai']]
-  ])('gives the default Platforms, no Custom site and debug off for %s', (_label, stored) => {
-    expect(parseSiteSettings(stored)).toEqual({
-      enabledSites: getDefaultEnabledPlatforms(),
-      customSites: [],
-      debugMode: false
+  ])('gives no Platform choice, so the default Platforms on, no Custom site and debug off for %s', (_label, stored) => {
+    const settings = parseSiteSettings(stored);
+
+    expect(settings).toEqual({ platformChoices: {}, customSites: [], debugMode: false });
+    expect(enabledPlatforms(settings)).toEqual(getDefaultEnabledPlatforms());
+  });
+
+  it('reads the stored Platform choices', () => {
+    const settings = parseSiteSettings({ platformChoices: { 'claude.ai': false, 'chatgpt.com': true } });
+
+    expect(settings.platformChoices).toEqual({ 'claude.ai': false, 'chatgpt.com': true });
+    expect(enabledPlatforms(settings)).toEqual(getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'claude.ai'));
+  });
+
+  it('leaves out of the Platform choices an entry that is not a switch', () => {
+    expect(parseSiteSettings({ platformChoices: { 'claude.ai': false, 'chatgpt.com': 'off', 'gemini.google.com': null } }).platformChoices)
+      .toEqual({ 'claude.ai': false });
+  });
+
+  describe('a store written before the Platform choices, which held the list of the Platforms that were on', () => {
+    it('gives off for every Platform of that release missing from the list, and on for the others', () => {
+      const settings = parseSiteSettings({ enabledSites: ['claude.ai'] });
+
+      expect(enabledPlatforms(settings)).toEqual(['claude.ai']);
+      expect(settings.platformChoices).toEqual(
+        Object.fromEntries(PLATFORMS_OF_THE_ENABLED_LIST.map((hostname) => [hostname, hostname === 'claude.ai']))
+      );
+    });
+
+    it('gives every Platform of that release off for an empty list', () => {
+      expect(enabledPlatforms(parseSiteSettings({ enabledSites: [] }))).toEqual([]);
+    });
+
+    it('leaves out of the list what is not a hostname', () => {
+      expect(enabledPlatforms(parseSiteSettings({ enabledSites: ['claude.ai', '', 42, null] }))).toEqual(['claude.ai']);
+    });
+
+    it('keeps on a hostname of the list that is no Platform, as that release had it', () => {
+      const settings = parseSiteSettings({ enabledSites: ['claude.ai', 'old-platform.example.com'] });
+
+      expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'old-platform.example.com']);
+      expect(isHostnameEnabled(settings, 'old-platform.example.com')).toBe(true);
+    });
+
+    it('is read by its Platform choices when it holds both', () => {
+      const settings = parseSiteSettings({ enabledSites: [], platformChoices: { 'claude.ai': false } });
+
+      expect(settings.platformChoices).toEqual({ 'claude.ai': false });
     });
   });
 
-  it('uses a stored list of Platforms as it is, an empty one included', () => {
-    expect(parseSiteSettings({ enabledSites: ['claude.ai'] }).enabledSites).toEqual(['claude.ai']);
-    expect(parseSiteSettings({ enabledSites: [] }).enabledSites).toEqual([]);
-  });
-
-  it('leaves out of the Platforms what is not a hostname', () => {
-    expect(parseSiteSettings({ enabledSites: ['claude.ai', '', 42, null] }).enabledSites).toEqual(['claude.ai']);
-  });
-
   it('takes the default for a field that is missing or of the wrong type', () => {
-    const settings = parseSiteSettings({ enabledSites: 'claude.ai', customSites: {}, debugMode: 'yes' });
+    const settings = parseSiteSettings({ enabledSites: 'claude.ai', platformChoices: ['claude.ai'], customSites: {}, debugMode: 'yes' });
 
     expect(settings).toEqual(defaultSiteSettings());
   });
@@ -85,9 +122,41 @@ describe('parseSiteSettings', () => {
   });
 
   it('ignores floatingFallback, which a store written by an earlier version holds', () => {
-    const settings = parseSiteSettings({ enabledSites: ['claude.ai'], customSites: [], debugMode: false, floatingFallback: true });
+    const settings = parseSiteSettings({ platformChoices: {}, customSites: [], debugMode: false, floatingFallback: true });
 
-    expect(settings).toEqual({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    expect(settings).toEqual({ platformChoices: {}, customSites: [], debugMode: false });
+  });
+});
+
+describe('isPlatformEnabled', () => {
+  it('is the choice of the user for a Platform they switched', () => {
+    const settings = parseSiteSettings({ platformChoices: { 'claude.ai': false, 'old-platform.example.com': true } });
+
+    expect(isPlatformEnabled(settings, 'claude.ai')).toBe(false);
+    expect(isPlatformEnabled(settings, 'old-platform.example.com')).toBe(true);
+  });
+
+  it('is the default of a Platform the user never switched', () => {
+    for (const hostname of getAllSupportedHostnames()) {
+      expect(isPlatformEnabled(defaultSiteSettings(), hostname)).toBe(getDefaultEnabledPlatforms().includes(hostname));
+    }
+  });
+
+  it('is off for a hostname that is no Platform and that the user never turned on', () => {
+    expect(isPlatformEnabled(defaultSiteSettings(), 'news.example.com')).toBe(false);
+  });
+});
+
+describe('PLATFORMS_OF_THE_ENABLED_LIST', () => {
+  // The hostnames of the Platforms added after the release that started storing the Platform
+  // choices. A new Platform goes here, never in the frozen list, which says which Platforms a stored
+  // list of the Platforms that were on could hold (.claude/skills/add-platform/SKILL.md)
+  const ADDED_AFTER_THE_PLATFORM_CHOICES: string[] = [];
+
+  it('is every Platform of the release that started storing the Platform choices', () => {
+    const platformsOfThatRelease = getAllSupportedHostnames().filter((hostname) => !ADDED_AFTER_THE_PLATFORM_CHOICES.includes(hostname));
+
+    expect([...PLATFORMS_OF_THE_ENABLED_LIST].sort()).toEqual(platformsOfThatRelease.sort());
   });
 });
 
@@ -162,10 +231,10 @@ describe('readSiteSettings', () => {
   it('gives what storage holds, validated', async () => {
     const kept = customSite();
     await chrome.storage.local.set({
-      [SITE_SETTINGS_KEY]: { enabledSites: ['claude.ai'], customSites: [kept, { hostname: 'broken.example.com' }], debugMode: true }
+      [SITE_SETTINGS_KEY]: { platformChoices: { 'claude.ai': false }, customSites: [kept, { hostname: 'broken.example.com' }], debugMode: true }
     });
 
-    expect(await readSiteSettings()).toEqual({ enabledSites: ['claude.ai'], customSites: [kept], debugMode: true });
+    expect(await readSiteSettings()).toEqual({ platformChoices: { 'claude.ai': false }, customSites: [kept], debugMode: true });
   });
 
   it('rejects when storage cannot be read, and never answers with the defaults', async () => {
@@ -176,24 +245,31 @@ describe('readSiteSettings', () => {
 });
 
 describe('applySiteSettingsChange', () => {
+  // Gemini and Copilot off, the other Platforms on by default
   const settings: SiteSettings = {
-    enabledSites: ['claude.ai', 'chatgpt.com'],
+    platformChoices: { 'gemini.google.com': false, 'copilot.microsoft.com': false, 'm365.cloud.microsoft': false },
     customSites: [customSite({ hostname: 'on.example.com' })],
     debugMode: false
   };
 
-  it('turns a Platform off and leaves the others', () => {
+  it('turns a Platform off as a choice of the user and leaves the others', () => {
     const after = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false }, 0);
 
-    expect(after.enabledSites).toEqual(['chatgpt.com']);
+    expect(after.platformChoices).toEqual({ ...settings.platformChoices, 'claude.ai': false });
+    expect(isPlatformEnabled(after, 'claude.ai')).toBe(false);
+    expect(isPlatformEnabled(after, 'chatgpt.com')).toBe(true);
   });
 
-  it('turns a Platform on once, however many times it is asked', () => {
+  it('turns a Platform back on as a choice of the user, however many times it is asked', () => {
     const on = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'gemini.google.com', enabled: true }, 0);
     const again = applySiteSettingsChange(on, { type: 'setPlatformEnabled', hostname: 'gemini.google.com', enabled: true }, 0);
 
-    expect(on.enabledSites).toEqual(['claude.ai', 'chatgpt.com', 'gemini.google.com']);
+    expect(on.platformChoices['gemini.google.com']).toBe(true);
     expect(again).toEqual(on);
+  });
+
+  it('records no choice for a Platform already as asked, which keeps following its default', () => {
+    expect(applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: true }, 0)).toBe(settings);
   });
 
   it('turns the Platforms linked to a Platform on and off with it', () => {
@@ -203,8 +279,10 @@ describe('applySiteSettingsChange', () => {
     const on = applySiteSettingsChange(settings, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: true }, 0);
     const off = applySiteSettingsChange(on, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
 
-    expect(on.enabledSites).toEqual(['claude.ai', 'chatgpt.com', ...linked]);
-    expect(off.enabledSites).toEqual(['claude.ai', 'chatgpt.com']);
+    for (const hostname of linked) {
+      expect(isPlatformEnabled(on, hostname)).toBe(true);
+      expect(isPlatformEnabled(off, hostname)).toBe(false);
+    }
   });
 
   it('adds a Custom site, dated now', () => {
@@ -262,24 +340,32 @@ describe('changeSiteSettings', () => {
   const sent = () => vi.mocked(chrome.tabs.sendMessage).mock.calls.map(([tabId, message]) => ({ tabId, message }));
 
   it('applies the change to what storage holds and resolves with the result', async () => {
-    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: true });
+    await store({ platformChoices: { 'gemini.google.com': false }, customSites: [], debugMode: true });
 
     const settings = await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false });
 
-    expect(settings).toEqual({ enabledSites: ['chatgpt.com'], customSites: [], debugMode: true });
+    expect(settings).toEqual({ platformChoices: { 'gemini.google.com': false, 'claude.ai': false }, customSites: [], debugMode: true });
     expect(await stored()).toEqual(settings);
   });
 
-  it('starts from the default Platforms when nothing is stored', async () => {
-    const [first, ...others] = getDefaultEnabledPlatforms();
+  it('starts from no choice when nothing is stored, and stores only the choice made', async () => {
+    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: false });
 
-    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: first, enabled: false });
+    expect(await stored()).toEqual({ platformChoices: { 'chatgpt.com': false }, customSites: [], debugMode: false });
+  });
 
-    expect(await stored()).toEqual({ enabledSites: others.filter((site) => !getLinkedPlatformHostnames(first).includes(site)), customSites: [], debugMode: false });
+  it('writes a store of an earlier release, the list of the Platforms that were on, as Platform choices on its next change', async () => {
+    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: false });
+
+    await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false });
+
+    const after = parseSiteSettings(await stored());
+    expect(await stored()).not.toHaveProperty('enabledSites');
+    expect(enabledPlatforms(after)).toEqual(['chatgpt.com']);
   });
 
   it('loses neither change when two surfaces change the Site settings at once', async () => {
-    await store({ enabledSites: ['claude.ai', 'chatgpt.com'], customSites: [], debugMode: false });
+    await store({ platformChoices: {}, customSites: [], debugMode: false });
     const { dateAdded: _dateAdded, ...site } = customSite();
 
     await Promise.all([
@@ -288,11 +374,11 @@ describe('changeSiteSettings', () => {
       changeSiteSettings({ type: 'setDebugMode', enabled: true })
     ]);
 
-    expect(await stored()).toMatchObject({ enabledSites: ['chatgpt.com'], customSites: [site], debugMode: true });
+    expect(await stored()).toMatchObject({ platformChoices: { 'claude.ai': false }, customSites: [site], debugMode: true });
   });
 
   it('refuses the change and leaves storage untouched when storage cannot be read', async () => {
-    const before = { enabledSites: ['claude.ai'], customSites: [], debugMode: false };
+    const before = { platformChoices: { 'chatgpt.com': false }, customSites: [], debugMode: false };
     await store(before);
     vi.mocked(chrome.storage.local.set).mockClear();
     vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
@@ -305,7 +391,7 @@ describe('changeSiteSettings', () => {
   });
 
   it('rejects and sends nothing when storage refuses the write', async () => {
-    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    await store({ platformChoices: {}, customSites: [], debugMode: false });
     vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('quota'));
 
     await expect(changeSiteSettings({ type: 'setDebugMode', enabled: true })).rejects.toThrow('quota');
@@ -314,7 +400,7 @@ describe('changeSiteSettings', () => {
   });
 
   it('writes nothing and sends nothing for a change that changes nothing', async () => {
-    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    await store({ platformChoices: {}, customSites: [], debugMode: false });
     vi.mocked(chrome.storage.local.set).mockClear();
     openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
 
@@ -325,7 +411,7 @@ describe('changeSiteSettings', () => {
   });
 
   it('sends the new Site settings to every web tab, and to no other', async () => {
-    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    await store({ platformChoices: {}, customSites: [], debugMode: false });
     openTabs([
       { id: 1, url: 'https://claude.ai/chat' },
       { id: 2, url: 'http://localhost:3000/' },
@@ -346,7 +432,7 @@ describe('changeSiteSettings', () => {
     ['turned off', { type: 'setCustomSiteEnabled', hostname: 'chat.example.com', enabled: false }],
     ['removed', { type: 'removeCustomSite', hostname: 'chat.example.com' }]
   ] as const)('asks the tabs of a Custom site to start over when it is %s', async (label, change) => {
-    await store({ enabledSites: [], customSites: label === 'added' ? [] : [customSite()], debugMode: false });
+    await store({ platformChoices: {}, customSites: label === 'added' ? [] : [customSite()], debugMode: false });
     openTabs([{ id: 1, url: 'https://claude.ai/chat' }, { id: 2, url: 'https://chat.example.com/thread' }]);
 
     await changeSiteSettings(change);
@@ -357,7 +443,7 @@ describe('changeSiteSettings', () => {
   });
 
   it('keeps the change when a tab does not answer or the tabs cannot be listed', async () => {
-    await store({ enabledSites: ['claude.ai'], customSites: [], debugMode: false });
+    await store({ platformChoices: {}, customSites: [], debugMode: false });
     openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
     vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('no receiver'));
 
@@ -371,7 +457,7 @@ describe('changeSiteSettings', () => {
 
   describe('reset', () => {
     it('leaves nothing stored, resolves with the defaults and sends them to the tabs', async () => {
-      await store({ enabledSites: [], customSites: [customSite()], debugMode: true });
+      await store({ platformChoices: {}, customSites: [customSite()], debugMode: true });
       openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
 
       const settings = await changeSiteSettings({ type: 'reset' });
@@ -382,7 +468,7 @@ describe('changeSiteSettings', () => {
     });
 
     it('works on a store that cannot be read, since it reads nothing', async () => {
-      await store({ enabledSites: [], customSites: [customSite()], debugMode: true });
+      await store({ platformChoices: {}, customSites: [customSite()], debugMode: true });
       vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
 
       await expect(changeSiteSettings({ type: 'reset' })).resolves.toEqual(defaultSiteSettings());
@@ -401,7 +487,7 @@ describe('changeSiteSettings', () => {
   });
 
   it('does not write the Site settings back after Clear All Data asked for while the change was reading them', async () => {
-    await store({ enabledSites: ['claude.ai'], customSites: [customSite()], debugMode: false });
+    await store({ platformChoices: {}, customSites: [customSite()], debugMode: false });
     // The change has read the Site settings and is paused before it writes, as in another surface
     const get = vi.mocked(chrome.storage.local.get);
     const readNow = get.getMockImplementation() as unknown as (keys: unknown) => Promise<Record<string, unknown>>;
