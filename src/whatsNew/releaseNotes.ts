@@ -20,20 +20,20 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
       {
         kind: 'feature',
         title: 'Search with ⌘K',
-        description: 'Press ⌘K, or Ctrl+K, in the Library to jump straight to the search field.',
+        description: 'Press ⌘K, or Ctrl+K, from any Section to jump to the search field of the Library.',
         icon: 'search',
         destination: 'library-search'
       },
       {
         kind: 'feature',
         title: 'Type // on a Platform',
-        description: 'Type // in the chat box of a Platform to pick a Prompt without leaving the keyboard.',
+        description: 'Type // in the input field of a Platform to pick a Prompt without leaving the keyboard.',
         icon: 'slash'
       },
       {
         kind: 'feature',
         title: 'Pinned prompts',
-        description: 'Star the Prompts you use most and find them together under the Pinned filter.',
+        description: 'Pin the Prompts you rely on to keep them first in the Library and together under the Pinned filter.',
         icon: 'pin',
         destination: 'library'
       },
@@ -47,7 +47,7 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
       {
         kind: 'feature',
         title: 'Tidy up',
-        description: 'Analytics lists the Prompts you never used and the possible duplicates, ready to review.',
+        description: 'Analytics counts your Never used Prompts and Duplicate pairs, and Review opens them in the Library.',
         icon: 'broom',
         destination: 'analytics'
       },
@@ -61,7 +61,7 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
       {
         kind: 'feature',
         title: 'Undo a Category deletion',
-        description: 'Undo in the notification brings a deleted Category back with all its Prompts.',
+        description: 'Undo in the Notification brings a deleted Category back with all its Prompts.',
         icon: 'undo',
         destination: 'categories'
       },
@@ -85,7 +85,7 @@ export const RELEASE_NOTES: readonly ReleaseNotes[] = [
       {
         kind: 'critical-fix',
         title: 'Your site settings are safe',
-        description: 'A failed load no longer replaces your site settings with the defaults.'
+        description: 'A slow or failed load no longer replaces your Site settings with empty or default ones.'
       },
       {
         kind: 'critical-fix',
