@@ -16,7 +16,7 @@ interface AdvancedSectionProps {
   onReset: () => Promise<void>;
 }
 
-/** The Advanced group: debug logging, and resetting the settings */
+/** The Advanced group: Debug mode (debug logging, What's new at every opening), and resetting the settings */
 const AdvancedSection: FC<AdvancedSectionProps> = ({ debugMode, onDebugModeChange, saving, onReset }) => {
   const debugLabelId = useId();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -49,7 +49,7 @@ const AdvancedSection: FC<AdvancedSectionProps> = ({ debugMode, onDebugModeChang
         {debugMode && (
           <div className="mt-2 p-2 bg-accent-subtle border border-accent rounded-lg flex items-center gap-2 text-xs text-accent-strong">
             <DebugInfoIcon />
-            Debug logging is now active. Check browser console for detailed information.
+            Debug logging is now active, and What's new shows each time you open the extension. Check the browser console for detailed information.
           </div>
         )}
       </SettingsRow>

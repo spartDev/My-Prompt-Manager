@@ -58,6 +58,18 @@ describe('AdvancedSection', () => {
       expect(screen.getByText(/debug logging is now active/i)).toBeInTheDocument();
     });
 
+    it("says What's new shows at every opening only while it is on", () => {
+      const { rerender } = render(<AdvancedSection {...defaultProps} />);
+      expect(screen.queryByText(/what's new shows each time you open the extension/i)).not.toBeInTheDocument();
+
+      rerender(<AdvancedSection {...defaultProps} debugMode={true} />);
+      expect(
+        screen.getByText(
+          "Debug logging is now active, and What's new shows each time you open the extension. Check the browser console for detailed information."
+        )
+      ).toBeInTheDocument();
+    });
+
     it('cannot change while Settings saves', () => {
       render(<AdvancedSection {...defaultProps} saving={true} />);
 

@@ -447,7 +447,9 @@ For more complex integrations, see our comprehensive [Platform Integration Guide
 
 ### Debug Mode
 
-Enable debug logging:
+Turn on **Settings → Advanced → Debug mode**: detailed logging on the Platforms, and What's new shows each time you open the popup or side panel, with the installed Release's notes (else the newest Release that has notes). Closing it in Debug mode does not change the Last seen Release, so turning Debug mode off gives back the normal What's new behaviour.
+
+The localStorage flag below turns on debug logging on a Platform page only; it does not show What's new, which reads the Settings switch alone.
 ```javascript
 // In browser console
 localStorage.setItem('prompt-library-debug', 'true');
