@@ -181,7 +181,7 @@ for tool in claude gh; do printf '#!/usr/bin/env bash\nexit 0\n' > "$BIN/$tool";
 # sends TERM to the launcher once it is created; with term-at-lock-refused,
 # the one refused the claim lock sends TERM. With dir-at-lock, an older
 # launcher takes its directory lock just before the claim lock is made and
-# frees it (rmdir, which fails on a directory not empty) just after. With
+# frees it (rmdir, which fails on a directory not empty) just after, once. With
 # alive-at-reap, the one that creates the removal lock makes the ps stub
 # report every process alive from then on, as when a dead pid is reused. With
 # fail-lock, perl and ln fail to create the claim lock, as on a read-only
@@ -198,6 +198,7 @@ if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -
 fi
 if [ "$tool" != mkdir ] && [ -n "\${LOCK:-}" ] && [ "\$last" = "\$LOCK" ] && [ -e "\$STATE/dir-at-lock" ]; then
     older=1
+    rm -f "\$STATE/dir-at-lock"
     $REAL_MKDIR "\$LOCK" 2>/dev/null || older=""
 fi
 $real "\$@"
@@ -409,6 +410,22 @@ expect_eq "removal lock holder" "$dead" "$(readlink "$LOCK.reap")"
 if grep -q "removal lock $LOCK.reap was left by launch $dead, which no longer runs" "$STATE/out"; then pass; else fail "the error does not name the dead removal lock"; fi
 rm -f "$LOCK" "$LOCK.reap"
 
+setup "a removal lock left beside a free claim lock is removed" A='|open'
+dead=$(dead_pid)
+ln -s "$dead" "$LOCK.reap"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
+if grep -q "Removed the removal lock of launch $dead" "$STATE/out"; then pass; else fail "no warning about the stale removal lock"; fi
+expect_no_lock
+
+setup "a live removal lock beside a free claim lock is kept" A='|open'
+ln -s "$$" "$LOCK.reap"
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_eq "removal lock holder" "$$" "$(readlink "$LOCK.reap")"
+rm -f "$LOCK.reap"
+
 setup "TERM as the removal lock is taken" A='|open'
 dead=$(dead_pid)
 ln -s "$dead" "$LOCK"
@@ -441,10 +458,9 @@ rm -f "$LOCK" "$LOCK.reap"
 
 setup "an older launcher's lock taken and freed while the lock is made" A='|open'
 touch "$STATE/dir-at-lock"
-with_claims 'claim_issues A'
-expect_eq "exit code" 1 $?
-expect_owner A '|open'
-expect_untouched A
+with_claims 'claim_issues A || exit 9; finish_launch'
+expect_eq "exit code" 0 $?
+expect_owner A 'me|in_progress'
 expect_no_lock
 
 setup "the lock directory of an older launcher is kept" A='|open'

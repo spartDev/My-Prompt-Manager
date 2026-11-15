@@ -133,8 +133,12 @@ finish_launch() {
 # Whether a process runs; kill -0 fails on another user's process, ps does not.
 # Only processes of this host and pid namespace are seen: a repository shared
 # with a container or another machine must not run launches from both sides.
+# A holder no probe can answer for counts as alive.
 pid_alive() {
-    kill -0 "$1" 2>/dev/null || ps -p "$1" >/dev/null 2>&1
+    kill -0 "$1" 2>/dev/null && return 0
+    [ -d "/proc/$1" ] && return 0
+    command -v ps >/dev/null || return 0
+    ps -p "$1" >/dev/null 2>&1
 }
 
 # Create a lock for this shell: a symlink to this pid, made in one step.
@@ -171,11 +175,15 @@ remove_dead_lock() { # <lock> <pid> <what>
 # with SIGKILL) is removed first. The removal happens under a second lock and
 # only while the holder read is still the one in place, so two launches that
 # find the same stale lock never remove the lock one of them has just taken.
-# A removal lock left by a launch killed while removing is not removed: nothing
-# would guard that removal, so the launch stops and names it.
+# A removal lock left by a launch killed while removing is removed only once
+# the claim lock is held, which keeps every other launch away from it; a
+# launch that finds the claim lock stale beside it stops and names it.
 take_claim_lock() {
     local holder
-    link_lock "$LAUNCH_LOCK" && return 0
+    if link_lock "$LAUNCH_LOCK"; then
+        clear_dead_reap_lock
+        return 0
+    fi
     holder=$(dead_holder "$LAUNCH_LOCK") || return 1
     # Named before it is taken, so an interrupt while it is taken still frees it
     LAUNCH_REAP="$LAUNCH_LOCK.reap"
@@ -186,6 +194,14 @@ take_claim_lock() {
     fi
     free_reap_lock
     link_lock "$LAUNCH_LOCK"
+}
+
+# With the claim lock held, remove a removal lock whose launch no longer runs.
+clear_dead_reap_lock() {
+    local reaper
+    if reaper=$(dead_holder "$LAUNCH_LOCK.reap"); then
+        remove_dead_lock "$LAUNCH_LOCK.reap" "$reaper" "removal lock"
+    fi
 }
 
 # Take the lock (flock is not on macOS) and claim the tickets. On success the
@@ -203,7 +219,9 @@ claim_issues() {
     # the lock is taken, so no interrupt falls between the lock and its trap.
     LAUNCH_LOCK="$lock"
     trap 'abort_launch; exit 130' INT TERM
-    if ! take_claim_lock; then
+    # A lock freed between the attempt and now is tried once more
+    if ! take_claim_lock \
+        && { [ -L "$lock" ] || [ -e "$lock" ] || ! take_claim_lock; }; then
         trap - INT TERM
         LAUNCH_LOCK=""
         free_reap_lock
