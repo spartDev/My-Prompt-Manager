@@ -339,6 +339,27 @@ describe('background: a picker that could not be activated leaves no session', (
     expect(await chrome.storage.session.get(null)).toEqual({});
   });
 
+  it('stores the session of the activation the page holds when the answers come back out of order', async () => {
+    const listener = await startServiceWorker();
+    const answer = holdActivations();
+
+    const earlier = startOn(listener);
+    const later = startOn(listener);
+    // The page received both, in send order, so it holds the later one; its answer comes back first
+    await answer(1, true);
+    await answer(0, true);
+
+    expect(await later).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    expect(await earlier).toEqual({ success: true, tabId: CLAUDE_TAB.id });
+    const [, laterActivation] = pickerMessages();
+    const key = `pickerSession:${CLAUDE_TAB.id}`;
+    expect((await chrome.storage.session.get(key))[key]).toMatchObject({ attempt: laterActivation?.attempt });
+
+    // So a stop ends the picker the page holds
+    expect(await send(listener, { type: 'STOP_ELEMENT_PICKER' })).toEqual({ success: true });
+    expect(pickerMessages().at(-1)).toMatchObject({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: laterActivation?.attempt });
+  });
+
   it('sends no activation for a start stopped before it activates', async () => {
     const listener = await startServiceWorker();
     vi.mocked(chrome.tabs.sendMessage).mockResolvedValue(undefined);

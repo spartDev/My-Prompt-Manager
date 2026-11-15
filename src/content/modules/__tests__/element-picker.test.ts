@@ -90,3 +90,58 @@ describe('ElementPicker: a deactivation that names a start', () => {
     expect(overlay()).toBeNull();
   });
 });
+
+describe('ElementPicker: the activations and deactivations the service worker sends', () => {
+  type Listener = (message: unknown, sender: chrome.runtime.MessageSender, sendResponse: () => void) => void;
+  const overlay = () => document.getElementById('mpm-element-picker-overlay');
+
+  /** Loads the content script afresh, so its own runtime.onMessage listener is registered again */
+  const loadContentScript = async (): Promise<void> => {
+    vi.resetModules();
+    await import('../element-picker');
+  };
+
+  /** Delivers a message to the listeners registered and not removed, in the order they were added, as Chrome does */
+  const deliver = (message: { type: string; attempt?: string }): void => {
+    const removed = vi.mocked(chrome.runtime.onMessage.removeListener).mock.calls.map(([listener]) => listener);
+    const listeners = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls
+      .map(([listener]) => listener as unknown as Listener)
+      .filter((listener) => !removed.includes(listener as never));
+    for (const listener of listeners) {
+      listener({ ...message, source: 'background' }, {}, () => undefined);
+    }
+  };
+
+  afterEach(() => {
+    deliver({ type: 'DEACTIVATE_ELEMENT_PICKER' });
+  });
+
+  it('closes the picker on the deactivation of the start that activated it', async () => {
+    await loadContentScript();
+    deliver({ type: 'ACTIVATE_ELEMENT_PICKER', attempt: 'first' });
+
+    deliver({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: 'first' });
+
+    expect(overlay()).toBeNull();
+  });
+
+  it('keeps the picker of a later start on the deactivation of an earlier one', async () => {
+    await loadContentScript();
+    deliver({ type: 'ACTIVATE_ELEMENT_PICKER', attempt: 'earlier' });
+    deliver({ type: 'ACTIVATE_ELEMENT_PICKER', attempt: 'later' });
+
+    deliver({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: 'earlier' });
+
+    expect(overlay()).not.toBeNull();
+  });
+
+  it('closes the picker on the deactivation of the later start', async () => {
+    await loadContentScript();
+    deliver({ type: 'ACTIVATE_ELEMENT_PICKER', attempt: 'earlier' });
+    deliver({ type: 'ACTIVATE_ELEMENT_PICKER', attempt: 'later' });
+
+    deliver({ type: 'DEACTIVATE_ELEMENT_PICKER', attempt: 'later' });
+
+    expect(overlay()).toBeNull();
+  });
+});
