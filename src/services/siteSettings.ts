@@ -73,9 +73,12 @@ export const PLATFORMS_OF_THE_ENABLED_LIST: readonly string[] = Object.freeze([
 function choicesOfEnabledList(enabledSites: readonly string[]): Record<string, boolean> {
   const choices: Record<string, boolean> = {};
   for (const hostname of PLATFORMS_OF_THE_ENABLED_LIST) {
-    // A Platform is switched with the Platforms linked to it, so one that is on turns them on: a list
-    // with Copilot and without M365 Copilot was written before M365 Copilot existed
-    choices[hostname] = getLinkedPlatformHostnames(hostname).some((linked) => enabledSites.includes(linked));
+    choices[hostname] = enabledSites.includes(hostname);
+  }
+  // M365 Copilot is switched with Copilot, so a list with Copilot and without M365 Copilot was
+  // written before M365 Copilot existed. Frozen like the list: a later link changes nothing here
+  if (enabledSites.includes('copilot.microsoft.com')) {
+    choices['m365.cloud.microsoft'] = true;
   }
   // A hostname on the list that is no Platform of those releases stays on, as it was
   for (const hostname of enabledSites) {

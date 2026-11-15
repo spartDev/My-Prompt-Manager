@@ -98,7 +98,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 
 ### Upgrade pass
 
-`StorageManager.upgradeStoredData()` runs once per extension update (the service worker calls it from `chrome.runtime.onInstalled` when the reason is `update`), and again at every browser startup. Beside it, apart from its locks, the service worker runs `upgradeStoredSiteSettings()` (`src/services/siteSettings.ts`), which writes Site settings stored as the list of the Platforms that were on back as the Platform choices. It runs `scrubStoredCategories`, then `scrubStored` and `scrubStoredSettings` with its merges, over the raw stored values, under the CATEGORIES, PROMPTS and SETTINGS locks in that order, and writes every key that changed in one atomic set.
+`StorageManager.upgradeStoredData()` runs once per extension update (the service worker calls it from `chrome.runtime.onInstalled` when the reason is `update`), and again at every browser startup. It runs `scrubStoredCategories`, then `scrubStored` and `scrubStoredSettings` with its merges, over the raw stored values, under the CATEGORIES, PROMPTS and SETTINGS locks in that order, and writes every key that changed in one atomic set. Beside it, apart from its locks, the service worker runs `upgradeStoredSiteSettings()` (`src/services/siteSettings.ts`), which writes Site settings stored as the list of the Platforms that were on back as the Platform choices, under the Site settings lock.
 
 - It never trims Prompt text; it trims the labels that Admission trims.
 - Categories whose names become the same ignoring case are merged into the first; their Prompts move to the kept Category.
