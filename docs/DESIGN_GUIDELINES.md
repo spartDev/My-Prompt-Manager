@@ -1173,7 +1173,11 @@ The What's new sheet (`src/components/whatsNew/WhatsNewSheet.tsx`) rises from th
 | `shadow-sheet` (`--shadow-tint-sheet`) | `0 -20px 50px -20px`, violet at 0.45 in light, black at 0.72 in dark | the shadow the sheet casts upwards |
 | `bg-handle` | `border-strong` (`#DCD4EA` / `#41375A`) | the handle, 38 by 5px, decorative |
 
-The sheet is `bg-card` and the footer above Got it has a `border-divider` rule. Under
+The sheet is `bg-card`, its pill "New in {version}" `bg-accent-subtle text-accent` (information, not a
+chosen item: the mockup's `#2F2350` in dark), and the footer above Got it has a `border-divider` rule.
+Every color of the sheet and its tiles is a token with a `.dark` value, listed with both values and
+checked for contrast in light and dark by "What's new in light and dark" in
+`src/theme/__tests__/tokens.test.ts`. Under
 `prefers-reduced-motion`, `src/popup.css` makes all of them last 1ms, and the caller's timer waits
 for nothing (`motionDuration`).
 

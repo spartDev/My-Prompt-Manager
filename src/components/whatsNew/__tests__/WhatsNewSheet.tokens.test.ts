@@ -58,7 +58,7 @@ describe('WhatsNewSheet tokens', () => {
         ['rounded-t-sheet', '--radius-sheet'],
         ['bg-backdrop', '--background-color-backdrop'],
         ['bg-card', '--background-color-card'],
-        ['bg-accent-selected', '--background-color-accent-selected'],
+        ['bg-accent-subtle', '--background-color-accent-subtle'],
         ['text-accent', '--text-color-accent'],
         ['border-divider', '--border-color-divider'],
         ['bg-accent', '--background-color-accent'],

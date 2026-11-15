@@ -295,3 +295,101 @@ describe("What's new tiles tokens", () => {
   });
 });
 // --- end What's new tiles ---
+
+// --- What's new in light and dark (My-Prompt-Manager-d1g.9) ---
+/** The files that draw What's new: the sheet, the grid, its tiles and their icons */
+const WHATS_NEW_FILES = [
+  'components/whatsNew/WhatsNewSheet.tsx',
+  'components/whatsNew/WhatsNewGrid.tsx',
+  'components/whatsNew/WhatsNewTile.tsx',
+  'components/icons/WhatsNewIcons.tsx'
+].map(file => readFileSync(path.resolve(__dirname, '../..', file), 'utf8'));
+
+/**
+ * Every color token What's new reads, with its value in light and in dark. The dark mockup
+ * (MPM-C-Atelier-Sombre, block wn) is in the comment where it differs; each gap is kept on purpose,
+ * since these tokens are shared with the other screens.
+ */
+const WHATS_NEW_COLORS: Array<[token: string, light: string, dark: string]> = [
+  // The backdrop (mockup rgba(4, 2, 10, 0.53)), the sheet, its handle and its upward shadow
+  ['--background-color-backdrop', 'rgba(42, 33, 64, 0.45)', 'rgba(7, 5, 12, 0.7)'],
+  ['--background-color-card', '#ffffff', '#231c34'],
+  ['--background-color-handle', '#dcd4ea', '#41375a'],
+  ['--shadow-tint-sheet', 'rgba(45, 25, 90, 0.45)', 'rgba(0, 0, 0, 0.72)'],
+  // The pill "New in {version}"
+  ['--background-color-accent-subtle', '#f1ebfd', '#2f2350'],
+  ['--text-color-accent', '#5b21b6', '#c4b5fd'],
+  // The title, the hero sentence, the tile titles, the ⌘K chip (mockup hero sentence #e4def0)
+  ['--text-color-primary', '#1d1530', '#f1edf9'],
+  // The descriptions (mockup #b3aac8)
+  ['--text-color-secondary', '#5c5370', '#bcb3d0'],
+  // The tiles, the ⌘K chip; a hovered Feature tile and the Variable pills (mockup hover #2f2350, pills #3d2d75)
+  ['--background-color-subtle', '#f4f1fa', '#2b2340'],
+  ['--background-color-accent-selected', '#ede5ff', '#38296a'],
+  ['--border-color-strong', '#dcd4ea', '#41375a'],
+  ['--shadow-tint-40', 'rgba(45, 25, 90, 0.4)', 'rgba(0, 0, 0, 0.64)'],
+  // The Fixed pill of a Critical fix
+  ['--background-color-success-subtle', '#e7f8ef', '#0f2d22'],
+  ['--text-color-success', '#065f46', '#6ee7b7'],
+  // The footer rule (mockup #2e2645), Got it, its hover and the focus outline
+  ['--border-color-divider', '#f0ebf8', '#2f2744'],
+  ['--background-color-accent', '#6d28d9', '#844bf2'],
+  ['--background-color-accent-hover', '#5b21b6', '#7a40e3'],
+  ['--text-color-on-accent', '#ffffff', '#ffffff'],
+  ['--outline-color-accent', '#6d28d9', '#844bf2']
+];
+
+describe("What's new in light and dark", () => {
+  it('lists every color class of the What\'s new files', async () => {
+    const { light } = await readDeclarations();
+    const prefixes: Record<string, string> = { bg: 'background', text: 'text', border: 'border' };
+    const used = new Set<string>();
+    for (const source of WHATS_NEW_FILES) {
+      for (const [, prefix, name] of source.matchAll(/(?<![\w-])(bg|text|border)-([a-z][a-z-]*[a-z])(?![\w-])/g)) {
+        const token = `--${prefixes[prefix]}-color-${name}`;
+        if (token in light) {used.add(token);}
+      }
+    }
+    // Drawn through a utility rather than a color class: focus-primary, shadow-sheet, shadow-tile-icon
+    used.add('--outline-color-accent').add('--shadow-tint-sheet').add('--shadow-tint-40');
+
+    expect(used.size).toBeGreaterThan(10);
+    expect([...used].filter(token => !WHATS_NEW_COLORS.some(([listed]) => listed === token)), 'tokens missing from the list').toEqual([]);
+  });
+
+  it.each(WHATS_NEW_COLORS)('%s is %s in light and %s in dark', async (token, lightValue, darkValue) => {
+    const declared = await readDeclarations();
+    const { light, dark } = await readTokens();
+    const reference = /^var\((--[\w-]+)\)$/.exec(declared.light[token] ?? '')?.[1];
+
+    expect(token in declared.dark || (reference !== undefined && reference in declared.dark), `${token} has a .dark value`).toBe(true);
+    expect(light[token]).toBe(lightValue);
+    expect(dark[token]).toBe(darkValue);
+  });
+
+  it('its text is readable (4.5:1) and its marks stand out (3:1), in light and dark', async () => {
+    const tokens = await readTokens();
+    const pairs: Array<[what: string, foreground: string, background: string, minimum: number]> = [
+      ['pill "New in"', '--text-color-accent', '--background-color-accent-subtle', 4.5],
+      ['title', '--text-color-primary', '--background-color-card', 4.5],
+      ['hero sentence, tile title, ⌘K chip', '--text-color-primary', '--background-color-subtle', 4.5],
+      ['hovered hero sentence, tile title', '--text-color-primary', '--background-color-accent-selected', 4.5],
+      ['description', '--text-color-secondary', '--background-color-subtle', 4.5],
+      ['hovered description', '--text-color-secondary', '--background-color-accent-selected', 4.5],
+      ['Variable pill', '--text-color-accent', '--background-color-accent-selected', 4.5],
+      ['Variable pill on the hovered hero', '--text-color-accent', '--background-color-card', 4.5],
+      ['Fixed pill', '--text-color-success', '--background-color-success-subtle', 4.5],
+      ['Got it', '--text-color-on-accent', '--background-color-accent', 4.5],
+      ['hovered Got it', '--text-color-on-accent', '--background-color-accent-hover', 4.5],
+      ['Feature icon (non-text)', '--text-color-accent', '--background-color-card', 3],
+      ['focus outline (non-text)', '--outline-color-accent', '--background-color-card', 3]
+    ];
+
+    for (const [mode, values] of Object.entries(tokens)) {
+      for (const [what, foreground, background, minimum] of pairs) {
+        expect(getContrastRatio(values[foreground], values[background]), `${what}, ${mode}`).toBeGreaterThanOrEqual(minimum);
+      }
+    }
+  });
+});
+// --- end What's new in light and dark ---
