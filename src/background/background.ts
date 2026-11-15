@@ -68,10 +68,10 @@ const pickerSessions = {
   },
 };
 
-/** Forgets a tab's picker session, as its tab closes */
+/** Forgets a tab's picker session: its tab closed, or the picker could not be activated in it */
 function forgetPickerSession(tabId: number): void {
   pickerSessions.delete(tabId).catch((error: unknown) => {
-    Logger.warn("Could not forget the picker session of a closed tab", {
+    Logger.warn("Could not forget a picker session", {
       component: "Background",
       tabId,
       error: getErrorMessage(error),
@@ -707,6 +707,10 @@ const pickerWindow = {
    * Forgets the picker window if it is this one, in one change: a window opened since keeps its
    * record. True when it was this one.
    */
+  /** Forgets the tab it picks in if it is this one: a picker window opened since for another tab keeps its own */
+  async forgetTabIf(tabId: number): Promise<void> {
+    await changePickerWindow((current) => (current.originalTabId === tabId ? { originalTabId: null } : null));
+  },
   async forgetIf(windowId: number): Promise<boolean> {
     let matched = false;
     await changePickerWindow((current) => {
@@ -1181,6 +1185,8 @@ async function handleStartElementPicker(
   }) => void,
   repairHostname?: string,
 ) {
+  // The tab whose session was stored, until the picker is active in it: any failure in between forgets it
+  let pendingTabId: number | null = null;
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
@@ -1229,6 +1235,7 @@ async function handleStartElementPicker(
     }
 
     // Store picker session
+    pendingTabId = targetTabId;
     await pickerSessions.set({
       tabId: targetTabId,
       windowId: sender.tab?.windowId || 0,
@@ -1285,6 +1292,7 @@ async function handleStartElementPicker(
         type: "ACTIVATE_ELEMENT_PICKER",
         source: "background",
       });
+      pendingTabId = null;
       sendResponse({ success: true, tabId: targetTabId });
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
@@ -1304,6 +1312,10 @@ async function handleStartElementPicker(
       senderTabId: sender.tab?.id,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
+  } finally {
+    if (pendingTabId !== null) {
+      forgetPickerSession(pendingTabId);
+    }
   }
 }
 
@@ -1336,7 +1348,7 @@ async function handleElementSelected(
         return;
       }
       await changeIconPlacementRepairs({ type: "setOverride", hostname: session.repairHostname, positioning });
-      await pickerWindow.update({ originalTabId: null });
+      await pickerWindow.forgetTabIf(tabId);
       sendResponse({ success: true });
       return;
     }
@@ -1353,19 +1365,15 @@ async function handleElementSelected(
       },
     });
 
-    // If we have a picker window, focus it
+    // If we have a picker window, focus it. One that closed is forgotten by windows.onRemoved, not here:
+    // a window opened since may have taken its place
     const { windowId } = await pickerWindow.read();
     if (windowId) {
-      try {
-        await chrome.windows.update(windowId, { focused: true });
-      } catch {
-        // Window might be closed, ignore
-        await pickerWindow.update({ windowId: null });
-      }
+      await chrome.windows.update(windowId, { focused: true }).catch(() => undefined);
     }
 
-    // Clear the original tab reference; the window id is left as windows.onRemoved may have cleared it meanwhile
-    await pickerWindow.update({ originalTabId: null });
+    // Clear the original tab reference
+    await pickerWindow.forgetTabIf(tabId);
 
     sendResponse({ success: true });
   } catch (error) {

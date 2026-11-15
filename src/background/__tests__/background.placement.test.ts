@@ -195,4 +195,47 @@ describe('background: the picker window of a Custom site, across a service worke
 
     expect((await chrome.storage.session.get('pickerWindow')).pickerWindow).toEqual({ windowId: 43, originalTabId: PAGE_TAB.id });
   });
+
+  it('keeps a picker window opened for another tab while a pick tries to bring a closed one to the front', async () => {
+    await openPicker();
+    const listener = await startServiceWorker();
+    vi.mocked(chrome.windows.create).mockResolvedValue({ id: 43 } as never);
+    vi.mocked(chrome.windows.update).mockImplementationOnce(async () => {
+      // Window 42 is gone; the user opened the picker again, for tab 12
+      await send(listener, { type: 'OPEN_PICKER_WINDOW', data: { tabId: 12 } });
+      throw new Error('No window with id: 42');
+    });
+
+    await send(listener, { type: 'ELEMENT_SELECTED', data: { selector: '#send' } }, { tab: PAGE_TAB });
+
+    expect((await chrome.storage.session.get('pickerWindow')).pickerWindow).toEqual({ windowId: 43, originalTabId: 12 });
+  });
+});
+
+describe('background: a picker that could not be activated leaves no session', () => {
+  beforeEach(() => {
+    Object.assign(getChromeMock().tabs, {
+      get: vi.fn().mockResolvedValue(CLAUDE_TAB),
+      update: vi.fn().mockResolvedValue(CLAUDE_TAB)
+    });
+  });
+
+  it.each([
+    ['the content script does not answer the activation', () => {
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('Could not establish connection'));
+    }],
+    ['the content script cannot be injected', () => {
+      vi.mocked(chrome.scripting.executeScript).mockRejectedValue(new Error('Cannot access contents of the page'));
+    }]
+  ])('forgets the session when %s', async (_case, fail) => {
+    const listener = await startServiceWorker();
+    fail();
+
+    const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+    expect(response).toMatchObject({ success: false });
+    await vi.waitFor(async () => {
+      expect(await chrome.storage.session.get(null)).toEqual({});
+    });
+  });
 });

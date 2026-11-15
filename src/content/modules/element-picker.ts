@@ -81,6 +81,7 @@ interface ElementPickerListeners {
   mousemove?: EventListener;
   click?: EventListener;
   keydown?: EventListener;
+  pagehide?: EventListener;
   message?: RuntimeMessageListener;
 }
 
@@ -522,6 +523,12 @@ export class ElementPicker {
     const boundHandleKeyDown: EventListener = (event: Event) => {
       this.handleKeyDown(event as KeyboardEvent);
     };
+    // The page unloads (a reload, a navigation): the pick can no longer come, so the service
+    // worker forgets the session, as for Escape
+    const boundHandlePageHide: EventListener = () => {
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' }).catch(() => undefined);
+      this.deactivate();
+    };
     const boundHandleMessage: RuntimeMessageListener = (message, sender, sendResponse) => {
       this.handleMessage(message as ElementPickerMessage, sender, sendResponse);
     };
@@ -529,12 +536,14 @@ export class ElementPicker {
     document.addEventListener('mousemove', boundHandleMouseMove, true);
     document.addEventListener('click', boundHandleClick, true);
     document.addEventListener('keydown', boundHandleKeyDown, true);
+    window.addEventListener('pagehide', boundHandlePageHide);
     chrome.runtime.onMessage.addListener(boundHandleMessage);
     
     // Store listeners for cleanup
     this.listeners.mousemove = boundHandleMouseMove;
     this.listeners.click = boundHandleClick;
     this.listeners.keydown = boundHandleKeyDown;
+    this.listeners.pagehide = boundHandlePageHide;
     this.listeners.message = boundHandleMessage;
   }
 
@@ -542,7 +551,7 @@ export class ElementPicker {
    * Detach event listeners
    */
   private detachEventListeners(): void {
-    const { mousemove, click, keydown, message } = this.listeners;
+    const { mousemove, click, keydown, pagehide, message } = this.listeners;
 
     if (mousemove) {
       document.removeEventListener('mousemove', mousemove, true);
@@ -552,6 +561,9 @@ export class ElementPicker {
     }
     if (keydown) {
       document.removeEventListener('keydown', keydown, true);
+    }
+    if (pagehide) {
+      window.removeEventListener('pagehide', pagehide);
     }
     if (message) {
       chrome.runtime.onMessage.removeListener(message);

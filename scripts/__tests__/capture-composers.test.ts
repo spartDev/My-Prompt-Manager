@@ -244,12 +244,26 @@ describe('parseCaptureArgs', () => {
 });
 
 describe('redactUrls', () => {
-  it('writes the address in a navigation error without its query, fragment or credentials', () => {
-    expect(redactUrls('page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://user:pw@chat.example.com/c/1?token=abc#x'))
-      .toBe('page.goto: net::ERR_CERT_AUTHORITY_INVALID at https://chat.example.com/c/1');
-    expect(redactUrls('net::ERR_FILE_NOT_FOUND at file:///Users/alice/stand-ins/claude.html'))
-      .toBe('net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html');
-    expect(redactUrls('Timeout 30000ms exceeded.')).toBe('Timeout 30000ms exceeded.');
+  it('writes the requested address in a navigation error as the fixture header does, whatever it holds', () => {
+    const cases: Array<[string, string]> = [
+      ['https://user:pw@chat.example.com/c/1?token=abc#x', 'https://chat.example.com/c/1'],
+      ['https://x.example/c?token=a(b)SECRET', 'https://x.example/c'],
+      ["https://x.example/c?q=it'sSECRET", 'https://x.example/c'],
+      ['https://user:p(w)SECRET@x.example/c', 'https://x.example/c'],
+      ['file:///Users/alice/My Docs/claude.html', 'file://<stand-in>/claude.html'],
+      ['http://localhost:5173/a b?t=SECRET', 'http://localhost:5173/a%20b']
+    ];
+    for (const [requested, written] of cases) {
+      const redacted = redactUrls(`page.goto: net::ERR_CONNECTION_REFUSED at ${requested}`, requested);
+      expect(redacted).toBe(`page.goto: net::ERR_CONNECTION_REFUSED at ${written}`);
+      expect(redacted).not.toMatch(/SECRET|alice|token/);
+    }
+  });
+
+  it('redacts another address in the message too, and leaves a message with none as it is', () => {
+    expect(redactUrls('redirected to https://login.example.com/sso?ticket=SECRET', 'https://x.example/'))
+      .toBe('redirected to https://login.example.com/sso');
+    expect(redactUrls('Timeout 30000ms exceeded.', 'https://x.example/')).toBe('Timeout 30000ms exceeded.');
   });
 });
 
