@@ -166,8 +166,8 @@ export function endsWithSelectorTrigger(before: string): boolean {
 
 /**
  * True when the selection holds text only: no element without text (an image, an icon drawn by
- * the page) that deleting it would take with the slashes. An editor's span around a zero-width
- * space holds text. The page's elements are judged, not a copy of the selection: a copy holds an
+ * the page, a chip the user cannot edit that holds only a zero-width space) that deleting it
+ * would take with the slashes. An editor's own span around a zero-width space holds text. The page's elements are judged, not a copy of the selection: a copy holds an
  * empty piece of the element the selection starts at the end of (bold text before the slashes).
  */
 function holdsOnlyText(selection: Selection): boolean {
@@ -177,7 +177,11 @@ function holdsOnlyText(selection: Selection): boolean {
   const range = selection.getRangeAt(0);
   const root = range.commonAncestorContainer;
   const scope = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : root.parentElement;
-  return Array.from(scope?.querySelectorAll('*') ?? []).every((element) => element.textContent !== '' || !range.intersectsNode(element));
+  return Array.from(scope?.querySelectorAll('*') ?? []).every((element) => {
+    // A chip the user cannot edit holds no text when all it holds is invisible
+    const text = element.closest('[contenteditable="false"]') ? visible(element.textContent ?? '') : element.textContent;
+    return text !== '' || !range.intersectsNode(element);
+  });
 }
 
 /**

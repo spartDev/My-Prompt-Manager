@@ -318,6 +318,21 @@ describe('removeTypedTrigger', () => {
       expect(paragraph.innerHTML).toBe(before);
       restore();
     });
+
+    it('leaves a // with a chip the user cannot edit between its slashes, though the chip holds a zero-width space', () => {
+      const field = editable('<p>Hi /<span contenteditable="false">\u200B</span>/</p>');
+      const paragraph = field.querySelector('p') as HTMLElement;
+      const first = paragraph.firstChild as Text;
+      const last = paragraph.lastChild as Text;
+      const before = paragraph.innerHTML;
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [paragraph, 1], [first, 3]]);
+
+      expect(removeTypedTrigger(field)).toBe(false);
+
+      expect(paragraph.innerHTML).toBe(before);
+      restore();
+    });
   });
 
   it('removes a // typed on a new line of a contenteditable, after a <br>', () => {
@@ -412,6 +427,17 @@ describe('removeTypedTrigger', () => {
     document.getSelection()?.collapse(field.querySelector('p')?.firstChild ?? null, 9);
     const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
     field.addEventListener('input', () => { field.innerHTML = '<p>BEFORE  AFTER</p>'; });
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
+  it('reports a contenteditable whose editor drops the joiner of an emoji elsewhere in the draft on input', () => {
+    const field = editable('<p>\u{1F469}\u200D\u{1F4BB} Before //</p>');
+    const text = field.querySelector('p')?.firstChild as Text;
+    document.getSelection()?.collapse(text, text.length);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>\u{1F469}\u{1F4BB} Before </p>'; });
 
     expect(removeTypedTrigger(field)).toBe(false);
     refused.mockRestore();
