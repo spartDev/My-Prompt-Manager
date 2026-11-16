@@ -574,6 +574,24 @@ describe('icon placement override on a built-in Platform', () => {
     expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
   });
 
+  it.each([
+    ['keeps the icon at the chain\'s first anchor', false, true],
+    ['places the icon again at a later anchor of the chain', true, false]
+  ])('on a new pick, %s', async (_case, later, kept) => {
+    if (later) {
+      renameToolbar('', 'renamed-');
+      showSecondAnchor();
+    }
+    await internals().injectIcon(editor);
+    const placed = icon();
+    expect(placed.getAttribute('data-mpm-anchor')).toBe(later ? '1' : '0');
+
+    internals().handleOverrideChange();
+    await settle();
+
+    expect(icon() === placed).toBe(kept);
+  });
+
   it('puts the icon at a later anchor of the chain rendered within the grace period when the user has no pick', async () => {
     grace(1000);
     renameToolbar('', 'renamed-');

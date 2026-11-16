@@ -76,7 +76,7 @@ export class PromptLibraryInjector {
   private readonly overlay: AnchoredOverlay;
   /** Watches the placed icon and asks for a new placement when the Platform removes it */
   private readonly placement: IconPlacementController;
-  /** The element the user picked for a built-in Platform whose toolbar is not found, and the placement reports */
+  /** The element the user picked for a built-in Platform whose chain's first anchor is not found, and the placement reports */
   private readonly repair: PlacementRepair;
   /** The picked element showed in the wait just read: the placement that follows was asked for by the pick (pickShowsBeside) */
   private pickShowed = false;
