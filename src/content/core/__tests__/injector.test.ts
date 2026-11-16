@@ -559,6 +559,18 @@ describe('PromptLibraryInjector', () => {
           expect(open).not.toHaveBeenCalled();
         });
 
+        it('drops the opening when the site is turned off while the editor tidies up', async () => {
+          const { open } = await listen();
+          lexical = lexicalField();
+
+          await typeSlash(lexical);
+          await new Promise(resolve => window.setTimeout(resolve, 5));
+          injector.cleanup();
+          await new Promise(resolve => window.setTimeout(resolve, 150));
+
+          expect(open).not.toHaveBeenCalled();
+        });
+
         it('in Lexical, opens the selector with no wait: Lexical took the // out itself', async () => {
           const { open } = await listen();
           lexical = lexicalField({ lexical: true });

@@ -315,6 +315,7 @@ export class PromptLibraryInjector {
    */
   private openFromTyping(field: HTMLElement): void {
     let dropped = false;
+    const teardowns = this.teardowns;
     // A key, a paste, a drop or a composed character in the field, or a click anywhere (another
     // field takes the focus): the user's own actions only, which are trusted events
     const onUserAction = (event: Event): void => {
@@ -342,7 +343,8 @@ export class PromptLibraryInjector {
         return;
       }
       await editorSettled(field);
-      if (!dropped) {
+      // The site turned off or the injector cleaned up meanwhile: no selector over that page
+      if (!dropped && teardowns === this.teardowns) {
         await this.selector.open(field, this.state.icon);
       }
     };
@@ -459,6 +461,8 @@ export class PromptLibraryInjector {
 
   /** The settings updates being handled, each after the one before it */
   private settingsUpdates: Promise<void> = Promise.resolve();
+  /** Counts the cleanups: an opening that started before one is not for the page after it. */
+  private teardowns = 0;
 
   /**
    * Handle settings update from popup
@@ -1717,6 +1721,7 @@ export class PromptLibraryInjector {
    * Partial cleanup - removes UI elements but preserves message listener for re-enabling
    */
   private partialCleanup(): void {
+    this.teardowns++;
     debug('Starting partial cleanup (preserving message listener)', { instanceId: this.state.instanceId });
 
     // Clear timeouts and intervals
@@ -1775,6 +1780,7 @@ export class PromptLibraryInjector {
    * Cleans up all resources
    */
   cleanup(): void {
+    this.teardowns++;
     debug('Starting full cleanup', { instanceId: this.state.instanceId });
 
     // Clear timeouts and intervals
