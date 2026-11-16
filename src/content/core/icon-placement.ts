@@ -25,6 +25,8 @@ export interface PlacementRecord {
   icon: HTMLElement;
   editor: HTMLElement;
   kind: PlacementKind;
+  /** The anchor of the chain the icon was placed at, for a Toolbar placement */
+  anchorIndex?: number;
 }
 
 /** The attribute the controller writes on the icon, read by tests and by the debug logs */
@@ -71,7 +73,7 @@ export class IconPlacementController {
   track(icon: HTMLElement, editor: HTMLElement, kind: PlacementKind, anchorIndex?: number): void {
     this.cancelReplacement();
     this.stopAwaitingToolbar();
-    this.record = { icon, editor, kind };
+    this.record = { icon, editor, kind, anchorIndex };
     icon.setAttribute(PLACEMENT_ATTRIBUTE, kind);
     if (anchorIndex === undefined) {
       icon.removeAttribute(ANCHOR_ATTRIBUTE);

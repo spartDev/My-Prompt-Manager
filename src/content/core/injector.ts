@@ -24,7 +24,7 @@ import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
 import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
-import { ANCHOR_ATTRIBUTE, IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
+import { IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
 import { PlatformInsertionManager } from './insertion-manager';
 import { PlacementRepair } from './placement-repair';
 
@@ -1322,7 +1322,7 @@ export class PromptLibraryInjector {
     // The chain's first anchor is found in this tab, and comes before the pick: placing again would
     // only put the icon back there. Not at a later anchor of the chain: a pick on the page comes first
     const current = this.placement.current;
-    if (current?.kind === 'toolbar' && current.icon.isConnected && current.icon.getAttribute(ANCHOR_ATTRIBUTE) === '0') {
+    if (current?.kind === 'toolbar' && current.icon.isConnected && current.anchorIndex === 0) {
       return;
     }
     this.injectIcon(editor).catch((err: unknown) => {

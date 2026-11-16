@@ -13,8 +13,9 @@
  * override with no status (a pick stored after the chain resolved); and when the page comes back from
  * the back/forward cache, since the service worker forgot the tab when it left. While the icon waits
  * within the grace period for a toolbar or a pick rendered late, the tab has no placement to send. A
- * tab opened in that wait is not counted yet: a Toolbar reported by another tab meanwhile drops the
- * repair, pick included, and this one reports the overlay once its wait ends.
+ * tab opened in that wait is not counted yet, and one whose last report was the Toolbar is counted
+ * there: a Toolbar reported by another tab meanwhile drops the repair, pick included, and this one
+ * reports the overlay once its wait ends.
  */
 
 import {
@@ -36,7 +37,7 @@ export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
   /** The placement last sent for this tab; null when the service worker may hold none, or another */
   private sent: PlacementReport | null = null;
-  /** How the icon was last placed in this tab, sent or not; null before its first placement */
+  /** How the icon was last placed in this tab, sent or not; null until a placement reports: before the first, and while one waits */
   private placed: PlacementReport | null = null;
   /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
   private atLaterAnchor = false;
@@ -50,7 +51,8 @@ export class PlacementRepair {
 
   /**
    * @param onOverrideChange - Called when the user picks a new element for this Platform, or the
-   *   override is dropped elsewhere, while the icon is off the Toolbar, so it is placed again
+   *   override is dropped elsewhere, while the icon is off the Toolbar, waits or is not yet placed;
+   *   and for a new pick while it is at a later anchor of the chain. The icon is placed again
    */
   constructor(hostname: string, onOverrideChange: () => void) {
     this.hostname = hostname;
