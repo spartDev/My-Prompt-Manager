@@ -542,6 +542,38 @@ describe('icon placement override on a built-in Platform', () => {
     expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
   });
 
+  it.each([
+    ['once the grace period ended without the earlier pick', '[data-testid="not-rendered-yet"]'],
+    ['when the user had no pick', null]
+  ])('places the icon at an element picked after it settled at a later anchor of the chain, %s', async (_case, earlier) => {
+    grace(50);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    if (earlier) {
+      await changeIconPlacementRepairs({
+        type: 'setOverride',
+        hostname: 'claude.ai',
+        positioning: { mode: 'custom', placement: 'before', selector: earlier }
+      });
+      await internals().repair.load();
+    }
+    await internals().injectIcon(editor);
+    await vi.waitFor(() => { expect(internals().placement.current?.kind).toBe('toolbar'); });
+    await new Promise((done) => setTimeout(done, 200));
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+
+    // The user picks an element on the page: it comes before the chain's later anchors
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
+  });
+
   it('puts the icon at a later anchor of the chain rendered within the grace period when the user has no pick', async () => {
     grace(1000);
     renameToolbar('', 'renamed-');

@@ -24,7 +24,7 @@ import { injectCSS } from '../utils/styles';
 import { ThemeManager } from '../utils/theme-manager';
 
 import { AnchoredOverlay, INSIDE_CORNER_INSET } from './anchored-overlay';
-import { IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
+import { ANCHOR_ATTRIBUTE, IconPlacementController, placeAtAnchor, resolveIconPlacement } from './icon-placement';
 import { PlatformInsertionManager } from './insertion-manager';
 import { PlacementRepair } from './placement-repair';
 
@@ -1034,10 +1034,10 @@ export class PromptLibraryInjector {
           // it (or without the chain's first anchor)
           this.placement.awaitToolbar(
             () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon),
-            () => { this.repair.report('toolbar'); }
+            () => { this.repair.report('toolbar', true); }
           );
         } else {
-          this.repair.report('toolbar');
+          this.repair.report('toolbar', resolution.index > 0);
         }
       }
 
@@ -1319,11 +1319,10 @@ export class PromptLibraryInjector {
     if (!this.state.isSiteEnabled || !editor?.isConnected) {
       return;
     }
-    // The chain resolves in this tab, and comes before the pick: placing again would only put the
-    // icon back in the same Toolbar. Not while it waits at a later anchor of the chain for the
-    // picked element, which comes before that anchor
+    // The chain's first anchor is found in this tab, and comes before the pick: placing again would
+    // only put the icon back there. Not at a later anchor of the chain: a pick on the page comes first
     const current = this.placement.current;
-    if (current?.kind === 'toolbar' && current.icon.isConnected && !this.placement.awaiting) {
+    if (current?.kind === 'toolbar' && current.icon.isConnected && current.icon.getAttribute(ANCHOR_ATTRIBUTE) === '0') {
       return;
     }
     this.injectIcon(editor).catch((err: unknown) => {

@@ -12,7 +12,9 @@
  * storage drops the repair while this tab was off the Toolbar (as by Clear All Data), or holds an
  * override with no status (a pick stored after the chain resolved); and when the page comes back from
  * the back/forward cache, since the service worker forgot the tab when it left. While the icon waits
- * within the grace period for a toolbar or a pick rendered late, the tab has no placement to send.
+ * within the grace period for a toolbar or a pick rendered late, the tab has no placement to send. A
+ * tab opened in that wait is not counted yet: a Toolbar reported by another tab meanwhile drops the
+ * repair, pick included, and this one reports the overlay once its wait ends.
  */
 
 import {
@@ -36,6 +38,8 @@ export class PlacementRepair {
   private sent: PlacementReport | null = null;
   /** How the icon was last placed in this tab, sent or not; null before its first placement */
   private placed: PlacementReport | null = null;
+  /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
+  private atLaterAnchor = false;
   /** Whether storage holds a repair for this Platform: until it does, a Toolbar needs no report */
   private hasRepair = false;
   /** How many changes of the repairs this page followed */
@@ -130,10 +134,14 @@ export class PlacementRepair {
    * Tells the service worker how the icon was placed in this tab, when it differs from the last
    * report delivered. A placement in the Toolbar keeps the override here: the service worker drops
    * it, and storage says so, only when no other tab of the Platform still needs it; the chain comes
-   * before the override, so it is not used while the Toolbar is found.
+   * before the override, so it is not used while the Toolbar is found, unless the icon is at a later
+   * anchor of the chain: a pick on the page comes before that one.
+   *
+   * @param atLaterAnchor - The icon is in the Toolbar at an anchor of the chain after the first
    */
-  report(placement: PlacementReport): void {
+  report(placement: PlacementReport, atLaterAnchor = false): void {
     this.placed = placement;
+    this.atLaterAnchor = placement === 'toolbar' && atLaterAnchor;
     if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
       return;
     }
@@ -195,7 +203,8 @@ export class PlacementRepair {
 
   /**
    * Takes the Platform's repair as storage holds it now. A tab whose icon is off the Toolbar, or not
-   * yet placed, places it again when the pick changed, and that placement is sent; any other tab sends
+   * yet placed, places it again when the pick changed, and one at a later anchor of the chain when
+   * the user picked an element, and that placement is sent; any other tab sends
    * its placement, when not yet sent: a Toolbar from before the repair included.
    */
   private follow(repair: PlatformPlacementRepair | undefined): void {
@@ -203,11 +212,12 @@ export class PlacementRepair {
     const override = repair?.override ?? null;
     const changed = JSON.stringify(override) !== JSON.stringify(this.override);
     this.override = override;
-    if (changed && this.placed !== 'toolbar') {
+    // At a later anchor of the chain, a new pick comes first; a pick dropped leaves the icon where it is
+    if (changed && (this.placed !== 'toolbar' || (this.atLaterAnchor && override !== null))) {
       this.onOverrideChange();
       return;
     }
-    // In the Toolbar the chain comes before any pick: the placement stands
+    // At the chain's first anchor the chain comes before any pick: the placement stands
     this.reportPlaced();
   }
 
@@ -217,12 +227,13 @@ export class PlacementRepair {
    */
   placing(): void {
     this.placed = null;
+    this.atLaterAnchor = false;
   }
 
   /** Sends how the icon was last placed, when it was placed and not yet sent */
   private reportPlaced(): void {
     if (this.placed) {
-      this.report(this.placed);
+      this.report(this.placed, this.atLaterAnchor);
     }
   }
 

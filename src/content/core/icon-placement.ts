@@ -67,11 +67,6 @@ export class IconPlacementController {
     return this.record;
   }
 
-  /** Whether the icon waits within the grace period for where it belongs (awaitToolbar) */
-  get awaiting(): boolean {
-    return this.toolbarFound !== null;
-  }
-
   /** Remembers the icon just placed for this editor and watches the document for its removal. */
   track(icon: HTMLElement, editor: HTMLElement, kind: PlacementKind, anchorIndex?: number): void {
     this.cancelReplacement();
