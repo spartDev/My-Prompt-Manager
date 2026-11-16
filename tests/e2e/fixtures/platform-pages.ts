@@ -253,6 +253,17 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  * - An `input` event that carries text inserts that text again, after what the field holds. One
  *   that carries none follows a change the browser made to the DOM itself (the editing command
  *   deleting text): the editor takes its text from what its paragraph then shows.
+ * - A `beforeinput` that deletes, typed or sent by a script, is cancelled: the editor takes what the
+ *   event or the selection says out of its text at once, and draws the field again in a
+ *   microtask, as Lexical does.
+ * - Around an `input` event that carries none, as Lexical 0.41 does (the version perplexity.ai
+ *   serves, My-Prompt-Manager-9o0):
+ *   - an element the editor drew that the browser removed (the editing command emptying a
+ *     <span>) is drawn again from the editor's text: what was deleted is back;
+ *   - a text of the editor's found emptied, the caret in it, stays in the field 20 ms, then an
+ *     update of the editor's own takes it out and puts the caret back in the paragraph with
+ *     setBaseAndExtent: in Chrome, that takes the focus back to the field from where it was. A
+ *     character typed in those 20 ms goes in that emptied text, and is taken out with it.
  * - A Backspace key removes the last character.
  */
 const LEXICAL_EDITOR = /* html */ `
@@ -261,6 +272,8 @@ const LEXICAL_EDITOR = /* html */ `
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
+      // The elements the editor drew for the text, last time it drew
+      let drawn = [];
       const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : node.textContent.length);
       const draw = () => {
         const paragraph = document.createElement('p');
@@ -279,6 +292,7 @@ const LEXICAL_EDITOR = /* html */ `
           if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
         }
         editor.replaceChildren(paragraph);
+        drawn = Array.from(paragraph.querySelectorAll('span'));
       };
       /** The offset in the text of a point of the editor's DOM. */
       const offsetOf = (container, offset) => {
@@ -300,14 +314,14 @@ const LEXICAL_EDITOR = /* html */ `
         return text.length;
       };
       /** Puts the caret after the first characters of the text, in the DOM just drawn. */
-      const caretTo = (position) => {
+      const caretTo = (position, place = (node, offset) => document.getSelection().collapse(node, offset)) => {
         const paragraph = editor.querySelector('p');
         const nodes = Array.from(paragraph.childNodes);
         let remaining = position;
         let index = 0;
         for (const node of nodes) {
           if (node.nodeName !== 'BR' && remaining <= lengthOf(node)) {
-            document.getSelection().collapse(node.firstChild, remaining);
+            place(node.firstChild, remaining);
             known = { start: position, end: position };
             return;
           }
@@ -315,7 +329,7 @@ const LEXICAL_EDITOR = /* html */ `
           remaining -= lengthOf(node);
           index += 1;
         }
-        document.getSelection().collapse(paragraph, Math.min(index, nodes.length));
+        place(paragraph, Math.min(index, nodes.length));
         known = { start: position, end: position };
       };
       /** Text arrives where the known selection is, in place of what is selected. */
@@ -336,9 +350,15 @@ const LEXICAL_EDITOR = /* html */ `
         event.preventDefault();
         write(event.clipboardData.getData('text/plain'));
       });
+      // The emptied text the editor takes out 20 ms after it found it, until it does
+      let emptied = null;
       editor.addEventListener('beforeinput', (event) => {
         event.preventDefault();
-        if (event.inputType === 'insertText' && event.data) {
+        if (event.inputType === 'insertText' && event.data && emptied) {
+          // Typed in the emptied text: it goes with it
+          emptied.appendData(event.data);
+          document.getSelection().collapse(emptied, emptied.length);
+        } else if (event.inputType === 'insertText' && event.data) {
           write(event.data.replace(/\\n/g, ''));
         } else if (event.inputType.startsWith('delete')) {
           // What is deleted is what the event says, a selection made a moment ago included
@@ -347,7 +367,12 @@ const LEXICAL_EDITOR = /* html */ `
           if (range && editor.contains(range.startContainer)) {
             known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
           }
-          write('');
+          text = text.slice(0, known.start) + text.slice(known.end);
+          const caret = known.start;
+          queueMicrotask(() => {
+            draw();
+            caretTo(caret);
+          });
         }
       });
       editor.addEventListener('input', (event) => {
@@ -355,6 +380,12 @@ const LEXICAL_EDITOR = /* html */ `
           text += event.data;
           draw();
           caretTo(text.length);
+          return;
+        }
+        // The browser removed an element the editor drew: the editor draws it again from its text
+        if (drawn.some((span) => !span.isConnected)) {
+          draw();
+          caretTo(Math.min(known.end, text.length));
           return;
         }
         // The browser changed the DOM itself (the editing command deleted text): the editor takes
@@ -374,8 +405,22 @@ const LEXICAL_EDITOR = /* html */ `
           ? offsetOf(selection.focusNode, selection.focusOffset)
           : null;
         text = lines.join('\\n');
+        const at = caret === null ? text.length : Math.min(caret, text.length);
+        const focus = selection.focusNode;
+        if (focus && focus.nodeType === Node.TEXT_NODE && focus.nodeValue === '' && drawn.includes(focus.parentNode)) {
+          // A text of the editor's found emptied: taken out by an update of the editor's own, 20 ms
+          // later, whose commit puts the caret back with setBaseAndExtent
+          known = { start: at, end: at };
+          emptied = focus;
+          window.setTimeout(() => {
+            emptied = null;
+            draw();
+            caretTo(at, (node, offset) => document.getSelection().setBaseAndExtent(node, offset, node, offset));
+          }, 20);
+          return;
+        }
         draw();
-        caretTo(caret === null ? text.length : Math.min(caret, text.length));
+        caretTo(at);
       });
       editor.addEventListener('keydown', (event) => {
         if (event.key === 'Backspace') {
