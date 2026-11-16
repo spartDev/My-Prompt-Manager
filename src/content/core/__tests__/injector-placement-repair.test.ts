@@ -230,6 +230,27 @@ describe('icon placement override on a built-in Platform', () => {
     expect(await stored()).toEqual({ status: 'overlay' });
   });
 
+  it('moves the icon from the overlay into a toolbar rendered after the grace period, and reports the toolbar in its place', async () => {
+    grace(300);
+    const late = IconPlacementController.LATE_TOOLBAR_CHECK_MS;
+    (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = 100;
+    try {
+      renameToolbar('', 'renamed-');
+      await internals().injectIcon(editor);
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+
+      // The Platform renders the toolbar its chain knows, long after
+      renameToolbar('renamed-', '');
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+
+      expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+      expect(reports).toEqual(['overlay', 'toolbar']);
+      expect(await stored()).not.toEqual({ status: 'overlay' });
+    } finally {
+      (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = late;
+    }
+  });
+
   it('moves the icon from the picked element into the toolbar once the Platform renders it, and drops the pick', async () => {
     grace(1000);
     renameToolbar('', 'renamed-');

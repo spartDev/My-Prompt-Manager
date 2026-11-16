@@ -848,7 +848,7 @@ iconPlacement: {
 }
 
 // When no anchor is found, the icon is anchored inside the editor's bottom-end corner
-// (src/content/core/anchored-overlay.ts), and goes into the toolbar if the Platform renders it within the grace period.
+// (src/content/core/anchored-overlay.ts), and goes into the toolbar if the Platform renders it, even after the grace period.
 // Still not found 5 seconds after that placement (IconPlacementController.TOOLBAR_GRACE_MS), the console shows a warning:
 // "No anchor of this Platform found in its composer, the icon is anchored on the editor instead".
 // If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.

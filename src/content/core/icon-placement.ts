@@ -8,7 +8,8 @@
  * never sees the loss. While the icon is away from where it belongs (on the Anchored overlay, at
  * the element the user picked, or at a later anchor while the picked element is missing), it also
  * waits for that place, which a Platform may render after its editor, and asks for the icon to be
- * placed again if it shows within a grace period (awaitToolbar).
+ * placed again if it shows within a grace period (awaitToolbar); an icon on the overlay goes on
+ * looking for its toolbar after that, at a slower pace (keepWatching).
  */
 
 import type { IconPlacement } from '../../config/platforms';
@@ -104,10 +105,11 @@ export class IconPlacementController {
    * `onKept`, if given, runs when it is still false: only then is the overlay reported, or the
    * pick whose element never showed dropped. The caller says what counts as found (for an icon at
    * a pick, only the chain's first anchor). The grace period starts again with each placement of the
-   * icon. With `keepWatching`, the wait goes on after that, `found(true)` read on the settled
-   * changes at most every LATE_TOOLBAR_CHECK_MS, until the icon is placed again.
+   * icon. With `keepWatching`, the wait goes on after that, for what it says is found, read on the
+   * settled changes at most every LATE_TOOLBAR_CHECK_MS, until the icon is placed again or its
+   * editor leaves the page. It is to be cheap: it runs for as long as the page does.
    */
-  awaitToolbar(found: (settled: boolean) => boolean, onKept?: () => void, { keepWatching = false }: { keepWatching?: boolean } = {}): void {
+  awaitToolbar(found: (settled: boolean) => boolean, onKept?: () => void, { keepWatching }: { keepWatching?: () => boolean } = {}): void {
     const record = this.record;
     if (!record) {
       return;
@@ -134,7 +136,7 @@ export class IconPlacementController {
       this.stopAwaitingToolbar();
       onKept?.();
       if (keepWatching && this.record === record) {
-        this.toolbarFound = () => found(true);
+        this.toolbarFound = keepWatching;
         this.watchingLate = true;
       }
     };
@@ -223,6 +225,11 @@ export class IconPlacementController {
       // page is the loss check's to place again; an editor that left the page says nothing of
       // its toolbar
       const found = this.toolbarFound;
+      if (this.watchingLate && !record.editor.isConnected) {
+        // The editor left the page for good: the detection pass takes over
+        this.stopAwaitingToolbar();
+        return;
+      }
       if (found === null || !record.icon.isConnected || !record.editor.isConnected || !found(false)) {
         return;
       }

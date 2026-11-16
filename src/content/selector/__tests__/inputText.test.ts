@@ -661,6 +661,14 @@ describe('deleteTypedTriggerByEditor', () => {
     expect(events).toHaveLength(2);
   });
 
+  it('reads the field unchanged when it holds a non-breaking space the browser wrote', async () => {
+    const field = editable('<p><span data-lexical-text="true">Hi \u00a0//</span></p>');
+    document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 6);
+    ownEditor(field, { deletes: false });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('unchanged');
+  });
+
   it('reads the field changed when the editor deletes one slash only', async () => {
     const field = slashMenuEditor();
     const events = ownEditor(field);
