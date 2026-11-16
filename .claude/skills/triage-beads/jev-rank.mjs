@@ -235,6 +235,8 @@ async function ask(state, questions) {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
+      // A redirect, even https -> http, could resend the ticket text in clear: refuse it.
+      redirect: 'error',
       body: JSON.stringify(payload),
     });
     if (res.status === 429 && attempt < 3) {
