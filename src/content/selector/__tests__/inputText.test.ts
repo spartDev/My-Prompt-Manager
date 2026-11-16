@@ -365,13 +365,23 @@ describe('the // typed in a Lexical composer (Perplexity)', () => {
       if (!field.isConnected) {
         return;
       }
-      field.innerHTML = state === '' ? '<p><br></p>' : `<p dir="ltr"><span data-lexical-text="true">${state}</span></p>`;
-      rendered = field.querySelector('span');
+      const paragraph = document.createElement('p');
+      if (state === '') {
+        paragraph.append(document.createElement('br'));
+        rendered = null;
+      } else {
+        paragraph.dir = 'ltr';
+        const span = document.createElement('span');
+        span.setAttribute('data-lexical-text', 'true');
+        span.textContent = state;
+        paragraph.append(span);
+        rendered = span;
+      }
+      field.replaceChildren(paragraph);
       const text = rendered?.firstChild;
       if (text) {
         selection.collapse(text, state.length);
       } else {
-        const paragraph = field.querySelector('p') as HTMLElement;
         selection.setBaseAndExtent(paragraph, 0, paragraph, 0);
       }
     };
