@@ -261,19 +261,27 @@ const ticketBrief = (t) => ({
   type: t.issue_type,
   status: t.status,
   description: t.description ?? '',
-  acceptance_criteria: t.acceptance_criteria ?? '',
+  acceptance_criteria: acceptanceText(t),
 });
 
 const noulReading = (p) => (p >= THRESHOLDS.yes ? 'yes' : p <= THRESHOLDS.no ? 'no' : 'unsettled');
 const pct = (p) => Math.round(p * 100);
 
 // Splits acceptance criteria into items: "1. … 2. …", one per line, or "- …" bullets.
+// The acceptance field, or, when it is empty, an "Acceptance criteria" section written
+// inside the description (a heading or a line "Acceptance criteria:"), up to the next heading.
+function acceptanceText(t) {
+  if ((t.acceptance_criteria ?? '').trim()) return t.acceptance_criteria;
+  const m = (t.description ?? '').match(/^\s*(?:#+\s*)?acceptance(?: criteria)?\s*:?\s*$([\s\S]*?)(?=^\s*#+\s|(?![\s\S]))/im);
+  return m ? m[1].trim() : '';
+}
+
 function acceptanceItems(text) {
   const t = (text ?? '').trim();
   if (!t) return [];
   const numbered = t.split(/(?:^|\s)\d+[.)]\s+/).map((s) => s.trim()).filter(Boolean);
   if (numbered.length > 1) return withLeadIns(numbered);
-  const lines = t.split(/\n+/).map((s) => s.replace(/^\s*(?:[-*•]|\[[ x]\])\s*/, '').trim()).filter(Boolean);
+  const lines = t.split(/\n+/).map((s) => s.replace(/^\s*(?:[-*•]\s*)?(?:\[[ xX]\]\s*)?/, '').trim()).filter(Boolean);
   return withLeadIns(lines.length ? lines : [t]);
 }
 
@@ -360,7 +368,7 @@ async function rank(snapshotPath, opts) {
   const tickets = all.filter((t) => t.issue_type !== 'epic');
 
   const results = await pool(tickets, async (t) => {
-    const acItems = acceptanceItems(t.acceptance_criteria);
+    const acItems = acceptanceItems(acceptanceText(t));
     // Speculative fan-out: every question shares the ticket as state, so one request.
     const questions = {
       ...QUESTIONS,
@@ -412,9 +420,28 @@ async function rank(snapshotPath, opts) {
   }
 
   const ranked = [...results].sort((x, y) => (y.value ?? -1) - (x.value ?? -1));
+
+  // An epic is not judged on its own: it takes the best suggestion and the areas of its
+  // live children (ids "<epic>.<n>" in the snapshot), so the report and step 4 keep it.
+  const epics = all
+    .filter((t) => t.issue_type === 'epic')
+    .map((e) => {
+      const children = results.filter((r) => r.id.startsWith(`${e.id}.`));
+      const judged = children.filter((c) => !c.error);
+      const areas = [...new Set(judged.flatMap((c) => (noulReading(c.changes_files) === 'no' ? [] : c.areas.yes)))];
+      return {
+        id: e.id,
+        priority: e.priority,
+        status: e.status,
+        title: e.title,
+        children: children.map((c) => c.id),
+        suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
+        areas,
+      };
+    });
   const out = join(dirname(snapshotPath), 'jev.json');
   const areaPaths = Object.fromEntries(Object.entries(AREAS).map(([n, a]) => [n, a.paths]));
-  writeFileSync(out, JSON.stringify({ model: MODEL, weights: WEIGHTS, thresholds: THRESHOLDS, areas: areaPaths, ranked, duplicates }, null, 2));
+  writeFileSync(out, JSON.stringify({ model: MODEL, weights: WEIGHTS, thresholds: THRESHOLDS, areas: areaPaths, ranked, epics, duplicates }, null, 2));
 
   for (const r of ranked) {
     if (r.error) {
@@ -424,6 +451,13 @@ async function rank(snapshotPath, opts) {
     console.log(
       `${r.id} P${r.priority}->P${r.suggested} v=${r.value} sev=${r.sev.toFixed(1)} eff=${r.eff.toFixed(1)} ` +
         `vis=${pct(r.vis)} time=${pct(r.time)} ready=${pct(r.ready)}${r.flags.length ? ` | ${r.flags.join('; ')}` : ''}`
+    );
+  }
+  for (const e of epics) {
+    console.log(
+      e.suggested === null
+        ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand`
+        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.areas.join(', ') || 'no files'}`
     );
   }
   for (const d of duplicates) {
