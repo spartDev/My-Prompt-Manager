@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  deleteTypedTriggerByEditor,
   endsWithSelectorTrigger,
   focusAtEnd,
   insertionPointOf,
@@ -274,7 +275,7 @@ describe('removeTypedTrigger', () => {
     });
 
     describe('in M365 Copilot\'s editor while its slash menu is open', () => {
-      /** The editor as read on the live page, the caret after the spans the menu left (fixture) */
+      /** The editor as read on the live page, the caret put after the spans the menu left */
       const slashMenuEditor = (held = '\u200B\u200C') => {
         const markup = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
         // The fixture parsed as a page would parse it: its editor element is taken, its comment left
@@ -554,6 +555,126 @@ describe('removeTypedTrigger', () => {
     const field = textarea('Before / after', 8);
     expect(removeTypedTrigger(field)).toBe(false);
     expect(field.value).toBe('Before / after');
+  });
+});
+
+describe('deleteTypedTriggerByEditor', () => {
+  /**
+   * An editor that writes its own DOM, as Lexical: it cancels a deleteContentBackward and deletes the
+   * character before the caret itself, drawing its paragraph anew at once. It counts the events.
+   */
+  const ownEditor = (field: HTMLElement, { cancels = true, deletes = true } = {}) => {
+    const events: string[] = [];
+    field.addEventListener('beforeinput', (event) => {
+      events.push(event.inputType);
+      if (!cancels) {
+        return;
+      }
+      event.preventDefault();
+      const selection = document.getSelection();
+      const node = selection?.focusNode;
+      if (!deletes || node?.nodeType !== Node.TEXT_NODE || event.inputType !== 'deleteContentBackward') {
+        return;
+      }
+      const offset = selection?.focusOffset ?? 0;
+      const text = (node.nodeValue ?? '').slice(0, offset - 1) + (node.nodeValue ?? '').slice(offset);
+      const span = document.createElement('span');
+      span.setAttribute('data-lexical-text', 'true');
+      span.textContent = text;
+      node.parentElement?.replaceWith(span);
+      if (span.firstChild) {
+        selection?.collapse(span.firstChild, offset - 1);
+      } else {
+        selection?.collapse(span, 0);
+      }
+    });
+    return events;
+  };
+  /** M365 Copilot's editor while its slash menu is open, as read live: the caret after the // */
+  const slashMenuEditor = (): HTMLElement => {
+    const template = document.createElement('template');
+    template.innerHTML = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
+    const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+    document.body.append(field);
+    const slashes = field.querySelector('span[data-lexical-text]')?.firstChild as Text;
+    document.getSelection()?.collapse(slashes, 2);
+    return field;
+  };
+
+  it('has M365 Copilot\'s editor delete the //, as two presses of Backspace, and reads it gone', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field);
+
+    const removal = deleteTypedTriggerByEditor(field);
+
+    expect(removal).not.toBeNull();
+    await expect(removal).resolves.toBe(true);
+    expect(events).toEqual(['deleteContentBackward', 'deleteContentBackward']);
+    expect(plainTextOf(field, { hiddenMarks: false })).toBe('');
+  });
+
+  it('reads the field once an editor that draws in a microtask, as Lexical, has drawn', async () => {
+    const field = slashMenuEditor();
+    const slashes = field.querySelector('span[data-lexical-text]') as HTMLElement;
+    let deleted = 0;
+    field.addEventListener('beforeinput', (event) => {
+      event.preventDefault();
+      deleted += 1;
+      const now = deleted;
+      queueMicrotask(() => { slashes.textContent = '//'.slice(now); });
+    });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(true);
+    expect(slashes.textContent).toBe('');
+  });
+
+  it('keeps the rest of the draft and reads it kept', async () => {
+    const field = editable('<p><span data-lexical-text="true">Hi //there</span></p>');
+    document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 5);
+    ownEditor(field);
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(true);
+    expect(field.textContent).toBe('Hi there');
+  });
+
+  it('reads the // not removed when the editor cancels the events and deletes nothing', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field, { deletes: false });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(false);
+    expect(events).toHaveLength(2);
+  });
+
+  it('leaves the // to removeTypedTrigger when the editor does not cancel the event, after one event', () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field, { cancels: false });
+
+    expect(deleteTypedTriggerByEditor(field)).toBeNull();
+    expect(events).toHaveLength(1);
+    expect(plainTextOf(field, { hiddenMarks: false })).toBe('//');
+  });
+
+  it.each([
+    ['the two slashes are in two text nodes', '<p><span>Hi /</span><span>/</span></p>', 'span:last-child', 1],
+    ['the caret is not right after the //', '<p><span>Hi // there</span></p>', 'span', 6],
+    ['the caret is right after the // but not in a text node', '<p><span>Hi //</span></p>', 'p', 1],
+  ])('sends nothing when %s', (_case, html, at, offset) => {
+    const field = editable(html);
+    const element = field.querySelector(at) as HTMLElement;
+    document.getSelection()?.collapse(at === 'p' ? element : element.firstChild, offset);
+    const events = ownEditor(field);
+
+    expect(deleteTypedTriggerByEditor(field)).toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('sends nothing to a text control', () => {
+    const field = textarea('Hi //');
+    const events: Event[] = [];
+    field.addEventListener('beforeinput', (event) => { events.push(event); event.preventDefault(); });
+
+    expect(deleteTypedTriggerByEditor(field)).toBeNull();
+    expect(events).toEqual([]);
   });
 });
 

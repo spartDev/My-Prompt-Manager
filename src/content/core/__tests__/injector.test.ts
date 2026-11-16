@@ -430,6 +430,86 @@ describe('PromptLibraryInjector', () => {
         expect(mockTextarea.value).toBe('Draft ');
       });
 
+      describe('in an editor that writes its own DOM and puts back what is deleted behind its back', () => {
+        /**
+         * The detected field is such an editor, holding "Draft //", the caret after the //: it
+         * cancels each deleteContentBackward and deletes the character before the caret itself,
+         * drawing its text a task later. Gives what it was sent and a way to hear a typed slash.
+         */
+        const ownEditor = async ({ deletes = true } = {}) => {
+          const { open } = await listen();
+          const editor = document.createElement('div');
+          editor.contentEditable = 'true';
+          editor.innerHTML = '<p><span data-lexical-text="true">Draft //</span></p>';
+          document.body.appendChild(editor);
+          (injector as any).state.currentTextarea = editor;
+          const text = editor.querySelector('span')?.firstChild as Text;
+          document.getSelection()?.collapse(text, 8);
+          const sent: string[] = [];
+          let caret = 8;
+          editor.addEventListener('beforeinput', (event) => {
+            if (event.inputType !== 'deleteContentBackward') {
+              return;
+            }
+            event.preventDefault();
+            sent.push(event.inputType);
+            if (!deletes) {
+              return;
+            }
+            caret -= 1;
+            const at = caret;
+            window.setTimeout(() => {
+              text.data = text.data.slice(0, at) + text.data.slice(at + 1);
+              document.getSelection()?.collapse(text, at);
+            }, 0);
+          });
+          const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+          const typeSlash = (): void => {
+            // Each event of the second slash, heard as the browser sends it, the // already written
+            for (const [type, event] of [
+              ['keydown', new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true })],
+              ['beforeinput', new InputEvent('beforeinput', { data: '/', inputType: 'insertText', bubbles: true, composed: true })],
+              ['input', new InputEvent('input', { data: '/', inputType: 'insertText', bubbles: true, composed: true })],
+            ] as const) {
+              const listener = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+              const heard = (received: Event) => { listener?.(received); };
+              document.addEventListener(type, heard);
+              editor.dispatchEvent(event);
+              document.removeEventListener(type, heard);
+            }
+          };
+          return { open, editor, sent, typeSlash };
+        };
+        afterEach(() => {
+          (injector as any).state.currentTextarea = mockTextarea;
+        });
+
+        it('has the editor delete the //, once for all the slash\'s events, then opens the selector', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor();
+
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(open.mock.calls[0][0]).toBe(editor);
+          expect(sent).toEqual(['deleteContentBackward', 'deleteContentBackward']);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it('keeps the selector closed when the editor leaves the // in place', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor({ deletes: false });
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          expect(editor.textContent).toBe('Draft //');
+          editor.remove();
+        });
+      });
+
       it.each([
         ['keydown', () => new KeyboardEvent('keydown', { key: '/', isComposing: true, bubbles: true, composed: true })],
         ['beforeinput', () => new InputEvent('beforeinput', { data: '/', inputType: 'insertCompositionText', isComposing: true, bubbles: true, composed: true })]

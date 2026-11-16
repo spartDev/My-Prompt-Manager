@@ -11,7 +11,7 @@ import type { SiteSettings } from '../../services/siteSettings';
 import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
-import { endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
+import { deleteTypedTriggerByEditor, endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
 import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
@@ -383,6 +383,9 @@ export class PromptLibraryInjector {
    * first, as Backspace would, and the rest of the field is left as it is.
    */
   private listenForSelectorTrigger(): void {
+    // While the field's editor takes the // out, the reads the slash's other events set do nothing:
+    // the // they see is the one being removed
+    let removing = false;
     const onSlash = (event: Event): void => {
       if (this.selector.isOpen) {
         return;
@@ -407,7 +410,24 @@ export class PromptLibraryInjector {
       // after the // was taken out, or after the selector opened, does nothing
       window.setTimeout(() => {
         const before = field.isConnected ? textBeforeCaret(field) : null;
-        if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
+        if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen || removing) {
+          return;
+        }
+        // An editor that writes its own DOM takes the // out itself, as Backspace: one that puts
+        // back what is deleted behind its back would otherwise keep it
+        const byEditor = deleteTypedTriggerByEditor(field);
+        if (byEditor) {
+          removing = true;
+          void byEditor.then((removed) => {
+            removing = false;
+            if (!removed) {
+              debug('The editor did not remove the typed //, the prompt selector stays closed');
+              return;
+            }
+            if (field.isConnected && !this.selector.isOpen) {
+              this.openFromTyping(field);
+            }
+          });
           return;
         }
         // A // that cannot be removed stays as typed text: opening over it would leave it in the

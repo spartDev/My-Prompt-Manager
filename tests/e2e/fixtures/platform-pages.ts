@@ -365,13 +365,6 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
       /** Puts the caret after the first characters of the text, in the DOM just drawn. */
       const caretTo = (position) => {
         const paragraph = editor.querySelector('p');
-        const marks = menu ? paragraph.lastChild : null;
-        if (marks && position === text.length) {
-          // While the menu is open, the caret at the end of the text is after its spans
-          document.getSelection().collapse(marks.firstChild, marks.textContent.length);
-          known = { start: position, end: position };
-          return;
-        }
         const nodes = Array.from(paragraph.childNodes);
         let remaining = position;
         let index = 0;
@@ -435,6 +428,10 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         if (event.inputType === 'insertText' && event.data) {
           write(event.data.replace(/\\n/g, ''));
         } else if (event.inputType.startsWith('delete')) {
+          // A caret, not a selection: Backspace takes the character before it
+          if (known.start === known.end && event.inputType === 'deleteContentBackward') {
+            known = { start: Math.max(0, known.start - 1), end: known.end };
+          }
           write('');
         }
       });
@@ -443,6 +440,14 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           text += event.data;
           draw();
           caretTo(text.length);
+          return;
+        }
+        if (slashMenu) {
+          // Copilot's editor does not take a change the browser made behind its back: it draws its
+          // own text again, the caret where it was (read live on 2026-11-16)
+          const at = known.end;
+          draw();
+          caretTo(at);
           return;
         }
         // The browser changed the DOM itself (the editing command deleted text): the editor takes
@@ -494,10 +499,12 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
  * assumed, not seen there. And its own slash menu, seen on the live page on 2026-11-15: a slash
  * opens a list of recent files. While it is open the editor's paragraph ends with two text spans
  * hidden from assistive technology, an empty one and one holding a zero-width space and a
- * zero-width non-joiner, and the caret is after them (read on the live page on 2026-11-16):
- * `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span aria-hidden
- * data-lexical-text>U+200B U+200C</span>`. The stand-in also takes the worst a menu may do: while
- * it is open, the keys and the text typed stop at the editor. The menu closes once the slash is gone.
+ * zero-width non-joiner, the caret staying at the end of the slashes' text (read on the live page
+ * on 2026-11-16): `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span
+ * aria-hidden data-lexical-text>U+200B U+200C</span>`. The editor puts the // back when the browser's
+ * editing command deletes it; a deleteContentBackward beforeinput it handles itself, as Backspace,
+ * and the menu closes once the slash is gone. The stand-in also takes the worst a menu may do:
+ * while it is open, the keys and the text typed stop at the editor.
  */
 const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
   .replace('</body>', `${lexicalEditor('[data-lexical-editor]', true)}${LATE_TOOLBAR}\n  </body>`);

@@ -219,6 +219,72 @@ function holdsOnlyText(selection: Selection, field: HTMLElement): boolean {
 }
 
 /**
+ * Reads whether the `//` before the caret of a contenteditable field is gone, the rest kept: the
+ * field as it must be afterwards is its text now without the two characters. An editor whose own
+ * handler puts the // back, or changes the rest of the draft, did not take the removal. Two things
+ * the removal itself changes are not differences: the browser turns a space left at the end of a
+ * line into a non-breaking one, and the one line break before a // that ended the field becomes the
+ * break that keeps the last line open, which is not read as a line. Neither is a character the user
+ * does not see, which an editor may add or drop as it pleases.
+ *
+ * @param before - The text before the caret, read now, ending with the //
+ */
+function removalCheck(field: HTMLElement, before: string): () => boolean {
+  const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
+  const original = visible(plainTextOf(field, { hiddenMarks: false }));
+  const typed = visible(before);
+  const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
+  // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
+  const endedField = original.length === typed.length;
+  return () => {
+    const now = spaces(visible(plainTextOf(field, { hiddenMarks: false })));
+    return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
+  };
+}
+
+/**
+ * Asks the editor of a contenteditable field to delete the `//` before the caret itself, as two
+ * presses of Backspace do: one beforeinput event of `deleteContentBackward` per slash. An editor
+ * that writes its own DOM (Lexical) handles such an event and cancels it, and it may put back what
+ * the browser's editing command deletes behind its back, as Microsoft 365 Copilot's does while its
+ * slash menu is open (read live on 2026-11-16).
+ *
+ * Null when this is not for the editor to do, and removeTypedTrigger removes the // instead: the
+ * caret is not right after the two slashes in one text node, or the editor did not cancel the first
+ * event. Otherwise resolves, once the editor has drawn its change, to whether the // is gone and
+ * the rest of the field kept.
+ */
+export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<boolean> | null {
+  const before = textBeforeCaret(field);
+  const selection = field.ownerDocument.getSelection();
+  const node = selection?.focusNode;
+  const offset = selection?.focusOffset ?? 0;
+  // In a text control the caret is in no text node of the page
+  if (before === null || node?.nodeType !== Node.TEXT_NODE
+    || (node.nodeValue ?? '').slice(offset - SELECTOR_TRIGGER.length, offset) !== SELECTOR_TRIGGER) {
+    return null;
+  }
+  const removed = removalCheck(field, before);
+  const backspace = (): boolean => {
+    // At the caret, as the browser sends it: an editor that draws at once has replaced the node
+    // the first event went to
+    const at = selection?.focusNode?.parentElement;
+    const target = at && field.contains(at) ? at : field;
+    const event = new InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  if (!backspace()) {
+    return null;
+  }
+  backspace();
+  // An editor draws a change once its update is done: after the events, before the next task
+  return new Promise((resolve) => {
+    field.ownerDocument.defaultView?.setTimeout(() => { resolve(removed()); }, 0) ?? resolve(removed());
+  });
+}
+
+/**
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
  * When the editing command is missing or refused, the two characters are taken out of their text
@@ -259,22 +325,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   if (!selection) {
     return false;
   }
-  // The field as it must be afterwards: the same text, without the two characters. An editor
-  // whose own handler puts the // back, or changes the rest of the draft, did not take the removal.
-  // Two things the removal itself changes are not differences: the browser turns a space left
-  // at the end of a line into a non-breaking one, and the one line break before a // that ended
-  // the field becomes the break that keeps the last line open, which is not read as a line.
-  // Neither is a character the user does not see, which an editor may add or drop as it pleases
-  const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
-  const original = visible(plainTextOf(field, { hiddenMarks: false }));
-  const typed = visible(before);
-  const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
-  // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
-  const endedField = original.length === typed.length;
-  const removed = (): boolean => {
-    const now = spaces(visible(plainTextOf(field, { hiddenMarks: false })));
-    return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
-  };
+  const removed = removalCheck(field, before);
 
   if (canExec && typeof selection.modify === 'function') {
     // Back over the two slashes, and over a character the user does not see between them or
