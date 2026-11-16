@@ -330,6 +330,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           lines.forEach((line, index) => {
             if (line !== '') {
               const span = document.createElement('span');
+              span.setAttribute('data-lexical-text', 'true');
               span.textContent = line;
               paragraph.append(span);
             }

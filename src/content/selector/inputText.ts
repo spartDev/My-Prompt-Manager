@@ -280,7 +280,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
       const range = selection.getRangeAt(0);
       const text = plainTextOf(range.cloneContents(), { hiddenMarks: false });
       const around = range.commonAncestorContainer;
-      const hiddenAround = (around.nodeType === Node.ELEMENT_NODE && (around as Element).getAttribute('aria-hidden') === 'true') || isHidden(around, field);
+      const hiddenAround = (around.nodeType === Node.ELEMENT_NODE && (around as Element).getAttribute('aria-hidden') === 'true') || (around !== field && isHidden(around, field));
       return visible(hiddenAround ? text.replace(HIDDEN_MARKS, '') : text);
     };
     for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {

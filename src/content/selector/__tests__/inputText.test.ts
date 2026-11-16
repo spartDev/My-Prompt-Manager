@@ -295,6 +295,30 @@ describe('removeTypedTrigger', () => {
         expect(field.querySelector('p')?.textContent).toBe('');
         restore();
       });
+
+      it('removes the // with the caret between the marks: the mark left after it is not text of the field', () => {
+        const { field, slashes, marks } = slashMenuEditor();
+        document.getSelection()?.collapse(marks, 1);
+        const restore = browserCommands([[marks, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('\u200C');
+        restore();
+      });
+
+      it('reads the marks of a hidden span as no text when the selection is within that span', () => {
+        const { field, slashes, marks } = slashMenuEditor('\u200C\u200D');
+        const second = marks.splitText(1);
+        const span = marks.parentNode as Node;
+        document.getSelection()?.collapse(second, 1);
+        const restore = browserCommands([[span, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('');
+        restore();
+      });
     });
 
     it('removes a // whose zero-width space is in a span of its own, as Lexical writes it', () => {
@@ -341,6 +365,7 @@ describe('removeTypedTrigger', () => {
       ['an image', '<img alt="">'],
       ['an icon chip the user cannot edit', '<span contenteditable="false"><svg></svg></span>'],
       ['an icon the page draws on an element with no text', '<span class="icon"><!-- drawn by the page --></span>'],
+      ['an empty chip the user cannot edit, marked as text of Lexical', '<span contenteditable="false" data-lexical-text="true"></span>'],
     ])('leaves a // with %s between its slashes as it was', (_what, between) => {
       const field = editable(`<p>Hi /${between}/</p>`);
       const paragraph = field.querySelector('p') as HTMLElement;
