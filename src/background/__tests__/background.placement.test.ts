@@ -400,40 +400,124 @@ describe('background: a picker that could not be activated leaves no session', (
     });
   });
 
-  it('activates the picker once the content script just injected listens, a moment later', async () => {
-    const listener = await startServiceWorker();
-    let tries = 0;
-    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
-      if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER' && ++tries < 3) {
-        throw new Error('Could not establish connection. Receiving end does not exist.');
-      }
-      return undefined;
+  describe('while the content script just injected does not listen yet', () => {
+    const NO_LISTENER = 'Could not establish connection. Receiving end does not exist.';
+    /** The tab has no content script: the start injects it */
+    const notInjected = () => {
+      vi.mocked(chrome.permissions.contains).mockResolvedValue(true as never);
+      vi.mocked(chrome.tabs.get).mockResolvedValue({ ...CLAUDE_TAB, status: 'complete' } as never);
+      vi.mocked(chrome.scripting.executeScript).mockImplementation((async (injection: { func?: unknown }) =>
+        (injection.func ? [{ result: false }] : [{ result: undefined }])) as never);
+    };
+    const activations = () => vi.mocked(chrome.tabs.sendMessage).mock.calls
+      .filter(([, message]) => (message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER');
+
+    it('activates the picker once it listens, a moment later', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      let tries = 0;
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER' && ++tries < 3) {
+          throw new Error(NO_LISTENER);
+        }
+        return undefined;
+      });
+
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+      expect(response).toMatchObject({ success: true });
+      expect(tries).toBe(3);
     });
 
-    const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+    it('fails at once in a tab whose content script was already there, which then does not listen at all', async () => {
+      const listener = await startServiceWorker();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error(NO_LISTENER));
 
-    expect(response).toMatchObject({ success: true });
-    expect(tries).toBe(3);
-  });
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
 
-  it('sends no activation again once the start is stopped while the content script does not listen yet', async () => {
-    const listener = await startServiceWorker();
-    let tries = 0;
-    vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
-      if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER') {
-        tries += 1;
-        throw new Error('Could not establish connection. Receiving end does not exist.');
-      }
-      return undefined;
+      expect(response).toMatchObject({ success: false });
+      expect(activations()).toHaveLength(1);
     });
 
-    const started = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
-    await vi.waitFor(() => { expect(tries).toBe(1); });
-    await send(listener, { type: 'STOP_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id } });
+    it('sends no activation again once the start is stopped', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER') {
+          throw new Error(NO_LISTENER);
+        }
+        return undefined;
+      });
 
-    expect(await started).toMatchObject({ success: false });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(tries).toBe(1);
+      const started = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+      await vi.waitFor(() => { expect(activations()).toHaveLength(1); });
+      await send(listener, { type: 'STOP_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id } });
+
+      expect(await started).toMatchObject({ success: false });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(activations()).toHaveLength(1);
+    });
+
+    it('sends no activation again once the tab is closed', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error(NO_LISTENER));
+      const started = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+      await vi.waitFor(() => { expect(activations()).toHaveLength(1); });
+      vi.mocked(chrome.tabs.get).mockRejectedValue(new Error(`No tab with id: ${String(CLAUDE_TAB.id)}.`));
+
+      expect(await started).toMatchObject({ success: false });
+      expect(activations()).toHaveLength(1);
+    });
+
+    it('gives up once it has not listened for five seconds', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error(NO_LISTENER));
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] });
+      try {
+        let response: unknown;
+        void send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } })
+          .then((answered) => { response = answered; });
+        await vi.advanceTimersByTimeAsync(4_800);
+        expect(response).toBeUndefined();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(response).toMatchObject({ success: false });
+        const sent = activations().length;
+
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(activations()).toHaveLength(sent);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('stores the session of the activation the page holds when a newer start activates while an older one waits', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      let listening = false;
+      let held: string | undefined;
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        const sent = message as { type: string; attempt?: string };
+        if (!listening) {
+          throw new Error(NO_LISTENER);
+        }
+        if (sent.type === 'ACTIVATE_ELEMENT_PICKER') {
+          held = sent.attempt;
+        }
+        return undefined;
+      });
+
+      const older = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+      await vi.waitFor(() => { expect(activations()).toHaveLength(1); });
+      listening = true;
+      await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+      await older;
+
+      // The older start's activation reached the page last: the session stored names it
+      const [session] = Object.values(await chrome.storage.session.get(null)) as Array<{ attempt: string }>;
+      expect(session?.attempt).toBe(held);
+    });
   });
 
   it('deactivates the picker it activated when its session cannot be stored', async () => {

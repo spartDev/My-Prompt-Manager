@@ -99,10 +99,11 @@ export class PlacementRepair {
   /**
    * The element the override names on the page, by its fingerprint, then by its selector. A click
    * in the Element picker lands on the deepest node, often the icon inside a button: the icon goes
-   * by the button, not into it.
+   * by the button, not into it. `bySelectorOnly` skips the fingerprint, which scores every element
+   * of the picked one's tag: for a look repeated while the page changes.
    */
-  findAnchor(): HTMLElement | null {
-    const picked = this.findPicked();
+  findAnchor({ bySelectorOnly = false }: { bySelectorOnly?: boolean } = {}): HTMLElement | null {
+    const picked = this.findPicked(bySelectorOnly);
     if (!picked) {
       return null;
     }
@@ -111,12 +112,12 @@ export class PlacementRepair {
       ?? picked;
   }
 
-  private findPicked(): HTMLElement | null {
+  private findPicked(bySelectorOnly: boolean): HTMLElement | null {
     const positioning = this.override;
     if (!positioning) {
       return null;
     }
-    if (positioning.fingerprint) {
+    if (positioning.fingerprint && !bySelectorOnly) {
       const found = getElementFingerprintGenerator().findElement(positioning.fingerprint);
       if (found) {
         return found;

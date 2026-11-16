@@ -1300,9 +1300,9 @@ export class PromptLibraryInjector {
           this.repair.report('overlay');
         },
         // A composer that gets its toolbar, or the element the user picked, later still takes the
-        // icon, and the overlay report goes. Looking for a pick whose element is missing scans the
-        // elements of its tag: once a second at most, and only for a user who has a pick
-        { keepWatching: () => toolbarShows(true) || this.pickShowsBeside(icon) }
+        // icon, and the overlay report goes. The pick is looked for by its selector only: its
+        // fingerprint scores every element of its tag, too much to do once a second
+        { keepWatching: () => toolbarShows(true) || this.pickShowsBeside(icon, true) }
       );
     }
     debug('Icon anchored on the editor', { method: method ?? 'static' });
@@ -1334,11 +1334,11 @@ export class PromptLibraryInjector {
    * True when the element the user picked is on the page: not the icon itself, nor an element
    * inside it, that the pick's selector may find there
    */
-  private pickShowsBeside(icon: HTMLElement): boolean {
+  private pickShowsBeside(icon: HTMLElement, bySelectorOnly = false): boolean {
     if (!this.pickCounts) {
       return false;
     }
-    const anchor = this.repair.findAnchor();
+    const anchor = this.repair.findAnchor({ bySelectorOnly });
     this.pickShowed = anchor !== null && !icon.contains(anchor);
     return this.pickShowed;
   }

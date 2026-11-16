@@ -98,7 +98,8 @@ const pickerStarts = new Set<PickerStart>();
  * By tab, the latest activation sent there that the page answered. The page keeps the picker of the
  * last activation it received, and those arrive in the order they were sent, whatever the order
  * their answers come back in: a start whose activation a later one followed stores no session,
- * so the session stored always names the activation the page holds.
+ * so the session stored always names the activation the page holds. An activation sent again,
+ * while the content script did not listen yet, is numbered again when it is sent.
  */
 let pickerActivationsSent = 0;
 
@@ -1481,12 +1482,16 @@ async function handleStartElementPicker(
       await chrome.windows.update(tab.windowId, { focused: true });
     }
 
-    // Use the ContentScriptInjector to ensure content script is injected
+    // Use the ContentScriptInjector to ensure content script is injected. One already there listens
+    // (its flag is set once its modules, the picker's listener among them, are loaded); one injected
+    // now may not yet
+    let justInjected = false;
     try {
       // Check if content script is already injected
       const isInjected = await injector.isContentScriptInjected(targetTabId);
 
       if (!isInjected) {
+        justInjected = true;
         // Force inject the content script
         const injectionResult =
           await injector.forceInjectContentScript(targetTabId);
@@ -1522,7 +1527,8 @@ async function handleStartElementPicker(
     }
 
     // Now send the message to activate element picker. A content script injected a moment ago may
-    // not listen yet: the activation is sent again until it does, or the start is stopped
+    // not listen yet: the activation is sent again until it does, the start is stopped or the tab
+    // is gone. Each send takes a new number: one sent after a newer start's must not pass for older
     start.activation = nextPickerActivation();
     const listenedBy = Date.now() + PICKER_LISTENER_TIMEOUT_MS;
     try {
@@ -1535,7 +1541,7 @@ async function handleStartElementPicker(
           });
           break;
         } catch (notListening) {
-          if (!isNoListener(notListening) || Date.now() >= listenedBy) {
+          if (!justInjected || !isNoListener(notListening) || Date.now() >= listenedBy) {
             throw notListening;
           }
         }
@@ -1544,6 +1550,9 @@ async function handleStartElementPicker(
           sendResponse({ success: false, error: PICKER_STOPPED });
           return;
         }
+        // Rejects once the tab is closed: then nothing will ever listen
+        await chrome.tabs.get(targetTabId);
+        start.activation = nextPickerActivation();
       }
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {

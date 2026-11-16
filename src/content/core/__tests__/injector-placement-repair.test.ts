@@ -17,6 +17,7 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { changeIconPlacementRepairs, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
+import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
 import { IconPlacementController } from '../icon-placement';
 import { PromptLibraryInjector } from '../injector';
 import { PLACEMENT_REPORT_MESSAGE } from '../placement-repair';
@@ -505,7 +506,7 @@ describe('icon placement override on a built-in Platform', () => {
     afterEach(() => { lateChecks(LATE); });
 
     /** A pick stored whose element is not on the page, the chain finding nothing: the icon ends on the overlay */
-    const leftOnOverlay = async () => {
+    const leftOnOverlay = async ({ fingerprint }: { fingerprint?: never } = {}) => {
       grace(300);
       renameToolbar('', 'renamed-');
       const picked = page.querySelector(PICKED) as HTMLElement;
@@ -514,7 +515,7 @@ describe('icon placement override on a built-in Platform', () => {
       await changeIconPlacementRepairs({
         type: 'setOverride',
         hostname: 'claude.ai',
-        positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+        positioning: { mode: 'custom', placement: 'before', selector: PICKED, ...(fingerprint ? { fingerprint } : {}) }
       });
       await internals().repair.load();
       reports.length = 0;
@@ -530,6 +531,24 @@ describe('icon placement override on a built-in Platform', () => {
 
       await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
       expect(icon().nextElementSibling).toBe(picked);
+    });
+
+    it('looks for the missing picked element by its selector only, not scoring the page by its fingerprint', async () => {
+      const findElement = vi.spyOn(getElementFingerprintGenerator(), 'findElement').mockReturnValue(null);
+      try {
+        const { parent } = await leftOnOverlay({ fingerprint: { primary: {} } as never });
+        findElement.mockClear();
+
+        // The page keeps changing, the picked element still missing: each change is looked at
+        for (let change = 0; change < 3; change++) {
+          parent.appendChild(document.createElement('span'));
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+
+        expect(findElement).not.toHaveBeenCalled();
+      } finally {
+        findElement.mockRestore();
+      }
     });
 
     it('goes to a later anchor of the chain that renders, the picked element still missing', async () => {
