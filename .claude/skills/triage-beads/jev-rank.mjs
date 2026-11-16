@@ -22,7 +22,12 @@ import { dirname, join } from 'node:path';
 
 const API_URL = process.env.TYPESAFE_API_URL ?? 'https://api.typesafe.ai/v1/systemone';
 const MODEL = process.env.TYPESAFE_MODEL ?? 'jev-latest';
-const KEY = process.env.TYPESAFE_API_KEY;
+// A local mock (http://localhost) gets a dummy credential, never the real key.
+const LOCAL_MOCK = (() => {
+  const u = new URL(API_URL);
+  return u.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+})();
+const KEY = LOCAL_MOCK ? 'local-mock-dummy-key' : process.env.TYPESAFE_API_KEY;
 
 // ---------------------------------------------------------------------------
 // What Jev is told about the project. Shared by every request.
@@ -437,7 +442,7 @@ async function rank(snapshotPath, opts) {
 
   // An epic is not judged on its own: it takes the best suggestion and the areas of its
   // live children, so the report and step 4 keep it. Children are the tickets linked to
-  // it by a parent-child edge (bd list --parent); the "<epic>.<n>" id is a fallback when
+  // it by a parent-child edge (bd list --parent); the "<epic>.<n>" id is used only when
   // bd cannot be asked.
   const childIds = (epicId) => {
     try {
@@ -454,7 +459,7 @@ async function rank(snapshotPath, opts) {
     .filter((t) => t.issue_type === 'epic')
     .map((e) => {
       const linked = childIds(e.id);
-      const children = results.filter((r) => linked?.has(r.id) || r.id.startsWith(`${e.id}.`));
+      const children = results.filter((r) => (linked ? linked.has(r.id) : r.id.startsWith(`${e.id}.`)));
       const judged = children.filter((c) => !c.error);
       const changing = judged.filter((c) => noulReading(c.changes_files) !== 'no');
       const areas = [...new Set(changing.flatMap((c) => c.areas.yes))];
@@ -550,11 +555,10 @@ if (!args.length || (args[0] === 'deferred' && args.length < 3)) {
   console.error(usage);
   process.exit(2);
 }
-// The key goes over HTTPS only; plain HTTP is allowed to a local mock and nowhere else.
+// The key goes over HTTPS only; plain HTTP is allowed to a local mock, which gets a
+// dummy key (LOCAL_MOCK above), and nowhere else.
 {
-  const u = new URL(API_URL);
-  const local = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
-  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) {
+  if (new URL(API_URL).protocol !== 'https:' && !LOCAL_MOCK) {
     console.error(`TYPESAFE_API_URL must be https (or http to localhost for a mock): ${API_URL}`);
     process.exit(2);
   }
