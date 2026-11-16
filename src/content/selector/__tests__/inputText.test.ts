@@ -58,7 +58,9 @@ describe('endsWithSelectorTrigger', () => {
     ['// ', 'something typed after it'],
     ['', 'an empty field'],
     ['1//', 'right after a digit'],
-    ['a\u200B//', 'right after a letter, a zero-width space between']
+    ['a\u200B//', 'right after a letter, a zero-width space between'],
+    ['Hi /\u200C/', 'a zero-width non-joiner between the slashes: the user wrote it (Persian, Indic scripts)'],
+    ['Hi /\u200D/', 'a zero-width joiner between the slashes: the user wrote it (emoji, Indic scripts)']
   ])('does not open on %j: %s', (before) => {
     expect(endsWithSelectorTrigger(before)).toBe(false);
   });
@@ -239,6 +241,21 @@ describe('removeTypedTrigger', () => {
       expect(removeTypedTrigger(field)).toBe(true);
 
       expect(field.textContent).toBe('Hi  there');
+      restore();
+    });
+
+    it.each([
+      ['non-joiner', '\u200C'],
+      ['joiner', '\u200D']
+    ])('leaves alone two slashes with a zero-width %s between them', (_name, joiner) => {
+      const field = editable(`<p>Hi /${joiner}/</p>`);
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, 6);
+      const restore = browserCommands();
+
+      expect(removeTypedTrigger(field)).toBe(false);
+
+      expect(field.textContent).toBe(`Hi /${joiner}/`);
       restore();
     });
 

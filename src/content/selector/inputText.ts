@@ -21,9 +21,11 @@ export const SELECTOR_TRIGGER = '//';
 
 /**
  * Characters an editor puts in its markup that the user neither typed nor sees, such as the
- * zero-width space Lexical keeps beside the caret: not text of the field for the `//`.
+ * zero-width space Lexical keeps beside the caret: not text of the field for the `//`. Not the
+ * zero-width joiner and non-joiner (U+200C, U+200D): the user writes those (Persian and Indic
+ * scripts, emoji), so two slashes they separate are not a `//`.
  */
-const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/g;
+const INVISIBLE = /[\u200B\u2060\uFEFF]/g;
 
 const visible = (text: string): string => text.replace(INVISIBLE, '');
 
