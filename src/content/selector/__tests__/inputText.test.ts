@@ -277,9 +277,13 @@ describe('removeTypedTrigger', () => {
       /** The editor as read on the live page, the caret after the spans the menu left (fixture) */
       const slashMenuEditor = (held = '\u200B\u200C') => {
         const markup = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
-        document.body.insertAdjacentHTML('beforeend', markup.replace(/<!--[\s\S]*?-->/, '').trim().replace('\u200B\u200C', held));
-        const field = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+        // The fixture parsed as a page would parse it: its editor element is taken, its comment left
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+        document.body.append(field);
         const [slashes, , marks] = Array.from(field.querySelectorAll('span[data-lexical-text]'), (span) => span.firstChild as Text | null);
+        (marks as Text).data = held;
         document.getSelection()?.collapse(marks, (marks as Text).length);
         return { field, slashes: slashes as Text, marks: marks as Text };
       };
