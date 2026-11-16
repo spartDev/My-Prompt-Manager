@@ -196,7 +196,8 @@ const DEFERRED_QUESTIONS = {
 // ---------------------------------------------------------------------------
 const WEIGHTS = {
   // Policy (maintainer, 2026-11-17): test and tooling tickets rank below user-facing
-  // bugs. No dimension lifts a ticket that users would not notice.
+  // bugs. The weights do not guarantee it on their own: the sort in rank() puts every
+  // ticket users would notice first, then orders each tier by these weights.
   severity: 0.45, // severity / 4
   user_visible: 0.2, // Noul probability
   time_bound: 0.2, // Noul probability
@@ -214,9 +215,9 @@ const THRESHOLDS = {
     [Number.NEGATIVE_INFINITY, 4],
   ],
   mismatch: 2, // flag when |suggested - current| reaches this
-  maxDuplicatePairs: 300, // above, only pairs of the same issue_type are asked
 };
 const CONCURRENCY = 4;
+const DUPLICATE_BATCH = 60; // pairs per request: ~60 x 300 tokens, inside the 64k context
 
 // ---------------------------------------------------------------------------
 
@@ -239,7 +240,12 @@ async function ask(state, questions) {
       // A failed call is an error, never an answer.
       throw new ApiError(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
     }
-    return { payload, response: await res.json() };
+    try {
+      return { payload, response: await res.json() };
+    } catch (e) {
+      // A 200 whose body is not JSON is a failed call too.
+      throw new ApiError(`HTTP ${res.status}: response is not JSON (${e.message})`, { cause: e });
+    }
   }
 }
 
@@ -385,19 +391,21 @@ async function rank(snapshotPath, opts) {
     }
   });
 
+  // Every pair is asked, whatever its issue_type, in requests of at most
+  // DUPLICATE_BATCH pairs so each stays well inside the model's context. A failed
+  // batch is reported with the pairs it held, never read as "no duplicate".
   let duplicates = [];
   if (!opts.includes('--no-dups')) {
-    let pairs = [];
+    const pairs = [];
     for (let i = 0; i < tickets.length; i++) {
       for (let j = i + 1; j < tickets.length; j++) pairs.push([tickets[i], tickets[j]]);
     }
-    if (pairs.length > THRESHOLDS.maxDuplicatePairs) {
-      pairs = pairs.filter(([a, b]) => a.issue_type === b.issue_type);
-    }
-    if (pairs.length) {
-      const brief = (t) => ({ title: t.title, description: (t.description ?? '').slice(0, 600) });
+    const brief = (t) => ({ title: t.title, description: (t.description ?? '').slice(0, 600) });
+    const batches = [];
+    for (let s = 0; s < pairs.length; s += DUPLICATE_BATCH) batches.push(pairs.slice(s, s + DUPLICATE_BATCH));
+    const answered = await pool(batches, async (batch) => {
       const questions = Object.fromEntries(
-        pairs.map(([a, b], k) => [
+        batch.map(([a, b], k) => [
           `pair_${k}`,
           {
             type: 'noul',
@@ -408,18 +416,23 @@ async function rank(snapshotPath, opts) {
       );
       try {
         const { response } = await ask({ project: PROJECT }, questions);
-        duplicates = pairs
-          .map(([a, b], k) => ({ a: a.id, b: b.id, p: response.answers[`pair_${k}`].noul }))
-          .filter((d) => d.p > THRESHOLDS.no)
-          .sort((x, y) => y.p - x.p);
+        return batch.map(([a, b], k) => ({ a: a.id, b: b.id, p: response.answers[`pair_${k}`].noul }));
       } catch (e) {
         if (!(e instanceof ApiError) && !(e instanceof TypeError)) throw e;
-        duplicates = [{ error: String(e.message ?? e) }];
+        return [{ error: `${String(e.message ?? e)} (${batch.length} pairs not checked, from ${batch[0][0].id} ~ ${batch[0][1].id})` }];
       }
-    }
+    });
+    duplicates = answered
+      .flat()
+      .filter((d) => d.error || d.p > THRESHOLDS.no)
+      .sort((x, y) => (y.error ? 2 : y.p) - (x.error ? 2 : x.p));
   }
 
-  const ranked = [...results].sort((x, y) => (y.value ?? -1) - (x.value ?? -1));
+
+  // Policy before weights: a ticket users would notice (user_visible not read as 'no')
+  // ranks above every ticket they would not, whatever the weighted values say.
+  const tier = (r) => (r.error ? -1 : noulReading(r.vis) === 'no' ? 0 : 1);
+  const ranked = [...results].sort((x, y) => tier(y) - tier(x) || (y.value ?? -1) - (x.value ?? -1));
 
   // An epic is not judged on its own: it takes the best suggestion and the areas of its
   // live children (ids "<epic>.<n>" in the snapshot), so the report and step 4 keep it.
@@ -515,6 +528,15 @@ const usage =
 if (!args.length || (args[0] === 'deferred' && args.length < 3)) {
   console.error(usage);
   process.exit(2);
+}
+// The key goes over HTTPS only; plain HTTP is allowed to a local mock and nowhere else.
+{
+  const u = new URL(API_URL);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && local)) {
+    console.error(`TYPESAFE_API_URL must be https (or http to localhost for a mock): ${API_URL}`);
+    process.exit(2);
+  }
 }
 if (!KEY) {
   console.error('TYPESAFE_API_KEY is not set: do this step by hand, as SKILL.md says.');

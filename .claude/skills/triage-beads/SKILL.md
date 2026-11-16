@@ -30,7 +30,7 @@ Jev (TypeSafe's System One model) makes the judgments; code makes the ranking. R
 node .claude/skills/triage-beads/jev-rank.mjs <scratch>/backlog.json
 ```
 
-For each ticket but the epics, one request asks Jev five atomic judgments over the ticket's title, description and acceptance criteria (the field, or an "Acceptance criteria" section of the description when the field is empty): `user_visible`, `time_bound` and `ready` (Nouls), `severity` (Score 0-4), `effort` (Score 0-3). The same request asks, for each item of the acceptance criteria, whether someone could check it from a test, a command's output, a screenshot or a file to read, and, for step 4, which code areas the ticket would edit. One more request asks, pair by pair, whether two tickets ask for the same change (`--no-dups` skips it). The script combines the answers with the weights at its top, adds `dependent_count` from the snapshot as what the ticket unblocks, and prints one line per ticket, best first, then one line per epic (the best suggestion and the areas of its live children, `<epic>.<n>`), then the duplicates, then the areas step 4 reads:
+For each ticket but the epics, one request asks Jev five atomic judgments over the ticket's title, description and acceptance criteria (the field, or an "Acceptance criteria" section of the description when the field is empty): `user_visible`, `time_bound` and `ready` (Nouls), `severity` (Score 0-4), `effort` (Score 0-3). The same request asks, for each item of the acceptance criteria, whether someone could check it from a test, a command's output, a screenshot or a file to read, and, for step 4, which code areas the ticket would edit. More requests ask, for every pair of tickets whatever their type, whether they ask for the same change, 60 pairs per request (`--no-dups` skips them). The script combines the answers with the weights at its top, adds `dependent_count` from the snapshot as what the ticket unblocks, and prints one line per ticket, best first, then one line per epic (the best suggestion and the areas of its live children, `<epic>.<n>`), then the duplicates, then the areas step 4 reads:
 
 ```
 <id> P<current>->P<suggested> v=<value> sev= eff= vis= time= ready= | <flags>
@@ -51,11 +51,11 @@ Every payload and answer is kept in `<scratch>/jev.json`, so any line can be rer
 Add the flags Jev cannot see from the ticket alone, from the step 1 lines:
 
 - it is deferred: step 3 checks its condition against evidence;
-- it is in progress with no session working on it.
+- it is in progress with no session working on it. The listing does not say whether one is: look for the ticket's id in `git worktree list`, in `tmux list-windows -t claude-parallel` (the parallel-claude launchers), and in `gh pr list --search <id>`. When none names it, flag it "in progress, no session found" and ask the user before moving it back to open.
 
-Jev's suggested priority is a proposal for the report, never applied on its own. Test and tooling tickets rank below user-facing bugs by design: users would not notice them. When an answer looks wrong, fix the ticket's text or the question's wording in the script, not the weights for that one ticket.
+Jev's suggested priority is a proposal for the report, never applied on its own. Test and tooling tickets rank below user-facing bugs by design: users would not notice them. The script enforces it in its sort, not through the weights: every ticket whose `user_visible` does not read "no" comes first. When an answer looks wrong, fix the ticket's text or the question's wording in the script, not the weights for that one ticket.
 
-The script sends each ticket's text to the TypeSafe API and needs `TYPESAFE_API_KEY`. Without the key (exit 3), or for a ticket whose line says `ERROR`, rank by hand: by priority, then by what each ticket unblocks, and flag a priority that disagrees with the description (a user-facing bug at P4, a nice-to-have at P1) or a ticket that repeats another, or acceptance criteria that name no check. Say in the report which tickets were ranked by hand.
+The script sends each ticket's text to the TypeSafe API and needs `TYPESAFE_API_KEY`. Without the key (exit 3), or for a ticket whose line says `ERROR`, rank by hand: by priority, then by what each ticket unblocks, and flag a priority that disagrees with the description (a user-facing bug at P4, a nice-to-have at P1) or a ticket that repeats another, or acceptance criteria that name no check. Say in the report which tickets were ranked by hand. A `DUPLICATES ERROR` line names the pairs its failed request held: check those by hand, from the step 1 lines, and say so.
 
 Done when every line is ranked and every flag names the decision it needs.
 
@@ -69,7 +69,7 @@ A deferred ticket waits on a condition outside the project: an upstream issue, a
 node .claude/skills/triage-beads/jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json
 ```
 
-Jev judges whether the evidence is about the ticket's condition and whether the condition has happened; the script turns that into one of: condition met (propose reopening), still waiting (stays deferred), evidence does not settle it (fetch better evidence or read it yourself), unsettled (read it yourself). A ticket with no evidence fetched, or no key, is decided by hand from the evidence.
+Jev judges whether the evidence is about the ticket's condition and whether the condition has happened; the script turns that into one of: condition met (propose reopening), still waiting (stays deferred), evidence does not settle it (fetch better evidence or read it yourself), unsettled (read it yourself). A ticket with no evidence fetched, no key, or an `ERROR` line is decided by hand from the evidence.
 
 ## 4. Group by the files each ticket would touch
 
