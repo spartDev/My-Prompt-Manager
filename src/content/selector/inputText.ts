@@ -197,7 +197,7 @@ export function endsWithSelectorTrigger(before: string): boolean {
  * page's elements are judged, not a copy of the selection: a copy holds an empty piece of the
  * element the selection starts at the end of (bold text before the slashes).
  */
-function holdsOnlyText(selection: Selection): boolean {
+function holdsOnlyText(selection: Selection, field: HTMLElement): boolean {
   if (selection.rangeCount === 0) {
     return false;
   }
@@ -210,7 +210,10 @@ function holdsOnlyText(selection: Selection): boolean {
     if (element.getAttribute('data-lexical-text') === 'true' && !element.closest('[contenteditable="false"]')) {
       return true;
     }
-    const text = element.closest('[contenteditable="false"]') ? visible(element.textContent ?? '') : element.textContent;
+    // read as the // is: hidden, its joiners are marks too
+    const raw = element.textContent ?? '';
+    const chipText = isHidden(element, field) ? raw.replace(HIDDEN_MARKS, '') : visible(raw);
+    const text = element.closest('[contenteditable="false"]') ? chipText : raw;
     return text !== '' || !range.intersectsNode(element);
   });
 }
@@ -290,7 +293,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
       selection.modify('extend', 'backward', 'character');
     }
     // A selection that took in an element without text (an image) is not deleted
-    if (selected() === SELECTOR_TRIGGER && holdsOnlyText(selection) && document.execCommand('delete')) {
+    if (selected() === SELECTOR_TRIGGER && holdsOnlyText(selection, field) && document.execCommand('delete')) {
       // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
       // the editor hears only input. An editor that puts its own DOM back later (from a mutation
       // observer, after this read) is not seen here: the live check covers Copilot

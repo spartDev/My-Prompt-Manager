@@ -70,6 +70,17 @@ describe('endsWithSelectorTrigger', () => {
 });
 
 describe('plainTextOf', () => {
+  it('keeps the user\'s joiners as the // is read when the field itself sits in a hidden element of the page', () => {
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('aria-hidden', 'true');
+    wrapper.innerHTML = '<div contenteditable="true">Hi /\u200C/</div>';
+    document.body.append(wrapper);
+    const field = wrapper.firstElementChild as HTMLElement;
+
+    expect(plainTextOf(field, { hiddenMarks: false })).toBe('Hi /\u200C/');
+    wrapper.remove();
+  });
+
   it('reads text that has no markup', () => {
     expect(plainTextOf(editable('Hello  world'))).toBe('Hello  world');
   });
@@ -366,6 +377,8 @@ describe('removeTypedTrigger', () => {
       ['an icon chip the user cannot edit', '<span contenteditable="false"><svg></svg></span>'],
       ['an icon the page draws on an element with no text', '<span class="icon"><!-- drawn by the page --></span>'],
       ['an empty chip the user cannot edit, marked as text of Lexical', '<span contenteditable="false" data-lexical-text="true"></span>'],
+      ['a hidden chip the user cannot edit that holds a joiner', '<span contenteditable="false" aria-hidden="true">\u200D</span>'],
+      ['a hidden chip the user cannot edit, marked as text of Lexical, that holds a joiner', '<span contenteditable="false" aria-hidden="true" data-lexical-text="true">\u200C</span>'],
     ])('leaves a // with %s between its slashes as it was', (_what, between) => {
       const field = editable(`<p>Hi /${between}/</p>`);
       const paragraph = field.querySelector('p') as HTMLElement;
