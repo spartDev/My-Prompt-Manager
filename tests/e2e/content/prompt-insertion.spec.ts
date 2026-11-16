@@ -16,7 +16,7 @@ import type { Page } from '@playwright/test';
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { expectInsertionFlow, expectKeyboardInsertionFlow, fieldText, insertionPill, insertionSweep, tabToUndo, undoButton } from '../fixtures/insertion-flow';
-import { openPlatform, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { expectSelectorOpen, openPlatform, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptsButton } from '../fixtures/platform-pages';
 import { holdHover } from '../utils/hover';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
@@ -41,7 +41,7 @@ const field = (page: Page, platform: PlatformFixture) => page.locator(PLATFORM_F
 const insertByTyping = async (page: Page, platform: PlatformFixture, promptId: string, typed = '//') => {
   await field(page, platform).click();
   await page.keyboard.type(typed);
-  await expect(promptSelector(page)).toBeVisible();
+  await expectSelectorOpen(page);
   await promptRow(page, promptId).click();
   await expect(insertionPill(page)).toBeVisible();
 };
@@ -225,7 +225,7 @@ test.describe('// on a new line', () => {
       await page.keyboard.press('Shift+Enter');
       await page.keyboard.type('//');
 
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
       expect((await fieldText(input)).replace(/\s+$/, '')).toBe('First line');
       expect(await fieldText(input)).not.toContain('//');
     });
@@ -245,7 +245,7 @@ test.describe('// in a field that collapses spaces', () => {
     await input.click();
     await page.keyboard.type('Hello //');
 
-    await expect(promptSelector(page)).toBeVisible();
+    await expectSelectorOpen(page);
     expect((await fieldText(input)).replace(/\u00a0/g, ' ')).toBe('Hello ');
   });
 });
@@ -260,7 +260,7 @@ test.describe('Insertion on a React-controlled field', () => {
 
     await field(page, 'chatgpt').click();
     await page.keyboard.type('Hello //');
-    await expect(promptSelector(page)).toBeVisible();
+    await expectSelectorOpen(page);
     await expect(state).toHaveText('Hello ', { useInnerText: false });
 
     await promptRow(page, 'review').click();
@@ -307,7 +307,7 @@ test.describe('Insertion confirmation: visual proof', () => {
       const input = field(page, 'claude');
       await input.click();
       await page.keyboard.type('//');
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
       await input.evaluate((element) => {
         document.addEventListener('click', (event) => {
           if (event.target instanceof Element && event.target.id === 'mpm-prompt-selector') {

@@ -464,9 +464,10 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           caretTo(text.length);
           return;
         }
-        if (slashMenu) {
-          // Copilot's editor does not take a change the browser made behind its back: it draws its
-          // own text again, the caret where it was (read live on 2026-11-16)
+        if (menu) {
+          // While its slash menu is open, Copilot's editor does not take a change the browser made
+          // behind its back: it draws its own text again, the caret where it was (read live on
+          // 2026-11-16)
           const at = known.end;
           draw();
           caretTo(at);
@@ -644,11 +645,16 @@ export const listedTitles = (page: Page) => promptSelector(page).locator('.mpm-r
  */
 const OPENING_TIMEOUT = 30_000;
 
+/** Waits for the Prompt selector to show, as long as an opening may take (OPENING_TIMEOUT). */
+export async function expectSelectorOpen(page: Page): Promise<void> {
+  await expect(promptSelector(page)).toBeVisible({ timeout: OPENING_TIMEOUT });
+}
+
 /** Opens the Prompt selector from the Prompts button and waits for it. */
 export async function openPromptSelector(page: Page): Promise<void> {
   await expect(promptsButton(page)).toHaveCount(1);
   await promptsButton(page).click();
-  await expect(promptSelector(page)).toBeVisible({ timeout: OPENING_TIMEOUT });
+  await expectSelectorOpen(page);
 }
 
 /**

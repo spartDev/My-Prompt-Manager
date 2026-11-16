@@ -12,7 +12,7 @@
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
 import { undoButton } from '../fixtures/insertion-flow';
-import { choosePrompt, enterKeys, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { choosePrompt, enterKeys, expectSelectorOpen, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const REVIEW = {
@@ -76,7 +76,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
     await page.keyboard.type('//');
 
-    await expect(promptSelector(page)).toBeVisible();
+    await expectSelectorOpen(page);
     await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone' }).toBe('');
     await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
     // With the menu closed, the paragraph holds none of its hidden spans
@@ -94,7 +94,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     }
     await page.keyboard.type('//');
 
-    await expect(promptSelector(page)).toBeVisible();
+    await expectSelectorOpen(page);
     await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone, the rest kept' }).toBe('Hi there');
   });
 
@@ -111,7 +111,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 0); }));
     await page.keyboard.type('/');
 
-    await expect(promptSelector(page)).toBeVisible();
+    await expectSelectorOpen(page);
     await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone' }).toBe('');
     await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
 

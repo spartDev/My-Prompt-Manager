@@ -18,7 +18,7 @@ import type { Page } from '@playwright/test';
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
 import { fieldText, insertionPill, undoButton } from '../fixtures/insertion-flow';
-import { ALL_FIXTURES, choosePrompt, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { ALL_FIXTURES, choosePrompt, expectSelectorOpen, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const ROLE = { id: 'role', title: 'Reviewer role', content: 'as a senior reviewer, ' };
@@ -61,7 +61,7 @@ test.describe('An Insertion puts the Prompt where the caret is', () => {
 
       // Opened by typing //: the Prompt goes where the caret is, and the caret ends after it
       await page.keyboard.type('//');
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
       await expect.poll(() => fieldText(field)).toBe('Review this diff');
       await promptRow(page, ROLE.id).click();
       await expect(promptSelector(page)).toBeHidden();

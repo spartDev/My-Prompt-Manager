@@ -624,7 +624,7 @@ describe('deleteTypedTriggerByEditor', () => {
     const removal = deleteTypedTriggerByEditor(field);
 
     expect(removal).not.toBeNull();
-    await expect(removal).resolves.toBe(true);
+    await expect(removal).resolves.toBe('removed');
     expect(events).toEqual(['deleteContentBackward', 'deleteContentBackward']);
     expect(plainTextOf(field)).toBe('');
   });
@@ -640,7 +640,7 @@ describe('deleteTypedTriggerByEditor', () => {
       queueMicrotask(() => { slashes.textContent = '//'.slice(now); });
     });
 
-    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(true);
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
     expect(slashes.textContent).toBe('');
   });
 
@@ -649,16 +649,34 @@ describe('deleteTypedTriggerByEditor', () => {
     document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 5);
     ownEditor(field);
 
-    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(true);
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
     expect(field.textContent).toBe('Hi there');
   });
 
-  it('reads the // not removed when the editor cancels the events and deletes nothing', async () => {
+  it('reads the field unchanged when the editor cancels the events and deletes nothing', async () => {
     const field = slashMenuEditor();
     const events = ownEditor(field, { deletes: false });
 
-    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe(false);
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('unchanged');
     expect(events).toHaveLength(2);
+  });
+
+  it('reads the field changed when the editor deletes one slash only', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field);
+    let sent = 0;
+    // Its own handler runs first: the second event it cancels, and deletes nothing
+    field.addEventListener('beforeinput', (event) => {
+      sent += 1;
+      if (sent === 2) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    }, { capture: true });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('changed');
+    expect(events).toHaveLength(1);
+    expect(plainTextOf(field)).toBe('/');
   });
 
   it('leaves the // to removeTypedTrigger when the editor does not cancel the event, after one event', () => {
@@ -684,8 +702,11 @@ describe('deleteTypedTriggerByEditor', () => {
     expect(events).toEqual([]);
   });
 
-  it('sends nothing to a text control', () => {
+  it('sends nothing to a text control, wherever the page\'s selection is', () => {
     const field = textarea('Hi //');
+    // The page's selection after a // in a text node elsewhere
+    const elsewhere = editable('<p>Hi //</p>');
+    document.getSelection()?.collapse(elsewhere.querySelector('p')?.firstChild as Text, 5);
     const events: Event[] = [];
     field.addEventListener('beforeinput', (event) => { events.push(event); event.preventDefault(); });
 

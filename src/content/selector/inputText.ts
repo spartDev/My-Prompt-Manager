@@ -230,7 +230,7 @@ function holdsOnlyText(selection: Selection, field: HTMLElement): boolean {
  *
  * @param before - The text before the caret, read now, ending with the //
  */
-function removalCheck(field: HTMLElement, before: string): () => boolean {
+function removalCheck(field: HTMLElement, before: string): () => RemovalByEditor {
   const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
   const original = visible(plainTextOf(field));
   const typed = visible(before);
@@ -239,9 +239,19 @@ function removalCheck(field: HTMLElement, before: string): () => boolean {
   const endedField = original.length === typed.length;
   return () => {
     const now = spaces(visible(plainTextOf(field)));
-    return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
+    if (now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1))) {
+      return 'removed';
+    }
+    return now === spaces(original) ? 'unchanged' : 'changed';
   };
 }
+
+/**
+ * What the editor did with the two Backspaces deleteTypedTriggerByEditor sent: took the // out and
+ * kept the rest, left the field as it was, or changed it some other way (one slash gone, more than
+ * the //), which nothing else may then touch.
+ */
+export type RemovalByEditor = 'removed' | 'unchanged' | 'changed';
 
 /**
  * Asks the editor of a contenteditable field to delete the `//` before the caret itself, as two
@@ -256,9 +266,9 @@ function removalCheck(field: HTMLElement, before: string): () => boolean {
  * Null when this is not for the editor to do, and removeTypedTrigger removes the // instead: the
  * field is a text control, the caret is not right after the two slashes in one text node, or the
  * editor did not cancel the first event. Otherwise resolves, once the editor has drawn its change,
- * to whether the // is gone and the rest of the field kept.
+ * to what it did with the field (RemovalByEditor).
  */
-export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<boolean> | null {
+export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<RemovalByEditor> | null {
   if (isTextControl(field)) {
     return null;
   }
@@ -282,14 +292,7 @@ export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<boolean>
   backspace();
   // An editor draws a change once its update is done: after the events, before the next task
   return new Promise((resolve) => {
-    window.setTimeout(() => {
-      // Whatever the field holds then, the promise settles: the injector waits on it
-      try {
-        resolve(removed());
-      } catch {
-        resolve(false);
-      }
-    }, 0);
+    window.setTimeout(() => { resolve(removed()); }, 0);
   });
 }
 
@@ -357,7 +360,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
       // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
       // the editor hears only input. An editor that puts its own DOM back later (from a mutation
       // observer, after this read) is not seen here: the live check covers Copilot
-      return removed();
+      return removed() === 'removed';
     }
     if (!selection.isCollapsed) {
       selection.collapseToEnd();
@@ -378,7 +381,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   range.deleteContents();
   selection.collapse(node, start);
   field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
-  return removed();
+  return removed() === 'removed';
 }
 
 /**

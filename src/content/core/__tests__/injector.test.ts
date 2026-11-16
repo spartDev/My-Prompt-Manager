@@ -436,7 +436,7 @@ describe('PromptLibraryInjector', () => {
          * cancels each deleteContentBackward and deletes the character before the caret itself,
          * drawing its text a task later. Gives what it was sent and a way to hear a typed slash.
          */
-        const ownEditor = async ({ deletes = true, restores = false } = {}) => {
+        const ownEditor = async ({ deletes = true, restores = false, deletesOnce = false, elsewhere = false } = {}) => {
           const { open } = await listen();
           const editor = document.createElement('div');
           editor.contentEditable = 'true';
@@ -453,7 +453,15 @@ describe('PromptLibraryInjector', () => {
             }
             event.preventDefault();
             sent.push(event.inputType);
-            if (!deletes) {
+            if (!deletes || (deletesOnce && sent.length > 1)) {
+              return;
+            }
+            if (elsewhere) {
+              // Another part of the draft, the // left where it is
+              window.setTimeout(() => {
+                text.data = text.data.slice(1);
+                document.getSelection()?.collapse(text, text.data.length);
+              }, 0);
               return;
             }
             caret -= 1;
@@ -485,7 +493,14 @@ describe('PromptLibraryInjector', () => {
               document.removeEventListener(type, heard);
             }
           };
-          return { open, editor, sent, typeSlash };
+          // The user types the // again: the field and the caret as after the first time
+          const again = (): void => {
+            text.data = 'Draft //';
+            caret = 8;
+            document.getSelection()?.collapse(text, 8);
+            sent.length = 0;
+          };
+          return { open, editor, sent, typeSlash, again };
         };
         afterEach(() => {
           (injector as any).state.currentTextarea = mockTextarea;
@@ -511,6 +526,36 @@ describe('PromptLibraryInjector', () => {
           await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
           expect(sent).toHaveLength(2);
           expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it('opens again on the next //, once the editor removed the first', async () => {
+          const { open, editor, sent, typeSlash, again } = await ownEditor();
+          typeSlash();
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+
+          again();
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); });
+          expect(sent).toHaveLength(2);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it.each([
+          ['one slash deleted', { deletesOnce: true }, 'Draft /'],
+          ['other characters deleted, the // left', { elsewhere: true }, 'aft //'],
+        ])('leaves alone a field the editor changed otherwise, %s, and keeps the selector closed', async (_case, editorDoes, left) => {
+          const { open, editor, sent, typeSlash } = await ownEditor(editorDoes);
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          expect(editor.textContent).toBe(left);
           editor.remove();
         });
 

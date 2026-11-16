@@ -418,15 +418,16 @@ export class PromptLibraryInjector {
         const byEditor = deleteTypedTriggerByEditor(field);
         if (byEditor) {
           removing = true;
-          void byEditor.then((removed) => {
+          void byEditor.then((removal) => {
             removing = false;
             // The field replaced, or the selector opened from the Prompts button, meanwhile
             if (!field.isConnected || this.selector.isOpen) {
               return;
             }
-            // An editor that cancels the events and leaves the // (one that acts only on what the
-            // user does) may still let the editing command remove it
-            if (removed || removeTypedTrigger(field)) {
+            // An editor that cancels the events and leaves the field as it was (one that acts only
+            // on what the user does) may still let the editing command remove the //. A field it
+            // changed otherwise is left alone
+            if (removal === 'removed' || (removal === 'unchanged' && removeTypedTrigger(field))) {
               this.openFromTyping(field);
               return;
             }
