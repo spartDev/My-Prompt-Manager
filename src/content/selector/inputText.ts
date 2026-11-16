@@ -29,6 +29,24 @@ const INVISIBLE = /[\u200B\u2060\uFEFF]/g;
 
 const visible = (text: string): string => text.replace(INVISIBLE, '');
 
+/**
+ * Zero-width characters, the joiners included, in an element of the field hidden from assistive
+ * technology: the marks a Platform's own menu leaves there, not the user's text. M365 Copilot's
+ * slash menu ends the paragraph with `<span aria-hidden="true">` holding U+200B U+200C while it is
+ * open. A joiner the user writes sits in the editor's ordinary text.
+ */
+const HIDDEN_MARKS = /[\u200B-\u200D\u2060\uFEFF]/g;
+
+/** Whether `node` is inside an element hidden from assistive technology, up to `root` */
+const isHidden = (node: Node, root: Node): boolean => {
+  for (let current = node.parentNode; current && current !== root; current = current.parentNode) {
+    if (current.nodeType === Node.ELEMENT_NODE && (current as Element).getAttribute('aria-hidden') === 'true') {
+      return true;
+    }
+  }
+  return false;
+};
+
 const BLOCK_TAGS = new Set([
   'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DD', 'DIV', 'DL', 'DT', 'FIGCAPTION', 'FIGURE', 'FOOTER',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'OL', 'P', 'PRE', 'SECTION',
@@ -53,8 +71,10 @@ const nextContent = (node: Node): Node | null => {
 /**
  * The text under `root`, one line per block. A <br> breaks the line, except the one an editor
  * leaves at the end of a block to keep it open (an empty paragraph is `<p><br></p>`).
+ * `hiddenMarks: false` leaves out the zero-width characters of elements hidden from assistive
+ * technology (HIDDEN_MARKS), as the `//` is read.
  */
-export function plainTextOf(root: Node): string {
+export function plainTextOf(root: Node, { hiddenMarks = true }: { hiddenMarks?: boolean } = {}): string {
   const lines: string[] = [''];
   // A block has just ended: what comes next starts a new line
   let blockEnded = false;
@@ -69,7 +89,8 @@ export function plainTextOf(root: Node): string {
   const walk = (node: Node): void => {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
-        const text = child.nodeValue ?? '';
+        const raw = child.nodeValue ?? '';
+        const text = hiddenMarks || !isHidden(child, root) ? raw : raw.replace(HIDDEN_MARKS, '');
         // Indentation of the markup between two blocks is not text of the field
         const betweenBlocks = text.trim() === '' && (isBlock(child.previousSibling) || isBlock(child.nextSibling));
         if (text !== '' && !betweenBlocks) {
@@ -109,8 +130,9 @@ export function readInputText(field: HTMLElement): string {
 }
 
 /**
- * The plain text between the start of the field and the caret, or null when there is no caret in
- * the field (nothing is focused there, or text is selected).
+ * The plain text between the start of the field and the caret, as the `//` is read: without the
+ * zero-width marks of elements hidden from assistive technology (HIDDEN_MARKS). Null when there is
+ * no caret in the field (nothing is focused there, or text is selected).
  */
 export function textBeforeCaret(field: HTMLElement): string | null {
   if (isTextControl(field)) {
@@ -125,7 +147,7 @@ export function textBeforeCaret(field: HTMLElement): string | null {
   const range = field.ownerDocument.createRange();
   range.setStart(field, 0);
   range.setEnd(selection.focusNode, selection.focusOffset);
-  return plainTextOf(range.cloneContents());
+  return plainTextOf(range.cloneContents(), { hiddenMarks: false });
 }
 
 /**
@@ -178,7 +200,11 @@ function holdsOnlyText(selection: Selection): boolean {
   const root = range.commonAncestorContainer;
   const scope = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : root.parentElement;
   return Array.from(scope?.querySelectorAll('*') ?? []).every((element) => {
-    // A chip the user cannot edit holds no text when all it holds is invisible
+    // A chip the user cannot edit holds no text when all it holds is invisible. A text node of
+    // Lexical holds text even when empty, as one the slash menu of M365 Copilot leaves
+    if (element.getAttribute('data-lexical-text') === 'true' && !element.closest('[contenteditable="false"]')) {
+      return true;
+    }
     const text = element.closest('[contenteditable="false"]') ? visible(element.textContent ?? '') : element.textContent;
     return text !== '' || !range.intersectsNode(element);
   });
@@ -231,24 +257,26 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   // the field becomes the break that keeps the last line open, which is not read as a line.
   // Neither is a character the user does not see, which an editor may add or drop as it pleases
   const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
-  const original = visible(plainTextOf(field));
+  const original = visible(plainTextOf(field, { hiddenMarks: false }));
   const typed = visible(before);
   const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
   // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
   const endedField = original.length === typed.length;
   const removed = (): boolean => {
-    const now = spaces(visible(plainTextOf(field)));
+    const now = spaces(visible(plainTextOf(field, { hiddenMarks: false })));
     return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
   };
 
   if (canExec && typeof selection.modify === 'function') {
     // Back over the two slashes, and over a character the user does not see between them or
     // after them (Lexical's zero-width space)
-    for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && visible(selection.toString()).length < SELECTOR_TRIGGER.length; i++) {
+    // The selection is read as the // is: the marks of a hidden element are not text
+    const selected = (): string => (selection.rangeCount === 0 ? '' : visible(plainTextOf(selection.getRangeAt(0).cloneContents(), { hiddenMarks: false })));
+    for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
     // A selection that took in an element without text (an image) is not deleted
-    if (visible(selection.toString()) === SELECTOR_TRIGGER && holdsOnlyText(selection) && document.execCommand('delete')) {
+    if (selected() === SELECTOR_TRIGGER && holdsOnlyText(selection) && document.execCommand('delete')) {
       // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
       // the editor hears only input. An editor that puts its own DOM back later (from a mutation
       // observer, after this read) is not seen here: the live check covers Copilot

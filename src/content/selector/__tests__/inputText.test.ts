@@ -3,6 +3,9 @@
  * Insertion goes in the field.
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -257,6 +260,38 @@ describe('removeTypedTrigger', () => {
 
       expect(field.textContent).toBe(`Hi /${joiner}/`);
       restore();
+    });
+
+    describe('in M365 Copilot\'s editor while its slash menu is open', () => {
+      /** The editor as read on the live page, the caret after the spans the menu left (fixture) */
+      const slashMenuEditor = () => {
+        const markup = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
+        document.body.insertAdjacentHTML('beforeend', markup.replace(/<!--[\s\S]*?-->/, '').trim());
+        const field = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+        const [slashes, , marks] = Array.from(field.querySelectorAll('span[data-lexical-text]'), (span) => span.firstChild as Text | null);
+        document.getSelection()?.collapse(marks, (marks as Text).length);
+        return { field, slashes: slashes as Text, marks: marks as Text };
+      };
+      afterEach(() => {
+        document.getElementById('m365-chat-editor-target-element')?.remove();
+      });
+
+      it('reads the // before the caret: the marks of the hidden spans are not text of the field', () => {
+        const { field } = slashMenuEditor();
+
+        expect(textBeforeCaret(field)).toBe('//');
+        expect(endsWithSelectorTrigger(textBeforeCaret(field) ?? '')).toBe(true);
+      });
+
+      it('removes the // with the spans the menu left after it', () => {
+        const { field, slashes, marks } = slashMenuEditor();
+        const restore = browserCommands([[marks, 1], [marks, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('');
+        restore();
+      });
     });
 
     it('removes a // whose zero-width space is in a span of its own, as Lexical writes it', () => {

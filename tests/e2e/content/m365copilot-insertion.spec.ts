@@ -55,6 +55,20 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
   });
 
+  test('typing // in one go opens the Prompt selector next to Copilot\'s own slash menu, whose hidden marks go with the //', async ({ context }) => {
+    const page = await openPlatform(context, 'm365copilot-editor');
+    await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await page.keyboard.type('//');
+
+    await expect(promptSelector(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone' }).toBe('');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
+    // The spans Copilot's menu left in the paragraph, hidden from assistive technology, are gone too
+    await expect(page.locator('[data-lexical-editor] [aria-hidden="true"]')).toHaveCount(0);
+  });
+
   test('typing // opens the Prompt selector next to Copilot\'s own slash menu, which closes with the //', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
     await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');

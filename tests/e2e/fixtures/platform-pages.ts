@@ -311,7 +311,16 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
-      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : node.textContent.length);
+      // The spans the slash menu adds while it is open: not text of the editor
+      const hidden = (node) => node.nodeType === Node.ELEMENT_NODE && node.getAttribute('aria-hidden') === 'true';
+      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : hidden(node) ? 0 : node.textContent.length);
+      const menuSpans = () => ['', '\u200B\u200C'].map((marks) => {
+        const span = document.createElement('span');
+        span.setAttribute('aria-hidden', 'true');
+        span.setAttribute('data-lexical-text', 'true');
+        span.textContent = marks;
+        return span;
+      });
       const draw = () => {
         const paragraph = document.createElement('p');
         if (text === '') {
@@ -328,6 +337,9 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           });
           if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
         }
+        if (menu) {
+          paragraph.append(...menuSpans());
+        }
         editor.replaceChildren(paragraph);
       };
       /** The offset in the text of a point of the editor's DOM. */
@@ -343,7 +355,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         const span = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
         for (const node of nodes) {
           if (node === span) {
-            return position + (container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
+            return position + (hidden(node) ? 0 : container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
           }
           position += lengthOf(node);
         }
@@ -352,6 +364,13 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
       /** Puts the caret after the first characters of the text, in the DOM just drawn. */
       const caretTo = (position) => {
         const paragraph = editor.querySelector('p');
+        const marks = menu ? paragraph.lastChild : null;
+        if (marks && position === text.length) {
+          // While the menu is open, the caret at the end of the text is after its spans
+          document.getSelection().collapse(marks.firstChild, marks.textContent.length);
+          known = { start: position, end: position };
+          return;
+        }
         const nodes = Array.from(paragraph.childNodes);
         let remaining = position;
         let index = 0;
@@ -373,20 +392,16 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         text = text.slice(0, known.start) + written + text.slice(known.end);
         let caret = known.start + written.length;
         if (slashMenu && written === '/' && !menu) {
-          // A slash opens the menu, and a zero-width space goes after it while the menu is open
+          // A slash opens the menu, which adds its hidden spans to the paragraph
           menu = document.createElement('div');
           menu.setAttribute('role', 'listbox');
           menu.setAttribute('data-e2e', 'slash-menu');
           menu.textContent = 'Opened by you';
           document.body.append(menu);
-          text = text.slice(0, caret) + '\u200B' + text.slice(caret);
-          caret += 1;
         } else if (menu && !text.includes('/')) {
-          // The slash is gone: so is the menu, and its zero-width space
+          // The slash is gone: so is the menu, and its spans
           menu.remove();
           menu = null;
-          caret -= (text.slice(0, caret).match(/\u200B/g) ?? []).length;
-          text = text.replace(/\u200B/g, '');
         }
         draw();
         caretTo(caret);
@@ -437,7 +452,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         nodes.forEach((node, index) => {
           if (node.nodeName === 'BR') {
             if (index < nodes.length - 1) { lines.push(''); }
-          } else {
+          } else if (!hidden(node)) {
             lines[lines.length - 1] += node.textContent;
           }
         });
@@ -449,7 +464,6 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         if (menu && !text.includes('/')) {
           menu.remove();
           menu = null;
-          text = text.replace(/\\u200B/g, '');
         }
         draw();
         caretTo(caret === null ? text.length : Math.min(caret, text.length));
@@ -477,10 +491,12 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
  * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button
  * (LATE_TOOLBAR), and an editor that behaves as Perplexity's Lexical editor does (lexicalEditor),
  * assumed, not seen there. And its own slash menu, seen on the live page on 2026-11-15: a slash
- * opens a list of recent files, and the editor then holds a zero-width span beside the slashes.
- * What else the menu does was not read; the stand-in takes the worst a menu may do: while it is
- * open, the keys and the text typed stop at the editor, and a zero-width space sits after the
- * slash that opened it. The menu closes once that slash is gone.
+ * opens a list of recent files. While it is open the editor's paragraph ends with two text spans
+ * hidden from assistive technology, an empty one and one holding a zero-width space and a
+ * zero-width non-joiner, and the caret is after them (read on the live page on 2026-11-16):
+ * `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span aria-hidden
+ * data-lexical-text>U+200B U+200C</span>`. The stand-in also takes the worst a menu may do: while
+ * it is open, the keys and the text typed stop at the editor. The menu closes once the slash is gone.
  */
 const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
   .replace('</body>', `${lexicalEditor('[data-lexical-editor]', true)}${LATE_TOOLBAR}\n  </body>`);
