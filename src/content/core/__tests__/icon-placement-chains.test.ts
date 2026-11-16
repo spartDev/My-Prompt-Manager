@@ -53,6 +53,96 @@ describe('icon placement chains on the live composers', () => {
     expect(resolution?.index, `${platformId}: ${describeResolution(resolution?.index, placement?.anchors.length ?? 0)}`).toBe(0);
   });
 
+  it('m365copilot still finds the Fluent actions of the composer m365.cloud.microsoft served before its redirect', () => {
+    // Reconstructed on 2026-11-11 from the attributes the injector relied on before Phase 2
+    document.body.innerHTML = `
+      <div class="fai-ChatInput">
+        <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
+        <div class="fai-ChatInput__actions"><span><button type="button"></button><button type="submit"></button></span></div>
+      </div>`;
+    const editor = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('.fai-ChatInput__actions'));
+  });
+
+  it('m365copilot still finds the send button of a Fluent composer that has no actions element', () => {
+    document.body.innerHTML = `
+      <div class="fai-ChatInput">
+        <span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span>
+        <span><button type="submit"></button></span>
+      </div>`;
+    const editor = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.index).toBe(2);
+    expect(resolution?.anchor).toBe(document.querySelector('button[type="submit"]'));
+  });
+
+  it('m365copilot takes the Fluent composer that holds the actions, not an inner .fai-ChatInput around the editor', () => {
+    document.body.innerHTML = `
+      <div class="fai-ChatInput">
+        <div class="fai-ChatInput"><span id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox"><p><br></p></span></div>
+        <div class="fai-ChatInput__actions"><button type="submit"></button></div>
+      </div>`;
+    const editor = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
+
+    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)?.index).toBe(1);
+  });
+
+  it('m365copilot places the icon right after the plus menu of copilot.cloud.microsoft', () => {
+    const editor = loadComposer('m365copilot');
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('[data-testid="PlusMenuButton"]'));
+    expect(SUPPORTED_PLATFORMS.m365copilot.iconPlacement?.anchors[0].relation).toBe('after');
+  });
+
+  it('m365copilot finds its composer still when a capture folds the span around the editor', () => {
+    document.body.innerHTML = readFileSync(fixtureOf('m365copilot'), 'utf8').replace('<span></span>', '');
+    const wrapper = document.querySelector('[data-lexical-editor]')?.parentElement as HTMLElement;
+    wrapper.replaceWith(...Array.from(wrapper.children));
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+    expect(editor.parentElement?.tagName).toBe('DIV');
+
+    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)?.index).toBe(0);
+  });
+
+  it('m365copilot gives no anchor once the plus menu loses its test id: the icon goes on the editor', () => {
+    document.body.innerHTML = readFileSync(fixtureOf('m365copilot'), 'utf8').replace(' data-testid="PlusMenuButton"', '');
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+
+    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)).toBeNull();
+  });
+
+  it('m365copilot gives another editor on the page, such as a message being edited, no anchor of the composer', () => {
+    document.body.innerHTML = `
+      <div>
+        <div><div contenteditable="true" data-lexical-editor="true" role="textbox" id="edited-message"></div></div>
+        ${readFileSync(fixtureOf('m365copilot'), 'utf8')}
+      </div>`;
+    const edited = document.getElementById('edited-message') as HTMLElement;
+    const composerEditor = document.querySelector<HTMLElement>('[contenteditable="true"]:not(#edited-message)') as HTMLElement;
+
+    expect(resolveIconPlacement(edited, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)).toBeNull();
+    // The composer's own editor still finds its toolbar
+    expect(resolveIconPlacement(composerEditor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)?.index).toBe(0);
+  });
+
+  it('m365copilot takes no button of the page outside the composer, such as a dictation button in a header', () => {
+    document.body.innerHTML = `
+      <div>
+        <header><button type="button" aria-label="Start dictation"></button></header>
+        <div><div contenteditable="true" data-lexical-editor="true" role="textbox"></div></div>
+      </div>`;
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+
+    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)).toBeNull();
+  });
+
   it('never takes an anchor outside the composer, such as a message action bar above it', () => {
     const editor = loadComposer('claude');
     const messageBar = document.createElement('div');

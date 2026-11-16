@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
+import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
 import { PLACEMENT_REPORT_MESSAGE, PlacementRepair } from '../placement-repair';
 
 vi.mock('../../utils/logger', () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }));
@@ -354,5 +355,41 @@ describe('PlacementRepair.report', () => {
     repair.report('overlay');
 
     expect(sent()).toEqual(['overlay', 'overlay']);
+  });
+});
+
+describe('PlacementRepair.findAnchor', () => {
+  let repair: PlacementRepair;
+  const FINGERPRINT = { primary: { id: 'send' } } as never;
+
+  beforeEach(async () => {
+    await chrome.storage.local.clear();
+    document.body.innerHTML = '<button id="send">Send</button><button id="moved">Moved</button>';
+    await chrome.storage.local.set({
+      [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { status: 'override', override: { ...PICK, fingerprint: FINGERPRINT } } }
+    });
+    repair = new PlacementRepair('claude.ai', vi.fn());
+    await repair.load();
+  });
+
+  afterEach(() => {
+    repair.dispose();
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('finds the picked element by its fingerprint first', () => {
+    const moved = document.getElementById('moved');
+    vi.spyOn(getElementFingerprintGenerator(), 'findElement').mockReturnValue(moved);
+
+    expect(repair.findAnchor()).toBe(moved);
+  });
+
+  it('by its selector only, scores no element by the fingerprint', () => {
+    const scored = vi.spyOn(getElementFingerprintGenerator(), 'findElement')
+      .mockReturnValue(document.getElementById('moved'));
+
+    expect(repair.findAnchor({ bySelectorOnly: true })).toBe(document.getElementById('send'));
+    expect(scored).not.toHaveBeenCalled();
   });
 });

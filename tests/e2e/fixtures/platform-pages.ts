@@ -20,7 +20,7 @@ import { expect } from './extension';
  * - claude.ai: a contenteditable editor without an editor library, so Insertion goes
  *   through the Claude strategy's execCommand('insertText'). It is styled
  *   `white-space: pre-wrap`, as ProseMirror is, so spaces stay as typed.
- * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, m365.cloud.microsoft: a contenteditable
+ * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, copilot.cloud.microsoft: a contenteditable
  *   without an editor library, with the attributes each strategy selects on, so Insertion goes
  *   through that strategy's execCommand path.
  * - copilot.microsoft.com: a plain <textarea>, filled through the native value setter.
@@ -30,7 +30,13 @@ import { expect } from './extension';
  * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
  *
  * One more stands in for Perplexity's live composer, a Lexical editor that takes text as a paste
- * and inserts a second time the text an `input` event carries. See LEXICAL_EDITOR.
+ * and inserts a second time the text an `input` event carries (seen on 2026-11-11). See
+ * lexicalEditor. Another runs the same stand-in at copilot.cloud.microsoft, whose composer is a
+ * Lexical editor too: that it behaves as Perplexity's does was not seen on the live page, only its
+ * attributes were read (2026-11-15), so the live check of ticket My-Prompt-Manager-axv proves it.
+ *
+ * And one keeps the Fluent composer m365.cloud.microsoft served before it redirected a work account
+ * to copilot.cloud.microsoft, so the content script is proven to run on that host still.
  *
  * Every page counts the Enter keys that reach it, other than on a button, in
  * `window.__enterKeys`: the live sites send the message on Enter, so a test can prove a key
@@ -199,12 +205,60 @@ const COPILOT_HTML = plainPage(
   '<div class="bar" data-e2e="toolbar"><div><button type="button" data-testid="audio-call-button" aria-label="Talk to Copilot">Mic</button></div></div>'
 );
 
-const M365COPILOT_HTML = plainPage(
+/** The Fluent composer m365.cloud.microsoft served before its redirect (reconstructed on 2026-11-11) */
+const M365COPILOT_FLUENT_HTML = plainPage(
   'Microsoft 365 Copilot',
   '<span class="field" id="m365-chat-editor-target-element" data-lexical-editor="true" contenteditable="true" role="combobox" aria-label="Message Copilot"></span>',
   '<div class="bar fai-ChatInput__actions" data-e2e="toolbar"><button type="button">Mic</button></div>',
   'div class="fai-ChatInput"'
 );
+
+/**
+ * The composer of Microsoft 365 Copilot where m365.cloud.microsoft and copilot.microsoft.com send a
+ * work account, copilot.cloud.microsoft, as read on the live page on 2026-11-15 (ticket
+ * My-Prompt-Manager-axv): the editor, a span in a span, in the composer div, which also holds the
+ * plus menu in a div beside an svg, and the dictation button in a span. No send button while the
+ * field is empty. The plus menu's div is the bar a test finds the Prompts button in.
+ */
+const M365COPILOT_FIELD =
+  '<span><span class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></span><span></span></span>';
+const M365COPILOT_BAR =
+  '<div class="bar" data-e2e="toolbar"><svg width="0" height="0"></svg><div><button type="button" data-testid="PlusMenuButton" aria-label="Add and manage sources">+</button></div></div>' +
+  '<span><button type="button" aria-label="Start dictation">Mic</button></span>';
+
+/** Its editor without the editor library, its toolbar on the page from the start */
+const M365COPILOT_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div');
+
+/**
+ * The live page renders the plus menu and the dictation button after the editor (live check,
+ * 2026-11-15): this stand-in takes them out before the content script runs, and puts them back a
+ * moment after the Prompts button shows, noting in `window.__placementBeforeToolbar` where the
+ * button was until then. Meanwhile the composer holds what the live page first shows, a shell
+ * whose "+" is `chat-input-attach-button`, with no plus menu and no dictation button (live check,
+ * 2026-11-16). On a loaded machine the real toolbar came 44 s later: `window.__toolbarDelay`, set
+ * before the page loads, says after how many milliseconds it comes (500 otherwise).
+ */
+const LATE_TOOLBAR = /* html */ `
+    <script>
+      const composer = document.querySelector('[data-lexical-editor]').parentElement.parentElement;
+      const late = Array.from(composer.children).slice(1);
+      for (const element of late) { element.remove(); }
+      const shell = document.createElement('div');
+      shell.innerHTML = '<button type="button" data-testid="chat-input-attach-button" aria-label="Add">+</button>';
+      composer.append(shell);
+      const render = () => {
+        window.__placementBeforeToolbar = document.querySelector('[data-mpm-placement]')?.getAttribute('data-mpm-placement') ?? null;
+        shell.remove();
+        composer.append(...late);
+      };
+      const waitForButton = new MutationObserver(() => {
+        if (document.querySelector('[data-mpm-placement]')) {
+          waitForButton.disconnect();
+          window.setTimeout(render, window.__toolbarDelay ?? 500);
+        }
+      });
+      waitForButton.observe(document.body, { childList: true, subtree: true, attributes: true });
+    </script>`;
 
 /**
  * What a ProseMirror editor does with text it did not build itself: after each input it reads its
@@ -248,8 +302,8 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  *   leaves the caret after the pasted text. The editor learns of a selection from the
  *   `selectionchange` event; one over the editor itself, not from the start of its paragraph to
  *   its end, leaves out the line breaks that end the field.
- * - Typed text goes where that selection is too. Text from the editing command arrives with its
- *   line breaks dropped.
+ * - Typed text, and a deletion, go where the beforeinput event says: Lexical reads the selection
+ *   then. Text from the editing command arrives with its line breaks dropped.
  * - An `input` event that carries text inserts that text again, after what the field holds. One
  *   that carries none follows a change the browser made to the DOM itself (the editing command
  *   deleting text): the editor takes its text from what its paragraph then shows.
@@ -266,15 +320,32 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
  *     character typed in those 20 ms goes in that emptied text, and is taken out with it.
  * - A Backspace key removes the last character.
  */
-const LEXICAL_EDITOR = /* html */ `
+const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
     <script>
-      const editor = document.querySelector('#ask-input');
+      const editor = document.querySelector(${JSON.stringify(field)});
+      const slashMenu = ${String(slashMenu)};
+      // The slash menu while it is open (slashMenu)
+      let menu = null;
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
-      // The elements the editor drew for the text, last time it drew
+      // A deletion is drawn in a microtask, as Lexical commits its updates: until then the editor
+      // goes by the selection it knows, not by the page's, which still shows the old text
+      let pending = false;
+      // The spans the slash menu adds while it is open: not text of the editor
+      const hidden = (node) => node.nodeType === Node.ELEMENT_NODE && node.getAttribute('aria-hidden') === 'true';
+      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : hidden(node) ? 0 : node.textContent.length);
+      // The elements the editor drew for its text, last time it drew
       let drawn = [];
-      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : node.textContent.length);
+      // The emptied text the editor takes out 20 ms after it found it, until it does
+      let emptied = null;
+      const menuSpans = () => ['', '\u200B\u200C'].map((marks) => {
+        const span = document.createElement('span');
+        span.setAttribute('aria-hidden', 'true');
+        span.setAttribute('data-lexical-text', 'true');
+        span.textContent = marks;
+        return span;
+      });
       const draw = () => {
         const paragraph = document.createElement('p');
         if (text === '') {
@@ -284,6 +355,7 @@ const LEXICAL_EDITOR = /* html */ `
           lines.forEach((line, index) => {
             if (line !== '') {
               const span = document.createElement('span');
+              span.setAttribute('data-lexical-text', 'true');
               span.textContent = line;
               paragraph.append(span);
             }
@@ -291,8 +363,11 @@ const LEXICAL_EDITOR = /* html */ `
           });
           if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
         }
+        if (menu) {
+          paragraph.append(...menuSpans());
+        }
         editor.replaceChildren(paragraph);
-        drawn = Array.from(paragraph.querySelectorAll('span'));
+        drawn = Array.from(paragraph.querySelectorAll('span')).filter((span) => !hidden(span));
       };
       /** The offset in the text of a point of the editor's DOM. */
       const offsetOf = (container, offset) => {
@@ -307,7 +382,7 @@ const LEXICAL_EDITOR = /* html */ `
         const span = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
         for (const node of nodes) {
           if (node === span) {
-            return position + (container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
+            return position + (hidden(node) ? 0 : container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
           }
           position += lengthOf(node);
         }
@@ -333,16 +408,44 @@ const LEXICAL_EDITOR = /* html */ `
         known = { start: position, end: position };
       };
       /** Text arrives where the known selection is, in place of what is selected. */
-      const write = (written) => {
+      const write = (written, later = false) => {
         text = text.slice(0, known.start) + written + text.slice(known.end);
-        const caret = known.start + written.length;
+        let caret = known.start + written.length;
+        if (slashMenu && written === '/' && !menu) {
+          // A slash opens the menu, which adds its hidden spans to the paragraph
+          menu = document.createElement('div');
+          menu.setAttribute('role', 'listbox');
+          menu.setAttribute('data-e2e', 'slash-menu');
+          menu.textContent = 'Opened by you';
+          document.body.append(menu);
+        } else if (menu && !text.includes('/')) {
+          // The slash is gone: so is the menu, and its spans
+          menu.remove();
+          menu = null;
+        }
+        if (later) {
+          known = { start: caret, end: caret };
+          if (!pending) {
+            pending = true;
+            queueMicrotask(() => {
+              pending = false;
+              draw();
+              caretTo(known.end);
+            });
+          }
+          return;
+        }
         draw();
         caretTo(caret);
       };
+      // While the menu is open, the keys and the text typed are its own: they stop at the editor
+      for (const type of ['keydown', 'beforeinput', 'input']) {
+        editor.addEventListener(type, (event) => { if (menu) { event.stopPropagation(); } });
+      }
       document.addEventListener('selectionchange', () => {
         const selection = document.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        if (range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
           known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
         }
       });
@@ -350,10 +453,16 @@ const LEXICAL_EDITOR = /* html */ `
         event.preventDefault();
         write(event.clipboardData.getData('text/plain'));
       });
-      // The emptied text the editor takes out 20 ms after it found it, until it does
-      let emptied = null;
       editor.addEventListener('beforeinput', (event) => {
         event.preventDefault();
+        // What is typed or deleted goes where the event says, as Lexical reads the selection on a
+        // beforeinput: the selectionchange of a caret moved a moment ago (an arrow key) may not
+        // have come yet, the browser sends it later
+        const selection = document.getSelection();
+        const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
+        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+          known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
+        }
         if (event.inputType === 'insertText' && event.data && emptied) {
           // Typed in the emptied text: it goes with it
           emptied.appendData(event.data);
@@ -361,18 +470,11 @@ const LEXICAL_EDITOR = /* html */ `
         } else if (event.inputType === 'insertText' && event.data) {
           write(event.data.replace(/\\n/g, ''));
         } else if (event.inputType.startsWith('delete')) {
-          // What is deleted is what the event says, a selection made a moment ago included
-          const selection = document.getSelection();
-          const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
-          if (range && editor.contains(range.startContainer)) {
-            known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
+          // A caret, not a selection: Backspace takes the character before it
+          if (known.start === known.end && event.inputType === 'deleteContentBackward') {
+            known = { start: Math.max(0, known.start - 1), end: known.end };
           }
-          text = text.slice(0, known.start) + text.slice(known.end);
-          const caret = known.start;
-          queueMicrotask(() => {
-            draw();
-            caretTo(caret);
-          });
+          write('', true);
         }
       });
       editor.addEventListener('input', (event) => {
@@ -380,6 +482,15 @@ const LEXICAL_EDITOR = /* html */ `
           text += event.data;
           draw();
           caretTo(text.length);
+          return;
+        }
+        if (menu) {
+          // While its slash menu is open, Copilot's editor does not take a change the browser made
+          // behind its back: it draws its own text again, the caret where it was (read live on
+          // 2026-11-16)
+          const at = known.end;
+          draw();
+          caretTo(at);
           return;
         }
         // The browser removed an element the editor drew: the editor draws it again from its text
@@ -396,7 +507,7 @@ const LEXICAL_EDITOR = /* html */ `
         nodes.forEach((node, index) => {
           if (node.nodeName === 'BR') {
             if (index < nodes.length - 1) { lines.push(''); }
-          } else {
+          } else if (!hidden(node)) {
             lines[lines.length - 1] += node.textContent;
           }
         });
@@ -405,6 +516,10 @@ const LEXICAL_EDITOR = /* html */ `
           ? offsetOf(selection.focusNode, selection.focusOffset)
           : null;
         text = lines.join('\\n');
+        if (menu && !text.includes('/')) {
+          menu.remove();
+          menu = null;
+        }
         const at = caret === null ? text.length : Math.min(caret, text.length);
         const focus = selection.focusNode;
         if (focus && focus.nodeType === Node.TEXT_NODE && focus.nodeValue === '' && drawn.includes(focus.parentNode)) {
@@ -438,44 +553,65 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
   '<div class="field" id="ask-input" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Ask anything"></div>',
   '<div class="bar" data-e2e="toolbar"><div data-testid="ask-input-mode-toggle-indicator"></div><button type="button" aria-haspopup="menu" aria-label="Model">Model</button><button type="button" aria-label="Dictation">Mic</button></div>',
   'div'
-).replace('</body>', `${LEXICAL_EDITOR}\n  </body>`);
+).replace('</body>', `${lexicalEditor('#ask-input')}\n  </body>`);
+
+/**
+ * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft: its composer
+ * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button
+ * (LATE_TOOLBAR), and an editor that behaves as Perplexity's Lexical editor does (lexicalEditor),
+ * assumed, not seen there. And its own slash menu, seen on the live page on 2026-11-15: a slash
+ * opens a list of recent files. While it is open the editor's paragraph ends with two text spans
+ * hidden from assistive technology, an empty one and one holding a zero-width space and a
+ * zero-width non-joiner, the caret staying at the end of the slashes' text (read on the live page
+ * on 2026-11-16): `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span
+ * aria-hidden data-lexical-text>U+200B U+200C</span>`. The editor puts the // back when the browser's
+ * editing command deletes it; a deleteContentBackward beforeinput it handles itself, as Backspace,
+ * and the menu closes once the slash is gone. The stand-in also takes the worst a menu may do:
+ * while it is open, the keys and the text typed stop at the editor.
+ */
+const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
+  .replace('</body>', `${lexicalEditor('[data-lexical-editor]', true)}${LATE_TOOLBAR}\n  </body>`);
 
 /**
  * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and
- * Mistral (see PARAGRAPH_EDITOR), Lexical on Perplexity (see LEXICAL_EDITOR).
+ * Mistral (see PARAGRAPH_EDITOR), Lexical on Perplexity and on Microsoft 365 Copilot (see lexicalEditor).
  */
-export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-editor';
+export type EditorFixture = 'chatgpt-editor' | 'mistral-editor' | 'perplexity-editor' | 'm365copilot-editor' | 'm365copilot-fluent';
 
 export const EDITOR_FIXTURES: readonly EditorFixture[] = ['chatgpt-editor', 'mistral-editor'];
 
-/** Every stand-in page: the seven Platforms, then the rich text editors three of them have live. */
-export const ALL_FIXTURES: readonly (PlatformFixture | EditorFixture)[] = [...PLATFORM_FIXTURES, ...EDITOR_FIXTURES, 'perplexity-editor'];
+/** Every stand-in page: the seven Platforms, the rich text editors four of them have live, and the composer M365 Copilot had at m365.cloud.microsoft. */
+export const ALL_FIXTURES: readonly (PlatformFixture | EditorFixture)[] = [...PLATFORM_FIXTURES, ...EDITOR_FIXTURES, 'perplexity-editor', 'm365copilot-editor', 'm365copilot-fluent'];
 
 /** The input field of each stand-in page. */
 export const PLATFORM_FIELD: Record<PlatformFixture | EditorFixture, string> = {
   'chatgpt-editor': '#prompt-textarea',
   'mistral-editor': '.field',
   'perplexity-editor': '#ask-input',
+  'm365copilot-editor': '[data-lexical-editor]',
+  'm365copilot-fluent': '#m365-chat-editor-target-element',
   chatgpt: '#prompt-textarea',
   claude: '.ProseMirror',
   mistral: '.field',
   gemini: '.ql-editor',
   perplexity: '#ask-input',
   copilot: '#userInput',
-  m365copilot: '#m365-chat-editor-target-element',
+  m365copilot: '[data-lexical-editor]',
 };
 
 const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: string }> = {
   'chatgpt-editor': { url: 'https://chatgpt.com/', html: CHATGPT_EDITOR_HTML },
   'mistral-editor': { url: 'https://chat.mistral.ai/', html: MISTRAL_EDITOR_HTML },
   'perplexity-editor': { url: 'https://www.perplexity.ai/', html: PERPLEXITY_EDITOR_HTML },
+  'm365copilot-editor': { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_EDITOR_HTML },
+  'm365copilot-fluent': { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_FLUENT_HTML },
   chatgpt: { url: 'https://chatgpt.com/', html: CHATGPT_REACT_HTML },
   claude: { url: 'https://claude.ai/', html: CLAUDE_EDITOR_HTML },
   mistral: { url: 'https://chat.mistral.ai/', html: MISTRAL_HTML },
   gemini: { url: 'https://gemini.google.com/', html: GEMINI_HTML },
   perplexity: { url: 'https://www.perplexity.ai/', html: PERPLEXITY_HTML },
   copilot: { url: 'https://copilot.microsoft.com/', html: COPILOT_HTML },
-  m365copilot: { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_HTML },
+  m365copilot: { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_HTML },
 };
 
 const readReactScript = ({ module, file }: { module: string; file: string }): string => {
@@ -541,11 +677,24 @@ export const promptRow = (page: Page, promptId: string) =>
 /** The titles the open Prompt selector lists, in order. */
 export const listedTitles = (page: Page) => promptSelector(page).locator('.mpm-row-title').allTextContents();
 
+/**
+ * How long an opening of the Prompt selector may take. The first one in a page also loads React
+ * and reads the Library: four to six times a later opening when the CPU is short (180 ms against
+ * 79, 4.5 s against 0.75 s at 40 times slower), which went past the 10 s of an assertion on a
+ * loaded machine (PR #576, 2026-11-16).
+ */
+const OPENING_TIMEOUT = 30_000;
+
+/** Waits for the Prompt selector to show, as long as an opening may take (OPENING_TIMEOUT). */
+export async function expectSelectorOpen(page: Page): Promise<void> {
+  await expect(promptSelector(page)).toBeVisible({ timeout: OPENING_TIMEOUT });
+}
+
 /** Opens the Prompt selector from the Prompts button and waits for it. */
 export async function openPromptSelector(page: Page): Promise<void> {
   await expect(promptsButton(page)).toHaveCount(1);
   await promptsButton(page).click();
-  await expect(promptSelector(page)).toBeVisible();
+  await expectSelectorOpen(page);
 }
 
 /**

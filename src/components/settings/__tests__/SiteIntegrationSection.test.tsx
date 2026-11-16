@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ConfigurationEncoder } from '../../../services/configurationEncoder';
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
 import type { CustomSite } from '../../../types';
 import SiteIntegrationSection from '../SiteIntegrationSection';
@@ -51,11 +52,13 @@ describe('SiteIntegrationSection - AI sites group', () => {
     expect(screen.getByTestId('site-logo')).toHaveClass('grayscale', 'opacity-50', 'duration-(--duration-dim)');
   });
 
-  it('shows the linked M365 Copilot domain on the Copilot row, which one switch turns on', () => {
+  it('shows the linked M365 Copilot domains on the Copilot row, which one switch turns on', () => {
     const siteConfigs = { 'copilot.microsoft.com': { name: 'Microsoft Copilot', icon: () => <span>C</span> } };
     render(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} />);
 
-    expect(screen.getByText('copilot.microsoft.com · m365.cloud.microsoft')).toBeInTheDocument();
+    const domains = screen.getByText('copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
+    // Cut to the row's width in the popup: whole on hover
+    expect(domains).toHaveAttribute('title', 'copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
     expect(screen.getAllByRole('switch')).toHaveLength(1);
   });
 
@@ -240,5 +243,31 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
 
     rerender(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} enabledPlatforms={[]} />);
     expect(screen.queryByTestId('site-placement')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteIntegrationSection - importing a configuration', () => {
+  beforeEach(() => {
+    (chrome.tabs.query as unknown as Mock).mockResolvedValue([]);
+  });
+
+  it('refuses a configuration for a host of a Platform that has no row of its own, such as copilot.cloud.microsoft', async () => {
+    const user = userEvent.setup();
+    const onShowToast = vi.fn();
+    const code = await ConfigurationEncoder.encode({
+      hostname: 'copilot.cloud.microsoft',
+      displayName: 'Copilot at work',
+      enabled: true,
+      dateAdded: Date.now()
+    });
+    render(<SiteIntegrationSection {...defaultProps} onShowToast={onShowToast} />);
+
+    await user.click(getAddButton());
+    await user.click(screen.getByText('Import Configuration'));
+    await user.type(screen.getByLabelText('Encoded configuration string'), code);
+    await user.click(screen.getByRole('button', { name: 'Preview Configuration' }));
+
+    expect(await screen.findByText('This hostname already has a built-in integration and cannot be imported as custom.')).toBeInTheDocument();
+    expect(onShowToast).toHaveBeenCalled();
   });
 });

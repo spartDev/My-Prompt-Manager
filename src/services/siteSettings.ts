@@ -21,7 +21,7 @@
  * The module imports neither `StorageManager` nor React, so the content script can load it.
  */
 
-import { getLinkedPlatformHostnames, getPlatformByHostname, getPlatformsByPriority } from '../config/platforms';
+import { getLinkedPlatformHostnames, getPlatformByHostname, getPlatformsByPriority, platformHostnames } from '../config/platforms';
 import type { CustomSite } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 
@@ -89,6 +89,21 @@ function choicesOfEnabledList(enabledSites: readonly string[], mayPredateM365: b
     choices[hostname] = true;
   }
   return choices;
+}
+
+/**
+ * Whether a hostname is one of the other hosts of a Platform (`otherHostnames`, such as
+ * copilot.cloud.microsoft for M365 Copilot). Such a host holds no Platform choice of its own: it is
+ * on or off as its Platform is, whatever a store or the list of an earlier release says of it.
+ */
+function followsItsPlatform(hostname: string): boolean {
+  const platform = getPlatformByHostname(hostname);
+  return platform !== undefined && platform.hostname !== hostname;
+}
+
+/** The choices without any for a host that follows its Platform */
+function withoutOtherHosts(choices: Record<string, boolean>): Record<string, boolean> {
+  return Object.fromEntries(Object.entries(choices).filter(([hostname]) => !followsItsPlatform(hostname)));
 }
 
 /** The stored Platform choices, leaving out an entry that is not a hostname and a switch */
@@ -182,9 +197,11 @@ export function parseSiteSettings(stored: unknown): SiteSettings {
   }
 
   return {
-    platformChoices,
+    platformChoices: withoutOtherHosts(platformChoices),
+    // A Custom site at a host a later release made a Platform's (copilot.cloud.microsoft, added by
+    // hand while the extension did nothing there) gives way to the Platform: its switch decides
     customSites: Array.isArray(stored.customSites)
-      ? stored.customSites.filter(isCustomSite)
+      ? stored.customSites.filter(isCustomSite).filter((site) => getPlatformByHostname(site.hostname) === undefined)
       : defaults.customSites,
     debugMode: typeof stored.debugMode === 'boolean' ? stored.debugMode : defaults.debugMode
   };
@@ -204,6 +221,7 @@ function choiceOf(settings: SiteSettings, hostname: string): boolean | undefined
  * Whether a Platform is on: as the user turned it; when the user never switched it, as they turned
  * a Platform linked to it, since one switch turns them together (a Platform linked to Copilot in a
  * later release stays off for a user who turned Copilot off); else as the Platform is by default.
+ * One of the other hosts of a Platform holds no choice: it is on or off as its Platform is.
  * A hostname that is no Platform and that the user never turned on is off.
  */
 export function isPlatformEnabled(settings: SiteSettings, hostname: string): boolean {
@@ -221,11 +239,12 @@ export function isPlatformEnabled(settings: SiteSettings, hostname: string): boo
 }
 
 /**
- * The hostnames of the Platforms that are on, highest priority first, then any other hostname the
- * user has turned on (one kept from a list an earlier release stored)
+ * The hostnames of the Platforms that are on, highest priority first, each followed by the other
+ * hosts it is served on, then any other hostname the user has turned on (one kept from a list an
+ * earlier release stored)
  */
 export function enabledPlatforms(settings: SiteSettings): string[] {
-  const platforms = getPlatformsByPriority().map((platform) => platform.hostname);
+  const platforms = getPlatformsByPriority().flatMap(platformHostnames);
   const others = Object.keys(settings.platformChoices).filter((hostname) => !platforms.includes(hostname));
   return [...platforms, ...others].filter((hostname) => isPlatformEnabled(settings, hostname));
 }
@@ -260,7 +279,9 @@ export async function readSiteSettings(): Promise<SiteSettings> {
  * Both can go once no rollback to v1.9.0 or earlier is possible.
  */
 function storedShape(settings: SiteSettings): SiteSettings & { enabledSites: string[]; enabledSitesWritten: string[] } {
-  const enabledSites = enabledPlatforms(settings);
+  // An earlier release switches the hosts it knows only: a host it does not know, left on its list,
+  // would no longer follow its Platform once updated again
+  const enabledSites = enabledPlatforms(settings).filter((hostname) => !followsItsPlatform(hostname));
   return { ...settings, enabledSites, enabledSitesWritten: [...enabledSites] };
 }
 
@@ -282,7 +303,7 @@ export function applySiteSettingsChange(settings: SiteSettings, change: SiteSett
     case 'setPlatformEnabled': {
       // A Platform already as asked is left without a choice, so it keeps following its default
       const switched = getLinkedPlatformHostnames(change.hostname)
-        .filter((hostname) => isPlatformEnabled(settings, hostname) !== change.enabled);
+        .filter((hostname) => !followsItsPlatform(hostname) && isPlatformEnabled(settings, hostname) !== change.enabled);
       if (switched.length === 0) {
         return settings;
       }

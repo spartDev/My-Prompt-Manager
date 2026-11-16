@@ -19,6 +19,38 @@ export const MODIFIER_KEYS: ReadonlySet<string> = new Set([
 /** The two characters that open the Prompt selector when typed in the input field. */
 export const SELECTOR_TRIGGER = '//';
 
+/**
+ * Characters an editor puts in its markup that the user neither typed nor sees, such as the
+ * zero-width space Lexical keeps beside the caret: not text of the field for the `//`. Not the
+ * zero-width joiner and non-joiner (U+200C, U+200D): the user writes those (Persian and Indic
+ * scripts, emoji), so two slashes they separate are not a `//`.
+ */
+const INVISIBLE = /[\u200B\u2060\uFEFF]/g;
+
+const visible = (text: string): string => text.replace(INVISIBLE, '');
+
+/**
+ * Zero-width characters, the joiners included, in an element of the field hidden from assistive
+ * technology: the marks a Platform's own menu leaves there, not the user's text. M365 Copilot's
+ * slash menu ends the paragraph with `<span aria-hidden="true">` holding U+200B U+200C while it is
+ * open. A joiner the user writes sits in the editor's ordinary text: an editable hidden span that
+ * holds only joiners between two slashes is taken for such marks, as one holding U+200B is.
+ */
+const HIDDEN_MARKS = /[\u200B-\u200D\u2060\uFEFF]/g;
+
+/**
+ * Whether `node` is, or is inside, an element hidden from assistive technology, below `root`: what
+ * is around the root itself is not looked at
+ */
+const isHidden = (node: Node, root: Node): boolean => {
+  for (let current: Node | null = node; current && current !== root; current = current.parentNode) {
+    if (current.nodeType === Node.ELEMENT_NODE && (current as Element).getAttribute('aria-hidden') === 'true') {
+      return true;
+    }
+  }
+  return false;
+};
+
 const BLOCK_TAGS = new Set([
   'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'DD', 'DIV', 'DL', 'DT', 'FIGCAPTION', 'FIGURE', 'FOOTER',
   'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'OL', 'P', 'PRE', 'SECTION',
@@ -43,6 +75,9 @@ const nextContent = (node: Node): Node | null => {
 /**
  * The text under `root`, one line per block. A <br> breaks the line, except the one an editor
  * leaves at the end of a block to keep it open (an empty paragraph is `<p><br></p>`).
+ * The zero-width characters of elements hidden from assistive technology (HIDDEN_MARKS) are left
+ * out: a Platform's menu leaves them, wherever its editor then moves them (M365 Copilot puts its
+ * slash menu's span after an inserted Prompt, read live on 2026-11-16), and they are not the user's.
  */
 export function plainTextOf(root: Node): string {
   const lines: string[] = [''];
@@ -59,7 +94,8 @@ export function plainTextOf(root: Node): string {
   const walk = (node: Node): void => {
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
-        const text = child.nodeValue ?? '';
+        const raw = child.nodeValue ?? '';
+        const text = isHidden(child, root) ? raw.replace(HIDDEN_MARKS, '') : raw;
         // Indentation of the markup between two blocks is not text of the field
         const betweenBlocks = text.trim() === '' && (isBlock(child.previousSibling) || isBlock(child.nextSibling));
         if (text !== '' && !betweenBlocks) {
@@ -99,8 +135,9 @@ export function readInputText(field: HTMLElement): string {
 }
 
 /**
- * The plain text between the start of the field and the caret, or null when there is no caret in
- * the field (nothing is focused there, or text is selected).
+ * The plain text between the start of the field and the caret, as the `//` is read: without the
+ * zero-width marks of elements hidden from assistive technology (HIDDEN_MARKS). Null when there is
+ * no caret in the field (nothing is focused there, or text is selected).
  */
 export function textBeforeCaret(field: HTMLElement): string | null {
   if (isTextControl(field)) {
@@ -146,32 +183,187 @@ export function textAround(field: HTMLElement, range: Range): { before: string; 
  * start of the field, or right after a space or a line break. The `//` of `https://` opens nothing.
  */
 export function endsWithSelectorTrigger(before: string): boolean {
-  if (!before.endsWith(SELECTOR_TRIGGER)) {
+  const seen = visible(before);
+  if (!seen.endsWith(SELECTOR_TRIGGER)) {
     return false;
   }
-  const preceding = before.charAt(before.length - SELECTOR_TRIGGER.length - 1);
+  const preceding = seen.charAt(seen.length - SELECTOR_TRIGGER.length - 1);
   return preceding === '' || /\s/.test(preceding);
+}
+
+/**
+ * True when the selection holds text only: no element without text (an image, an icon drawn by
+ * the page, a chip the user cannot edit that holds only a zero-width space) that deleting it
+ * would take with the slashes. An editor's own span around a zero-width space holds text. The
+ * page's elements are judged, not a copy of the selection: a copy holds an empty piece of the
+ * element the selection starts at the end of (bold text before the slashes).
+ */
+function holdsOnlyText(selection: Selection, field: HTMLElement): boolean {
+  if (selection.rangeCount === 0) {
+    return false;
+  }
+  const range = selection.getRangeAt(0);
+  const root = range.commonAncestorContainer;
+  const scope = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : root.parentElement;
+  return Array.from(scope?.querySelectorAll('*') ?? []).every((element) => {
+    // A chip the user cannot edit holds no text when all it holds is invisible. A text node of
+    // Lexical holds text even when empty, as one the slash menu of M365 Copilot leaves
+    if (element.getAttribute('data-lexical-text') === 'true' && !element.closest('[contenteditable="false"]')) {
+      return true;
+    }
+    // read as the // is: hidden, its joiners are marks too
+    const raw = element.textContent ?? '';
+    const chipText = isHidden(element, field) ? raw.replace(HIDDEN_MARKS, '') : visible(raw);
+    const text = element.closest('[contenteditable="false"]') ? chipText : raw;
+    return text !== '' || !range.intersectsNode(element);
+  });
+}
+
+/**
+ * Reads whether the `//` before the caret of a contenteditable field is gone, the rest kept: the
+ * field as it must be afterwards is its text now without the two characters. An editor whose own
+ * handler puts the // back, or changes the rest of the draft, did not take the removal. Two things
+ * the removal itself changes are not differences: the browser turns a space left at the end of a
+ * line into a non-breaking one, and the one line break before a // that ended the field becomes the
+ * break that keeps the last line open, which is not read as a line. Neither is a character the user
+ * does not see, which an editor may add or drop as it pleases.
+ *
+ * @param before - The text before the caret, read now, ending with the //
+ */
+function removalCheck(field: HTMLElement, before: string): () => RemovalByEditor {
+  const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
+  const original = visible(plainTextOf(field));
+  const typed = visible(before);
+  const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
+  // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
+  const endedField = original.length === typed.length;
+  return () => {
+    const now = spaces(visible(plainTextOf(field)));
+    if (now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1))) {
+      return 'removed';
+    }
+    return now === spaces(original) ? 'unchanged' : 'changed';
+  };
+}
+
+/**
+ * What the editor did with the two Backspaces deleteTypedTriggerByEditor sent: took the // out and
+ * kept the rest, left the field as it was, or changed it some other way (one slash gone, more than
+ * the //), which nothing else may then touch.
+ */
+export type RemovalByEditor = 'removed' | 'unchanged' | 'changed';
+
+/**
+ * Asks the editor of a contenteditable field to delete the `//` before the caret itself, as two
+ * presses of Backspace do: one beforeinput event of `deleteContentBackward` per slash. An editor
+ * that writes its own DOM (Lexical) handles such an event and cancels it, and it may put back what
+ * the browser's editing command deletes behind its back, as Microsoft 365 Copilot's does while its
+ * slash menu is open (read live on 2026-11-16).
+ *
+ * The events go to the field, where such an editor listens: the browser sends them at the caret,
+ * from where they reach it, but the editor may have drawn the caret's node anew after the first.
+ * Only Lexical, which marks the element it edits with data-lexical-editor, is asked: other editors
+ * do not take such an event, or take it their own way. Lexical commits its update in a microtask,
+ * which this waits for.
+ *
+ * Resolves to null when this is not for the editor to do, and removeTypedTrigger removes the //
+ * instead: the field is a text control or not a Lexical editor, the caret is not right after the
+ * two slashes in one text node, or the editor left the first event alone and the field as it was. Otherwise resolves, once
+ * the editor has drawn its change, to what it did with the field (RemovalByEditor): an editor that
+ * left the event alone but changed the field took it its own way, and nothing else may touch it.
+ */
+export async function deleteTypedTriggerByEditor(field: HTMLElement): Promise<RemovalByEditor | null> {
+  if (isTextControl(field)) {
+    return null;
+  }
+  const before = textBeforeCaret(field);
+  const selection = field.ownerDocument.getSelection();
+  const node = selection?.focusNode;
+  const offset = selection?.focusOffset ?? 0;
+  if (before === null || node?.nodeType !== Node.TEXT_NODE
+    || (node.nodeValue ?? '').slice(offset - SELECTOR_TRIGGER.length, offset) !== SELECTOR_TRIGGER) {
+    return null;
+  }
+  const editor = node.parentElement?.closest('[data-lexical-editor="true"]');
+  if (!editor || !(field.contains(editor) || editor.contains(field))) {
+    return null;
+  }
+  const removed = removalCheck(field, before);
+  const backspace = (): boolean => {
+    const event = new InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true });
+    field.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  // An editor that took the first slash, cancelling the event or changing the field as it heard
+  // it, is sent the second
+  const cancelled = backspace();
+  const took = cancelled || removed() !== 'unchanged';
+  if (took) {
+    backspace();
+  }
+  // Lexical draws its change once its update is committed, in a microtask queued by the events
+  await Promise.resolve();
+  let removal = removed();
+  if (cancelled && removal === 'unchanged') {
+    // An editor that draws in the next frame, or a later task: the editing command would delete
+    // two more characters from a draft that has dropped the // already
+    await nextFrame();
+    removal = removed();
+  }
+  // An editor that left the event alone and the field as it was: the // is not its to remove
+  return !took && removal === 'unchanged' ? null : removal;
+}
+
+/** How long nextFrame waits, at most, for a frame that does not come (a page in the background). */
+const FRAME_WAIT_MS = 100;
+
+/** Resolves after the next frame, then a task: when an editor that draws late has drawn. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    const settle = (): void => {
+      window.clearTimeout(timer);
+      window.setTimeout(resolve, 0);
+    };
+    const timer = window.setTimeout(settle, FRAME_WAIT_MS);
+    window.requestAnimationFrame(settle);
+  });
 }
 
 /**
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
- * A Lexical editor (Perplexity, Microsoft 365 Copilot) is asked to delete them itself, with the
- * `beforeinput` event Backspace sends (`deleteThroughLexical`). Elsewhere, or when it leaves the
- * event alone, the editing command deletes them; when that command is missing or refused, or the
- * `//` is the whole text of an inline element, the two characters are taken out of their text
- * node. Resolves to whether they are gone: the selector does not open over a `//` it could not
- * remove. The editor may still have to tidy up after it: `editorSettled` says when it is done.
+ * The editor of a contenteditable is asked first to delete them itself (deleteTypedTriggerByEditor):
+ * Lexical (Perplexity, Microsoft 365 Copilot) puts back a // deleted behind its back. An editor that
+ * does not take that, or takes it and leaves the field as it was, gets the editing command. When
+ * that command is missing or refused, or the `//` is the whole text of an inline element, the two
+ * characters are taken out of their text node (only a // with no character the user does not see
+ * between or after its slashes: otherwise the selector stays closed and the field as it was). The
+ * marks a Platform's menu leaves after the slashes in hidden elements (HIDDEN_MARKS) go with them
+ * only by the editing command. Resolves to whether they are gone: the selector does not open over
+ * a `//` it could not remove. The editor may still have to tidy up after it: `editorSettled` says
+ * when it is done.
  */
 export async function removeTypedTrigger(field: HTMLElement): Promise<boolean> {
+  const byEditor = await deleteTypedTriggerByEditor(field);
+  if (byEditor !== null && byEditor !== 'unchanged') {
+    return byEditor === 'removed';
+  }
+  return removeByCommand(field);
+}
+
+/** removeTypedTrigger without asking the editor: the editing command, or the text node. */
+function removeByCommand(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
-  if (before === null || !before.endsWith(SELECTOR_TRIGGER)) {
+  if (before === null || !visible(before).endsWith(SELECTOR_TRIGGER)) {
     return false;
   }
   const document = field.ownerDocument;
   const canExec = typeof document.execCommand === 'function';
 
   if (isTextControl(field)) {
+    if (!before.endsWith(SELECTOR_TRIGGER)) {
+      return false;
+    }
     const caret = field.selectionStart ?? 0;
     const start = caret - SELECTOR_TRIGGER.length;
     const original = field.value;
@@ -192,27 +384,7 @@ export async function removeTypedTrigger(field: HTMLElement): Promise<boolean> {
   if (!selection) {
     return false;
   }
-  // The field as it must be afterwards: the same text, without the two characters. An editor
-  // whose own handler puts the // back, or changes the rest of the draft, did not take the removal.
-  // Two things the removal itself changes are not differences: the browser turns a space left
-  // at the end of a line into a non-breaking one, and the one line break before a // that ended
-  // the field becomes the break that keeps the last line open, which is not read as a line
-  const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
-  const original = plainTextOf(field);
-  const expected = spaces(original.slice(0, before.length - SELECTOR_TRIGGER.length) + original.slice(before.length));
-  // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
-  const endedField = original.length === before.length;
-  const removed = (): boolean => {
-    const now = spaces(plainTextOf(field));
-    return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
-  };
-
-  const lexical = await deleteThroughLexical(field, selection);
-  if (lexical === 'cancelled' || (lexical === 'left alone' && spaces(plainTextOf(field)) !== spaces(original))) {
-    // The editor took the event (cancelled it, or changed the field): what it did is the outcome,
-    // and the // is not removed a second time
-    return removed();
-  }
+  const removed = removalCheck(field, before);
 
   // A // that is the whole text of an inline element (Lexical's <span data-lexical-text>, in a
   // field that held nothing before it) is not removed by the editing command: the browser removes
@@ -224,11 +396,27 @@ export async function removeTypedTrigger(field: HTMLElement): Promise<boolean> {
     && focus.parentNode !== field && !isBlock(focus.parentNode);
 
   if (canExec && typeof selection.modify === 'function' && !fillsInline) {
-    for (let i = 0; i < SELECTOR_TRIGGER.length; i++) {
+    // Back over the two slashes, and over a character the user does not see between them or
+    // after them (Lexical's zero-width space)
+    // The selection is read as the // is: the marks of a hidden element are not text
+    // A selection wholly inside a hidden element is cloned without it: its marks are judged on the page
+    const selected = (): string => {
+      if (selection.rangeCount === 0) {
+        return '';
+      }
+      const range = selection.getRangeAt(0);
+      const text = plainTextOf(range.cloneContents());
+      return visible(isHidden(range.commonAncestorContainer, field) ? text.replace(HIDDEN_MARKS, '') : text);
+    };
+    for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
-    if (selection.toString() === SELECTOR_TRIGGER && document.execCommand('delete')) {
-      return removed();
+    // A selection that took in an element without text (an image) is not deleted
+    if (selected() === SELECTOR_TRIGGER && holdsOnlyText(selection, field) && document.execCommand('delete')) {
+      // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
+      // the editor hears only input. An editor that puts its own DOM back later (from a mutation
+      // observer, after this read) is not seen here: the live check covers Copilot
+      return removed() === 'removed';
     }
     if (!selection.isCollapsed) {
       selection.collapseToEnd();
@@ -249,47 +437,7 @@ export async function removeTypedTrigger(field: HTMLElement): Promise<boolean> {
   range.deleteContents();
   selection.collapse(node, start);
   field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
-  return removed();
-}
-
-/**
- * Asks the Lexical editor the caret is in to delete the `//` before the caret itself, as Backspace
- * does: the two characters selected, a cancelable `beforeinput` of type `deleteContentBackward`.
- * Lexical takes them out of its state at once, cancels the event, and draws the field again in a
- * microtask, which this waits for. Deleted another way, the `//` stays in Lexical's state a moment
- * (Lexical 0.38 to 0.45 keeps it 20 ms, perplexity.ai runs 0.41): a key typed meanwhile goes in the
- * text Lexical then takes out, and is lost. Lexical marks the element it edits with
- * data-lexical-editor. Only Lexical is asked: other editors do not take such an event, or take
- * their own selection, which may not have caught up with the one made here.
- * Resolves to 'cancelled' when the editor took the event, 'left alone' when it did not, with the
- * caret back where it was, or 'not asked' when the field is not a Lexical editor or the `//` is
- * not in one text node.
- */
-async function deleteThroughLexical(field: HTMLElement, selection: Selection): Promise<'cancelled' | 'left alone' | 'not asked'> {
-  const node = selection.focusNode;
-  const offset = selection.focusOffset;
-  const start = offset - SELECTOR_TRIGGER.length;
-  const editor = node?.parentElement?.closest<HTMLElement>('[data-lexical-editor="true"]') ?? null;
-  if (!editor || !(field.contains(editor) || editor.contains(field)) || node?.nodeType !== Node.TEXT_NODE
-    || start < 0 || (node.nodeValue ?? '').slice(start, offset) !== SELECTOR_TRIGGER) {
-    return 'not asked';
-  }
-  // Selected from the caret back, as two presses of Shift+Left would
-  selection.setBaseAndExtent(node, offset, node, start);
-  const taken = !editor.dispatchEvent(new InputEvent('beforeinput', {
-    bubbles: true,
-    cancelable: true,
-    composed: true,
-    inputType: 'deleteContentBackward'
-  }));
-  await Promise.resolve();
-  if (taken) {
-    return 'cancelled';
-  }
-  if (node.isConnected && (node.nodeValue ?? '').slice(start, offset) === SELECTOR_TRIGGER) {
-    selection.collapse(node, offset);
-  }
-  return 'left alone';
+  return removed() === 'removed';
 }
 
 /** How long `editorSettled` waits, at most, for the Platform's editor to take an emptied text out. */

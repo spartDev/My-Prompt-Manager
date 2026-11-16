@@ -45,6 +45,39 @@ describe('EventManager', () => {
       expect(addEventListenerSpy).toHaveBeenCalledWith('click', mockHandler);
     });
 
+    it('listens in the capture phase when asked, and removes that listener on cleanup', () => {
+      const element = document.createElement('div');
+      const child = document.createElement('span');
+      element.appendChild(child);
+      // The page stops the event where it starts: only a listener in the capture phase hears it
+      child.addEventListener('keydown', (event) => { event.stopPropagation(); });
+      const heard = vi.fn();
+      eventManager.addTrackedEventListener(element, 'keydown', heard, true);
+
+      child.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+      expect(heard).toHaveBeenCalledTimes(1);
+
+      eventManager.cleanup();
+      child.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+      expect(heard).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['on cleanup', (manager: EventManager) => { manager.cleanup(); }],
+      ['when the element is thrown away', (manager: EventManager, target: EventTarget) => { manager.removeTrackedListeners(target); }],
+    ])('removes a capture-phase listener as a capture one %s: a browser keeps it otherwise', (_when, remove) => {
+      const element = document.createElement('div');
+      const handler = vi.fn();
+      eventManager.addTrackedEventListener(element, 'keydown', handler, true);
+      eventManager.addTrackedEventListener(element, 'click', handler);
+      const removeSpy = vi.spyOn(element, 'removeEventListener');
+
+      remove(eventManager, element);
+
+      expect(removeSpy).toHaveBeenCalledWith('keydown', handler, true);
+      expect(removeSpy).toHaveBeenCalledWith('click', handler);
+    });
+
     it('should track multiple event listeners on same element', () => {
       const handler1 = vi.fn();
       const handler2 = vi.fn();

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { getPlatformByHostname } from '../config/platforms';
 import type { CustomSite, ElementFingerprint } from '../types';
 import { Logger, toError } from '../utils';
 
@@ -134,7 +135,7 @@ export function usePickerWindow({
               setCurrentTabUrl(tabUrl);
               setCurrentTabTitle(tabTitle || null);
 
-              const isBuiltIn = Object.keys(siteConfigs).includes(hostname);
+              const isBuiltIn = getPlatformByHostname(hostname) !== undefined || Object.keys(siteConfigs).includes(hostname);
               const isCustom = customSites.some((site) => site.hostname === hostname);
               setIsCurrentSiteIntegrated(isBuiltIn || isCustom);
             }

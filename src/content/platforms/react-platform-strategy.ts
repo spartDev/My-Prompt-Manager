@@ -24,7 +24,7 @@ type ValidationResult = { valid: true } | { valid: false; error: string };
 
 /**
  * Abstract base strategy for React-based platforms
- * Provides shared functionality for platforms like Copilot and M365 Copilot
+ * Provides shared functionality for platforms whose input field is a React-controlled textarea, like Copilot
  */
 export abstract class ReactPlatformStrategy extends PlatformStrategy {
   /**
@@ -57,7 +57,7 @@ export abstract class ReactPlatformStrategy extends PlatformStrategy {
    *
    * @param element - Textarea element to insert content into
    * @param content - Content to insert (inserted exactly as given)
-   * @param platformName - Platform name for logging (e.g., 'Copilot React', 'M365 Copilot')
+   * @param platformName - Platform name for logging (e.g., 'Copilot React')
    * @param methodName - Optional custom method name for result (defaults to auto-generated from platformName)
    * @returns Promise resolving to insertion result
    * @protected

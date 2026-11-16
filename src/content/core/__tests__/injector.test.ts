@@ -372,6 +372,11 @@ describe('PromptLibraryInjector', () => {
         const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
         const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
         expect(keydown).toBeDefined();
+        // In the capture phase, each of the slash's events: a Platform's slash menu may stop them at its editor
+        for (const type of ['keydown', 'beforeinput', 'input']) {
+          const call = eventManagerInstance.addTrackedEventListener.mock.calls.find((listened: any[]) => listened[0] === document && listened[1] === type && listened[2] === keydown[2]);
+          expect(call?.[3], type).toBe(true);
+        }
 
         const typeSlashes = (field: HTMLTextAreaElement): void => {
           field.value = 'Draft //';
@@ -396,6 +401,271 @@ describe('PromptLibraryInjector', () => {
         await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
         expect(open.mock.calls[0][0]).toBe(mockTextarea);
         expect(mockTextarea.value).toBe('Draft ');
+      });
+
+      it('opens when the key of the second slash is heard before its character is written, in an editor that cancels beforeinput', async () => {
+        const { open } = await listen();
+        const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+        const listener = (type: string) => eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+        const hear = (type: string, event: Event) => {
+          const heard = (received: Event) => { listener(type)?.(received); };
+          document.addEventListener(type, heard);
+          mockTextarea.dispatchEvent(event);
+          document.removeEventListener(type, heard);
+        };
+
+        // The first slash is written; the key of the second is heard, and the read it set runs
+        // before the editor writes the second slash
+        mockTextarea.value = 'Draft /';
+        mockTextarea.setSelectionRange(7, 7);
+        hear('keydown', new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+        await handled();
+        expect(open).not.toHaveBeenCalled();
+        // Lexical cancels the beforeinput and writes the slash itself: no input event follows
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+        hear('beforeinput', new InputEvent('beforeinput', { data: '/', inputType: 'insertText', bubbles: true, composed: true }));
+
+        await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+        expect(mockTextarea.value).toBe('Draft ');
+      });
+
+      describe('in an editor that writes its own DOM and puts back what is deleted behind its back', () => {
+        /**
+         * The detected field is such an editor, holding "Draft //", the caret after the //: it
+         * cancels each deleteContentBackward and deletes the character before the caret itself,
+         * drawing its text a task later. Gives what it was sent and a way to hear a typed slash.
+         */
+        const ownEditor = async ({ deletes = true, restores = false, deletesOnce = false, elsewhere = false } = {}) => {
+          const { open } = await listen();
+          const editor = document.createElement('div');
+          editor.contentEditable = 'true';
+          editor.setAttribute('data-lexical-editor', 'true');
+          editor.innerHTML = '<p><span data-lexical-text="true">Draft //</span></p>';
+          document.body.appendChild(editor);
+          (injector as any).state.currentTextarea = editor;
+          const text = editor.querySelector('span')?.firstChild as Text;
+          document.getSelection()?.collapse(text, 8);
+          const sent: string[] = [];
+          let caret = 8;
+          editor.addEventListener('beforeinput', (event) => {
+            if (event.inputType !== 'deleteContentBackward') {
+              return;
+            }
+            event.preventDefault();
+            sent.push(event.inputType);
+            if (!deletes || (deletesOnce && sent.length > 1)) {
+              return;
+            }
+            if (elsewhere) {
+              // Another part of the draft, the // left where it is
+              queueMicrotask(() => {
+                text.data = text.data.slice(1);
+                document.getSelection()?.collapse(text, text.data.length);
+              });
+              return;
+            }
+            caret -= 1;
+            const at = caret;
+            // Drawn once its update is committed, in a microtask, as Lexical does
+            queueMicrotask(() => {
+              text.data = text.data.slice(0, at) + text.data.slice(at + 1);
+              document.getSelection()?.collapse(text, at);
+            });
+          });
+          // As M365 Copilot's while its slash menu is open: what the browser deletes, it draws again
+          editor.addEventListener('input', () => {
+            if (restores) {
+              text.data = 'Draft //';
+              document.getSelection()?.collapse(text, 8);
+            }
+          });
+          const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+          const typeSlash = (): void => {
+            // Each event of the second slash, heard as the browser sends it, the // already written
+            for (const [type, event] of [
+              ['keydown', new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true })],
+              ['beforeinput', new InputEvent('beforeinput', { data: '/', inputType: 'insertText', bubbles: true, composed: true })],
+              ['input', new InputEvent('input', { data: '/', inputType: 'insertText', bubbles: true, composed: true })],
+            ] as const) {
+              const listener = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+              const heard = (received: Event) => { listener?.(received); };
+              document.addEventListener(type, heard);
+              editor.dispatchEvent(event);
+              document.removeEventListener(type, heard);
+            }
+          };
+          // The user types the // again: the field and the caret as after the first time
+          const again = (): void => {
+            text.data = 'Draft //';
+            caret = 8;
+            document.getSelection()?.collapse(text, 8);
+            sent.length = 0;
+          };
+          return { open, editor, sent, typeSlash, again };
+        };
+        afterEach(() => {
+          (injector as any).state.currentTextarea = mockTextarea;
+        });
+
+        it('has the editor delete the //, once for all the slash\'s events, then opens the selector', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor();
+
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(open.mock.calls[0][0]).toBe(editor);
+          expect(sent).toEqual(['deleteContentBackward', 'deleteContentBackward']);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it('removes the // the older way when the editor cancels the events but leaves it, then opens', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor({ deletes: false });
+
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(sent).toHaveLength(2);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it('opens again on the next // when removing the first threw', async () => {
+          const { open, editor, typeSlash, again } = await ownEditor({ deletes: false });
+          const commandable = Selection.prototype as unknown as { modify?: unknown };
+          const hadModify = 'modify' in commandable;
+          if (!hadModify) {
+            Object.defineProperty(Selection.prototype, 'modify', {
+              configurable: true,
+              value(this: Selection) {
+                if (this.focusNode) {
+                  this.extend(this.focusNode, this.focusOffset - 1);
+                }
+              }
+            });
+          }
+          const execCommand = vi.spyOn(document, 'execCommand').mockImplementationOnce(() => {
+            throw new Error('The editing command failed');
+          });
+          try {
+            typeSlash();
+            await vi.waitFor(() => { expect(execCommand).toHaveBeenCalled(); });
+            await handled();
+            expect(open).not.toHaveBeenCalled();
+
+            again();
+            typeSlash();
+
+            await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); }, { timeout: 5000 });
+          } finally {
+            execCommand.mockRestore();
+            if (!hadModify) {
+              delete commandable.modify;
+            }
+            editor.remove();
+          }
+        });
+
+        it('opens again on the next // while the first opening has not settled (a Library slow to read)', async () => {
+          const { open, editor, typeSlash, again } = await ownEditor();
+          open.mockReturnValue(new Promise(() => { /* never settles */ }));
+          typeSlash();
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+
+          again();
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); }, { timeout: 5000 });
+          editor.remove();
+        });
+
+        it('opens again on the next //, once the editor removed the first', async () => {
+          const { open, editor, sent, typeSlash, again } = await ownEditor();
+          typeSlash();
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+
+          again();
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); }, { timeout: 5000 });
+          expect(sent).toHaveLength(2);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it.each([
+          ['one slash deleted', { deletesOnce: true }, 'Draft /'],
+          ['other characters deleted, the // left', { elsewhere: true }, 'aft //'],
+        ])('leaves alone a field the editor changed otherwise, %s, and keeps the selector closed', async (_case, editorDoes, left) => {
+          const { open, editor, sent, typeSlash } = await ownEditor(editorDoes);
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          expect(editor.textContent).toBe(left);
+          editor.remove();
+        });
+
+        it('keeps the selector closed when neither the editor nor the older way can remove the //', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor({ deletes: false, restores: true });
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          expect(editor.textContent).toBe('Draft //');
+          editor.remove();
+        });
+
+        it.each([
+          ['the Platform replaced the field', (editor: HTMLElement) => { editor.remove(); }],
+          ['the selector opened from the Prompts button', () => { selector().isOpen = true; }],
+        ])('opens nothing once the editor removed the // when %s meanwhile', async (_case, meanwhile) => {
+          const { open, editor, sent, typeSlash } = await ownEditor();
+          // Right after the second event, before the editor has drawn
+          editor.addEventListener('beforeinput', () => {
+            if (sent.length === 2) {
+              queueMicrotask(() => { meanwhile(editor); });
+            }
+          });
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          selector().isOpen = false;
+          editor.remove();
+        });
+      });
+
+      it.each([
+        ['keydown', () => new KeyboardEvent('keydown', { key: '/', isComposing: true, bubbles: true, composed: true })],
+        ['beforeinput', () => new InputEvent('beforeinput', { data: '/', inputType: 'insertCompositionText', isComposing: true, bubbles: true, composed: true })]
+      ])('does not open on a slash an input method is still composing, heard by its %s', async (type, event) => {
+        const { open } = await listen();
+        const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+        const listener = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+        expect(listener).toBeDefined();
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+
+        const heard = (received: Event) => { listener?.(received); };
+        document.addEventListener(type, heard);
+        mockTextarea.dispatchEvent(event());
+        document.removeEventListener(type, heard);
+        await handled();
+        await handled();
+
+        expect(open).not.toHaveBeenCalled();
+        expect(mockTextarea.value).toBe('Draft //');
       });
 
       it('drops the opening when the user goes on typing in the field while the selector loads', async () => {

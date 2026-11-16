@@ -139,4 +139,357 @@ describe('IconPlacementController', () => {
     expect(onLost).toHaveBeenCalledWith(editor);
     expect(editor.isConnected).toBe(false);
   });
+
+  describe('while the icon waits for its toolbar', () => {
+    const GRACE = IconPlacementController.TOOLBAR_GRACE_MS;
+    const DELAY = IconPlacementController.REPLACE_DELAY_MS;
+    let found: boolean;
+    let onKept: ReturnType<typeof vi.fn<() => void>>;
+
+    /** Lets the MutationObserver deliver a change made just before (a microtask), then time pass */
+    const elapse = async (ms: number) => {
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(ms);
+    };
+    const change = () => document.body.appendChild(document.createElement('div'));
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      found = false;
+      onKept = vi.fn();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('places the icon again once a change of the page brings the toolbar, and reports nothing', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      found = true;
+      change();
+      await elapse(DELAY);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
+      expect(controller.current).toBeNull();
+      await elapse(GRACE);
+      expect(onKept).not.toHaveBeenCalled();
+    });
+
+    it('looks for the toolbar once when it starts waiting: the toolbar may have rendered while the icon was placed', async () => {
+      found = true;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      await elapse(DELAY);
+
+      expect(onLost).toHaveBeenCalledTimes(1);
+    });
+
+    it('says the toolbar is missing once the grace period is over, then stops looking for it', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => { checks++; return found; }, onKept);
+      await elapse(GRACE);
+      expect(onKept).toHaveBeenCalledTimes(1);
+
+      // A busy page: a later anchor that shows (a send button) moves nothing
+      checks = 0;
+      found = true;
+      for (let index = 0; index < 10; index++) {
+        change();
+        await elapse(DELAY);
+      }
+      expect(checks).toBe(0);
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('with keepWatching, still places the icon again when the toolbar shows long after the grace period', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => found });
+      await elapse(GRACE);
+      expect(onKept).toHaveBeenCalledTimes(1);
+
+      // A composer without the toolbar, then the one with it 40 s later
+      await elapse(40_000);
+      found = true;
+      change();
+      await elapse(DELAY);
+      expect(onLost).not.toHaveBeenCalled();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
+      expect(controller.current).toBeNull();
+    });
+
+    it('with keepWatching, looks at most once a second after the grace period on a page that keeps changing', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => { checks++; return found; } });
+      await elapse(GRACE);
+      checks = 0;
+
+      for (let index = 0; index < 30; index++) {
+        change();
+        await elapse(DELAY);
+      }
+
+      expect(checks).toBeLessThanOrEqual(3);
+      expect(checks).toBeGreaterThan(0);
+    });
+
+    it('with keepWatching, does not watch for an icon placed anew when the grace period ended', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, () => { controller.track(icon, editor, 'toolbar', 0); }, { keepWatching: () => { checks++; return found; } });
+      await elapse(GRACE);
+      checks = 0;
+
+      found = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS * 2);
+
+      expect(checks).toBe(0);
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('with keepWatching, looks after the grace period for what keepWatching says, not for what the grace period looked for', async () => {
+      let late = false;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => late });
+      await elapse(GRACE);
+
+      found = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+      expect(onLost).not.toHaveBeenCalled();
+
+      late = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
+    it('with keepWatching, looks again for an editor out of the page for a moment once it is back', async () => {
+      const parent = editor.parentElement as HTMLElement;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => found });
+      await elapse(GRACE);
+      editor.remove();
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+
+      parent.appendChild(editor);
+      found = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
+    it('with keepWatching, stops looking once the icon is placed anew', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => { checks++; return found; } });
+      await elapse(GRACE);
+      controller.track(icon, editor, 'toolbar', 0);
+      checks = 0;
+
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS * 2);
+
+      expect(checks).toBe(0);
+
+      // Its next wait looks at the pace of the grace period again
+      controller.awaitToolbar(() => found, onKept);
+      found = true;
+      change();
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
+    it('stops looking at the end of the grace period for an icon at a pick, which a later anchor no longer moves', async () => {
+      controller.track(icon, editor, 'override');
+      controller.awaitToolbar(() => found);
+      await elapse(GRACE);
+
+      found = true;
+      change();
+      await elapse(DELAY * 3);
+
+      expect(onLost).not.toHaveBeenCalled();
+      expect(controller.current?.kind).toBe('override');
+    });
+
+    it('moves the icon instead of reporting when the toolbar is there at the end of the grace period, with no change seen', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+      await elapse(DELAY);
+
+      found = true;
+      await elapse(GRACE);
+
+      expect(onKept).not.toHaveBeenCalled();
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
+    it('reports nothing for an editor that left the page during the grace period', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      editor.remove();
+      await elapse(GRACE);
+
+      expect(onKept).not.toHaveBeenCalled();
+    });
+
+    it('goes on waiting when the icon is out of the page for a moment and back', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      icon.remove();
+      await elapse(0);
+      toolbar.appendChild(icon);
+      await elapse(DELAY * 2);
+      expect(onLost).not.toHaveBeenCalled();
+
+      found = true;
+      change();
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledWith(editor);
+      expect(onKept).not.toHaveBeenCalled();
+    });
+
+    it('looks for the toolbar when the icon is back in the page, without a later change', async () => {
+      controller.track(icon, editor, 'override');
+      controller.awaitToolbar(() => found);
+      // The look it starts with is over
+      await elapse(DELAY * 2);
+
+      // The Platform takes the icon's node out, renders its toolbar, and puts the node back
+      icon.remove();
+      await elapse(0);
+      found = true;
+      toolbar.appendChild(icon);
+      await elapse(DELAY * 3);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
+    it('stops waiting when another icon is tracked: the toolbar found later does not move it', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+      const placed = document.createElement('button');
+      toolbar.appendChild(placed);
+      controller.track(placed, editor, 'toolbar', 0);
+
+      found = true;
+      change();
+      await elapse(GRACE);
+
+      expect(onLost).not.toHaveBeenCalled();
+      expect(onKept).not.toHaveBeenCalled();
+    });
+
+    it('ends the wait just after the grace period when the icon was out of the page at its end and is back', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      await elapse(GRACE - DELAY / 2);
+      icon.remove();
+      await elapse(0);
+      await elapse(DELAY / 2 + 10);
+      toolbar.appendChild(icon);
+      await elapse(DELAY * 2);
+      expect(onKept).toHaveBeenCalledTimes(1);
+
+      // Ended: a later anchor that shows moves nothing
+      found = true;
+      change();
+      await elapse(DELAY * 2);
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('does not move an icon the Platform took out while the toolbar was looked for: it is placed again as a lost one', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+      await elapse(DELAY * 2);
+
+      found = true;
+      change();
+      await elapse(DELAY / 2);
+      icon.remove();
+      // The look for the toolbar is over, the loss is not yet
+      await elapse(DELAY / 2 + 10);
+      expect(onLost).not.toHaveBeenCalled();
+
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not move the icon of an editor that left the page while the toolbar was looked for', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+      await elapse(DELAY * 2);
+
+      found = true;
+      change();
+      await elapse(0);
+      editor.remove();
+      await elapse(DELAY * 2);
+
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('reports nothing when the grace period ends while the icon is out of the page', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      await elapse(GRACE - DELAY / 2);
+      toolbar.remove();
+      await elapse(DELAY * 3);
+
+      expect(onKept).not.toHaveBeenCalled();
+      expect(onLost).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops waiting on reset: no report, no re-placement once the site is turned off', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      controller.reset();
+      found = true;
+      change();
+      await elapse(GRACE);
+
+      expect(onKept).not.toHaveBeenCalled();
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('drops the report when the icon is lost while it waits: the icon is placed again as a lost one', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      toolbar.remove();
+      await elapse(GRACE);
+
+      expect(onKept).not.toHaveBeenCalled();
+      expect(onLost).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends the wait when the icon is lost, even when nothing is placed again (the site turned off)', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      // onLost places nothing: no new record, no new wait
+      toolbar.remove();
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledTimes(1);
+      await elapse(GRACE * 2);
+
+      expect(vi.getTimerCount()).toBe(0);
+      expect(onKept).not.toHaveBeenCalled();
+    });
+  });
 });

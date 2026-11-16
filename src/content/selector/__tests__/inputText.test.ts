@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  deleteTypedTriggerByEditor,
   editorSettled,
   endsWithSelectorTrigger,
   focusAtEnd,
@@ -47,7 +48,9 @@ describe('endsWithSelectorTrigger', () => {
     ['Summarize this //', 'after a space'],
     ['First line\n//', 'at the start of a new line'],
     ['Tab\t//', 'after a tab'],
-    ['A //', 'after a non-breaking space']
+    ['A //', 'after a non-breaking space'],
+    ['Hi /\u200B/', 'with a zero-width space an editor keeps between the slashes (Lexical, M365 Copilot)'],
+    ['Hi //\uFEFF', 'with a zero-width character after the slashes']
   ])('opens on %j: %s', (before) => {
     expect(endsWithSelectorTrigger(before)).toBe(true);
   });
@@ -59,13 +62,27 @@ describe('endsWithSelectorTrigger', () => {
     ['/', 'a single slash'],
     ['// ', 'something typed after it'],
     ['', 'an empty field'],
-    ['1//', 'right after a digit']
+    ['1//', 'right after a digit'],
+    ['a\u200B//', 'right after a letter, a zero-width space between'],
+    ['Hi /\u200C/', 'a zero-width non-joiner between the slashes: the user wrote it (Persian, Indic scripts)'],
+    ['Hi /\u200D/', 'a zero-width joiner between the slashes: the user wrote it (emoji, Indic scripts)']
   ])('does not open on %j: %s', (before) => {
     expect(endsWithSelectorTrigger(before)).toBe(false);
   });
 });
 
 describe('plainTextOf', () => {
+  it('keeps the user\'s joiners as the // is read when the field itself sits in a hidden element of the page', () => {
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('aria-hidden', 'true');
+    wrapper.innerHTML = '<div contenteditable="true">Hi /\u200C/</div>';
+    document.body.append(wrapper);
+    const field = wrapper.firstElementChild as HTMLElement;
+
+    expect(plainTextOf(field)).toBe('Hi /\u200C/');
+    wrapper.remove();
+  });
+
   it('reads text that has no markup', () => {
     expect(plainTextOf(editable('Hello  world'))).toBe('Hello  world');
   });
@@ -104,6 +121,22 @@ describe('plainTextOf', () => {
 });
 
 describe('readInputText', () => {
+  it('reads M365 Copilot\'s field after an Insertion as the Prompt, without the marks its menu left at the end', () => {
+    const template = document.createElement('template');
+    template.innerHTML = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-after-insertion.html'), 'utf8');
+    const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+    document.body.append(field);
+
+    expect(readInputText(field)).toBe('Rewrite the paragraph below so it is shorter, then say what you cut and why.\n\nParagraph:\n');
+    field.remove();
+  });
+
+  it('keeps a joiner the user wrote in the editor\'s ordinary text', () => {
+    const field = editable('<p><span data-lexical-text="true">a\u200Cb</span></p>');
+
+    expect(readInputText(field)).toBe('a\u200Cb');
+  });
+
   it('reads the value of a textarea and of an input, exactly', () => {
     expect(readInputText(textarea('  Two lines\n  kept  '))).toBe('  Two lines\n  kept  ');
     const input = document.createElement('input');
@@ -155,6 +188,13 @@ describe('removeTypedTrigger', () => {
     expect(heard).toBe(1);
   });
 
+  it('leaves a textarea whose // has a character the user does not see between its slashes as it was', async () => {
+    const field = textarea('Hi /\u200B/', 6);
+
+    expect(await removeTypedTrigger(field)).toBe(false);
+    expect(field.value).toBe('Hi /\u200B/');
+  });
+
   it('reports a textarea whose own handler puts the // back', async () => {
     const field = textarea('Before //', 9);
     field.addEventListener('input', () => { field.value = 'Before //'; });
@@ -183,6 +223,216 @@ describe('removeTypedTrigger', () => {
     expect(textBeforeCaret(field)).toBe('Before ');
     expect(heard).toBe(1);
     refused.mockRestore();
+  });
+
+  describe('with the editing command of a browser', () => {
+    /**
+     * The browser's commands, which the test DOM lacks: `modify` extends the selection back by one
+     * character of its text node, or to each of `steps` in turn (a step over an element), `delete`
+     * takes the selected contents out.
+     */
+    const browserCommands = (steps: Array<[Node, number]> = []) => {
+      const selection = document.getSelection() as Selection;
+      const commandable = selection as unknown as { modify?: (alter: string, direction: string, granularity: string) => void };
+      const ahead = [...steps];
+      commandable.modify = () => {
+        const [node, offset] = ahead.shift() ?? [selection.focusNode as Node, selection.focusOffset - 1];
+        selection.extend(node, offset);
+      };
+      const execCommand = vi.spyOn(document, 'execCommand').mockImplementation((command: string) => {
+        if (command !== 'delete') {
+          return false;
+        }
+        selection.getRangeAt(0).deleteContents();
+        return true;
+      });
+      return () => {
+        delete commandable.modify;
+        execCommand.mockRestore();
+      };
+    };
+
+    it('removes a // followed by a character the user does not see, and that character with it', async () => {
+      const field = editable('<p>Hi //\uFEFF</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, text.length);
+      const restore = browserCommands();
+
+      expect(await removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi ');
+      restore();
+    });
+
+    it('removes a // with a zero-width space between its slashes', async () => {
+      const field = editable('<p>Hi /\u200B/ there</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, 6);
+      const restore = browserCommands();
+
+      expect(await removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi  there');
+      restore();
+    });
+
+    it.each([
+      ['non-joiner', '\u200C'],
+      ['joiner', '\u200D']
+    ])('leaves alone two slashes with a zero-width %s between them', async (_name, joiner) => {
+      const field = editable(`<p>Hi /${joiner}/</p>`);
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, 6);
+      const restore = browserCommands();
+
+      expect(await removeTypedTrigger(field)).toBe(false);
+
+      expect(field.textContent).toBe(`Hi /${joiner}/`);
+      restore();
+    });
+
+    describe('in M365 Copilot\'s editor while its slash menu is open', () => {
+      /** The editor as read on the live page, the caret put after the spans the menu left */
+      const slashMenuEditor = (held = '\u200B\u200C') => {
+        const markup = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
+        // The fixture parsed as a page would parse it: its editor element is taken, its comment left
+        const template = document.createElement('template');
+        template.innerHTML = markup;
+        const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+        document.body.append(field);
+        const [slashes, , marks] = Array.from(field.querySelectorAll('span[data-lexical-text]'), (span) => span.firstChild as Text | null);
+        (marks as Text).data = held;
+        document.getSelection()?.collapse(marks, (marks as Text).length);
+        return { field, slashes: slashes as Text, marks: marks as Text };
+      };
+      afterEach(() => {
+        document.getElementById('m365-chat-editor-target-element')?.remove();
+      });
+
+      it('reads the // before the caret: the marks of the hidden spans are not text of the field', () => {
+        const { field } = slashMenuEditor();
+
+        expect(textBeforeCaret(field)).toBe('//');
+        expect(endsWithSelectorTrigger(textBeforeCaret(field) ?? '')).toBe(true);
+      });
+
+      it.each([
+        ['the marks read on the live page', '\u200B\u200C'],
+        ['two joiners', '\u200C\u200D']
+      ])('removes the // with the spans the menu left after it, holding %s', async (_case, held) => {
+        const { field, slashes, marks } = slashMenuEditor(held);
+        const restore = browserCommands([[marks, 1], [marks, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(await removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('');
+        restore();
+      });
+
+      it('removes the // with the caret between the marks: the mark left after it is not text of the field', async () => {
+        const { field, slashes, marks } = slashMenuEditor();
+        document.getSelection()?.collapse(marks, 1);
+        const restore = browserCommands([[marks, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(await removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('\u200C');
+        restore();
+      });
+
+      it('reads the marks of a hidden span as no text when the selection is within that span', async () => {
+        const { field, slashes, marks } = slashMenuEditor('\u200C\u200D');
+        const second = marks.splitText(1);
+        const span = marks.parentNode as Node;
+        document.getSelection()?.collapse(second, 1);
+        const restore = browserCommands([[span, 0], [slashes, 1], [slashes, 0]]);
+
+        expect(await removeTypedTrigger(field)).toBe(true);
+
+        expect(field.querySelector('p')?.textContent).toBe('');
+        restore();
+      });
+    });
+
+    it('removes a // whose zero-width space is in a span of its own, as Lexical writes it', async () => {
+      const field = editable('<p><span>Hi /</span><span>\u200B</span><span>/</span></p>');
+      const [first, space, last] = Array.from(field.querySelectorAll('span'), (span) => span.firstChild as Text);
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [space, 0], [first, 3]]);
+
+      expect(await removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi ');
+      restore();
+    });
+
+    it('does not count a character the user does not see elsewhere in the field as a change', async () => {
+      const field = editable('<p>\u200BHi //</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, text.length);
+      const restore = browserCommands();
+
+      expect(await removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('\u200BHi ');
+      restore();
+    });
+
+    it('removes a // that is the whole text of its own element, after another element\'s text and an icon, out of its text node', async () => {
+      const field = editable('<p><i class="icon"><!-- drawn by the page --></i><b>Hi </b><span>//</span></p>');
+      const bold = field.querySelector('b')?.firstChild as Text;
+      const slashes = field.querySelector('span')?.firstChild as Text;
+      document.getSelection()?.collapse(slashes, 2);
+      // The selection starts at the end of the bold text, as Chrome puts it
+      const restore = browserCommands([[slashes, 1], [bold, 3]]);
+      const execCommand = vi.mocked(document.execCommand);
+
+      expect(await removeTypedTrigger(field)).toBe(true);
+
+      // The editing command would empty the element, which the browser then removes
+      expect(execCommand).not.toHaveBeenCalled();
+      expect(field.querySelector('span')?.textContent).toBe('');
+      expect(field.querySelector('i.icon')).not.toBeNull();
+      restore();
+    });
+
+    it.each([
+      ['an image', '<img alt="">'],
+      ['an icon chip the user cannot edit', '<span contenteditable="false"><svg></svg></span>'],
+      ['an icon the page draws on an element with no text', '<span class="icon"><!-- drawn by the page --></span>'],
+      ['an empty chip the user cannot edit, marked as text of Lexical', '<span contenteditable="false" data-lexical-text="true"></span>'],
+      ['a hidden chip the user cannot edit that holds a joiner', '<span contenteditable="false" aria-hidden="true">\u200D</span>'],
+      ['a hidden chip the user cannot edit, marked as text of Lexical, that holds a joiner', '<span contenteditable="false" aria-hidden="true" data-lexical-text="true">\u200C</span>'],
+    ])('leaves a // with %s between its slashes as it was', async (_what, between) => {
+      const field = editable(`<p>Hi /${between}/</p>`);
+      const paragraph = field.querySelector('p') as HTMLElement;
+      const first = paragraph.firstChild as Text;
+      const last = paragraph.lastChild as Text;
+      const before = paragraph.innerHTML;
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [paragraph, 1], [first, 3]]);
+
+      expect(textBeforeCaret(field)).toBe('Hi //');
+      expect(await removeTypedTrigger(field)).toBe(false);
+
+      expect(paragraph.innerHTML).toBe(before);
+      restore();
+    });
+
+    it('leaves a // with a chip the user cannot edit between its slashes, though the chip holds a zero-width space', async () => {
+      const field = editable('<p>Hi /<span contenteditable="false">\u200B</span>/</p>');
+      const paragraph = field.querySelector('p') as HTMLElement;
+      const first = paragraph.firstChild as Text;
+      const last = paragraph.lastChild as Text;
+      const before = paragraph.innerHTML;
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [paragraph, 1], [first, 3]]);
+
+      expect(await removeTypedTrigger(field)).toBe(false);
+
+      expect(paragraph.innerHTML).toBe(before);
+      restore();
+    });
   });
 
   it('removes a // typed on a new line of a contenteditable, after a <br>', async () => {
@@ -282,6 +532,17 @@ describe('removeTypedTrigger', () => {
     refused.mockRestore();
   });
 
+  it('reports a contenteditable whose editor drops the joiner of an emoji elsewhere in the draft on input', async () => {
+    const field = editable('<p>\u{1F469}\u200D\u{1F4BB} Before //</p>');
+    const text = field.querySelector('p')?.firstChild as Text;
+    document.getSelection()?.collapse(text, text.length);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+    field.addEventListener('input', () => { field.innerHTML = '<p>\u{1F469}\u{1F4BB} Before </p>'; });
+
+    expect(await removeTypedTrigger(field)).toBe(false);
+    refused.mockRestore();
+  });
+
   it('reports a // it cannot remove: the caret is not in a text node that holds it', async () => {
     const field = editable('<p><b>/</b>/</p>');
     const second = field.querySelector('p')?.lastChild as Text;
@@ -291,6 +552,21 @@ describe('removeTypedTrigger', () => {
     expect(textBeforeCaret(field)).toBe('//');
     expect(await removeTypedTrigger(field)).toBe(false);
     expect(field.textContent).toBe('//');
+    refused.mockRestore();
+  });
+
+  it.each([
+    ['between its slashes', 'Hi /\u200B/'],
+    ['after its slashes', 'Hi //\uFEFF'],
+  ])('without the editing command, leaves a // with an unseen character %s as it was', async (_where, text) => {
+    const field = editable('<p></p>');
+    const node = document.createTextNode(text);
+    field.querySelector('p')?.append(node);
+    document.getSelection()?.collapse(node, text.length);
+    const refused = vi.spyOn(document, 'execCommand').mockReturnValue(false);
+
+    expect(await removeTypedTrigger(field)).toBe(false);
+    expect(node.nodeValue).toBe(text);
     refused.mockRestore();
   });
 
@@ -357,10 +633,14 @@ describe('the // typed in a Lexical composer (Perplexity)', () => {
     field.setAttribute('data-lexical-editor', 'true');
     const selection = document.getSelection() as Selection;
     let state = '';
+    // Where the caret is in the state while a change waits to be drawn: a second event of the same
+    // batch goes there, not to the page's selection, which still shows the text before the change
+    let pending: number | null = null;
     let rendered: HTMLElement | null = null;
     // The text found emptied, while it waits for the editor's update that takes it out
     let emptied: Text | null = null;
     const render = (): void => {
+      pending = null;
       // A field a test left behind is not drawn again: its selection would be the next test's
       if (!field.isConnected) {
         return;
@@ -392,11 +672,18 @@ describe('the // typed in a Lexical composer (Perplexity)', () => {
         || range.startContainer !== text || range.endContainer !== text) {
         return;
       }
+      // At a caret, as Backspace: the character before it
+      const end = pending ?? range.endOffset;
+      const start = pending !== null || range.collapsed ? Math.max(0, end - 1) : range.startOffset;
       if (beforeInput === 'cancels') {
         event.preventDefault();
-        state = state.slice(0, range.startOffset) + state.slice(range.endOffset);
-        queueMicrotask(render);
+        state = state.slice(0, start) + state.slice(end);
+        if (pending === null) {
+          queueMicrotask(render);
+        }
+        pending = start;
       } else {
+        range.setStart(text, start);
         range.deleteContents();
         state = text.textContent ?? '';
       }
@@ -627,6 +914,188 @@ describe('editorSettled', () => {
 
     await vi.advanceTimersByTimeAsync(1);
     expect(settled).toBe(true);
+  });
+});
+
+describe('deleteTypedTriggerByEditor', () => {
+  /**
+   * An editor that writes its own DOM, as Lexical: it cancels a deleteContentBackward and deletes the
+   * character before the caret itself, drawing its paragraph anew at once. It counts the events.
+   */
+  const ownEditor = (field: HTMLElement, { cancels = true, deletes = true } = {}) => {
+    const events: string[] = [];
+    field.addEventListener('beforeinput', (event) => {
+      events.push(event.inputType);
+      if (!cancels) {
+        return;
+      }
+      event.preventDefault();
+      const selection = document.getSelection();
+      const node = selection?.focusNode;
+      if (!deletes || node?.nodeType !== Node.TEXT_NODE || event.inputType !== 'deleteContentBackward') {
+        return;
+      }
+      const offset = selection?.focusOffset ?? 0;
+      const text = (node.nodeValue ?? '').slice(0, offset - 1) + (node.nodeValue ?? '').slice(offset);
+      const span = document.createElement('span');
+      span.setAttribute('data-lexical-text', 'true');
+      span.textContent = text;
+      node.parentElement?.replaceWith(span);
+      if (span.firstChild) {
+        selection?.collapse(span.firstChild, offset - 1);
+      } else {
+        selection?.collapse(span, 0);
+      }
+    });
+    return events;
+  };
+  /** A contenteditable Lexical edits: it marks it with data-lexical-editor */
+  const lexicalEditable = (html: string): HTMLElement => {
+    const field = editable(html);
+    field.setAttribute('data-lexical-editor', 'true');
+    return field;
+  };
+  /** M365 Copilot's editor while its slash menu is open, as read live: the caret after the // */
+  const slashMenuEditor = (): HTMLElement => {
+    const template = document.createElement('template');
+    template.innerHTML = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
+    const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+    document.body.append(field);
+    const slashes = field.querySelector('span[data-lexical-text]')?.firstChild as Text;
+    document.getSelection()?.collapse(slashes, 2);
+    return field;
+  };
+
+  it('has M365 Copilot\'s editor delete the //, as two presses of Backspace, and reads it gone', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field);
+
+    const removal = deleteTypedTriggerByEditor(field);
+
+    expect(removal).not.toBeNull();
+    await expect(removal).resolves.toBe('removed');
+    expect(events).toEqual(['deleteContentBackward', 'deleteContentBackward']);
+    expect(plainTextOf(field)).toBe('');
+  });
+
+  it('reads the field once an editor that draws in a microtask, as Lexical, has drawn', async () => {
+    const field = slashMenuEditor();
+    const slashes = field.querySelector('span[data-lexical-text]') as HTMLElement;
+    let deleted = 0;
+    field.addEventListener('beforeinput', (event) => {
+      event.preventDefault();
+      deleted += 1;
+      const now = deleted;
+      queueMicrotask(() => { slashes.textContent = '//'.slice(now); });
+    });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
+    expect(slashes.textContent).toBe('');
+  });
+
+  it('keeps the rest of the draft and reads it kept', async () => {
+    const field = lexicalEditable('<p><span data-lexical-text="true">Hi //there</span></p>');
+    document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 5);
+    ownEditor(field);
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
+    expect(field.textContent).toBe('Hi there');
+  });
+
+  it('reads the field unchanged when the editor cancels the events and deletes nothing', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field, { deletes: false });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('unchanged');
+    expect(events).toHaveLength(2);
+  });
+
+  it.each([
+    ['in the next frame', (draw: () => void) => { window.requestAnimationFrame(draw); }],
+    ['in a later task', (draw: () => void) => { window.setTimeout(draw, 0); }],
+  ])('reads the field once an editor that draws %s has drawn, so the // goes once', async (_when, later) => {
+    const field = slashMenuEditor();
+    const slashes = field.querySelector('span[data-lexical-text]') as HTMLElement;
+    let deleted = 0;
+    field.addEventListener('beforeinput', (event) => {
+      event.preventDefault();
+      deleted += 1;
+      const now = deleted;
+      later(() => { slashes.textContent = '//'.slice(now); });
+    });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
+    expect(slashes.textContent).toBe('');
+  });
+
+  it('reads the field unchanged when it holds a non-breaking space the browser wrote', async () => {
+    const field = lexicalEditable('<p><span data-lexical-text="true">Hi \u00a0//</span></p>');
+    document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 6);
+    ownEditor(field, { deletes: false });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('unchanged');
+  });
+
+  it('reads the field changed when the editor deletes one slash only', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field);
+    let sent = 0;
+    // Its own handler runs first: the second event it cancels, and deletes nothing
+    field.addEventListener('beforeinput', (event) => {
+      sent += 1;
+      if (sent === 2) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    }, { capture: true });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('changed');
+    expect(events).toHaveLength(1);
+    expect(plainTextOf(field)).toBe('/');
+  });
+
+  it('leaves the // to removeTypedTrigger when the editor does not cancel the event, after one event', async () => {
+    const field = slashMenuEditor();
+    const events = ownEditor(field, { cancels: false });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBeNull();
+    expect(events).toHaveLength(1);
+    expect(plainTextOf(field)).toBe('//');
+  });
+
+  it.each([
+    ['the two slashes are in two text nodes', '<p><span>Hi /</span><span>/</span></p>', 'span:last-child', 1],
+    ['the caret is not right after the //', '<p><span>Hi // there</span></p>', 'span', 6],
+    ['the caret is right after the // but not in a text node', '<p><span>Hi //</span></p>', 'p', 1],
+  ])('sends nothing when %s', async (_case, html, at, offset) => {
+    const field = lexicalEditable(html);
+    const element = field.querySelector(at) as HTMLElement;
+    document.getSelection()?.collapse(at === 'p' ? element : element.firstChild, offset);
+    const events = ownEditor(field);
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('sends nothing to an editor that is not Lexical\'s', async () => {
+    const field = editable('<p><span>Hi //</span></p>');
+    document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 5);
+    const events = ownEditor(field);
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('sends nothing to a text control, wherever the page\'s selection is', async () => {
+    const field = textarea('Hi //');
+    // The page's selection after a // in a text node elsewhere
+    const elsewhere = editable('<p>Hi //</p>');
+    document.getSelection()?.collapse(elsewhere.querySelector('p')?.firstChild as Text, 5);
+    const events: Event[] = [];
+    field.addEventListener('beforeinput', (event) => { events.push(event); event.preventDefault(); });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBeNull();
+    expect(events).toEqual([]);
   });
 });
 

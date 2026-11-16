@@ -19,19 +19,20 @@ vi.mock('../../config/platforms', async (importOriginal) => {
   const platforms = () => [...Object.values(actual.SUPPORTED_PLATFORMS), ...release.added];
   return {
     ...actual,
-    getPlatformByHostname: (hostname: string) => platforms().find((platform) => platform.hostname === hostname),
+    getPlatformByHostname: (hostname: string) => platforms().find((platform) => actual.platformHostnames(platform).includes(hostname)),
     getPlatformsByPriority: () => platforms().sort((a, b) => b.priority - a.priority),
-    getAllSupportedHostnames: () => platforms().map((platform) => platform.hostname)
+    getAllSupportedHostnames: () => platforms().flatMap(actual.platformHostnames)
   };
 });
 
 // The test setup loaded the Site settings module with the real Platform list: load it again on the mocked one
 vi.resetModules();
-const { getAllSupportedHostnames, getDefaultEnabledPlatforms, SUPPORTED_PLATFORMS } = await import('../../config/platforms');
+const { getDefaultEnabledPlatforms, SUPPORTED_PLATFORMS } = await import('../../config/platforms');
 const {
   changeSiteSettings,
   enabledPlatforms,
   isHostnameEnabled,
+  PLATFORMS_OF_THE_ENABLED_LIST,
   readSiteSettings,
   SITE_SETTINGS_KEY,
   upgradeStoredSiteSettings
@@ -121,7 +122,8 @@ describe('upgradeStoredSiteSettings', () => {
 
     expect(await stored()).toEqual({
       platformChoices: Object.fromEntries(
-        getAllSupportedHostnames().map((hostname) => [hostname, hostname === 'claude.ai' || hostname === 'gemini.google.com'])
+        // The Platforms of the releases that stored the list: a host added since has no choice and follows its Platform
+        PLATFORMS_OF_THE_ENABLED_LIST.map((hostname) => [hostname, hostname === 'claude.ai' || hostname === 'gemini.google.com'])
       ),
       customSites: [customSite],
       debugMode: true,

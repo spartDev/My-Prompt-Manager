@@ -72,12 +72,13 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `id` | string | ✅ | Unique platform identifier (lowercase, no spaces) |
-| `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai') |
+| `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai'): the one the Platform's row in Settings and its Platform choice go by |
+| `otherHostnames` | string[] | ❌ | Other hosts the same Platform is served on, such as the host a sign-in redirects to (M365 Copilot: `copilot.cloud.microsoft`). Each needs its origin in `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` fails otherwise), and its hostname in `ADDED_AFTER_THE_PLATFORM_CHOICES` of `src/services/__tests__/siteSettings.test.ts`. Without a choice of its own, a host follows the Platform choice of its Platform |
 | `displayName` | string | ✅ | Human-readable name shown in UI |
 | `priority` | number | ✅ | Strategy selection priority (100 = highest) |
 | `defaultEnabled` | boolean | ✅ | On for every user who never switched it, existing users included (the Site settings store the user's Platform choices) |
 | `selectors` | string[] | ✅ | CSS selectors for finding text input elements |
-| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts` and a warning is logged |
+| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts`, and goes into the toolbar if the Platform renders it within `IconPlacementController.TOOLBAR_GRACE_MS` (`awaitToolbar`: a toolbar may render after its editor; the same holds for an icon at the element the user picked, which only the chain's first anchor takes the icon from, since a later one may show only at times, like a send button). Still not found by then, a warning is logged and the overlay is reported, so Settings offers to place the icon; the icon keeps looking for the chain's first anchor, or for the element the user picked, at most once a second (`LATE_TOOLBAR_CHECK_MS`), and goes there if it shows later, which replaces the overlay report. A later anchor does not count then: it may show only once the draft holds text (a send button), and would move the icon as the user types. A composer whose usual anchor is a later one (Fluent's `.fai-ChatInput__actions` on m365.cloud.microsoft) therefore keeps the icon on the overlay when its toolbar comes late. The picked element is looked for then by its selector only, not its fingerprint, which scores every element of its tag: a pick whose selector no longer matches is not found late |
 | `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
 | `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
 | `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
@@ -128,9 +129,10 @@ src/
 │   ├── claude-strategy.ts          # Claude.ai implementation
 │   ├── chatgpt-strategy.ts         # ChatGPT implementation
 │   ├── mistral-strategy.ts         # Mistral LeChat implementation
+│   ├── lexical-strategy.ts         # Insertion and Undo of a Lexical editor, as a paste
 │   ├── perplexity-strategy.ts      # Perplexity implementation
 │   ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
-│   ├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+│   ├── m365copilot-strategy.ts     # M365 Copilot (extends Lexical)
 │   ├── your-platform-strategy.ts   # Your custom strategy
 │   └── platform-manager.ts         # Registers and manages strategies
 └── background/background.ts        # Uses centralized config
@@ -156,7 +158,6 @@ Is the platform using React for input management?
 │   │
 │   ├─ Examples:
 │   │   • Microsoft Copilot (copilot.microsoft.com)
-│   │   • M365 Copilot (m365.cloud.microsoft)
 │   │
 │   └─ Benefits:
 │       • ✅ Automatic React event handling
@@ -502,7 +503,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
-- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner
+- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner. It comes 5 seconds after the icon was placed on the editor (`IconPlacementController.TOOLBAR_GRACE_MS`), not at once: until then the icon waits there for a toolbar the Platform renders after it
 - Check that `editor.closest(composer)` finds the composer, and that an anchor exists inside it
 
 **Content doesn't insert:**
@@ -847,14 +848,15 @@ iconPlacement: {
 }
 
 // When no anchor is found, the icon is anchored inside the editor's bottom-end corner
-// (src/content/core/anchored-overlay.ts) and the console shows a warning:
+// (src/content/core/anchored-overlay.ts), and goes into the toolbar if the Platform renders it, even after the grace period.
+// Still not found 5 seconds after that placement (IconPlacementController.TOOLBAR_GRACE_MS), the console shows a warning:
 // "No anchor of this Platform found in its composer, the icon is anchored on the editor instead".
 // If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.
 ```
 
 After fixing the chain, refresh `tests/fixtures/composers/<id>.html` from the live composer with `npm run composers:capture -- --only <id>` (sign in once with `--login`), which runs the chain tests on what it captured.
 
-Until a release fixes the chain, a user can repair it: the Platform's row in Settings says its toolbar changed and offers **Place the icon**, which opens the Element picker on the Platform's tab. The pick is stored under `iconPlacementRepairs` (`src/services/iconPlacementRepairs.ts`) and the icon goes before the picked element; it is dropped on its own once the chain finds its anchor again.
+Until a release fixes the chain, a user can repair it: the Platform's row in Settings says its toolbar changed and offers **Place the icon**, which opens the Element picker on the Platform's tab. The pick is stored under `iconPlacementRepairs` (`src/services/iconPlacementRepairs.ts`) and the icon goes before the picked element; it is dropped on its own once the chain finds its anchor again: its first anchor while the picked element is on the page, a later one only once the grace period is over without it.
 
 ### Content Doesn't Insert
 

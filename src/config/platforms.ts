@@ -41,8 +41,13 @@ export interface IconPlacement {
 export interface PlatformDefinition {
   /** Unique platform identifier */
   id: string;
-  /** Platform hostname (e.g., 'claude.ai') */
+  /** Platform hostname (e.g., 'claude.ai'): the one its row in Settings and its Platform choice go by */
   hostname: string;
+  /**
+   * Other hosts the same Platform is served on, such as the host a sign-in redirects to. Each is
+   * in the manifest beside `hostname`, and follows the Platform choice of the Platform.
+   */
+  otherHostnames?: string[];
   /** Human-readable platform name */
   displayName: string;
   /** Platform priority for strategy selection (higher = higher priority) */
@@ -246,18 +251,30 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     displayName: "Microsoft 365 Copilot",
     priority: 80,
     defaultEnabled: true,
+    // A work account lands on copilot.cloud.microsoft from m365.cloud.microsoft and from
+    // copilot.microsoft.com (seen on 2026-11-15, ticket My-Prompt-Manager-axv)
+    otherHostnames: ["copilot.cloud.microsoft"],
     selectors: [
       'span[id="m365-chat-editor-target-element"]', // Primary selector - specific ID
+      '[data-lexical-editor][contenteditable="true"][role="textbox"]', // Lexical editor of copilot.cloud.microsoft
       'span[data-lexical-editor="true"][contenteditable="true"]', // Lexical editor
       'span[role="combobox"][contenteditable="true"]', // Combobox role
       'div[contenteditable="true"]', // Generic contenteditable fallback
       'textarea[placeholder*="Message"]', // Legacy textarea fallback
     ],
-    // Fluent's component class names, not its hashed ones. Not confirmed on the live composer,
-    // which needs sign-in: see tests/fixtures/composers/m365copilot.html
+    // copilot.cloud.microsoft first: the composer is the div two levels above the editor, which
+    // holds it in a span beside an empty span (or the editor alone, as a capture folds a wrapper
+    // that holds one element), then the plus menu and the dictation button (nesting read on the live
+    // page signed in, 2026-11-15, ticket My-Prompt-Manager-axv). The plus menu is found by its
+    // test id, which does not follow the user's language; its toolbar renders after the editor,
+    // so the icon waits for it (IconPlacementController.awaitToolbar). Then Fluent's component
+    // class names of m365.cloud.microsoft, not its hashed ones, on the composer that holds its
+    // actions or its send button (an inner .fai-ChatInput holding neither is not the composer). Neither is captured, since both need sign-in: see
+    // tests/fixtures/composers/m365copilot.html.
     iconPlacement: {
-      composer: ".fai-ChatInput",
+      composer: 'div:has(> span > [data-lexical-editor]):has([data-testid="PlusMenuButton"]), div:has(> [data-lexical-editor]):has([data-testid="PlusMenuButton"]), .fai-ChatInput:has(.fai-ChatInput__actions, button[type="submit"])',
       anchors: [
+        { find: '[data-testid="PlusMenuButton"]', relation: "after" },
         { find: ".fai-ChatInput__actions", relation: "inside-start" },
         { find: 'button[type="submit"]', relation: "before" },
       ],
@@ -302,24 +319,29 @@ validateLinkedPlatforms();
  */
 
 /**
- * The hostnames of the Platforms that are on by default, highest priority first: the Platforms on
- * for a user with no Platform choice
+ * The hostnames of the Platforms that are on by default, highest priority first, each followed by
+ * its other hostnames: the Platforms on for a user with no Platform choice
  */
 export function getDefaultEnabledPlatforms(): string[] {
   return Object.values(SUPPORTED_PLATFORMS)
     .filter((platform) => platform.defaultEnabled)
     .sort((a, b) => b.priority - a.priority) // Sort by priority (highest first)
-    .map((platform) => platform.hostname);
+    .flatMap(platformHostnames);
+}
+
+/** Every host a Platform is served on: its hostname, then its other hostnames */
+export function platformHostnames(platform: PlatformDefinition): string[] {
+  return [platform.hostname, ...(platform.otherHostnames ?? [])];
 }
 
 /**
- * Get platform definition by hostname
+ * Get platform definition by hostname, its other hostnames included
  */
 export function getPlatformByHostname(
   hostname: string,
 ): PlatformDefinition | undefined {
   return Object.values(SUPPORTED_PLATFORMS).find(
-    (platform) => platform.hostname === hostname,
+    (platform) => platformHostnames(platform).includes(hostname),
   );
 }
 
@@ -331,12 +353,10 @@ export function getPlatformById(id: string): PlatformDefinition | undefined {
 }
 
 /**
- * Get all supported platform hostnames
+ * Get all supported platform hostnames, the other hostnames of each Platform included
  */
 export function getAllSupportedHostnames(): string[] {
-  return Object.values(SUPPORTED_PLATFORMS).map(
-    (platform) => platform.hostname,
-  );
+  return Object.values(SUPPORTED_PLATFORMS).flatMap(platformHostnames);
 }
 
 /**
@@ -346,8 +366,8 @@ export function getAllHostnamePatterns(): string[] {
   const patterns: string[] = [];
 
   Object.values(SUPPORTED_PLATFORMS).forEach((platform) => {
-    // Add exact hostname
-    patterns.push(platform.hostname);
+    // Add exact hostnames
+    patterns.push(...platformHostnames(platform));
 
     // Add additional patterns
     if (platform.hostnamePatterns) {
@@ -384,8 +404,9 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
 /**
  * Get all linked platform hostnames for a given hostname
  *
- * Returns an array containing the original hostname plus all hostnames of linked platforms.
- * This is used for toggling related platforms together (e.g., Microsoft Copilot and M365 Copilot).
+ * Returns the hostname, then the other hosts of its Platform, then every host of the Platforms
+ * linked to it. This is used for toggling related platforms together (e.g., Microsoft Copilot and
+ * M365 Copilot), and for reading the Platform choice of a host that has none of its own.
  *
  * @param hostname - The hostname to get linked platforms for
  * @returns Array of hostnames including the original and all linked platforms (deduplicated)
@@ -393,42 +414,33 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
  * @example
  * ```typescript
  * getLinkedPlatformHostnames('copilot.microsoft.com')
- * // Returns: ['copilot.microsoft.com', 'm365.cloud.microsoft']
+ * // Returns: ['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']
  *
  * getLinkedPlatformHostnames('claude.ai')
  * // Returns: ['claude.ai'] (no linked platforms)
  * ```
  */
 export function getLinkedPlatformHostnames(hostname: string): string[] {
-  // Find the platform for this hostname
-  const platform = Object.values(SUPPORTED_PLATFORMS).find(
-    (p) => p.hostname === hostname,
-  );
+  const platform = getPlatformByHostname(hostname);
 
   if (!platform) {
     return [hostname]; // Unknown platform, just return itself
   }
 
-  if (!platform.linkedPlatforms || platform.linkedPlatforms.length === 0) {
-    return [hostname]; // No linked platforms
-  }
-
   // Get hostnames of all linked platforms
-  const linkedHostnames = platform.linkedPlatforms
-    .map((platformId) => {
-      if (!(platformId in SUPPORTED_PLATFORMS)) {
-        // biome-ignore lint/suspicious/noConsole: dependency-free config shared by every surface, so no logger to import
-        console.error(
-          `Linked platform ${platformId} not found in SUPPORTED_PLATFORMS`,
-        );
-        return null;
-      }
-      return SUPPORTED_PLATFORMS[platformId].hostname;
-    })
-    .filter((h): h is string => h !== null);
+  const linkedHostnames = (platform.linkedPlatforms ?? []).flatMap((platformId) => {
+    if (!(platformId in SUPPORTED_PLATFORMS)) {
+      // biome-ignore lint/suspicious/noConsole: dependency-free config shared by every surface, so no logger to import
+      console.error(
+        `Linked platform ${platformId} not found in SUPPORTED_PLATFORMS`,
+      );
+      return [];
+    }
+    return platformHostnames(SUPPORTED_PLATFORMS[platformId]);
+  });
 
-  // Return original hostname + all linked hostnames (deduplicated)
-  return [...new Set([hostname, ...linkedHostnames])];
+  // Return original hostname + the other hosts of its Platform + all linked hostnames (deduplicated)
+  return [...new Set([hostname, ...platformHostnames(platform), ...linkedHostnames])];
 }
 
 /**

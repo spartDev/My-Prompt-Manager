@@ -97,6 +97,12 @@ const PLATFORMS: PlatformCase[] = [
     strategy: () => new M365CopilotStrategy('m365.cloud.microsoft'),
     textarea: textarea({ placeholder: 'Message Copilot' }),
     editor: editable('span', { id: 'm365-chat-editor-target-element', 'data-lexical-editor': 'true', role: 'combobox' })
+  },
+  {
+    // Where nothing takes a paste. Its Lexical editor is in m365copilot-strategy.test.ts
+    platform: 'M365 Copilot at copilot.cloud.microsoft',
+    strategy: () => new M365CopilotStrategy('copilot.cloud.microsoft'),
+    editor: editable('div', { 'data-lexical-editor': 'true', role: 'textbox', 'aria-label': 'Message Copilot' })
   }
 ];
 

@@ -400,6 +400,195 @@ describe('background: a picker that could not be activated leaves no session', (
     });
   });
 
+  describe('while the content script just injected does not listen yet', () => {
+    const NO_LISTENER = 'Could not establish connection. Receiving end does not exist.';
+    /** The tab has no content script: the start injects it */
+    const notInjected = () => {
+      vi.mocked(chrome.permissions.contains).mockResolvedValue(true as never);
+      vi.mocked(chrome.tabs.get).mockResolvedValue({ ...CLAUDE_TAB, status: 'complete' } as never);
+      vi.mocked(chrome.scripting.executeScript).mockImplementation((async (injection: { func?: unknown }) =>
+        (injection.func ? [{ result: false }] : [{ result: undefined }])) as never);
+    };
+    const activations = () => vi.mocked(chrome.tabs.sendMessage).mock.calls
+      .filter(([, message]) => (message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER');
+
+    it('activates the picker once it listens, a moment later', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      let tries = 0;
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER' && ++tries < 3) {
+          throw new Error(NO_LISTENER);
+        }
+        return undefined;
+      });
+
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+      expect(response).toMatchObject({ success: true });
+      expect(tries).toBe(3);
+    });
+
+    it('fails at once in a tab just injected that answers another error than not listening', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('The page is gone'));
+
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+      expect(response).toMatchObject({ success: false });
+      expect(activations()).toHaveLength(1);
+    });
+
+    it('fails at once in a tab whose content script was already there, which then does not listen at all', async () => {
+      const listener = await startServiceWorker();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error(NO_LISTENER));
+
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+      expect(response).toMatchObject({ success: false });
+      expect(activations()).toHaveLength(1);
+    });
+
+    /**
+     * The retries run on fake timers: each step lands inside a known retry window, whatever the
+     * load of the machine. The first activation is sent within RETRY_WINDOW, the next one 100 ms on
+     */
+    const RETRY_WINDOW = 50;
+    const onFakeTimers = async (steps: () => Promise<void>) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] });
+      try {
+        await steps();
+      } finally {
+        vi.useRealTimers();
+      }
+    };
+    const neverListening = () => {
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER') {
+          throw new Error(NO_LISTENER);
+        }
+        return undefined;
+      });
+    };
+    const answered = (pending: Promise<unknown>) => {
+      const result: { response?: unknown } = {};
+      void pending.then((response) => { result.response = response; });
+      return result;
+    };
+
+    it('sends no activation again once the start is stopped', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      neverListening();
+      await onFakeTimers(async () => {
+        const started = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(RETRY_WINDOW);
+        expect(activations()).toHaveLength(1);
+
+        await send(listener, { type: 'STOP_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id } });
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(started.response).toMatchObject({ success: false });
+        expect(activations()).toHaveLength(1);
+      });
+    });
+
+    it('sends no activation again once the tab is closed', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      neverListening();
+      await onFakeTimers(async () => {
+        const started = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(RETRY_WINDOW);
+        expect(activations()).toHaveLength(1);
+
+        vi.mocked(chrome.tabs.get).mockRejectedValue(new Error(`No tab with id: ${String(CLAUDE_TAB.id)}.`));
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(started.response).toEqual({ success: false, error: 'The tab was closed' });
+        expect(activations()).toHaveLength(1);
+      });
+    });
+
+    it('sends no activation again once the start is stopped while it checks the tab is open', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      neverListening();
+      await onFakeTimers(async () => {
+        const started = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(RETRY_WINDOW);
+        expect(activations()).toHaveLength(1);
+
+        // The stop lands while the start asks whether the tab is still open
+        vi.mocked(chrome.tabs.get).mockImplementation((async () => {
+          await send(listener, { type: 'STOP_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id } });
+          return { ...CLAUDE_TAB, status: 'complete' };
+        }) as never);
+        await vi.advanceTimersByTimeAsync(300);
+
+        expect(started.response).toMatchObject({ success: false });
+        expect(activations()).toHaveLength(1);
+      });
+    });
+
+    it('gives up once it has not listened for five seconds', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      neverListening();
+      await onFakeTimers(async () => {
+        const started = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(4_800);
+        expect(started.response).toBeUndefined();
+        await vi.advanceTimersByTimeAsync(400);
+        expect(started.response).toMatchObject({ success: false });
+        const sent = activations().length;
+
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(activations()).toHaveLength(sent);
+      });
+    });
+
+    it('stores the session of the older start when its activation, sent again, reaches the page after a newer start\'s', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      let listening = false;
+      let held: string | undefined;
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        const sent = message as { type: string; attempt?: string };
+        if (!listening) {
+          throw new Error(NO_LISTENER);
+        }
+        if (sent.type === 'ACTIVATE_ELEMENT_PICKER') {
+          held = sent.attempt;
+        }
+        return undefined;
+      });
+      await onFakeTimers(async () => {
+        const older = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(RETRY_WINDOW);
+        expect(activations()).toHaveLength(1);
+        const [[, firstActivation]] = activations();
+        const olderAttempt = (firstActivation as { attempt: string }).attempt;
+
+        // The newer start activates, and is answered, before the older one sends again
+        listening = true;
+        const newer = answered(send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } }));
+        await vi.advanceTimersByTimeAsync(RETRY_WINDOW / 2);
+        expect(newer.response).toMatchObject({ success: true });
+        expect(older.response).toBeUndefined();
+
+        await vi.advanceTimersByTimeAsync(300);
+        expect(older.response).toMatchObject({ success: true });
+
+        // The older start's activation reached the page last: the session stored names it
+        expect(held).toBe(olderAttempt);
+        const [session] = Object.values(await chrome.storage.session.get(null)) as Array<{ attempt: string }>;
+        expect(session?.attempt).toBe(olderAttempt);
+      });
+    });
+  });
+
   it('deactivates the picker it activated when its session cannot be stored', async () => {
     const listener = await startServiceWorker();
     const messages: string[] = [];

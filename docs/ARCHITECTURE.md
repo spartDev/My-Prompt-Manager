@@ -92,9 +92,10 @@ src/content/platforms/
 ├── chatgpt-strategy.ts         # ChatGPT implementation
 ├── gemini-strategy.ts          # Google Gemini implementation
 ├── mistral-strategy.ts         # Mistral.ai implementation
+├── lexical-strategy.ts         # Insertion and Undo of a Lexical editor (Perplexity, M365 Copilot), as a paste
 ├── perplexity-strategy.ts      # Perplexity implementation
 ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
-├── m365copilot-strategy.ts     # M365 Copilot (extends React)
+├── m365copilot-strategy.ts     # M365 Copilot (extends Lexical)
 ├── default-strategy.ts         # Fallback for unknown sites
 └── platform-manager.ts         # Strategy orchestration
 ```
@@ -141,7 +142,7 @@ Where the icon goes is not a strategy's business: `PlatformManager.getIconPlacem
 
 **Purpose**: Provide shared functionality for React-based AI platforms
 
-**When to Use**: Platforms that use React for their input controls (e.g., Microsoft Copilot, M365 Copilot)
+**When to Use**: Platforms that use React for their input controls (e.g., Microsoft Copilot)
 
 **Implementation**: `ReactPlatformStrategy` extends `PlatformStrategy` and provides:
 
@@ -413,6 +414,7 @@ src/content/
 │   ├── chatgpt-strategy.ts    # ChatGPT
 │   ├── gemini-strategy.ts     # Google Gemini
 │   ├── mistral-strategy.ts    # Mistral.ai
+│   ├── lexical-strategy.ts    # Lexical editors, as a paste
 │   ├── perplexity-strategy.ts # Perplexity
 │   ├── default-strategy.ts    # Fallback
 │   └── platform-manager.ts    # Orchestration
@@ -421,7 +423,7 @@ src/content/
 └── core/
     ├── injector.ts            # Main orchestrator
     ├── insertion-manager.ts   # Platform insertion coordinator
-    ├── icon-placement.ts      # Resolves a Platform's anchor chain; watches the placed icon, places it again after a re-render
+    ├── icon-placement.ts      # Resolves a Platform's anchor chain; watches the placed icon, places it again after a re-render or once a toolbar rendered after the editor shows (5 s grace, then a look a second for an icon on the overlay)
     └── anchored-overlay.ts    # Icon anchored on an element: CSS Anchor, then Floating UI
 ```
 
@@ -430,7 +432,7 @@ src/content/
 | Component | Responsibility | Pattern |
 |-----------|---------------|---------|
 | `PromptLibraryInjector` | Detect inputs, inject icons, manage lifecycle | Orchestrator |
-| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it | Controller |
+| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it, or when the toolbar it waited for renders within a grace period, after which the overlay is reported and an icon on the overlay keeps looking for the chain's first anchor or the user's pick, once a second at most | Controller |
 | `AnchoredOverlay` | Keep the icon on its reference element when no toolbar holds it: CSS Anchor Positioning, then Floating UI | Strategy |
 | `PlatformInsertionManager` | Coordinate strategy selection and insertion | Mediator |
 | `PlatformManager` | Manage strategy registry and instantiation | Factory |
@@ -582,7 +584,6 @@ Is the platform's input field powered by React?
 │   │
 │   └─ Examples:
 │       • Microsoft Copilot (copilot.microsoft.com)
-│       • M365 Copilot (m365.cloud.microsoft)
 │       • Any platform with React-managed textarea/input
 │   │
 │   └─ Benefits:

@@ -6,7 +6,7 @@
  * all the modular components.
  */
 
-import { getPlatformByHostname } from '../../config/platforms';
+import { getPlatformByHostname, type IconPlacement } from '../../config/platforms';
 import type { SiteSettings } from '../../services/siteSettings';
 import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
@@ -76,8 +76,17 @@ export class PromptLibraryInjector {
   private readonly overlay: AnchoredOverlay;
   /** Watches the placed icon and asks for a new placement when the Platform removes it */
   private readonly placement: IconPlacementController;
-  /** The element the user picked for a built-in Platform whose toolbar is not found, and the placement reports */
+  /** The element the user picked for a built-in Platform whose chain's first anchor is not found, and the placement reports */
   private readonly repair: PlacementRepair;
+  /** The picked element showed in the wait just read: the placement that follows was asked for by the pick (pickShowsBeside) */
+  private pickShowed = false;
+  /**
+   * Whether the waits of this placement count the picked element showing. Not after a placement
+   * asked for by the pick that could not use it: a selector by position (`:nth-of-type`) may
+   * match only while the icon is in the bar, and counting it again would place the icon again
+   * and again
+   */
+  private pickCounts = true;
   private iconCleanups: Map<HTMLElement, () => void>;
   /**
    * Themes the Prompts button when the extension's theme is read or changes. The theme manager
@@ -312,8 +321,9 @@ export class PromptLibraryInjector {
    * The removal, the wait, then reading the Library, and React the first time, can take a moment:
    * a user who goes on typing in the field meanwhile, or clicks elsewhere, wants their text or that
    * other field, not a selector that takes the focus from them, so the opening is then dropped.
+   * `removed` is called once the removal is over, whatever its outcome, before the Library is read.
    */
-  private openFromTyping(field: HTMLElement): void {
+  private openFromTyping(field: HTMLElement, removed: () => void): void {
     let dropped = false;
     const teardowns = this.teardowns;
     // A key, a paste, a drop or a composed character in the field, or a click anywhere (another
@@ -338,13 +348,18 @@ export class PromptLibraryInjector {
       document.addEventListener(type, onUserAction, true);
     }
     const open = async (): Promise<void> => {
-      if (!(await removeTypedTrigger(field))) {
-        debug('Could not remove the typed //, the prompt selector stays closed');
-        return;
+      try {
+        if (!(await removeTypedTrigger(field))) {
+          debug('Could not remove the typed //, the prompt selector stays closed');
+          return;
+        }
+        await editorSettled(field);
+      } finally {
+        removed();
       }
-      await editorSettled(field);
-      // The site turned off or the injector cleaned up meanwhile: no selector over that page
-      if (!dropped && teardowns === this.teardowns) {
+      // The site turned off or the injector cleaned up meanwhile: no selector over that page. Nor
+      // for a field the Platform replaced, or when the Prompts button opened the selector
+      if (!dropped && teardowns === this.teardowns && field.isConnected && !this.selector.isOpen) {
         await this.selector.open(field, this.state.icon);
       }
     };
@@ -391,35 +406,50 @@ export class PromptLibraryInjector {
    * first, as Backspace would, and the rest of the field is left as it is.
    */
   private listenForSelectorTrigger(): void {
-    let scheduled = false;
+    // While the // is taken out, and until the reads the slash's other events set have run, those
+    // reads do nothing: the // they see is the one being removed, or one that could not be
+    let removing = false;
     const onSlash = (event: Event): void => {
-      if (scheduled || this.selector.isOpen) {
+      if (this.selector.isOpen) {
         return;
       }
       const field = this.triggerField(event);
       if (!field) {
         return;
       }
-      // An editor that handles typing itself sends no input event: the key is heard as well
+      // An editor that handles typing itself sends no input event: the key is heard as well, and so
+      // is the beforeinput event, which an editor that cancels it to write the character itself
+      // (Lexical) still lets reach the page
       const typedSlash = event instanceof KeyboardEvent
         ? event.key === '/' && !event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey
         : event instanceof InputEvent && event.data === '/' && !event.isComposing;
       if (!typedSlash) {
         return;
       }
-      scheduled = true;
-      // Once the Platform has handled the character itself: its editor is then up to date
+      // Once the Platform has handled the character itself: its editor is then up to date. Each
+      // event the slash sends reads the field again. The key of the second slash can be heard
+      // before its character is written, and an editor that cancels beforeinput sends no input
+      // event after it: only the read set by its beforeinput sees the //. A read that comes
+      // after the // was taken out, or after the selector opened, does nothing
       window.setTimeout(() => {
-        scheduled = false;
         const before = field.isConnected ? textBeforeCaret(field) : null;
-        if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
+        if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen || removing) {
           return;
         }
-        this.openFromTyping(field);
+        removing = true;
+        // Released once the // is out, or could not be, not when the selector shows: a Library that
+        // takes long to read does not hold the next //. The reads the slash's other events set come
+        // first: a // that stayed is not tried again
+        this.openFromTyping(field, () => {
+          window.setTimeout(() => { removing = false; }, 0);
+        });
       }, 0);
     };
-    this.eventManager.addTrackedEventListener(document, 'keydown', onSlash);
-    this.eventManager.addTrackedEventListener(document, 'input', onSlash);
+    // In the capture phase: a Platform's own slash menu (Microsoft 365 Copilot opens one on a /)
+    // may stop the slash's events at its editor, before they reach the document
+    this.eventManager.addTrackedEventListener(document, 'keydown', onSlash, true);
+    this.eventManager.addTrackedEventListener(document, 'beforeinput', onSlash, true);
+    this.eventManager.addTrackedEventListener(document, 'input', onSlash, true);
   }
 
   /**
@@ -959,6 +989,9 @@ export class PromptLibraryInjector {
 
       // Forget the icon being replaced before it leaves the DOM, so its removal is not taken for a loss
       this.placement.reset();
+      this.repair.placing();
+      this.pickCounts = !this.pickShowed;
+      this.pickShowed = false;
 
       // The icon being replaced may already be out of the DOM (the Platform removed it), where the
       // queries below cannot find it: dispose of it first, with its observer and click listener
@@ -1009,14 +1042,31 @@ export class PromptLibraryInjector {
 
       // Into the Platform's composer, at the first anchor of its chain that is found there
       const iconPlacement = this.platformManager.getIconPlacement();
+      // The element the user picked comes before the chain's later anchors: one of them may show
+      // only at times (a send button while the field holds text), and placing the icon there
+      // would drop the pick, then leave the icon on the overlay once it goes. Only the anchor the
+      // chain was written for takes the icon from a pick on the page
       const resolution = resolveIconPlacement(textarea, iconPlacement);
+      if (iconPlacement && (resolution === null || resolution.index > 0) && this.placeAtOverride(icon, textarea)) {
+        // A toolbar rendered after its editor: if it shows within the grace period, the icon goes into it
+        this.placement.awaitToolbar(() => resolveIconPlacement(textarea, iconPlacement)?.index === 0);
+        return;
+      }
       const injected = resolution !== null;
       if (resolution) {
         placeAtAnchor(icon, resolution);
         this.placement.track(icon, textarea, 'toolbar', resolution.index);
-        this.repair.report('toolbar');
-      } else if (iconPlacement && this.placeAtOverride(icon, textarea)) {
-        return;
+        if (resolution.index > 0 && this.repair.positioning !== null) {
+          // At a later anchor while the picked element is not on the page: it may render late, or
+          // come back after a re-render. The pick ends only once the grace period is over without
+          // it (or without the chain's first anchor)
+          this.placement.awaitToolbar(
+            () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon),
+            () => { this.repair.report('toolbar', true); }
+          );
+        } else {
+          this.repair.report('toolbar', resolution.index > 0);
+        }
       }
 
       // Check if we have custom positioning configuration (declare outside if block for scope)
@@ -1193,7 +1243,7 @@ export class PromptLibraryInjector {
         }
 
         // No toolbar and no custom positioning: the icon is anchored on the editor itself
-        await this.placeOnEditor(icon, textarea, iconPlacement !== undefined);
+        await this.placeOnEditor(icon, textarea, iconPlacement);
       }
 
       debug('Icon injection completed', { 
@@ -1208,16 +1258,15 @@ export class PromptLibraryInjector {
 
   /**
    * Places the icon on the editor when the Platform's toolbar was not found: anchored inside its
-   * bottom-end corner, following scroll and resize. On a built-in Platform, an anchor chain that
-   * found nothing is the sign its UI changed, so it is logged as a warning.
+   * bottom-end corner, following scroll and resize. On a built-in Platform (`iconPlacement`, the
+   * chain that found nothing) the icon waits there for the toolbar, which a Platform may render
+   * after its editor, and goes into it if it shows within the grace period. Still not found after
+   * the grace period of IconPlacementController, the toolbar is taken as changed: that is logged as a warning and
+   * reported, so Settings offers to place the icon. The icon still goes into the chain's toolbar, or
+   * to the element the user picked, if it shows later, and that is reported in place of the overlay.
    */
-  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, hasAnchorChain: boolean): Promise<void> {
-    if (hasAnchorChain) {
-      warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
-        hostname: this.state.hostname
-      });
-      this.repair.report('overlay');
-    } else {
+  private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, iconPlacement: IconPlacement | undefined): Promise<void> {
+    if (!iconPlacement) {
       debug('No anchor chain for this site, the icon is anchored on the editor');
     }
 
@@ -1236,12 +1285,40 @@ export class PromptLibraryInjector {
       this.placeStatically(icon, textarea);
     }
     this.placement.track(icon, textarea, 'overlay');
+    if (iconPlacement) {
+      // The element the user picked may render late too: if it shows within the grace period, the
+      // icon goes there. While the user has a pick, a later anchor of the chain waits for the end
+      // of the grace period: the pick may still render, and comes before it. Once the page has
+      // settled without the pick, any anchor of the chain takes the icon
+      const toolbarShows = (settled: boolean): boolean => {
+        const resolution = resolveIconPlacement(textarea, iconPlacement);
+        return resolution !== null && (resolution.index === 0 || settled || this.repair.positioning === null);
+      };
+      this.placement.awaitToolbar(
+        (settled) => toolbarShows(settled) || this.pickShowsBeside(icon),
+        () => {
+          warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
+            hostname: this.state.hostname
+          });
+          this.repair.report('overlay');
+        },
+        // A composer that gets its toolbar, or the element the user picked, later still takes the
+        // icon, and the overlay report goes. Only the chain's first anchor counts then: a later one
+        // may show only once the draft holds text (a send button), and would move the icon as the
+        // user types, then report the Toolbar and drop the repair. So a composer whose usual
+        // anchor is a later one (Fluent's actions on m365.cloud.microsoft) is not moved late. The
+        // pick is looked for by its selector only: its fingerprint scores every element of its
+        // tag, too much to do once a second. A pick whose selector no longer matches is not found
+        // late
+        { keepWatching: () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon, true) }
+      );
+    }
     debug('Icon anchored on the editor', { method: method ?? 'static' });
   }
 
   /**
-   * Places the icon at the element the user picked for this Platform in Settings, when its
-   * toolbar is not found. False when there is no such element, or it is not on the page: the icon
+   * Places the icon at the element the user picked for this Platform in Settings, when the
+   * chain's first anchor is not found. False when there is no such element, or it is not on the page: the icon
    * then goes on the Anchored overlay, and Settings keeps offering to place it.
    */
   private placeAtOverride(icon: HTMLElement, textarea: HTMLElement): boolean {
@@ -1261,16 +1338,29 @@ export class PromptLibraryInjector {
     return true;
   }
 
+  /**
+   * True when the element the user picked is on the page: not the icon itself, nor an element
+   * inside it, that the pick's selector may find there
+   */
+  private pickShowsBeside(icon: HTMLElement, bySelectorOnly = false): boolean {
+    if (!this.pickCounts) {
+      return false;
+    }
+    const anchor = this.repair.findAnchor({ bySelectorOnly });
+    this.pickShowed = anchor !== null && !icon.contains(anchor);
+    return this.pickShowed;
+  }
+
   /** The user picked an element for this Platform, or the pick was dropped: the icon is placed again */
   private handleOverrideChange(): void {
     const editor = this.state.currentTextarea;
     if (!this.state.isSiteEnabled || !editor?.isConnected) {
       return;
     }
-    // The chain resolves in this tab, and comes before the pick: placing again would only put the
-    // icon back in the same Toolbar
+    // The chain's first anchor is found in this tab, and comes before the pick: placing again would
+    // only put the icon back there. Not at a later anchor of the chain: a pick on the page comes first
     const current = this.placement.current;
-    if (current?.kind === 'toolbar' && current.icon.isConnected) {
+    if (current?.kind === 'toolbar' && current.icon.isConnected && current.anchorIndex === 0) {
       return;
     }
     this.injectIcon(editor).catch((err: unknown) => {

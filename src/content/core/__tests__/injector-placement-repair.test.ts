@@ -15,8 +15,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { changeIconPlacementRepairs, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
+import type { ElementFingerprint } from '../../../types';
+import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
+import { IconPlacementController } from '../icon-placement';
 import { PromptLibraryInjector } from '../injector';
 import { PLACEMENT_REPORT_MESSAGE } from '../placement-repair';
 
@@ -38,7 +40,11 @@ vi.mock('../anchored-overlay', () => ({
   INSIDE_CORNER_INSET: 8,
   AnchoredOverlay: vi.fn(function() {
     return {
-      place: vi.fn().mockResolvedValue('floating-ui'),
+      // As the overlay does, the icon goes into the page
+      place: vi.fn(async (icon: HTMLElement) => {
+        document.body.appendChild(icon);
+        return 'floating-ui';
+      }),
       release: vi.fn().mockReturnValue(false),
       placeWithCSSAnchor: vi.fn().mockReturnValue(false),
       placeWithFloatingUI: vi.fn().mockResolvedValue(false)
@@ -125,6 +131,13 @@ describe('icon placement override on a built-in Platform', () => {
   const stored = async () => (await readIconPlacementRepairs())['claude.ai'];
   /** Lets the storage write, its change event and the placement it starts run */
   const settle = () => new Promise((done) => setTimeout(done, 20));
+  /** Lets a batch of DOM changes settle, and the toolbar it rendered be looked for */
+  const toolbarLookedFor = () => new Promise((done) => setTimeout(done, IconPlacementController.REPLACE_DELAY_MS + 50));
+  /** The time a Platform is given to render its toolbar after its editor: none, unless a test sets it */
+  const grace = (ms: number) => {
+    (IconPlacementController as unknown as { TOOLBAR_GRACE_MS: number }).TOOLBAR_GRACE_MS = ms;
+  };
+  const GRACE_MS = IconPlacementController.TOOLBAR_GRACE_MS;
 
   /** The Platform re-renders its toolbar with the test ids its chain anchors on renamed (or renamed back) */
   const renameToolbar = (from: string, to: string) => {
@@ -138,8 +151,17 @@ describe('icon placement override on a built-in Platform', () => {
     }
   };
 
+  /** The chain's second anchor shows, as a send button does once the field holds text */
+  const showSecondAnchor = () => {
+    const attach = page.querySelector('[data-testid="renamed-chat-input-attach"]') as HTMLElement;
+    const rendered = attach.cloneNode(true) as HTMLElement;
+    rendered.setAttribute('data-testid', 'chat-input-attach');
+    attach.replaceWith(rendered);
+  };
+
   beforeEach(async () => {
     reports.length = 0;
+    grace(0);
     // The service worker: a placement report is applied to storage for the sender tab, tab 1, of its Platform
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (message: { type: string; data: { placement: PlacementReport } }) => {
       if (message.type === PLACEMENT_REPORT_MESSAGE) {
@@ -163,6 +185,226 @@ describe('icon placement override on a built-in Platform', () => {
   afterEach(() => {
     injector.cleanup();
     page.remove();
+    grace(GRACE_MS);
+  });
+
+  it('gives a Platform five seconds to render its toolbar after its editor', () => {
+    expect(GRACE_MS).toBe(5000);
+  });
+
+  it('puts the icon into a toolbar rendered after the editor, and reports nothing', async () => {
+    grace(1000);
+    // The editor is on the page, its toolbar buttons are not yet
+    const buttons = Array.from(page.querySelectorAll('[data-testid="chat-input-attach"], [data-testid="composer-dictate"]'));
+    const places = buttons.map((button) => ({ button, parent: button.parentElement, next: button.nextSibling }));
+    for (const button of buttons) {
+      button.remove();
+    }
+
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+    expect(reports).toEqual([]);
+
+    // The Platform renders them
+    for (const { button, parent, next } of places) {
+      parent?.insertBefore(button, next);
+    }
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('composer-dictate');
+    expect(reports).toEqual([]);
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('reports the overlay only once the toolbar is still missing after the grace period', async () => {
+    grace(300);
+    renameToolbar('', 'renamed-');
+
+    await internals().injectIcon(editor);
+    await toolbarLookedFor();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+    expect(reports).toEqual([]);
+
+    await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+    expect(await stored()).toEqual({ status: 'overlay' });
+  });
+
+  it('moves the icon from the overlay into a toolbar rendered after the grace period, and reports the toolbar in its place', async () => {
+    grace(300);
+    const late = IconPlacementController.LATE_TOOLBAR_CHECK_MS;
+    (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = 100;
+    try {
+      renameToolbar('', 'renamed-');
+      await internals().injectIcon(editor);
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+
+      // The Platform renders the toolbar its chain knows, long after
+      renameToolbar('renamed-', '');
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+
+      expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+      expect(reports).toEqual(['overlay', 'toolbar']);
+      expect(await stored()).not.toEqual({ status: 'overlay' });
+    } finally {
+      (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = late;
+    }
+  });
+
+  it('moves the icon from the picked element into the toolbar once the Platform renders it, and drops the pick', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+
+    // Within the grace period: the Platform rendered its toolbar after its editor
+    renameToolbar('renamed-', '');
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+    await settle();
+
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('composer-dictate');
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('keeps the icon at the picked element when only a later anchor of the chain shows within the grace period', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    const placed = icon();
+
+    // Within the grace period, the chain's second anchor shows; its first one, the toolbar the
+    // chain was written for, does not
+    showSecondAnchor();
+    await new Promise((done) => setTimeout(done, 1000 + IconPlacementController.REPLACE_DELAY_MS + 50));
+
+    expect(icon()).toBe(placed);
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.matches(PICKED)).toBe(true);
+    expect(reports).not.toContain('toolbar');
+    expect((await stored())?.status).toBe('override');
+  });
+
+  it('puts the icon at a later anchor of the chain while the picked element is missing, and back at it once it renders', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    const picked = page.querySelector(PICKED) as HTMLElement;
+    const parent = picked.parentElement as HTMLElement;
+    picked.remove();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    reports.length = 0;
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    expect(reports).toEqual([]);
+
+    // The Platform renders the picked element after the rest of its composer
+    parent.appendChild(picked);
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
+
+    expect(reports).not.toContain('toolbar');
+    expect((await stored())?.override).toEqual({ mode: 'custom', placement: 'before', selector: PICKED });
+
+    // A re-render takes the picked element and the icon out, and brings the element back late
+    // again: the pick counts as it did the first time
+    picked.remove();
+    icon().remove();
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-anchor')).toBe('1'); }, { timeout: 1000 });
+    parent.appendChild(picked);
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
+    expect(reports).not.toContain('toolbar');
+  });
+
+  it('moves the icon from a later anchor into the chain\'s first one once it renders, and ends the pick', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    page.querySelector(PICKED)?.remove();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    reports.length = 0;
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+
+    // Within the grace period, the toolbar the chain was written for renders
+    const dictate = page.querySelector('[data-testid="renamed-composer-dictate"]') as HTMLElement;
+    dictate.setAttribute('data-testid', 'composer-dictate');
+    await toolbarLookedFor();
+
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 200 });
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('places the icon once more, not again and again, for a pick whose selector matches only while the icon is in the bar', async () => {
+    grace(500);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    // A selector by position, as the Element picker writes when it has no better one: with the
+    // icon after the attach button, it finds the next element; without it, nothing
+    const byPosition = '[data-testid="chat-input-attach"] + button + div';
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: byPosition }
+    });
+    await internals().repair.load();
+    reports.length = 0;
+    const placements = vi.spyOn(internals(), 'injectIcon');
+
+    await internals().injectIcon(editor);
+    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 1500 });
+
+    expect(placements.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    expect(await stored()).toBeUndefined();
+  });
+
+  it('ends the pick once the grace period is over without the picked element, the icon at a later anchor of the chain', async () => {
+    grace(300);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    page.querySelector(PICKED)?.remove();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    reports.length = 0;
+    await internals().injectIcon(editor);
+    await settle();
+    expect(reports).toEqual([]);
+
+    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 1000 });
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    expect(await stored()).toBeUndefined();
   });
 
   it('reports nothing while the chain resolves: storage already says the icon is in the toolbar', async () => {
@@ -210,6 +452,282 @@ describe('icon placement override on a built-in Platform', () => {
     expect(reports).toEqual(['overlay', 'override', 'toolbar']);
     expect(await stored()).toBeUndefined();
     expect(internals().repair.positioning).toBeNull();
+  });
+
+  it('places the icon at the element the user picked once it renders after the editor, and reports no overlay', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    const picked = page.querySelector(PICKED) as HTMLElement;
+    const parent = picked.parentElement as HTMLElement;
+    picked.remove();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    reports.length = 0;
+
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    parent.appendChild(picked);
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
+
+    expect(icon().nextElementSibling).toBe(picked);
+    expect(reports).not.toContain('overlay');
+  });
+
+  it('places the icon at the element the user picked, not at a later anchor of the chain, and keeps the pick', async () => {
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.matches(PICKED)).toBe(true);
+    expect(reports).not.toContain('toolbar');
+    expect((await stored())?.status).toBe('override');
+  });
+
+  describe('after the grace period, the icon left on the overlay', () => {
+    const LATE = IconPlacementController.LATE_TOOLBAR_CHECK_MS;
+    const lateChecks = (ms: number) => {
+      (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = ms;
+    };
+    beforeEach(() => { lateChecks(100); });
+    afterEach(() => { lateChecks(LATE); });
+
+    /** A pick stored whose element is not on the page, the chain finding nothing: the icon ends on the overlay */
+    const leftOnOverlay = async ({ fingerprint }: { fingerprint?: ElementFingerprint } = {}) => {
+      grace(300);
+      renameToolbar('', 'renamed-');
+      const picked = page.querySelector(PICKED) as HTMLElement;
+      const parent = picked.parentElement as HTMLElement;
+      picked.remove();
+      await changeIconPlacementRepairs({
+        type: 'setOverride',
+        hostname: 'claude.ai',
+        positioning: { mode: 'custom', placement: 'before', selector: PICKED, ...(fingerprint ? { fingerprint } : {}) }
+      });
+      await internals().repair.load();
+      reports.length = 0;
+      await internals().injectIcon(editor);
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+      return { picked, parent };
+    };
+
+    it('goes to the element the user picked once it renders', async () => {
+      const { picked, parent } = await leftOnOverlay();
+
+      parent.appendChild(picked);
+
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
+      expect(icon().nextElementSibling).toBe(picked);
+    });
+
+    it('looks for the missing picked element by its selector only, not scoring the page by its fingerprint', async () => {
+      const findElement = vi.spyOn(getElementFingerprintGenerator(), 'findElement').mockReturnValue(null);
+      const findAnchor = vi.spyOn(internals().repair, 'findAnchor');
+      try {
+        const { parent } = await leftOnOverlay({ fingerprint: { primary: {} } as unknown as ElementFingerprint });
+        findElement.mockClear();
+        findAnchor.mockClear();
+
+        // The page keeps changing, the picked element still missing: each change is looked at
+        for (let change = 0; change < 3; change++) {
+          parent.appendChild(document.createElement('span'));
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+
+        // The late watch looked, and by the selector
+        expect(findAnchor).toHaveBeenCalledWith({ bySelectorOnly: true });
+        expect(findElement).not.toHaveBeenCalled();
+      } finally {
+        findAnchor.mockRestore();
+        findElement.mockRestore();
+      }
+    });
+
+    it('goes to the chain\'s first anchor once it renders, the picked element still missing', async () => {
+      await leftOnOverlay();
+
+      renameToolbar('renamed-', '');
+
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+      expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay', 'toolbar']); }, { timeout: 1000 });
+    });
+
+    it('stays on the overlay when a later anchor of the chain renders, as a send button once the user types, and keeps the pick', async () => {
+      await leftOnOverlay();
+
+      showSecondAnchor();
+      // Several late checks go by
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+      expect(reports).toEqual(['overlay']);
+      expect((await readIconPlacementRepairs())['claude.ai']?.override).toMatchObject({ selector: PICKED });
+    });
+  });
+
+  it('puts the icon at a later anchor of the chain only once the grace period is over without the picked element', async () => {
+    grace(500);
+    renameToolbar('', 'renamed-');
+    page.querySelector(PICKED)?.remove();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    // Within the grace period: the picked element may still render, and comes before it
+    showSecondAnchor();
+    await toolbarLookedFor();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    // The page settled without the picked element
+    await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    expect(reports).not.toContain('overlay');
+  });
+
+  it('sends no placement for this tab while its icon waits on the overlay, when another tab stores a repair', async () => {
+    grace(300);
+    // The icon was in the toolbar, then the Platform re-rendered the composer without it
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar');
+    renameToolbar('', 'renamed-');
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    // Another tab of the Platform reports the overlay: the Toolbar of before is no longer this tab's placement
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay', tabId: 2 });
+    await settle();
+    expect(reports).toEqual([]);
+
+    await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+  });
+
+  it('places the icon at an element picked while it waits at a later anchor of the chain', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: '[data-testid="not-rendered-yet"]' }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+
+    // The user picks an element on the page, in this tab or another
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
+  });
+
+  it.each([
+    ['once the grace period ended without the earlier pick', '[data-testid="not-rendered-yet"]'],
+    ['when the user had no pick', null]
+  ])('places the icon at an element picked after it settled at a later anchor of the chain, %s', async (_case, earlier) => {
+    grace(50);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    if (earlier) {
+      await changeIconPlacementRepairs({
+        type: 'setOverride',
+        hostname: 'claude.ai',
+        positioning: { mode: 'custom', placement: 'before', selector: earlier }
+      });
+      await internals().repair.load();
+    }
+    await internals().injectIcon(editor);
+    await vi.waitFor(() => { expect(internals().placement.current?.kind).toBe('toolbar'); });
+    await new Promise((done) => setTimeout(done, 200));
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+
+    // The user picks an element on the page: it comes before the chain's later anchors
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
+  });
+
+  it.each([
+    ['keeps the icon at the chain\'s first anchor', false, true],
+    ['places the icon again at a later anchor of the chain', true, false]
+  ])('on a new pick, %s', async (_case, later, kept) => {
+    if (later) {
+      renameToolbar('', 'renamed-');
+      showSecondAnchor();
+    }
+    await internals().injectIcon(editor);
+    const placed = icon();
+    expect(placed.getAttribute('data-mpm-anchor')).toBe(later ? '1' : '0');
+
+    internals().handleOverrideChange();
+    await settle();
+
+    expect(icon() === placed).toBe(kept);
+  });
+
+  it('puts the icon at a later anchor of the chain rendered within the grace period when the user has no pick', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    await internals().injectIcon(editor);
+    await settle();
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    showSecondAnchor();
+    await toolbarLookedFor();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar');
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    expect(reports).toEqual([]);
+  });
+
+  it('does not take the icon itself for the element the user picked', async () => {
+    grace(300);
+    renameToolbar('', 'renamed-');
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: 'button[data-prompt-library-icon]' }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    const placed = icon();
+    expect(placed.getAttribute('data-mpm-placement')).toBe('overlay');
+
+    // On the overlay the icon is on the page, where the pick's selector now finds it
+    await vi.waitFor(() => { expect(reports).toContain('overlay'); }, { timeout: 1000 });
+    expect(icon()).toBe(placed);
+    expect(placed.isConnected).toBe(true);
   });
 
   it('places the icon by the button whose inner icon the user clicked, not inside it', async () => {

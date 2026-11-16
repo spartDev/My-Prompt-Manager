@@ -98,7 +98,8 @@ const pickerStarts = new Set<PickerStart>();
  * By tab, the latest activation sent there that the page answered. The page keeps the picker of the
  * last activation it received, and those arrive in the order they were sent, whatever the order
  * their answers come back in: a start whose activation a later one followed stores no session,
- * so the session stored always names the activation the page holds.
+ * so the session stored always names the activation the page holds. An activation sent again,
+ * while the content script did not listen yet, is numbered again when it is sent.
  */
 let pickerActivationsSent = 0;
 
@@ -1387,6 +1388,18 @@ async function handleOpenPickerWindow(
 
 /** The answer to a start a stop ended while it activated */
 const PICKER_STOPPED = "The element picker was stopped";
+const PICKER_TAB_CLOSED = "The tab was closed";
+
+/**
+ * How long a content script just injected is given to listen for the picker's activation. Its loader
+ * imports the script, which registers its listener once loaded: a moment, or seconds on a loaded
+ * machine, where a fixed wait of 100 ms lost the activation (e2e, PR #576, 2026-11-16).
+ */
+const PICKER_LISTENER_TIMEOUT_MS = 5000;
+const PICKER_LISTENER_RETRY_MS = 100;
+
+/** Chrome's answer to a message sent to a tab where nothing listens yet */
+const isNoListener = (error: unknown): boolean => /Receiving end does not exist/i.test(toError(error).message);
 
 /**
  * Ends the picker a start activated in its tab, and only that one: the page has one picker per
@@ -1470,12 +1483,16 @@ async function handleStartElementPicker(
       await chrome.windows.update(tab.windowId, { focused: true });
     }
 
-    // Use the ContentScriptInjector to ensure content script is injected
+    // Use the ContentScriptInjector to ensure content script is injected. One already there listens
+    // (its flag is set once its modules, the picker's listener among them, are loaded); one injected
+    // now may not yet
+    let justInjected = false;
     try {
       // Check if content script is already injected
       const isInjected = await injector.isContentScriptInjected(targetTabId);
 
       if (!isInjected) {
+        justInjected = true;
         // Force inject the content script
         const injectionResult =
           await injector.forceInjectContentScript(targetTabId);
@@ -1489,9 +1506,6 @@ async function handleStartElementPicker(
           });
           return;
         }
-
-        // Wait a bit for the script to initialize
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
       Logger.error("Error checking/injecting content script", toError(error), {
@@ -1513,14 +1527,43 @@ async function handleStartElementPicker(
       return;
     }
 
-    // Now send the message to activate element picker
+    // Now send the message to activate element picker. A content script injected a moment ago may
+    // not listen yet: the activation is sent again until it does, the start is stopped or the tab
+    // is gone. Each send takes a new number: one sent after a newer start's must not pass for older
     start.activation = nextPickerActivation();
+    const listenedBy = Date.now() + PICKER_LISTENER_TIMEOUT_MS;
     try {
-      await chrome.tabs.sendMessage(targetTabId, {
-        type: "ACTIVATE_ELEMENT_PICKER",
-        source: "background",
-        attempt,
-      });
+      for (;;) {
+        try {
+          await chrome.tabs.sendMessage(targetTabId, {
+            type: "ACTIVATE_ELEMENT_PICKER",
+            source: "background",
+            attempt,
+          });
+          break;
+        } catch (notListening) {
+          if (!justInjected || !isNoListener(notListening) || Date.now() >= listenedBy) {
+            throw notListening;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, PICKER_LISTENER_RETRY_MS));
+        // A closed tab will never listen
+        const open = await chrome.tabs.get(targetTabId).then(() => true, () => false);
+        if (!open) {
+          Logger.warn("The tab closed before the element picker could be activated", {
+            component: "Background",
+            tabId: targetTabId,
+          });
+          sendResponse({ success: false, error: PICKER_TAB_CLOSED });
+          return;
+        }
+        // Checked last, with nothing awaited until the send: a stop during the wait sends nothing
+        if (start.stopped) {
+          sendResponse({ success: false, error: PICKER_STOPPED });
+          return;
+        }
+        start.activation = nextPickerActivation();
+      }
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
         component: "Background",

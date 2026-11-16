@@ -2,8 +2,9 @@
  * E2E: an Insertion puts the Prompt where the caret is (My-Prompt-Manager-7k4; CONTEXT.md, Insertion)
  *
  * Runs the built extension's content script on the stand-in page of each of the seven Platforms,
- * and on the stand-ins of the rich text editors three of them have live (ProseMirror on ChatGPT
- * and Mistral, Lexical on Perplexity). On each, with a real caret in a real browser:
+ * on the stand-ins of the rich text editors four of them have live (ProseMirror on ChatGPT and
+ * Mistral, Lexical on Perplexity and on Microsoft 365 Copilot at copilot.cloud.microsoft), and on
+ * the composer M365 Copilot had at m365.cloud.microsoft. On each, with a real caret in a real browser:
  * - the Prompt goes where the caret is, and the text before and after it stays;
  * - the caret ends right after the Prompt;
  * - selected text is replaced by the Prompt;
@@ -17,7 +18,7 @@ import type { Page } from '@playwright/test';
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
 import { fieldText, insertionPill, undoButton } from '../fixtures/insertion-flow';
-import { ALL_FIXTURES, choosePrompt, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { ALL_FIXTURES, choosePrompt, expectSelectorOpen, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const ROLE = { id: 'role', title: 'Reviewer role', content: 'as a senior reviewer, ' };
@@ -60,7 +61,7 @@ test.describe('An Insertion puts the Prompt where the caret is', () => {
 
       // Opened by typing //: the Prompt goes where the caret is, and the caret ends after it
       await page.keyboard.type('//');
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
       await expect.poll(() => fieldText(field)).toBe('Review this diff');
       await promptRow(page, ROLE.id).click();
       await expect(promptSelector(page)).toBeHidden();

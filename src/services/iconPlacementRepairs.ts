@@ -5,14 +5,18 @@
  *
  * The lifecycle of an override:
  * 1. The content script finds no anchor of the Platform's chain and puts the icon on the Anchored
- *    overlay: it reports `overlay`, and the Platform's row in Settings offers "Place the icon".
+ *    overlay. Still none after a grace period (a Platform may render its toolbar after its
+ *    editor), it reports `overlay`, and the Platform's row in Settings offers "Place the icon".
  * 2. The user picks an element of the Platform with the Element picker: the service worker stores
  *    it as the Platform's override, the content script places the icon there and reports `override`.
- * 3. Once a release fixes the chain, the content script finds its anchor again and reports
- *    `toolbar`: the Platform's entry, override included, is dropped, unless another tab of the
- *    Platform still has the icon on the overlay or the override (another variant of its UI). A tab
- *    that closes, or leaves the Platform, is forgotten, and the status follows the tabs left
- *    (forgetIconPlacementTab).
+ * 3. Once a release fixes the chain, or the toolbar the icon waited for renders, the content
+ *    script finds its anchor again and reports `toolbar`: the Platform's entry, override
+ *    included, is dropped, unless another tab of the Platform still has the icon on the overlay
+ *    or the override (another variant of its UI). A tab that closes, or leaves the Platform, is
+ *    forgotten, and the status follows the tabs left (forgetIconPlacementTab). While the picked
+ *    element is on the page, only the chain's first anchor ends the pick: a later one may show
+ *    only at times (a send button), and ends it only once the grace period is over without the
+ *    picked element.
  *
  * Kept under a key of its own, apart from the Site settings, and written only by the service
  * worker, under a lock shared by the extension's contexts. The module imports neither

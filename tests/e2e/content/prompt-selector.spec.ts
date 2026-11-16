@@ -11,7 +11,7 @@ import type { Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS, type Prompt } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
-import { enterKeys, listedTitles, openPlatform, openPromptSelector, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
+import { enterKeys, expectSelectorOpen, listedTitles, openPlatform, openPromptSelector, PLATFORM_FIELD, PLATFORM_FIXTURES, type PlatformFixture, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/prompt-selector';
@@ -89,7 +89,7 @@ test.describe('Prompt selector on each Platform', () => {
       // Open from the button with the keyboard
       await promptsButton(page).focus();
       await page.keyboard.press('Enter');
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
 
       // Arrows move the selection and change tab; Enter on an empty list does nothing
       await page.keyboard.press('ArrowDown');
@@ -101,7 +101,7 @@ test.describe('Prompt selector on each Platform', () => {
       }
       await expect(selectedTab(page)).toHaveText('Research');
       await page.keyboard.press('Enter');
-      await expect(promptSelector(page)).toBeVisible();
+      await expectSelectorOpen(page);
 
       // Back to Writing, down to the Prompt with Variables, Enter opens the variables step
       await page.keyboard.press('ArrowLeft');
