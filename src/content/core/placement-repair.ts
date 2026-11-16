@@ -37,7 +37,7 @@ export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
   /** The placement last sent for this tab; null when the service worker may hold none, or another */
   private sent: PlacementReport | null = null;
-  /** How the icon was last placed in this tab, sent or not; null until a placement reports: before the first, and while one waits */
+  /** How the icon was last placed in this tab, sent or not; null until a placement reports: before the first, and while one waits on the overlay or at a later anchor */
   private placed: PlacementReport | null = null;
   /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
   private atLaterAnchor = false;
