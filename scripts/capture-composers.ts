@@ -184,6 +184,80 @@ export function headerUrl(url: string): string {
   }
 }
 
+/** What may stand right before or after an address in a message: a space, a quote, a bracket, a parenthesis, or punctuation that ends a sentence */
+const BEFORE_ADDRESS = '(?<=^|[\\s"\'(<])';
+const AFTER_ADDRESS = '(?=$|[\\s"\'<>)]|[.,;:](?:$|\\s))';
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** An address as headerUrl writes it, with the trailing punctuation and closing parentheses that are the message's given back */
+function redactAddress(match: string, opened: number): string {
+  let url = match;
+  let open = opened;
+  for (;;) {
+    if (/[.,;:]$/.test(url)) {
+      url = url.slice(0, -1);
+    } else if (open > 0 && url.endsWith(')') && url.split(')').length > url.split('(').length) {
+      url = url.slice(0, -1);
+      open--;
+    } else {
+      break;
+    }
+  }
+  return `${headerUrl(url)}${match.slice(url.length)}`;
+}
+
+/**
+ * The address as page.goto prints it in its errors (Playwright's Frame.goto): as `new URL()`
+ * writes it when it parses, else as passed; then http:// before one that starts with localhost
+ * or 127.0.0.1.
+ */
+export function addressAsPrinted(requested: string): string {
+  let resolved = requested;
+  try {
+    resolved = new URL(requested).toString();
+  } catch {
+    // Not an address new URL() parses: as passed
+  }
+  return resolved.startsWith('localhost') || resolved.startsWith('127.0.0.1') ? `http://${resolved}` : resolved;
+}
+
+/**
+ * A message with every address in it as headerUrl writes it. The requested address is replaced
+ * first, as page.goto prints it (addressAsPrinted), as typed and as `new URL()` writes the
+ * printed form, whatever its scheme and whatever it holds (a space in a path), but only as a
+ * whole address, never inside a longer one. Then any other http(s) or file address (the
+ * browser's own, in "interrupted by another navigation to"), up to a space, a double quote or an
+ * angle bracket; trailing punctuation, and a closing parenthesis the message opened, stay the
+ * message's.
+ */
+export function redactUrls(message: string, requested = ''): string {
+  // As capture passes it to page.goto, untrimmed: new URL() keeps and encodes what trim() would drop (a no-break space)
+  const printed = addressAsPrinted(requested);
+  const typed = requested.trim();
+  const forms = new Set<string>();
+  if (printed.includes(':')) {
+    forms.add(printed);
+    forms.add(addressAsPrinted(typed));
+    forms.add(typed);
+    try {
+      forms.add(new URL(printed).toString());
+    } catch {
+      // Not an address: only the forms as written
+    }
+  }
+  let redacted = message;
+  // Longest first, so a form that holds another is replaced whole
+  for (const form of [...forms].sort((a, b) => b.length - a.length)) {
+    redacted = redacted.replace(new RegExp(`${BEFORE_ADDRESS}${escapeRegExp(form)}${AFTER_ADDRESS}`, 'g'), () => headerUrl(printed));
+  }
+  return redacted.replace(/\b(?:https?|file):\/\/[^\s"<>]+/gi, (match: string, offset: number, whole: string) => {
+    const before = whole.slice(0, offset);
+    return redactAddress(match, before.split('(').length - before.split(')').length);
+  });
+}
+
+
 export type CaptureResult =
   | { id: string; outcome: 'captured'; composerFound: boolean; file: string }
   | { id: string; outcome: 'no-editor'; url: string }
@@ -191,8 +265,10 @@ export type CaptureResult =
 
 /**
  * The exit code of a capture run: non-zero when a requested Platform was not captured (signed
- * out, a selector that drifted, a page that failed), even when others were and their chains pass,
- * so a stale fixture never passes for a fresh one; else the chain tests' code when they ran.
+ * out, a selector that drifted, a page that failed), or was captured from an ancestor of its
+ * editor because its chain's composer selector found nothing, even when others were and their
+ * chains pass, so a stale fixture or a drifted chain never passes, with or without --no-test;
+ * else the chain tests' code when they ran.
  *
  * @param testsStatus - The chain tests' exit code; undefined when they did not run
  */
@@ -200,7 +276,7 @@ export function captureExitCode(results: readonly CaptureResult[], testsStatus?:
   if (testsStatus !== undefined && testsStatus !== 0) {
     return testsStatus ?? 1;
   }
-  return results.length > 0 && results.every((result) => result.outcome === 'captured') ? 0 : 1;
+  return results.length > 0 && results.every((result) => result.outcome === 'captured' && result.composerFound) ? 0 : 1;
 }
 
 /** Tried after a Platform's own selectors, in this order */
@@ -242,9 +318,11 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
       return null;
     }
   };
-  if (!(await findEditor())) {
+  const firstEditor = await findEditor();
+  if (!firstEditor) {
     return { id, outcome: 'no-editor', url };
   }
+  await firstEditor.dispose();
   await page.waitForTimeout(options.settle);
   // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile
   const editorHandle = await findEditor();
@@ -272,6 +350,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
     },
     { composerSelector: platform.iconPlacement?.composer ?? '', marker: EDITOR_MARKER, depth: FALLBACK_DEPTH }
   );
+  await editorHandle.dispose();
 
   const { document } = new JSDOM('<!doctype html><body></body>').window;
   document.body.innerHTML = live.html;
@@ -332,11 +411,11 @@ async function main(): Promise<number> {
 
   for (const result of results) {
     if (result.outcome === 'no-editor') {
-      process.stdout.write(`  ${result.id}: no editor at ${result.url} (signed out?), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: no editor at ${headerUrl(result.url)} (signed out?), fixture kept as it was\n`);
     } else if (result.outcome === 'error') {
-      process.stdout.write(`  ${result.id}: capture failed at ${result.url} (${result.message}), fixture kept as it was\n`);
+      process.stdout.write(`  ${result.id}: capture failed at ${headerUrl(result.url)} (${redactUrls(result.message, result.url)}), fixture kept as it was\n`);
     } else if (!result.composerFound) {
-      process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}\n`);
+      process.stdout.write(`  ${result.id}: CHAIN COMPOSER NOT FOUND, an ancestor of the editor written to ${shown(result.file)}: the run fails\n`);
     } else {
       process.stdout.write(`  ${result.id}: written to ${shown(result.file)}\n`);
     }

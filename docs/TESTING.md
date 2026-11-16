@@ -30,7 +30,7 @@ Every test file runs in **happy-dom** unless it says otherwise in a comment at i
 
 It runs before each test file and resets before each test:
 
-- **A fake `chrome`**: `chrome.storage.local` is an in-memory store (`src/test/utils/InMemoryStorage.ts`) that answers like Chrome, callbacks and promises, `getBytesInUse` included; `runtime`, `tabs`, `permissions` and `scripting` are `vi.fn()` with neutral defaults. A test sets `chrome.runtime.lastError` or overrides a mock for its own case.
+- **A fake `chrome`**: `chrome.storage.local` is an in-memory store (`src/test/utils/InMemoryStorage.ts`) that answers like Chrome, callbacks and promises, `getBytesInUse` included; `chrome.storage.session` is a second in-memory store (promises only), emptied before each test as a browser restart empties it; `runtime`, `tabs`, `permissions` and `scripting` are `vi.fn()` with neutral defaults (`tabs.getCurrent` resolves to undefined, as in the action popup and the side panel). A test sets `chrome.runtime.lastError` or overrides a mock for its own case.
 - **Spied singletons**: `StorageManager.getInstance()` and `PromptManager.getInstance()` return an instance whose methods are `vi.fn()` wrapping the real ones. Tests run the real storage logic on the fake storage, and can still assert calls or force a failure with `mockRejectedValueOnce`.
 - **DOM stubs**: `matchMedia`, the clipboard and the other browser APIs happy-dom lacks.
 - `@testing-library/jest-dom` matchers.

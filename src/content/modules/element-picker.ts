@@ -74,18 +74,22 @@ const SENSITIVE_DOMAINS = [
   /citibank\./i
 ];
 
-type ElementPickerMessage = { source?: string; type?: string };
+/** `attempt` names the start of the service worker an activation came from; a deactivation that names one ends only that activation */
+type ElementPickerMessage = { source?: string; type?: string; attempt?: string };
 type RuntimeMessageListener = Parameters<typeof chrome.runtime.onMessage.addListener>[0];
 
 interface ElementPickerListeners {
   mousemove?: EventListener;
   click?: EventListener;
   keydown?: EventListener;
+  pagehide?: EventListener;
   message?: RuntimeMessageListener;
 }
 
 export class ElementPicker {
   private isActive = false;
+  /** The start of the service worker this activation came from, if any */
+  private attempt: string | undefined;
   private overlay: HTMLDivElement | null = null;
   private highlightBox: HTMLDivElement | null = null;
   private infoBox: HTMLDivElement | null = null;
@@ -376,7 +380,9 @@ export class ElementPicker {
   /**
    * Activate the element picker
    */
-  activate(): void {
+  activate(attempt?: string): void {
+    // A start that activates the picker again takes it over: its deactivation is now the one that ends it
+    this.attempt = attempt;
     if (this.isActive) {return;}
     
     info('[ElementPicker] Activating element picker mode');
@@ -400,8 +406,10 @@ export class ElementPicker {
   /**
    * Deactivate the element picker
    */
-  deactivate(): void {
+  deactivate(attempt?: string): void {
     if (!this.isActive) {return;}
+    // A deactivation sent for an earlier start leaves the picker of a later one active
+    if (attempt !== undefined && attempt !== this.attempt) {return;}
     
     info('[ElementPicker] Deactivating element picker mode');
     this.isActive = false;
@@ -522,6 +530,12 @@ export class ElementPicker {
     const boundHandleKeyDown: EventListener = (event: Event) => {
       this.handleKeyDown(event as KeyboardEvent);
     };
+    // The page unloads (a reload, a navigation): the pick can no longer come, so the service
+    // worker forgets the session, as for Escape
+    const boundHandlePageHide: EventListener = () => {
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED', attempt: this.attempt }).catch(() => undefined);
+      this.deactivate();
+    };
     const boundHandleMessage: RuntimeMessageListener = (message, sender, sendResponse) => {
       this.handleMessage(message as ElementPickerMessage, sender, sendResponse);
     };
@@ -529,12 +543,14 @@ export class ElementPicker {
     document.addEventListener('mousemove', boundHandleMouseMove, true);
     document.addEventListener('click', boundHandleClick, true);
     document.addEventListener('keydown', boundHandleKeyDown, true);
+    window.addEventListener('pagehide', boundHandlePageHide);
     chrome.runtime.onMessage.addListener(boundHandleMessage);
     
     // Store listeners for cleanup
     this.listeners.mousemove = boundHandleMouseMove;
     this.listeners.click = boundHandleClick;
     this.listeners.keydown = boundHandleKeyDown;
+    this.listeners.pagehide = boundHandlePageHide;
     this.listeners.message = boundHandleMessage;
   }
 
@@ -542,7 +558,7 @@ export class ElementPicker {
    * Detach event listeners
    */
   private detachEventListeners(): void {
-    const { mousemove, click, keydown, message } = this.listeners;
+    const { mousemove, click, keydown, pagehide, message } = this.listeners;
 
     if (mousemove) {
       document.removeEventListener('mousemove', mousemove, true);
@@ -552,6 +568,9 @@ export class ElementPicker {
     }
     if (keydown) {
       document.removeEventListener('keydown', keydown, true);
+    }
+    if (pagehide) {
+      window.removeEventListener('pagehide', pagehide);
     }
     if (message) {
       chrome.runtime.onMessage.removeListener(message);
@@ -680,7 +699,8 @@ export class ElementPicker {
       event.preventDefault();
       event.stopPropagation();
       
-      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED' });
+      // Names the start whose picker it cancels: the service worker may have stored a later one's since
+      void chrome.runtime.sendMessage({ type: 'PICKER_CANCELLED', attempt: this.attempt });
       this.deactivate();
     }
   }
@@ -693,10 +713,10 @@ export class ElementPicker {
     
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
-        this.activate();
+        this.activate(message.attempt);
         break;
       case 'DEACTIVATE_ELEMENT_PICKER':
-        this.deactivate();
+        this.deactivate(message.attempt);
         break;
     }
   }
@@ -1015,16 +1035,16 @@ export function getElementPicker(): ElementPicker {
 }
 
 // Listen for activation messages
-chrome.runtime.onMessage.addListener((message: { source?: string; type?: string }) => {
+chrome.runtime.onMessage.addListener((message: ElementPickerMessage) => {
   if (message.source === 'background') {
     const picker = getElementPicker();
     
     switch (message.type) {
       case 'ACTIVATE_ELEMENT_PICKER':
-        picker.activate();
+        picker.activate(message.attempt);
         break;
       case 'DEACTIVATE_ELEMENT_PICKER':
-        picker.deactivate();
+        picker.deactivate(message.attempt);
         break;
     }
   }

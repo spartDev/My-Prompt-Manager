@@ -5,6 +5,8 @@
 
 import {
   changeIconPlacementRepairs,
+  forgetIconPlacementTab,
+  moveIconPlacementTab,
   overrideFromPick,
   type PlacementReport,
   type PlacementReportResponse,
@@ -23,16 +25,198 @@ import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
 import { recordInstall, recordUpdateFrom } from "../whatsNew/storage";
 
-// Track active element picker sessions
-const activePickerSessions = new Map<
-  number,
-  {
-    tabId: number;
-    windowId: number;
-    /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
-    repairHostname?: string;
+/** An Element picker open in a tab, from START_ELEMENT_PICKER until the pick or its cancel */
+interface PickerSession {
+  tabId: number;
+  windowId: number;
+  /** Set when the pick repairs the icon placement of this built-in Platform (Settings, "Place the icon") */
+  repairHostname?: string;
+  /** The START_ELEMENT_PICKER that stored it: a stop removes a session only as it saw it, never a newer start's */
+  attempt?: string;
+  /** When its activation was sent, in the order of all activations: a cancel removes it if sent no later than the one cancelled */
+  activation?: number;
+}
+
+const PICKER_SESSION_KEY_PREFIX = "pickerSession:";
+const pickerSessionKey = (tabId: number): string => `${PICKER_SESSION_KEY_PREFIX}${tabId}`;
+
+function isPickerSession(value: unknown): value is PickerSession {
+  if (typeof value !== "object" || value === null) {
+    return false;
   }
->();
+  const session = value as Record<string, unknown>;
+  return typeof session.tabId === "number"
+    && typeof session.windowId === "number"
+    && (session.repairHostname === undefined || typeof session.repairHostname === "string")
+    && (session.attempt === undefined || typeof session.attempt === "string")
+    && (session.activation === undefined || typeof session.activation === "number");
+}
+
+// The changes of picker sessions run one after the other, so a change that reads then writes is one step
+let pickerSessionChanges: Promise<unknown> = Promise.resolve();
+function changePickerSessions<T>(change: () => Promise<T>): Promise<T> {
+  const run = pickerSessionChanges.then(change);
+  pickerSessionChanges = run.catch(() => undefined);
+  return run;
+}
+
+/** The sessions held now, by tab, with the start that stored each */
+async function readPickerSessions(): Promise<Map<number, PickerSession>> {
+  const stored = await chrome.storage.session.get(null);
+  const sessions = new Map<number, PickerSession>();
+  for (const [key, value] of Object.entries(stored)) {
+    if (key.startsWith(PICKER_SESSION_KEY_PREFIX) && isPickerSession(value)) {
+      sessions.set(value.tabId, value);
+    }
+  }
+  return sessions;
+}
+
+/**
+ * A START_ELEMENT_PICKER not yet stored. A stop that runs meanwhile finds no session to end, so it
+ * marks the starts in flight instead: each one it marked stores nothing, and ends its picker if it
+ * already sent its activation. Held in memory: a service worker restart ends the starts in flight with it.
+ */
+interface PickerStart {
+  stopped: boolean;
+  /** Names its activation in the page, and its session */
+  attempt: string;
+  /** The tab it activates the picker in, once known: a cancel there stops it too */
+  tabId?: number;
+  /** When its activation was sent, in the order of all activations; 0 until then */
+  activation: number;
+  /**
+   * Set while its store step writes its session, past the stop check: a cancel does not count it
+   * among the starts it stops, since it will keep its picker once the write succeeds. Should the
+   * write fail, the step itself removes the older session (see pickerSessions.set).
+   */
+  storing?: boolean;
+}
+const pickerStarts = new Set<PickerStart>();
+
+/**
+ * By tab, the latest activation sent there that the page answered. The page keeps the picker of the
+ * last activation it received, and those arrive in the order they were sent, whatever the order
+ * their answers come back in: a start whose activation a later one followed stores no session,
+ * so the session stored always names the activation the page holds.
+ */
+let pickerActivationsSent = 0;
+
+/**
+ * The stamp of an activation sent now: above every one this service worker sent before, and above
+ * those of a session stored before it restarted as long as the clock was not set back meanwhile
+ */
+function nextPickerActivation(): number {
+  pickerActivationsSent = Math.max(Date.now(), pickerActivationsSent + 1);
+  return pickerActivationsSent;
+}
+const pickerActivationsAnswered = new Map<number, number>();
+
+/**
+ * The open picker sessions, in chrome.storage.session under one key per tab, not in memory: Chrome
+ * stops the service worker after about 30 s with no event, and hovering the page sends none, so a
+ * session held in memory would be gone by the time the user clicks, and the pick lost. Every
+ * change goes through one chain, and a change that depends on what is stored reads it in its step.
+ */
+const pickerSessions = {
+  async get(tabId: number): Promise<PickerSession | undefined> {
+    const key = pickerSessionKey(tabId);
+    const stored: unknown = (await chrome.storage.session.get(key))[key];
+    return isPickerSession(stored) ? stored : undefined;
+  },
+  /**
+   * Stores the session of a picker now active in its tab, unless a stop marked its start
+   * ("stopped") or a later activation in the tab took over the picker ("superseded"). Checked in
+   * the step, so a stop either marked the start first or reads the session it stored.
+   */
+  set(session: PickerSession, start: PickerStart): Promise<"stored" | "stopped" | "superseded"> {
+    return changePickerSessions(async () => {
+      if (start.stopped) {
+        return "stopped";
+      }
+      if ((pickerActivationsAnswered.get(session.tabId) ?? 0) > start.activation) {
+        return "superseded";
+      }
+      start.storing = true;
+      try {
+        await chrome.storage.session.set({ [pickerSessionKey(session.tabId)]: session });
+      } catch (error) {
+        start.storing = false;
+        // The page took this start's activation after the older session's, so that session has
+        // no picker left: it goes too. Should this removal fail as well, after the write (two
+        // storage failures), the older session stays until something else removes it
+        const older = await pickerSessions.get(session.tabId).catch(() => undefined);
+        if (older && (older.activation ?? 0) < start.activation) {
+          await chrome.storage.session.remove(pickerSessionKey(session.tabId)).catch(() => undefined);
+        }
+        throw error;
+      }
+      return "stored";
+    });
+  },
+  /** Takes the tab's session for a pick: read and removed in one step */
+  take(tabId: number): Promise<PickerSession | undefined> {
+    return changePickerSessions(async () => {
+      const session = await pickerSessions.get(tabId);
+      if (session) {
+        await chrome.storage.session.remove(pickerSessionKey(tabId));
+      }
+      return session;
+    });
+  },
+  delete(tabId: number): Promise<void> {
+    return changePickerSessions(() => chrome.storage.session.remove(pickerSessionKey(tabId)));
+  },
+  /**
+   * Removes the tab's session as its picker is cancelled, read and removed in one step. The session
+   * goes if it is the cancelled start's, or of an activation sent no later than `activation`, the
+   * latest one among the starts in flight the cancel stopped, which each end their own picker. A
+   * session of a later activation is kept: its picker is the one the page holds now. With no start
+   * named, the session goes whichever it is.
+   */
+  cancel(tabId: number, attempt: string | undefined, activation: number | undefined): Promise<void> {
+    return changePickerSessions(async () => {
+      const session = await pickerSessions.get(tabId);
+      if (!session) {
+        return;
+      }
+      const cancelled = attempt === undefined
+        || session.attempt === attempt
+        || (activation !== undefined && (session.activation ?? 0) <= activation);
+      if (cancelled) {
+        await chrome.storage.session.remove(pickerSessionKey(tabId));
+      }
+    });
+  },
+  /** The sessions held now, to stop them */
+  snapshot(): Promise<Map<number, PickerSession>> {
+    return changePickerSessions(readPickerSessions);
+  },
+  /** Removes the sessions of a snapshot still as they were: a start since keeps its own */
+  removeUnchanged(snapshot: ReadonlyMap<number, PickerSession>): Promise<void> {
+    return changePickerSessions(async () => {
+      const current = await readPickerSessions();
+      const keys = [...snapshot.values()]
+        .filter((session) => current.get(session.tabId)?.attempt === session.attempt)
+        .map((session) => pickerSessionKey(session.tabId));
+      if (keys.length > 0) {
+        await chrome.storage.session.remove(keys);
+      }
+    });
+  },
+};
+
+/** Forgets a tab's picker session, as its tab closes */
+function forgetPickerSession(tabId: number): void {
+  pickerActivationsAnswered.delete(tabId);
+  pickerSessions.delete(tabId).catch((error: unknown) => {
+    Logger.warn("Could not forget a picker session", {
+      component: "Background",
+      tabId,
+      error: getErrorMessage(error),
+    });
+  });
+}
 
 const storageManager = StorageManager.getInstance();
 
@@ -591,10 +775,47 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 // Clean up when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   injector.cleanup(tabId);
-  if (activePickerSessions.has(tabId)) {
-    activePickerSessions.delete(tabId);
+  forgetPickerSession(tabId);
+  forgetPlacementTab(tabId, null);
+});
+
+// A tab whose page Chrome swapped (a prerender, a discard) gets a new id: its placement on the
+// Platform the new page is on goes with it, whatever order Chrome tells the swap and the new URL in;
+// its placements on other Platforms are forgotten
+chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
+  void movePlacementTab(removedTabId, addedTabId);
+});
+
+async function movePlacementTab(removedTabId: number, addedTabId: number): Promise<void> {
+  try {
+    const tab = await chrome.tabs.get(addedTabId).catch(() => undefined);
+    const hostname = repairablePlatformHostname(tab?.url);
+    if (hostname) {
+      await moveIconPlacementTab(removedTabId, addedTabId, hostname);
+    }
+  } catch (error) {
+    Logger.warn("Could not move the icon placement of a replaced tab", { component: "Background", addedTabId, removedTabId, error: getErrorMessage(error) });
+  }
+  forgetPlacementTab(removedTabId, null);
+}
+
+// A tab that leaves a Platform no longer keeps its icon placement repair
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.url !== undefined) {
+    forgetPlacementTab(tabId, repairablePlatformHostname(changeInfo.url));
   }
 });
+
+/** Forgets the icon placement of a tab, but on the Platform it is on now */
+function forgetPlacementTab(tabId: number, keepHostname: string | null): void {
+  forgetIconPlacementTab(tabId, keepHostname).catch((error: unknown) => {
+    Logger.warn("Could not forget the icon placement of a tab", {
+      component: "Background",
+      tabId,
+      error: getErrorMessage(error),
+    });
+  });
+}
 
 // Inject when extension icon is clicked (activeTab permission)
 chrome.action.onClicked.addListener((tab) => {
@@ -629,9 +850,73 @@ void (async () => {
   }
 })();
 
-// Track the picker window
-let pickerWindowId: number | null = null;
-let originalTabId: number | null = null;
+/** The picker window of the Custom site flow, and the tab it picks in */
+interface PickerWindow {
+  windowId: number | null;
+  originalTabId: number | null;
+}
+
+const PICKER_WINDOW_KEY = "pickerWindow";
+const NO_PICKER_WINDOW: PickerWindow = { windowId: null, originalTabId: null };
+let pickerWindowUpdates: Promise<void> = Promise.resolve();
+
+/**
+ * The picker window, in chrome.storage.session like the picker sessions, so that after a service
+ * worker restart a pick still brings the window back to the front, and closing it still stops the
+ * picker.
+ */
+const pickerWindow = {
+  async read(): Promise<PickerWindow> {
+    const stored: unknown = (await chrome.storage.session.get(PICKER_WINDOW_KEY))[PICKER_WINDOW_KEY];
+    if (typeof stored !== "object" || stored === null) {
+      return NO_PICKER_WINDOW;
+    }
+    const { windowId, originalTabId } = stored as Record<string, unknown>;
+    return {
+      windowId: typeof windowId === "number" ? windowId : null,
+      originalTabId: typeof originalTabId === "number" ? originalTabId : null,
+    };
+  },
+  /** Changes some of its fields; the changes run one after the other, so none is lost or undone */
+  async update(change: Partial<PickerWindow>): Promise<void> {
+    await changePickerWindow(() => change);
+  },
+  /** Forgets the tab it picks in if it is this one: a picker window opened since for another tab keeps its own */
+  async forgetTabIf(tabId: number): Promise<void> {
+    await changePickerWindow((current) => (current.originalTabId === tabId ? { originalTabId: null } : null));
+  },
+  /**
+   * Forgets the picker window if it is this one, in one change: a window opened since keeps its
+   * record. True when it was this one.
+   */
+  async forgetIf(windowId: number): Promise<boolean> {
+    let matched = false;
+    await changePickerWindow((current) => {
+      matched = current.windowId === windowId;
+      return matched ? NO_PICKER_WINDOW : null;
+    });
+    return matched;
+  },
+};
+
+/** Runs a change of the picker window after the ones before it; a change that returns null writes nothing */
+function changePickerWindow(change: (current: PickerWindow) => Partial<PickerWindow> | null): Promise<void> {
+  const run = pickerWindowUpdates.then(async () => {
+    const current = await pickerWindow.read();
+    const fields = change(current);
+    if (fields === null) {
+      return;
+    }
+    const next = { ...current, ...fields };
+    if (next.windowId === null && next.originalTabId === null) {
+      await chrome.storage.session.remove(PICKER_WINDOW_KEY);
+      return;
+    }
+    await chrome.storage.session.set({ [PICKER_WINDOW_KEY]: next });
+  });
+  pickerWindowUpdates = run.catch(() => undefined);
+  return run;
+}
 
 // Message types for element picker and injection
 interface BackgroundMessage {
@@ -646,6 +931,8 @@ interface BackgroundMessage {
     | "REQUEST_PERMISSION"
     | "PROMPT_USAGE_INCREMENT"
     | "ICON_PLACEMENT_REPORTED";
+  /** PICKER_CANCELLED: the start whose picker the page cancelled */
+  attempt?: string;
   data?: {
     /** START_ELEMENT_PICKER: the built-in Platform the pick places the icon for */
     repairHostname?: string;
@@ -683,8 +970,16 @@ chrome.runtime.onMessage.addListener(
         void handleElementSelected(message.data, sender, sendResponse);
         break;
 
-      case "STOP_ELEMENT_PICKER":
       case "PICKER_CANCELLED":
+        // From the picker in a tab (Escape, or its page unloading): only that tab's pick ends
+        if (sender.tab?.id !== undefined) {
+          void handlePickerCancelled(sender.tab.id, message.attempt, sendResponse);
+          break;
+        }
+        void handleStopElementPicker(undefined, sender, sendResponse);
+        break;
+
+      case "STOP_ELEMENT_PICKER":
         void handleStopElementPicker(undefined, sender, sendResponse);
         break;
 
@@ -727,13 +1022,18 @@ async function handleIconPlacementReported(
   sender: chrome.runtime.MessageSender,
   sendResponse: (response: PlacementReportResponse) => void,
 ) {
+  // A prerendered page is not the tab's page yet: its sender tab is the page it may replace
+  if (sender.documentLifecycle === "prerender") {
+    sendResponse({ success: false, error: "Not the tab's page yet" });
+    return;
+  }
   const hostname = repairablePlatformHostname(sender.tab?.url);
   if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
     sendResponse({ success: false, error: "Not a placement report of a built-in platform", permanent: true });
     return;
   }
   try {
-    await changeIconPlacementRepairs({ type: "reportPlacement", hostname, placement });
+    await changeIconPlacementRepairs({ type: "reportPlacement", hostname, placement, tabId: sender.tab?.id });
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Failed to record the icon placement", toError(error), {
@@ -1020,6 +1320,7 @@ async function handleOpenPickerWindow(
 ) {
   try {
     // Store the original tab that we're picking from
+    let originalTabId: number | null = null;
     let originalUrl = "";
     let originalHostname = "";
 
@@ -1073,15 +1374,26 @@ async function handleOpenPickerWindow(
       top: 100,
     });
 
-    pickerWindowId = window?.id ?? null;
+    await pickerWindow.update({ windowId: window?.id ?? null, originalTabId });
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error opening picker window", toError(error), {
       component: "Background",
-      originalTabId,
+      targetTabId,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
+}
+
+/** The answer to a start a stop ended while it activated */
+const PICKER_STOPPED = "The element picker was stopped";
+
+/**
+ * Ends the picker a start activated in its tab, and only that one: the page has one picker per
+ * tab, and a start since may have activated it again. A tab that closed has none to end.
+ */
+function deactivatePicker(tabId: number, attempt: string | undefined): Promise<unknown> {
+  return chrome.tabs.sendMessage(tabId, { type: "DEACTIVATE_ELEMENT_PICKER", source: "background", attempt }).catch(() => undefined);
 }
 
 /**
@@ -1097,17 +1409,21 @@ async function handleStartElementPicker(
   }) => void,
   repairHostname?: string,
 ) {
+  // Names this start's activation in the page, and its session
+  const attempt = crypto.randomUUID();
+  const start: PickerStart = { stopped: false, attempt, activation: 0 };
+  pickerStarts.add(start);
   try {
     // Determine which tab to activate picker on
     let targetTabId: number | null = null;
 
-    // First priority: Use the explicitly passed tab ID (from picker window)
+    // First priority: the explicitly passed tab ID (from picker window); second, the original
+    // tab stored as the picker window opened, if any
+    const storedTabId = passedTabId ? null : (await pickerWindow.read()).originalTabId;
     if (passedTabId) {
       targetTabId = passedTabId;
-    }
-    // Second priority: Use the original tab stored (from picker window), if any
-    else if (originalTabId) {
-      targetTabId = originalTabId;
+    } else if (storedTabId) {
+      targetTabId = storedTabId;
     } else {
       // Otherwise, get the active tab (but not the popup itself)
       const tabs = await chrome.tabs.query({
@@ -1130,6 +1446,7 @@ async function handleStartElementPicker(
       });
       return;
     }
+    start.tabId = targetTabId;
 
     // Get the tab details
     const tab = await chrome.tabs.get(targetTabId);
@@ -1144,12 +1461,6 @@ async function handleStartElementPicker(
       return;
     }
 
-    // Store picker session
-    activePickerSessions.set(targetTabId, {
-      tabId: targetTabId,
-      windowId: sender.tab?.windowId || 0,
-      ...(repairHostname !== undefined ? { repairHostname } : {}),
-    });
 
     // Switch to the target tab
     await chrome.tabs.update(targetTabId, { active: true });
@@ -1195,13 +1506,21 @@ async function handleStartElementPicker(
       return;
     }
 
+    // A start stopped before it activates sends nothing: an activation sent after the stop could
+    // reach the page after the one of a start since, and take its place
+    if (start.stopped) {
+      sendResponse({ success: false, error: PICKER_STOPPED });
+      return;
+    }
+
     // Now send the message to activate element picker
+    start.activation = nextPickerActivation();
     try {
       await chrome.tabs.sendMessage(targetTabId, {
         type: "ACTIVATE_ELEMENT_PICKER",
         source: "background",
+        attempt,
       });
-      sendResponse({ success: true, tabId: targetTabId });
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
         component: "Background",
@@ -1212,7 +1531,37 @@ async function handleStartElementPicker(
         error:
           "Failed to activate element picker. Please refresh the page and try again.",
       });
+      return;
     }
+    if ((pickerActivationsAnswered.get(targetTabId) ?? 0) < start.activation) {
+      pickerActivationsAnswered.set(targetTabId, start.activation);
+    }
+
+    // Stored once the picker is active, never before: a start that fails leaves nothing behind,
+    // and of two starts on one tab, the last one active is the one kept
+    let stored: "stored" | "stopped" | "superseded";
+    try {
+      stored = await pickerSessions.set({
+        tabId: targetTabId,
+        windowId: sender.tab?.windowId || 0,
+        ...(repairHostname !== undefined ? { repairHostname } : {}),
+        attempt,
+        activation: start.activation,
+      }, start);
+    } catch (error) {
+      // A picker with no session would take a pick nobody keeps
+      await deactivatePicker(targetTabId, attempt);
+      throw error;
+    }
+    if (stored === "stopped") {
+      // Stopped while it activated: the stop could not reach this picker, so it ends here
+      await deactivatePicker(targetTabId, attempt);
+      sendResponse({ success: false, error: PICKER_STOPPED });
+      return;
+    }
+    // Superseded: the picker is active in the tab, under the later start that stores its session.
+    // Should that start then fail to store it, it ends the picker and answers the failure itself.
+    sendResponse({ success: true, tabId: targetTabId });
   } catch (error) {
     Logger.error("Error starting element picker", toError(error), {
       component: "Background",
@@ -1220,6 +1569,8 @@ async function handleStartElementPicker(
       senderTabId: sender.tab?.id,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
+  } finally {
+    pickerStarts.delete(start);
   }
 }
 
@@ -1234,25 +1585,24 @@ async function handleElementSelected(
   try {
     const tabId = sender.tab?.id;
 
-    if (!tabId || !activePickerSessions.has(tabId)) {
+    // Taken in one step: a start that lands meanwhile keeps its own session
+    const session = tabId ? await pickerSessions.take(tabId) : undefined;
+    if (!tabId || !session) {
       sendResponse({ success: false, error: "No active picker session" });
       return;
     }
 
-    const session = activePickerSessions.get(tabId);
-    // Remove session
-    activePickerSessions.delete(tabId);
 
     // A pick for a built-in Platform's icon is its override, stored here: the popup that asked
     // for it has closed by now. The content script places the icon there when storage changes.
-    if (session?.repairHostname) {
+    if (session.repairHostname) {
       const positioning = overrideFromPick(data);
       if (!positioning || repairablePlatformHostname(sender.tab?.url) !== session.repairHostname) {
         sendResponse({ success: false, error: "The pick names no element of this platform" });
         return;
       }
       await changeIconPlacementRepairs({ type: "setOverride", hostname: session.repairHostname, positioning });
-      originalTabId = null;
+      await pickerWindow.forgetTabIf(tabId);
       sendResponse({ success: true });
       return;
     }
@@ -1269,24 +1619,59 @@ async function handleElementSelected(
       },
     });
 
-    // If we have a picker window, focus it
-    if (pickerWindowId) {
-      try {
-        await chrome.windows.update(pickerWindowId, { focused: true });
-      } catch {
-        // Window might be closed, ignore
-        pickerWindowId = null;
-      }
+    // If we have a picker window, focus it. One that closed is forgotten by windows.onRemoved, not here:
+    // a window opened since may have taken its place
+    const { windowId } = await pickerWindow.read();
+    if (windowId) {
+      await chrome.windows.update(windowId, { focused: true }).catch(() => undefined);
     }
 
     // Clear the original tab reference
-    originalTabId = null;
+    await pickerWindow.forgetTabIf(tabId);
 
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error handling element selection", toError(error), {
       component: "Background",
       senderTabId: sender.tab?.id,
+    });
+    sendResponse({ success: false, error: getErrorMessage(error) });
+  }
+}
+
+/**
+ * The picker of one tab was cancelled there (Escape, or its page unloading): its session is
+ * forgotten; the picks open in other tabs go on
+ */
+async function handlePickerCancelled(
+  tabId: number,
+  attempt: string | undefined,
+  sendResponse: (response?: { success: boolean; error?: string }) => void,
+) {
+  // A start in flight in the tab would bring the picker back after the cancel: marked, it stores
+  // nothing and ends its picker by its attempt, unless its store step already passed the stop check. A start whose tab is not known yet is not one of them:
+  // every caller names the tab.
+  // The latest activation sent among the starts it stops: each of them ends its own picker, so a
+  // session of an activation sent no later has no picker left either
+  let latestStopped: number | undefined;
+  for (const start of pickerStarts) {
+    if (start.tabId === tabId) {
+      start.stopped = true;
+      // One writing its session keeps its picker if the write succeeds: it is not counted
+      if (start.activation > 0 && !start.storing) {
+        latestStopped = Math.max(latestStopped ?? 0, start.activation);
+      }
+    }
+  }
+  try {
+    // Not the session of a later start: it may have stored its own since, and its picker is the
+    // one the page holds
+    await pickerSessions.cancel(tabId, attempt, latestStopped);
+    sendResponse({ success: true });
+  } catch (error) {
+    Logger.error("Error cancelling element picker", toError(error), {
+      component: "Background",
+      tabId,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
@@ -1300,49 +1685,52 @@ async function handleStopElementPicker(
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: { success: boolean; error?: string }) => void,
 ) {
+  let sessions: Map<number, PickerSession> = new Map();
+  // The starts in flight have no session yet: marked now, before the snapshot, they store none
+  for (const start of pickerStarts) {
+    start.stopped = true;
+  }
   try {
-    // Clear all active sessions
-    for (const [tabId] of activePickerSessions) {
-      await chrome.tabs
-        .sendMessage(tabId, {
-          type: "DEACTIVATE_ELEMENT_PICKER",
-          source: "background",
-        })
-        .catch(() => {
-          // Tab might be closed, ignore error
-        });
+    // Clear all active sessions: those held now, unless a start replaced one meanwhile
+    sessions = await pickerSessions.snapshot();
+    // Each picker as the snapshot saw it: one a start activated since in the same tab goes on
+    for (const session of sessions.values()) {
+      await deactivatePicker(session.tabId, session.attempt);
     }
 
-    activePickerSessions.clear();
+    await pickerSessions.removeUnchanged(sessions);
     sendResponse({ success: true });
   } catch (error) {
     Logger.error("Error stopping element picker", toError(error), {
       component: "Background",
-      activeSessionCount: activePickerSessions.size,
+      activeSessionCount: sessions.size,
     });
     sendResponse({ success: false, error: getErrorMessage(error) });
   }
 }
 
-// Clean up on tab close
-chrome.tabs.onRemoved.addListener((tabId) => {
-  if (activePickerSessions.has(tabId)) {
-    activePickerSessions.delete(tabId);
-  }
-});
-
 // Clean up on window close
 chrome.windows.onRemoved.addListener((windowId) => {
-  if (pickerWindowId === windowId) {
-    pickerWindowId = null;
-    originalTabId = null;
+  void (async () => {
+    // Whether it is the picker window is in storage, so the stop marks the starts in flight only
+    // once that is read: marked any earlier, a closing window of any kind would stop them. A start
+    // made during that read is stopped with the picker window.
+    if (!(await pickerWindow.forgetIf(windowId))) {
+      return;
+    }
     // Stop any active picker sessions
-    void handleStopElementPicker(
+    await handleStopElementPicker(
       undefined,
       { tab: undefined } as chrome.runtime.MessageSender,
       () => undefined,
     );
-  }
+  })().catch((error: unknown) => {
+    Logger.warn("Could not stop the picker as its window closed", {
+      component: "Background",
+      windowId,
+      error: getErrorMessage(error),
+    });
+  });
 });
 
 // Handle connection for keeping popup alive

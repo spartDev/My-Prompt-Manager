@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Mock } from 'vitest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../../services/iconPlacementRepairs';
 import type { CustomSite } from '../../../types';
@@ -147,6 +147,64 @@ describe('SiteIntegrationSection - a Platform whose icon fell to the Anchored ov
       type: 'START_ELEMENT_PICKER',
       data: { tabId: 9, repairHostname: 'claude.ai' }
     });
+  });
+
+  describe('closing the popup once the Element picker is open, so it does not cover the page', () => {
+    const openedAt = window.location.href;
+    afterEach(() => { window.history.replaceState(null, '', openedAt); });
+
+    const placeFrom = async (path: string, interfaceMode: 'popup' | 'sidepanel', currentTab?: { id: number }) => {
+      const user = userEvent.setup();
+      const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+      window.history.replaceState(null, '', path);
+      (chrome.tabs.getCurrent as unknown as Mock).mockResolvedValue(currentTab);
+      await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+      (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
+        query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
+      render(<SiteIntegrationSection {...defaultProps} interfaceMode={interfaceMode} enabledPlatforms={['claude.ai']} />);
+
+      await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
+      await waitFor(() => { expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'START_ELEMENT_PICKER' })); });
+      // The answer to START_ELEMENT_PICKER settles before the popup closes, or does not
+      await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 0); }); });
+      const closed = close.mock.calls.length;
+      close.mockRestore();
+      return closed;
+    };
+
+    it.each([
+      // The interface mode setting can change while a surface is open: the page says where it is
+      { where: 'the action popup', path: '/src/popup.html', interfaceMode: 'popup' as const, closes: 1 },
+      { where: 'the action popup after switching the setting to side panel', path: '/src/popup.html', interfaceMode: 'sidepanel' as const, closes: 1 },
+      { where: 'the side panel', path: '/src/sidepanel.html', interfaceMode: 'sidepanel' as const, closes: 0 },
+      { where: 'the side panel after switching the setting to popup', path: '/src/sidepanel.html', interfaceMode: 'popup' as const, closes: 0 },
+      { where: 'the picker window', path: '/src/popup.html?picker=true&tabId=3', interfaceMode: 'popup' as const, closes: 0 }
+    ])('$where: closes $closes time(s)', async ({ path, interfaceMode, closes }) => {
+      expect(await placeFrom(path, interfaceMode)).toBe(closes);
+    });
+
+    it('popup.html opened in a tab stays open', async () => {
+      expect(await placeFrom('/src/popup.html', 'popup', { id: 4 })).toBe(0);
+    });
+  });
+
+  it('keeps the popup open with the reason when the Element picker could not open', async () => {
+    const user = userEvent.setup();
+    const close = vi.spyOn(window, 'close').mockImplementation(() => undefined);
+    const openedAt = window.location.href;
+    window.history.replaceState(null, '', '/src/popup.html');
+    await storeRepairs({ 'claude.ai': { status: 'overlay' } });
+    (chrome.tabs.query as unknown as Mock).mockImplementation(async (query: { url?: string }) =>
+      query.url === 'https://claude.ai/*' ? [{ id: 9, active: true }] : []);
+    (chrome.runtime.sendMessage as unknown as Mock).mockResolvedValue({ success: false, error: 'The tab is not on this platform' });
+    render(<SiteIntegrationSection {...defaultProps} interfaceMode="popup" enabledPlatforms={['claude.ai']} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Place the icon' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open the element picker');
+    expect(close).not.toHaveBeenCalled();
+    close.mockRestore();
+    window.history.replaceState(null, '', openedAt);
   });
 
   it('says where to go when no tab is on the Platform', async () => {

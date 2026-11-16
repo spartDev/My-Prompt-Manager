@@ -140,11 +140,11 @@ describe('icon placement override on a built-in Platform', () => {
 
   beforeEach(async () => {
     reports.length = 0;
-    // The service worker: a placement report is applied to storage for the sender tab's Platform
+    // The service worker: a placement report is applied to storage for the sender tab, tab 1, of its Platform
     vi.mocked(chrome.runtime.sendMessage).mockImplementation((async (message: { type: string; data: { placement: PlacementReport } }) => {
       if (message.type === PLACEMENT_REPORT_MESSAGE) {
         reports.push(message.data.placement);
-        await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: message.data.placement });
+        await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: message.data.placement, tabId: 1 });
       }
       return { success: true };
     }) as never);
@@ -241,6 +241,29 @@ describe('icon placement override on a built-in Platform', () => {
     await settle();
 
     expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+    expect(await stored()).toEqual({
+      status: 'overlay',
+      override: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+  });
+
+  it('keeps a pick made in another tab when its icon is in this tab\'s toolbar', async () => {
+    // This tab finds the toolbar; another tab of the Platform, on another variant of its UI, does not
+    await internals().injectIcon(editor);
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay', tabId: 2 });
+    await settle();
+
+    // The user picks an element in that other tab, and the service worker stores it
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    // This tab is counted with its Toolbar once the Platform has a repair, which keeps the pick
+    expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar');
+    expect(reports).toEqual(['toolbar']);
     expect(await stored()).toEqual({
       status: 'overlay',
       override: { mode: 'custom', placement: 'before', selector: PICKED }

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, rulesFor } from '../capture-composers';
+import { addressAsPrinted, type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, redactUrls, rulesFor } from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -243,6 +243,98 @@ describe('parseCaptureArgs', () => {
   });
 });
 
+describe('addressAsPrinted', () => {
+  it.each([
+    ['https://x.example?t=1', 'https://x.example/?t=1'],
+    ['file:///Users/alice/My Docs/claude.html', 'file:///Users/alice/My%20Docs/claude.html'],
+    ['localhost/My Docs/c.html', 'http://localhost/My Docs/c.html'],
+    ['localhost:9/My Docs/c?q=my SECRET', 'http://localhost:9/My Docs/c?q=my%20SECRET'],
+    ['127.0.0.10:9/a', 'http://127.0.0.10:9/a'],
+    ['HTTP://LOCALHOST:9/A b', 'http://localhost:9/A%20b']
+  ])('writes %j as page.goto prints it: %j', (requested, printed) => {
+    expect(addressAsPrinted(requested)).toBe(printed);
+  });
+});
+
+describe('redactUrls', () => {
+  // The address as new URL() writes it: the form of the browser's own addresses, and of the requested one once parsed
+  const printed = (requested: string): string => new URL(requested.trim()).toString();
+
+  it.each([
+    ['https://user:pw@chat.example.com/c/1?token=abc#x', 'https://chat.example.com/c/1'],
+    ['https://x.example/c?token=a(b)SECRET', 'https://x.example/c'],
+    ["https://x.example/c?q=it'sSECRET", 'https://x.example/c'],
+    ['https://user:p(w)SECRET@x.example/c', 'https://x.example/c'],
+    ['https://x.example?t=SECRET', 'https://x.example/'],
+    ["https://x.example/it's?t=SECRET", "https://x.example/it's"],
+    [' https://x.example/c?t=SECRET', 'https://x.example/c'],
+    ['file:///Users/alice/My Docs/claude.html', 'file://<stand-in>/claude.html'],
+    ['http://localhost:5173/a b?t=SECRET', 'http://localhost:5173/a%20b']
+  ])('writes %j in a navigation error as the fixture header does', (requested, written) => {
+    const redacted = redactUrls(`page.goto: net::ERR_CONNECTION_REFUSED at ${printed(requested)}`);
+
+    expect(redacted).toBe(`page.goto: net::ERR_CONNECTION_REFUSED at ${written}`);
+    expect(redacted).not.toMatch(/SECRET|alice|token|pw/);
+  });
+
+  it('redacts both addresses of an interrupted navigation, in their quotes', () => {
+    const message = `page.goto: Navigation to "${printed('https://x.example/c?t=SECRET')}" is interrupted by another navigation to "${printed('https://login.example.com/sso?ticket=SECRET')}"`;
+
+    expect(redactUrls(message)).toBe('page.goto: Navigation to "https://x.example/c" is interrupted by another navigation to "https://login.example.com/sso"');
+  });
+
+  it('leaves the parenthesis or bracket around an address, and a message with no address, as they are', () => {
+    expect(redactUrls('failed (https://a.example/b?x=1)')).toBe('failed (https://a.example/b)');
+    expect(redactUrls('see <https://a.example/b?x=1>.')).toBe('see <https://a.example/b>.');
+    expect(redactUrls('Timeout 30000ms exceeded.')).toBe('Timeout 30000ms exceeded.');
+    expect(redactUrls('net::ERR_ABORTED at https://x.example/c?t=SECRET)')).toBe('net::ERR_ABORTED at https://x.example/c');
+  });
+
+  it.each([
+    ['data:text/html,<p>SECRET</p>'],
+    ['chrome-extension://abc/p.html?t=SECRET']
+  ])('writes a requested address of another scheme (%j) as a stand-in, typed or normalized', (requested) => {
+    const message = `page.goto: Navigation to "${requested}" is interrupted by another navigation to "${new URL(requested).toString()}"`;
+
+    const redacted = redactUrls(message, requested);
+
+    expect(redacted).toBe('page.goto: Navigation to "<stand-in>" is interrupted by another navigation to "<stand-in>"');
+  });
+
+  it.each([
+    // Each address in the form page.goto prints it in its errors (checked on playwright-core 1.65, headless Chromium)
+    ['file:///Users/alice/My Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file:///Users/alice/My%20Docs/claude.html', 'net::ERR_FILE_NOT_FOUND at file://<stand-in>/claude.html'],
+    ['https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c?t=SECRET', 'net::ERR_CONNECTION_REFUSED at https://chat.example/c'],
+    ['localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html?token=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost:8080/claude.html'],
+    ['localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My Docs/c.html?t=SECRET', 'net::ERR_CONNECTION_REFUSED at http://localhost/My%20Docs/c.html'],
+    ['localhost:8080/a?q=my SECRET', 'Navigation to "http://localhost:8080/a?q=my%20SECRET" is interrupted by another navigation to "http://localhost:8080/login"', 'Navigation to "http://localhost:8080/a" is interrupted by another navigation to "http://localhost:8080/login"'],
+    ['localhost:9/My Docs/c?q=my SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My Docs/c?q=my%20SECRET', 'net::ERR_UNSAFE_PORT at http://localhost:9/My%20Docs/c'],
+    ['localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://localhost.localdomain:9/My%20Docs/c'],
+    ['127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My Docs/c?t=SECRET', 'net::ERR_UNSAFE_PORT at http://127.0.0.10:9/My%20Docs/c'],
+    ['localhost:1/a b?t=SECRET\u00a0', 'net::ERR_UNSAFE_PORT at http://localhost:1/a b?t=SECRET%C2%A0', 'net::ERR_UNSAFE_PORT at http://localhost:1/a%20b']
+  ])('writes the requested %j as page.goto prints it, untrimmed', (requested, message, written) => {
+    expect(redactUrls(message, requested)).toBe(written);
+  });
+
+  it('replaces the requested address only whole, never inside a longer one', () => {
+    expect(redactUrls('Navigation to "http://localhost:8080" is interrupted by another navigation to "http://localhost:8080/login?next=SECRET"', 'http://localhost:8080'))
+      .toBe('Navigation to "http://localhost:8080/" is interrupted by another navigation to "http://localhost:8080/login"');
+    expect(redactUrls('to "https://chat.example/" then "https://chat.example:8443/login?t=SECRET"', 'https://chat.example'))
+      .toBe('to "https://chat.example/" then "https://chat.example:8443/login"');
+    expect(redactUrls('at "http://alice:SECRETPW@host/p"', 'http://a')).toBe('at "http://host/p"');
+  });
+
+  it('gives back the punctuation and the parentheses the message opened', () => {
+    expect(redactUrls('failed ((https://a.example/b?x=1))')).toBe('failed ((https://a.example/b))');
+    expect(redactUrls('failed (https://a.example/b?x=1).')).toBe('failed (https://a.example/b).');
+    expect(redactUrls('failed (https://a.example/b?x=1), fixture kept')).toBe('failed (https://a.example/b), fixture kept');
+  });
+
+  it('leaves a message alone when the requested value is no address', () => {
+    expect(redactUrls('net::ERR_NAME_NOT_RESOLVED', 'e')).toBe('net::ERR_NAME_NOT_RESOLVED');
+  });
+});
+
 describe('captureExitCode', () => {
   const captured = (id: string): CaptureResult => ({ id, outcome: 'captured', composerFound: true, file: `/fx/${id}.html` });
   const signedOut: CaptureResult = { id: 'gemini', outcome: 'no-editor', url: 'https://gemini.google.com/' };
@@ -258,6 +350,14 @@ describe('captureExitCode', () => {
     ['with --no-test', undefined]
   ])('fails when one Platform had no editor and another was captured, %s', (_case, testsStatus) => {
     expect(captureExitCode([captured('claude'), signedOut], testsStatus)).toBe(1);
+  });
+
+  it.each([
+    ['with the chain tests passing', 0],
+    ['with --no-test', undefined]
+  ])('fails when a Platform was captured from an ancestor of its editor, its chain\'s composer not found, %s', (_case, testsStatus) => {
+    const ancestor: CaptureResult = { id: 'claude', outcome: 'captured', composerFound: false, file: '/fx/claude.html' };
+    expect(captureExitCode([ancestor, captured('chatgpt')], testsStatus)).toBe(1);
   });
 
   it('fails when a capture failed', () => {

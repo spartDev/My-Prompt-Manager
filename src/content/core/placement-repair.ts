@@ -3,17 +3,22 @@
  * keeps the override the user picked for this Platform in memory, follows its changes in
  * storage, finds the element it names, and tells the service worker how the icon was placed.
  *
- * A report is sent only when it differs from what storage holds, so a Platform whose chain
- * resolves costs one storage read per page load and no message. Two exceptions: a Toolbar report
- * is always sent while an override is held, since only the service worker's write drops it; and a
- * report the service worker did not save is sent again on the next placement, unless it refused it
- * for good.
+ * The service worker keeps how each tab last placed the icon, so a Toolbar in one tab does not drop
+ * a repair another tab needs. The tab's placement is sent when it differs from the last one sent; a
+ * Toolbar is not sent while the Platform has no repair, so a Platform whose chain resolves costs one
+ * storage read per page load and no message. It is sent again, whatever it is: once the Platform has
+ * a repair, so every open tab is counted, those whose icon was in the Toolbar before the repair
+ * included; after a report the service worker did not save, unless it refused it for good; when
+ * storage drops the repair while this tab was off the Toolbar (as by Clear All Data), or holds an
+ * override with no status (a pick stored after the chain resolved); and when the page comes back from
+ * the back/forward cache, since the service worker forgot the tab when it left.
  */
 
 import {
   ICON_PLACEMENT_REPAIRS_KEY,
   type PlacementReport,
   type PlacementReportResponse,
+  type PlatformPlacementRepair,
   parseIconPlacementRepairs,
   readIconPlacementRepairs
 } from '../../services/iconPlacementRepairs';
@@ -26,15 +31,21 @@ export const PLACEMENT_REPORT_MESSAGE = 'ICON_PLACEMENT_REPORTED';
 
 export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
-  /** How storage says the icon was last placed on this Platform; null when a report was not delivered */
-  private stored: PlacementReport | null = 'toolbar';
+  /** The placement last sent for this tab; null when the service worker may hold none, or another */
+  private sent: PlacementReport | null = null;
+  /** How the icon was last placed in this tab, sent or not; null before its first placement */
+  private placed: PlacementReport | null = null;
+  /** Whether storage holds a repair for this Platform: until it does, a Toolbar needs no report */
+  private hasRepair = false;
+  /** How many changes of the repairs this page followed */
+  private changes = 0;
   private listening = false;
   private readonly hostname: string;
   private readonly onOverrideChange: () => void;
 
   /**
    * @param onOverrideChange - Called when the user picks a new element for this Platform, or the
-   *   override is dropped elsewhere, so the icon is placed again
+   *   override is dropped elsewhere, while the icon is off the Toolbar, so it is placed again
    */
   constructor(hostname: string, onOverrideChange: () => void) {
     this.hostname = hostname;
@@ -46,21 +57,34 @@ export class PlacementRepair {
     return this.override;
   }
 
-  /** Reads this Platform's repair and follows its changes */
+  /**
+   * Reads this Platform's repair and follows its changes. It listens before it reads: a repair stored
+   * by another tab during the read reaches it by its storage event, which the read does not undo.
+   */
   async load(): Promise<void> {
-    const repair = (await readIconPlacementRepairs())[this.hostname];
-    this.override = repair?.override ?? null;
-    this.stored = repair?.status ?? 'toolbar';
+    // The first placement of the page is reported, but a Toolbar only while the Platform has a repair
+    this.sent = null;
     if (!this.listening) {
       chrome.storage.onChanged.addListener(this.handleStorageChange);
+      window.addEventListener('pageshow', this.handlePageShow);
+      document.addEventListener('prerenderingchange', this.handlePrerenderingChange);
       this.listening = true;
     }
+    const changesBefore = this.changes;
+    const repair = (await readIconPlacementRepairs())[this.hostname];
+    if (this.changes !== changesBefore) {
+      return;
+    }
+    this.override = repair?.override ?? null;
+    this.hasRepair = repair !== undefined;
   }
 
   /** Stops following storage */
   dispose(): void {
     if (this.listening) {
       chrome.storage.onChanged.removeListener(this.handleStorageChange);
+      window.removeEventListener('pageshow', this.handlePageShow);
+      document.removeEventListener('prerenderingchange', this.handlePrerenderingChange);
       this.listening = false;
     }
   }
@@ -102,32 +126,42 @@ export class PlacementRepair {
   }
 
   /**
-   * Tells the service worker how the icon was placed, when storage says otherwise. A placement in
-   * the Toolbar drops the override at once here, and is always sent while one is held: storage may
-   * hold an override with no status (a pick that came after the chain resolved), which only the
-   * service worker's write removes.
+   * Tells the service worker how the icon was placed in this tab, when it differs from the last
+   * report delivered. A placement in the Toolbar keeps the override here: the service worker drops
+   * it, and storage says so, only when no other tab of the Platform still needs it; the chain comes
+   * before the override, so it is not used while the Toolbar is found.
    */
   report(placement: PlacementReport): void {
-    const dropsOverride = placement === 'toolbar' && this.override !== null;
-    if (dropsOverride) {
-      info('The anchor chain of this Platform resolves again, the element picked for the icon is dropped', {
-        hostname: this.hostname
-      });
-      this.override = null;
-    }
-    if (placement === this.stored && !dropsOverride) {
+    this.placed = placement;
+    if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
       return;
     }
-    this.stored = placement;
+    if ((document as Document & { prerendering?: boolean }).prerendering) {
+      // Not the tab's page yet: the service worker would count it for the page it may replace.
+      // It is sent once the page is activated (prerenderingchange).
+      return;
+    }
+    if (placement === 'toolbar' && this.override !== null) {
+      info('The anchor chain of this Platform resolves again in this tab', { hostname: this.hostname });
+    }
+    this.sent = placement;
     debug('Icon placement reported', { hostname: this.hostname, placement });
     const notSaved = (reason: string) => {
       // The next placement reports again, whatever it is
-      if (this.stored === placement) {
-        this.stored = null;
+      if (this.sent === placement) {
+        this.sent = null;
       }
       debug('Icon placement report not saved', { placement, reason });
     };
-    chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } })
+    let sending: Promise<PlacementReportResponse | undefined>;
+    try {
+      sending = chrome.runtime.sendMessage({ type: PLACEMENT_REPORT_MESSAGE, data: { placement } });
+    } catch (err) {
+      // An orphaned page (the extension reloaded) throws at the call
+      notSaved(String(err));
+      return;
+    }
+    sending
       .then((response: PlacementReportResponse | undefined) => {
         if (response?.success) {
           return;
@@ -148,13 +182,83 @@ export class PlacementRepair {
     if (areaName !== 'local' || !(ICON_PLACEMENT_REPAIRS_KEY in changes)) {
       return;
     }
+    this.changes++;
     const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
-    this.stored = repair?.status ?? 'toolbar';
+    // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
+    // All Data), or an override waits for a status: this tab's placement is sent again
+    if ((!repair && this.sent !== 'toolbar') || (repair && !repair.status)) {
+      this.sent = null;
+    }
+    this.follow(repair);
+  };
+
+  /**
+   * Takes the Platform's repair as storage holds it now. A tab whose icon is off the Toolbar, or not
+   * yet placed, places it again when the pick changed, and that placement is sent; any other tab sends
+   * its placement, when not yet sent: a Toolbar from before the repair included.
+   */
+  private follow(repair: PlatformPlacementRepair | undefined): void {
+    this.hasRepair = repair !== undefined;
     const override = repair?.override ?? null;
-    if (JSON.stringify(override) === JSON.stringify(this.override)) {
+    const changed = JSON.stringify(override) !== JSON.stringify(this.override);
+    this.override = override;
+    if (changed && this.placed !== 'toolbar') {
+      this.onOverrideChange();
       return;
     }
-    this.override = override;
-    this.onOverrideChange();
+    // In the Toolbar the chain comes before any pick: the placement stands
+    this.reportPlaced();
+  }
+
+  /** Sends how the icon was last placed, when it was placed and not yet sent */
+  private reportPlaced(): void {
+    if (this.placed) {
+      this.report(this.placed);
+    }
+  }
+
+  /**
+   * Back from the back/forward cache: the service worker forgot this tab when it left the Platform,
+   * and storage may have changed while the page was frozen. The repair is read again, then this
+   * tab's placement is sent.
+   */
+  private readonly handlePageShow = (event: PageTransitionEvent): void => {
+    if (event.persisted) {
+      this.sendAgain('back/forward cache restore');
+    }
   };
+
+  /**
+   * A prerendered page the user navigated to: it sent nothing while it was not the tab's page, so its
+   * placement is sent now, on the repair read again.
+   */
+  private readonly handlePrerenderingChange = (): void => {
+    this.sendAgain('prerendered page activated');
+  };
+
+  private sendAgain(reason: string): void {
+    const changesBefore = this.changes;
+    // Read here, not by readIconPlacementRepairs: a read that fails must not pass for "no repair".
+    // An orphaned page (the extension reloaded) throws at the call: taken as a failed read.
+    let read: Promise<Record<string, unknown>>;
+    try {
+      read = chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY);
+    } catch (err) {
+      read = Promise.reject(err);
+    }
+    read.then((result) => {
+      this.sent = null;
+      if (this.changes !== changesBefore) {
+        // A storage event during the read is newer than the read, and was followed
+        this.reportPlaced();
+        return;
+      }
+      this.follow(parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY])[this.hostname]);
+    }, (err: unknown) => {
+      // The repair this page holds stands; its placement is sent on it
+      debug('Icon placement repair not read again', { reason, error: String(err) });
+      this.sent = null;
+      this.reportPlaced();
+    });
+  }
 }

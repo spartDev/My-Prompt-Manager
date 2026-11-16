@@ -60,12 +60,13 @@ const claudePage = /* html */ `
           '<svg width="18" height="18" viewBox="0 0 20 20"><path d="M10 3l6 14H4z" fill="currentColor"/></svg></button>' +
           '</div>';
       };
-      window.renderToolbar('renamed-');
+      // ?original: a tab on the variant of the UI the chain knows
+      window.renderToolbar(new URLSearchParams(location.search).has('original') ? '' : 'renamed-');
     </script>
   </body>
 </html>`;
 
-const openClaude = async (context: BrowserContext): Promise<Page> => {
+const openClaude = async (context: BrowserContext, url = 'https://claude.ai/new'): Promise<Page> => {
   await context.route('https://claude.ai/**', async (route) => {
     if (route.request().resourceType() === 'document') {
       await route.fulfill({ status: 200, contentType: 'text/html', body: claudePage });
@@ -74,7 +75,7 @@ const openClaude = async (context: BrowserContext): Promise<Page> => {
     }
   });
   const page = await context.newPage();
-  await page.goto('https://claude.ai/new', { waitUntil: 'domcontentloaded' });
+  await page.goto(url, { waitUntil: 'domcontentloaded' });
   return page;
 };
 
@@ -164,4 +165,64 @@ test.describe('Repairing the icon placement of a Platform from Settings', () => 
       await expect(notice).toHaveCount(0);
     });
   }
+
+  test('a pick holds while another tab of the Platform shows the toolbar the chain knows', async ({ context, storage, extensionId }) => {
+    await seedLibrary(storage, { settings: { ...DEFAULT_SETTINGS, interfaceMode: 'popup' } });
+    await storage.seed({ promptLibrarySettings: { enabledSites: ['claude.ai'], customSites: [] } });
+
+    // A tab still on the variant of the UI the chain knows, then one where the toolbar changed. The
+    // latter is the first tab of the window, the one Place the icon picks in when none is in front.
+    const claude = await context.newPage();
+    const other = await openClaude(context, 'https://claude.ai/new?original');
+    await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+    await claude.goto('https://claude.ai/new', { waitUntil: 'domcontentloaded' });
+    const icon = claude.locator(ICON_ROOT);
+    await expect(icon).toHaveAttribute('data-mpm-placement', 'overlay');
+    await expect.poll(() => repairsOf(storage)).toEqual({ 'claude.ai': { status: 'overlay' } });
+
+    const settings = await context.newPage();
+    await settings.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await settings.getByTestId('tab-settings').click();
+    await claudeRow(settings).getByRole('button', { name: 'Place the icon' }).click();
+    await claude.bringToFront();
+    await expect(claude.locator('#mpm-element-picker-overlay')).toHaveCount(1);
+    const sendBox = await claude.locator(SEND).boundingBox();
+    expect(sendBox).toBeTruthy();
+    if (!sendBox) {
+      return;
+    }
+    await claude.mouse.move(sendBox.x + sendBox.width / 2, sendBox.y + sendBox.height / 2);
+    await claude.mouse.click(sendBox.x + sendBox.width / 2, sendBox.y + sendBox.height / 2);
+
+    // The pick is placed and kept: the other tab, whose icon is in its toolbar, does not drop it
+    await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
+    await expect.poll(async () => (await repairsOf(storage))['claude.ai']?.status).toBe('override');
+    await claude.waitForTimeout(500);
+    expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
+    await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    // The other tab re-renders its toolbar, once then twice, and places the icon in it each time:
+    // the service worker already counts its Toolbar, and keeps the pick the first tab needs
+    for (const placement of [1, 2]) {
+      const before = await other.locator(ICON_ROOT).elementHandle();
+      await other.evaluate(() => { (window as Window & { renderToolbar?: (prefix: string) => void }).renderToolbar?.(''); });
+      await expect.poll(() => before?.evaluate((element) => element.isConnected), { message: `placement ${placement} of the other tab` }).toBe(false);
+      await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+      await claude.waitForTimeout(500);
+      expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
+      await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
+    }
+
+    // The other tab reloads: a page load on a Platform with a repair reports its placement, here its
+    // Toolbar, and the service worker keeps the pick the first tab still needs
+    await other.reload({ waitUntil: 'domcontentloaded' });
+    await expect(other.locator(ICON_ROOT)).toHaveAttribute('data-mpm-placement', 'toolbar');
+    await claude.waitForTimeout(500);
+    expect((await repairsOf(storage))['claude.ai']).toMatchObject({ status: 'override', override: { mode: 'custom', placement: 'before' } });
+    await expect(icon).toHaveAttribute('data-mpm-placement', 'override');
+
+    await settings.bringToFront();
+    await expect(claudeRow(settings).getByTestId('site-placement')).toHaveAttribute('data-status', 'override');
+    await expect(claudeRow(settings).getByRole('button', { name: 'Place again' })).toBeVisible();
+  });
 });

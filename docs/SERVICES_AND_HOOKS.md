@@ -130,7 +130,7 @@ A refusal keeps its type through `StorageManager` and `PromptManager`, so a call
 | `src/hooks/useEnhancedFloatingPosition.ts` | Keep a menu in the viewport (flip, shift) | `Dropdown` |
 | `src/hooks/useSitePermissions.ts` | Check and request host permissions for a site | site integration Settings, `usePickerWindow` |
 | `src/hooks/usePickerWindow.ts` | The element picker flow for a custom site | `SiteIntegrationSection` |
-| `src/hooks/useIconPlacementRepairs.ts` | The icon placement repairs, kept up to date from storage, and `placeIcon`: the Element picker on a tab of the Platform, the pick kept by the service worker | `SiteIntegrationSection` (Place the icon) |
+| `src/hooks/useIconPlacementRepairs.ts` | The icon placement repairs, kept up to date from storage, and `placeIcon`: the Element picker on a tab of the Platform, the pick kept by the service worker; in the action popup (popup.html in no tab, not the picker window), the popup then closes so it does not cover the page | `SiteIntegrationSection` (Place the icon) |
 | `src/hooks/useUsageStats.ts` | Usage history, Prompts and Categories, loaded once, with the Insertions per day and per time of day for the charts | Analytics, its full-page view |
 | `src/hooks/useNow.ts` | The current time, refreshed at an interval, for relative dates | Full-page Analytics view |
 | `src/hooks/useCountUp.ts` | A number counting up from 0 with an ease-out (`MOTION.countUp`); the value at once under reduced motion | Analytics hero |

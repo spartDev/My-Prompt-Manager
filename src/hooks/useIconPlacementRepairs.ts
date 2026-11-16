@@ -14,16 +14,32 @@ export interface UseIconPlacementRepairsReturn {
   /** The hostname whose pick could not start, with why, until the next attempt */
   placeError: { hostname: string; message: string } | null;
   /**
-   * Opens the Element picker on a tab of this Platform, to place the icon there. In the popup, the
-   * popup closes as the tab comes to the front: the service worker keeps the pick.
+   * Opens the Element picker on a tab of this Platform, to place the icon there. In the action
+   * popup, the popup then closes: the service worker keeps the pick.
    */
   placeIcon: (hostname: string) => Promise<void>;
 }
+
 
 /** The tab to pick in: the active one when it is on this Platform, else the first tab that is */
 async function findPlatformTab(hostname: string): Promise<chrome.tabs.Tab | undefined> {
   const tabs = await chrome.tabs.query({ url: `https://${hostname}/*` });
   return tabs.find((tab) => tab.active) ?? tabs[0];
+}
+
+/**
+ * True in the action popup, the page that would stay open over the Platform's tab when that tab is
+ * already in front, hiding part of the page and taking the user's first click. Told by the page
+ * itself, not by the interface mode setting, which can change while a surface is open: popup.html,
+ * not the picker window (popup.html?picker=true, whose closing cancels the pick), and in no tab
+ * (popup.html opened in a tab is a tab). The side panel is sidepanel.html.
+ */
+async function isActionPopup(): Promise<boolean> {
+  const { pathname, search } = window.location;
+  if (!pathname.endsWith('/popup.html') || new URLSearchParams(search).get('picker') === 'true') {
+    return false;
+  }
+  return (await chrome.tabs.getCurrent()) === undefined;
 }
 
 /** The icon placement repairs of the built-in Platforms (src/services/iconPlacementRepairs.ts), kept up to date */
@@ -64,6 +80,9 @@ export function useIconPlacementRepairs(): UseIconPlacementRepairsReturn {
       })) as { success?: boolean; error?: string } | undefined;
       if (!response?.success) {
         throw new Error(response?.error || 'Failed to start element picker');
+      }
+      if (await isActionPopup()) {
+        window.close();
       }
     } catch (error) {
       Logger.error('Failed to start placing the icon', toError(error), { component: 'useIconPlacementRepairs', hostname });
