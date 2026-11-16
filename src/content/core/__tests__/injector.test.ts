@@ -437,6 +437,7 @@ describe('PromptLibraryInjector', () => {
         const { open } = await listen();
         const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
         const listener = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+        expect(listener).toBeDefined();
         mockTextarea.value = 'Draft //';
         mockTextarea.setSelectionRange(8, 8);
 
@@ -447,7 +448,6 @@ describe('PromptLibraryInjector', () => {
         await handled();
         await handled();
 
-        expect(listener).toBeDefined();
         expect(open).not.toHaveBeenCalled();
         expect(mockTextarea.value).toBe('Draft //');
       });
