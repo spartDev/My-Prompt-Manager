@@ -1389,6 +1389,17 @@ async function handleOpenPickerWindow(
 const PICKER_STOPPED = "The element picker was stopped";
 
 /**
+ * How long a content script just injected is given to listen for the picker's activation. Its loader
+ * imports the script, which registers its listener once loaded: a moment, or seconds on a loaded
+ * machine, where a fixed wait of 100 ms lost the activation (e2e, PR #576, 2026-11-16).
+ */
+const PICKER_LISTENER_TIMEOUT_MS = 5000;
+const PICKER_LISTENER_RETRY_MS = 100;
+
+/** Chrome's answer to a message sent to a tab where nothing listens yet */
+const isNoListener = (error: unknown): boolean => /Receiving end does not exist/i.test(toError(error).message);
+
+/**
  * Ends the picker a start activated in its tab, and only that one: the page has one picker per
  * tab, and a start since may have activated it again. A tab that closed has none to end.
  */
@@ -1489,9 +1500,6 @@ async function handleStartElementPicker(
           });
           return;
         }
-
-        // Wait a bit for the script to initialize
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
     } catch (error) {
       Logger.error("Error checking/injecting content script", toError(error), {
@@ -1513,14 +1521,30 @@ async function handleStartElementPicker(
       return;
     }
 
-    // Now send the message to activate element picker
+    // Now send the message to activate element picker. A content script injected a moment ago may
+    // not listen yet: the activation is sent again until it does, or the start is stopped
     start.activation = nextPickerActivation();
+    const listenedBy = Date.now() + PICKER_LISTENER_TIMEOUT_MS;
     try {
-      await chrome.tabs.sendMessage(targetTabId, {
-        type: "ACTIVATE_ELEMENT_PICKER",
-        source: "background",
-        attempt,
-      });
+      for (;;) {
+        try {
+          await chrome.tabs.sendMessage(targetTabId, {
+            type: "ACTIVATE_ELEMENT_PICKER",
+            source: "background",
+            attempt,
+          });
+          break;
+        } catch (notListening) {
+          if (!isNoListener(notListening) || Date.now() >= listenedBy) {
+            throw notListening;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, PICKER_LISTENER_RETRY_MS));
+        if (start.stopped) {
+          sendResponse({ success: false, error: PICKER_STOPPED });
+          return;
+        }
+      }
     } catch (messageError) {
       Logger.error("Failed to activate element picker", toError(messageError), {
         component: "Background",

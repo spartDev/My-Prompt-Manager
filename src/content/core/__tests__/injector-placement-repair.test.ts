@@ -496,6 +496,52 @@ describe('icon placement override on a built-in Platform', () => {
     expect((await stored())?.status).toBe('override');
   });
 
+  describe('after the grace period, the icon left on the overlay', () => {
+    const LATE = IconPlacementController.LATE_TOOLBAR_CHECK_MS;
+    const lateChecks = (ms: number) => {
+      (IconPlacementController as unknown as { LATE_TOOLBAR_CHECK_MS: number }).LATE_TOOLBAR_CHECK_MS = ms;
+    };
+    beforeEach(() => { lateChecks(100); });
+    afterEach(() => { lateChecks(LATE); });
+
+    /** A pick stored whose element is not on the page, the chain finding nothing: the icon ends on the overlay */
+    const leftOnOverlay = async () => {
+      grace(300);
+      renameToolbar('', 'renamed-');
+      const picked = page.querySelector(PICKED) as HTMLElement;
+      const parent = picked.parentElement as HTMLElement;
+      picked.remove();
+      await changeIconPlacementRepairs({
+        type: 'setOverride',
+        hostname: 'claude.ai',
+        positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+      });
+      await internals().repair.load();
+      reports.length = 0;
+      await internals().injectIcon(editor);
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+      return { picked, parent };
+    };
+
+    it('goes to the element the user picked once it renders', async () => {
+      const { picked, parent } = await leftOnOverlay();
+
+      parent.appendChild(picked);
+
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('override'); }, { timeout: 1000 });
+      expect(icon().nextElementSibling).toBe(picked);
+    });
+
+    it('goes to a later anchor of the chain that renders, the picked element still missing', async () => {
+      await leftOnOverlay();
+
+      showSecondAnchor();
+
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+      expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+    });
+  });
+
   it('puts the icon at a later anchor of the chain only once the grace period is over without the picked element', async () => {
     grace(500);
     renameToolbar('', 'renamed-');

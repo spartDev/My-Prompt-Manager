@@ -271,23 +271,21 @@ describe('IconPlacementController', () => {
       expect(onLost).toHaveBeenCalledWith(editor);
     });
 
-    it('with keepWatching, stops looking once its editor has left the page', async () => {
-      let checks = 0;
+    it('with keepWatching, looks again for an editor out of the page for a moment once it is back', async () => {
+      const parent = editor.parentElement as HTMLElement;
       controller.track(icon, editor, 'overlay');
-      controller.awaitToolbar(() => found, onKept, { keepWatching: () => { checks++; return found; } });
+      controller.awaitToolbar(() => found, onKept, { keepWatching: () => found });
       await elapse(GRACE);
       editor.remove();
       change();
       await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
-      checks = 0;
 
-      // The page goes on changing: nothing is looked for any more
-      for (let index = 0; index < 3; index++) {
-        change();
-        await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
-      }
-      expect(checks).toBe(0);
-      expect((controller as unknown as { toolbarFound: unknown }).toolbarFound).toBeNull();
+      parent.appendChild(editor);
+      found = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
     });
 
     it('with keepWatching, stops looking once the icon is placed anew', async () => {

@@ -1259,8 +1259,8 @@ export class PromptLibraryInjector {
    * chain that found nothing) the icon waits there for the toolbar, which a Platform may render
    * after its editor, and goes into it if it shows within the grace period. Still not found after
    * the grace period of IconPlacementController, the toolbar is taken as changed: that is logged as a warning and
-   * reported, so Settings offers to place the icon. The icon still goes into the chain's toolbar if
-   * it shows later, and that is reported in place of the overlay.
+   * reported, so Settings offers to place the icon. The icon still goes into the chain's toolbar, or
+   * to the element the user picked, if it shows later, and that is reported in place of the overlay.
    */
   private async placeOnEditor(icon: HTMLElement, textarea: HTMLElement, iconPlacement: IconPlacement | undefined): Promise<void> {
     if (!iconPlacement) {
@@ -1299,9 +1299,10 @@ export class PromptLibraryInjector {
           });
           this.repair.report('overlay');
         },
-        // A composer that gets its toolbar later still takes the icon, and the overlay report goes.
-        // Only the chain is looked for then: finding a pick scans the page, too much once a second
-        { keepWatching: () => toolbarShows(true) }
+        // A composer that gets its toolbar, or the element the user picked, later still takes the
+        // icon, and the overlay report goes. Looking for a pick whose element is missing scans the
+        // elements of its tag: once a second at most, and only for a user who has a pick
+        { keepWatching: () => toolbarShows(true) || this.pickShowsBeside(icon) }
       );
     }
     debug('Icon anchored on the editor', { method: method ?? 'static' });

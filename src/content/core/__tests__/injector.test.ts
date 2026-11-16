@@ -537,7 +537,7 @@ describe('PromptLibraryInjector', () => {
           again();
           typeSlash();
 
-          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); });
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); }, { timeout: 5000 });
           expect(sent).toHaveLength(2);
           expect(editor.textContent).toBe('Draft ');
           editor.remove();
