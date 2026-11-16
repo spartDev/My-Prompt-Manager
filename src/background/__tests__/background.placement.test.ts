@@ -429,6 +429,17 @@ describe('background: a picker that could not be activated leaves no session', (
       expect(tries).toBe(3);
     });
 
+    it('fails at once in a tab just injected that answers another error than not listening', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('The page is gone'));
+
+      const response = await send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+
+      expect(response).toMatchObject({ success: false });
+      expect(activations()).toHaveLength(1);
+    });
+
     it('fails at once in a tab whose content script was already there, which then does not listen at all', async () => {
       const listener = await startServiceWorker();
       vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error(NO_LISTENER));

@@ -321,9 +321,9 @@ export class PromptLibraryInjector {
    * The removal, the wait, then reading the Library, and React the first time, can take a moment:
    * a user who goes on typing in the field meanwhile, or clicks elsewhere, wants their text or that
    * other field, not a selector that takes the focus from them, so the opening is then dropped.
-   * Resolves once the selector shows, or the opening is given up.
+   * `removed` is called once the removal is over, whatever its outcome, before the Library is read.
    */
-  private openFromTyping(field: HTMLElement): Promise<void> {
+  private openFromTyping(field: HTMLElement, removed: () => void): void {
     let dropped = false;
     const teardowns = this.teardowns;
     // A key, a paste, a drop or a composed character in the field, or a click anywhere (another
@@ -348,11 +348,15 @@ export class PromptLibraryInjector {
       document.addEventListener(type, onUserAction, true);
     }
     const open = async (): Promise<void> => {
-      if (!(await removeTypedTrigger(field))) {
-        debug('Could not remove the typed //, the prompt selector stays closed');
-        return;
+      try {
+        if (!(await removeTypedTrigger(field))) {
+          debug('Could not remove the typed //, the prompt selector stays closed');
+          return;
+        }
+        await editorSettled(field);
+      } finally {
+        removed();
       }
-      await editorSettled(field);
       // The site turned off or the injector cleaned up meanwhile: no selector over that page. Nor
       // for a field the Platform replaced, or when the Prompts button opened the selector
       if (!dropped && teardowns === this.teardowns && field.isConnected && !this.selector.isOpen) {
@@ -360,7 +364,7 @@ export class PromptLibraryInjector {
       }
     };
     // Once the selector shows, what the user does is its own business: the listeners go
-    return open().then(stop, stop);
+    open().then(stop, stop);
   }
 
   /**
@@ -433,8 +437,10 @@ export class PromptLibraryInjector {
           return;
         }
         removing = true;
-        // The reads the slash's other events set come first: a // that stayed is not tried again
-        void this.openFromTyping(field).finally(() => {
+        // Released once the // is out, or could not be, not when the selector shows: a Library that
+        // takes long to read does not hold the next //. The reads the slash's other events set come
+        // first: a // that stayed is not tried again
+        this.openFromTyping(field, () => {
           window.setTimeout(() => { removing = false; }, 0);
         });
       }, 0);
@@ -1297,10 +1303,12 @@ export class PromptLibraryInjector {
           this.repair.report('overlay');
         },
         // A composer that gets its toolbar, or the element the user picked, later still takes the
-        // icon, and the overlay report goes. The pick is looked for by its selector only: its
-        // fingerprint scores every element of its tag, too much to do once a second. A pick whose
-        // selector no longer matches is not found late
-        { keepWatching: () => toolbarShows(true) || this.pickShowsBeside(icon, true) }
+        // icon, and the overlay report goes. Only the chain's first anchor counts then: a later one
+        // may show only once the draft holds text (a send button), and would move the icon as the
+        // user types, then report the Toolbar and drop the repair. The pick is looked for by its
+        // selector only: its fingerprint scores every element of its tag, too much to do once a
+        // second. A pick whose selector no longer matches is not found late
+        { keepWatching: () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon, true) }
       );
     }
     debug('Icon anchored on the editor', { method: method ?? 'static' });

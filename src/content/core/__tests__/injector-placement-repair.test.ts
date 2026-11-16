@@ -556,13 +556,26 @@ describe('icon placement override on a built-in Platform', () => {
       }
     });
 
-    it('goes to a later anchor of the chain that renders, the picked element still missing', async () => {
+    it('goes to the chain\'s first anchor once it renders, the picked element still missing', async () => {
+      await leftOnOverlay();
+
+      renameToolbar('renamed-', '');
+
+      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
+      expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
+      await vi.waitFor(() => { expect(reports).toEqual(['overlay', 'toolbar']); }, { timeout: 1000 });
+    });
+
+    it('stays on the overlay when a later anchor of the chain renders, as a send button once the user types, and keeps the pick', async () => {
       await leftOnOverlay();
 
       showSecondAnchor();
+      // Several late checks go by
+      await new Promise((resolve) => setTimeout(resolve, 400));
 
-      await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
-      expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+      expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+      expect(reports).toEqual(['overlay']);
+      expect((await readIconPlacementRepairs())['claude.ai']?.override).toMatchObject({ selector: PICKED });
     });
   });
 

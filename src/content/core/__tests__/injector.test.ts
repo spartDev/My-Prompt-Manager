@@ -531,6 +531,55 @@ describe('PromptLibraryInjector', () => {
           editor.remove();
         });
 
+        it('opens again on the next // when removing the first threw', async () => {
+          const { open, editor, typeSlash, again } = await ownEditor({ deletes: false });
+          const commandable = Selection.prototype as unknown as { modify?: unknown };
+          const hadModify = 'modify' in commandable;
+          if (!hadModify) {
+            Object.defineProperty(Selection.prototype, 'modify', {
+              configurable: true,
+              value(this: Selection) {
+                if (this.focusNode) {
+                  this.extend(this.focusNode, this.focusOffset - 1);
+                }
+              }
+            });
+          }
+          const execCommand = vi.spyOn(document, 'execCommand').mockImplementationOnce(() => {
+            throw new Error('The editing command failed');
+          });
+          try {
+            typeSlash();
+            await vi.waitFor(() => { expect(execCommand).toHaveBeenCalled(); });
+            await handled();
+            expect(open).not.toHaveBeenCalled();
+
+            again();
+            typeSlash();
+
+            await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); }, { timeout: 5000 });
+          } finally {
+            execCommand.mockRestore();
+            if (!hadModify) {
+              delete commandable.modify;
+            }
+            editor.remove();
+          }
+        });
+
+        it('opens again on the next // while the first opening has not settled (a Library slow to read)', async () => {
+          const { open, editor, typeSlash, again } = await ownEditor();
+          open.mockReturnValue(new Promise(() => { /* never settles */ }));
+          typeSlash();
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+
+          again();
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(2); }, { timeout: 5000 });
+          editor.remove();
+        });
+
         it('opens again on the next //, once the editor removed the first', async () => {
           const { open, editor, sent, typeSlash, again } = await ownEditor();
           typeSlash();

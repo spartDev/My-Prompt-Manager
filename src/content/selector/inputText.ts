@@ -303,9 +303,30 @@ export async function deleteTypedTriggerByEditor(field: HTMLElement): Promise<Re
   }
   // Lexical draws its change once its update is committed, in a microtask queued by the events
   await Promise.resolve();
-  const removal = removed();
+  let removal = removed();
+  if (cancelled && removal === 'unchanged') {
+    // An editor that draws in the next frame, or a later task: the editing command would delete
+    // two more characters from a draft that has dropped the // already
+    await nextFrame();
+    removal = removed();
+  }
   // An editor that left the event alone and the field as it was: the // is not its to remove
   return !took && removal === 'unchanged' ? null : removal;
+}
+
+/** How long nextFrame waits, at most, for a frame that does not come (a page in the background). */
+const FRAME_WAIT_MS = 100;
+
+/** Resolves after the next frame, then a task: when an editor that draws late has drawn. */
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    const settle = (): void => {
+      window.clearTimeout(timer);
+      window.setTimeout(resolve, 0);
+    };
+    const timer = window.setTimeout(settle, FRAME_WAIT_MS);
+    window.requestAnimationFrame(settle);
+  });
 }
 
 /**

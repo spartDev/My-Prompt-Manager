@@ -1010,6 +1010,24 @@ describe('deleteTypedTriggerByEditor', () => {
     expect(events).toHaveLength(2);
   });
 
+  it.each([
+    ['in the next frame', (draw: () => void) => { window.requestAnimationFrame(draw); }],
+    ['in a later task', (draw: () => void) => { window.setTimeout(draw, 0); }],
+  ])('reads the field once an editor that draws %s has drawn, so the // goes once', async (_when, later) => {
+    const field = slashMenuEditor();
+    const slashes = field.querySelector('span[data-lexical-text]') as HTMLElement;
+    let deleted = 0;
+    field.addEventListener('beforeinput', (event) => {
+      event.preventDefault();
+      deleted += 1;
+      const now = deleted;
+      later(() => { slashes.textContent = '//'.slice(now); });
+    });
+
+    await expect(deleteTypedTriggerByEditor(field)).resolves.toBe('removed');
+    expect(slashes.textContent).toBe('');
+  });
+
   it('reads the field unchanged when it holds a non-breaking space the browser wrote', async () => {
     const field = lexicalEditable('<p><span data-lexical-text="true">Hi \u00a0//</span></p>');
     document.getSelection()?.collapse(field.querySelector('span')?.firstChild as Text, 6);

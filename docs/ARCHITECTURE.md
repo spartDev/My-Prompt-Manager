@@ -432,7 +432,7 @@ src/content/
 | Component | Responsibility | Pattern |
 |-----------|---------------|---------|
 | `PromptLibraryInjector` | Detect inputs, inject icons, manage lifecycle | Orchestrator |
-| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it, or when the toolbar it waited for renders within a grace period, after which the overlay is reported and an icon on the overlay keeps looking for its toolbar, once a second at most | Controller |
+| `IconPlacementController` | Remember which icon was placed for which editor, ask for a new placement when the Platform removes it, or when the toolbar it waited for renders within a grace period, after which the overlay is reported and an icon on the overlay keeps looking for the chain's first anchor or the user's pick, once a second at most | Controller |
 | `AnchoredOverlay` | Keep the icon on its reference element when no toolbar holds it: CSS Anchor Positioning, then Floating UI | Strategy |
 | `PlatformInsertionManager` | Coordinate strategy selection and insertion | Mediator |
 | `PlatformManager` | Manage strategy registry and instantiation | Factory |
