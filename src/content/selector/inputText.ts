@@ -163,6 +163,22 @@ export function endsWithSelectorTrigger(before: string): boolean {
 }
 
 /**
+ * True when the selection holds text only: no element without text (an image, an icon drawn by
+ * the page) that deleting it would take with the slashes. An editor's span around a zero-width
+ * space holds text. The page's elements are judged, not a copy of the selection: a copy holds an
+ * empty piece of the element the selection starts at the end of (bold text before the slashes).
+ */
+function holdsOnlyText(selection: Selection): boolean {
+  if (selection.rangeCount === 0) {
+    return false;
+  }
+  const range = selection.getRangeAt(0);
+  const root = range.commonAncestorContainer;
+  const scope = root.nodeType === Node.ELEMENT_NODE ? (root as Element) : root.parentElement;
+  return Array.from(scope?.querySelectorAll('*') ?? []).every((element) => element.textContent !== '' || !range.intersectsNode(element));
+}
+
+/**
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
  * When the editing command is missing or refused, the two characters are taken out of their text
@@ -225,7 +241,8 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
     for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && visible(selection.toString()).length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
-    if (visible(selection.toString()) === SELECTOR_TRIGGER && document.execCommand('delete')) {
+    // A selection that took in an element without text (an image) is not deleted
+    if (visible(selection.toString()) === SELECTOR_TRIGGER && holdsOnlyText(selection) && document.execCommand('delete')) {
       // Chrome deletes on the page at once and sends no beforeinput for the editing command, so
       // the editor hears only input. An editor that puts its own DOM back later (from a mutation
       // observer, after this read) is not seen here: the live check covers Copilot

@@ -62,6 +62,22 @@ describe('EventManager', () => {
       expect(heard).toHaveBeenCalledTimes(1);
     });
 
+    it.each([
+      ['on cleanup', (manager: EventManager) => { manager.cleanup(); }],
+      ['when the element is thrown away', (manager: EventManager, target: EventTarget) => { manager.removeTrackedListeners(target); }],
+    ])('removes a capture-phase listener as a capture one %s: a browser keeps it otherwise', (_when, remove) => {
+      const element = document.createElement('div');
+      const handler = vi.fn();
+      eventManager.addTrackedEventListener(element, 'keydown', handler, true);
+      eventManager.addTrackedEventListener(element, 'click', handler);
+      const removeSpy = vi.spyOn(element, 'removeEventListener');
+
+      remove(eventManager, element);
+
+      expect(removeSpy).toHaveBeenCalledWith('keydown', handler, true);
+      expect(removeSpy).toHaveBeenCalledWith('click', handler);
+    });
+
     it('should track multiple event listeners on same element', () => {
       const handler1 = vi.fn();
       const handler2 = vi.fn();

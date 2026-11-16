@@ -13,7 +13,10 @@
  *    script finds its anchor again and reports `toolbar`: the Platform's entry, override
  *    included, is dropped, unless another tab of the Platform still has the icon on the overlay
  *    or the override (another variant of its UI). A tab that closes, or leaves the Platform, is
- *    forgotten, and the status follows the tabs left (forgetIconPlacementTab).
+ *    forgotten, and the status follows the tabs left (forgetIconPlacementTab). While the picked
+ *    element is on the page, only the chain's first anchor ends the pick: a later one may show
+ *    only at times (a send button), and ends it only once the grace period is over without the
+ *    picked element.
  *
  * Kept under a key of its own, apart from the Site settings, and written only by the service
  * worker, under a lock shared by the extension's contexts. The module imports neither

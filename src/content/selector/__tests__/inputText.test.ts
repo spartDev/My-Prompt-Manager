@@ -154,6 +154,13 @@ describe('removeTypedTrigger', () => {
     expect(heard).toBe(1);
   });
 
+  it('leaves a textarea whose // has a character the user does not see between its slashes as it was', () => {
+    const field = textarea('Hi /\u200B/', 6);
+
+    expect(removeTypedTrigger(field)).toBe(false);
+    expect(field.value).toBe('Hi /\u200B/');
+  });
+
   it('reports a textarea whose own handler puts the // back', () => {
     const field = textarea('Before //', 9);
     field.addEventListener('input', () => { field.value = 'Before //'; });
@@ -187,13 +194,16 @@ describe('removeTypedTrigger', () => {
   describe('with the editing command of a browser', () => {
     /**
      * The browser's commands, which the test DOM lacks: `modify` extends the selection back by one
-     * character of its text node, `delete` takes the selected text out.
+     * character of its text node, or to each of `steps` in turn (a step over an element), `delete`
+     * takes the selected contents out.
      */
-    const browserCommands = () => {
+    const browserCommands = (steps: Array<[Node, number]> = []) => {
       const selection = document.getSelection() as Selection;
       const commandable = selection as unknown as { modify?: (alter: string, direction: string, granularity: string) => void };
+      const ahead = [...steps];
       commandable.modify = () => {
-        selection.extend(selection.focusNode as Node, selection.focusOffset - 1);
+        const [node, offset] = ahead.shift() ?? [selection.focusNode as Node, selection.focusOffset - 1];
+        selection.extend(node, offset);
       };
       const execCommand = vi.spyOn(document, 'execCommand').mockImplementation((command: string) => {
         if (command !== 'delete') {
@@ -229,6 +239,66 @@ describe('removeTypedTrigger', () => {
       expect(removeTypedTrigger(field)).toBe(true);
 
       expect(field.textContent).toBe('Hi  there');
+      restore();
+    });
+
+    it('removes a // whose zero-width space is in a span of its own, as Lexical writes it', () => {
+      const field = editable('<p><span>Hi /</span><span>\u200B</span><span>/</span></p>');
+      const [first, space, last] = Array.from(field.querySelectorAll('span'), (span) => span.firstChild as Text);
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [space, 0], [first, 3]]);
+
+      expect(removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('Hi ');
+      restore();
+    });
+
+    it('does not count a character the user does not see elsewhere in the field as a change', () => {
+      const field = editable('<p>\u200BHi //</p>');
+      const text = field.querySelector('p')?.firstChild as Text;
+      document.getSelection()?.collapse(text, text.length);
+      const restore = browserCommands();
+
+      expect(removeTypedTrigger(field)).toBe(true);
+
+      expect(field.textContent).toBe('\u200BHi ');
+      restore();
+    });
+
+    it('removes a // that starts its own element, after another element\'s text and an icon it does not take in', () => {
+      const field = editable('<p><i class="icon"><!-- drawn by the page --></i><b>Hi </b><span>//</span></p>');
+      const bold = field.querySelector('b')?.firstChild as Text;
+      const slashes = field.querySelector('span')?.firstChild as Text;
+      document.getSelection()?.collapse(slashes, 2);
+      // The selection starts at the end of the bold text, as Chrome puts it
+      const restore = browserCommands([[slashes, 1], [bold, 3]]);
+      const execCommand = vi.mocked(document.execCommand);
+
+      expect(removeTypedTrigger(field)).toBe(true);
+
+      expect(execCommand).toHaveBeenCalledWith('delete');
+      expect(field.querySelector('span')?.textContent).toBe('');
+      restore();
+    });
+
+    it.each([
+      ['an image', '<img alt="">'],
+      ['an icon chip the user cannot edit', '<span contenteditable="false"><svg></svg></span>'],
+      ['an icon the page draws on an element with no text', '<span class="icon"><!-- drawn by the page --></span>'],
+    ])('leaves a // with %s between its slashes as it was', (_what, between) => {
+      const field = editable(`<p>Hi /${between}/</p>`);
+      const paragraph = field.querySelector('p') as HTMLElement;
+      const first = paragraph.firstChild as Text;
+      const last = paragraph.lastChild as Text;
+      const before = paragraph.innerHTML;
+      document.getSelection()?.collapse(last, 1);
+      const restore = browserCommands([[last, 0], [paragraph, 1], [first, 3]]);
+
+      expect(textBeforeCaret(field)).toBe('Hi //');
+      expect(removeTypedTrigger(field)).toBe(false);
+
+      expect(paragraph.innerHTML).toBe(before);
       restore();
     });
   });

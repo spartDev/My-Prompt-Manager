@@ -78,6 +78,15 @@ export class PromptLibraryInjector {
   private readonly placement: IconPlacementController;
   /** The element the user picked for a built-in Platform whose toolbar is not found, and the placement reports */
   private readonly repair: PlacementRepair;
+  /** The picked element showed in the wait just read: the placement that follows was asked for by the pick (pickShowsBeside) */
+  private pickShowed = false;
+  /**
+   * Whether the waits of this placement count the picked element showing. Not after a placement
+   * asked for by the pick that could not use it: a selector by position (`:nth-of-type`) may
+   * match only while the icon is in the bar, and counting it again would place the icon again
+   * and again
+   */
+  private pickCounts = true;
   private iconCleanups: Map<HTMLElement, () => void>;
   /**
    * Themes the Prompts button when the extension's theme is read or changes. The theme manager
@@ -952,6 +961,8 @@ export class PromptLibraryInjector {
 
       // Forget the icon being replaced before it leaves the DOM, so its removal is not taken for a loss
       this.placement.reset();
+      this.pickCounts = !this.pickShowed;
+      this.pickShowed = false;
 
       // The icon being replaced may already be out of the DOM (the Platform removed it), where the
       // queries below cannot find it: dispose of it first, with its observer and click listener
@@ -1002,16 +1013,31 @@ export class PromptLibraryInjector {
 
       // Into the Platform's composer, at the first anchor of its chain that is found there
       const iconPlacement = this.platformManager.getIconPlacement();
+      // The element the user picked comes before the chain's later anchors: one of them may show
+      // only at times (a send button while the field holds text), and placing the icon there
+      // would drop the pick, then leave the icon on the overlay once it goes. Only the anchor the
+      // chain was written for takes the icon from a pick on the page
       const resolution = resolveIconPlacement(textarea, iconPlacement);
+      if (iconPlacement && (resolution === null || resolution.index > 0) && this.placeAtOverride(icon, textarea)) {
+        // A toolbar rendered after its editor: if it shows within the grace period, the icon goes into it
+        this.placement.awaitToolbar(() => resolveIconPlacement(textarea, iconPlacement)?.index === 0);
+        return;
+      }
       const injected = resolution !== null;
       if (resolution) {
         placeAtAnchor(icon, resolution);
         this.placement.track(icon, textarea, 'toolbar', resolution.index);
-        this.repair.report('toolbar');
-      } else if (iconPlacement && this.placeAtOverride(icon, textarea)) {
-        // A toolbar rendered after its editor: if it shows within the grace period, the icon goes into it
-        this.placement.awaitToolbar(() => resolveIconPlacement(textarea, iconPlacement) !== null);
-        return;
+        if (resolution.index > 0 && this.repair.positioning !== null) {
+          // At a later anchor while the picked element is not on the page: it may render late, or
+          // come back after a re-render. The pick ends only once the grace period is over without
+          // it (or without the chain's first anchor)
+          this.placement.awaitToolbar(
+            () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon),
+            () => { this.repair.report('toolbar'); }
+          );
+        } else {
+          this.repair.report('toolbar');
+        }
       }
 
       // Check if we have custom positioning configuration (declare outside if block for scope)
@@ -1231,13 +1257,15 @@ export class PromptLibraryInjector {
     this.placement.track(icon, textarea, 'overlay');
     if (iconPlacement) {
       // The element the user picked may render late too: if it shows within the grace period, the
-      // icon goes there
-      const pickShows = (): boolean => {
-        const anchor = this.repair.findAnchor();
-        return anchor !== null && anchor !== icon && !icon.contains(anchor);
+      // icon goes there. While the user has a pick, a later anchor of the chain waits for the end
+      // of the grace period: the pick may still render, and comes before it. Once the page has
+      // settled without the pick, any anchor of the chain takes the icon
+      const toolbarShows = (settled: boolean): boolean => {
+        const resolution = resolveIconPlacement(textarea, iconPlacement);
+        return resolution !== null && (resolution.index === 0 || settled || this.repair.positioning === null);
       };
       this.placement.awaitToolbar(
-        () => resolveIconPlacement(textarea, iconPlacement) !== null || pickShows(),
+        (settled) => toolbarShows(settled) || this.pickShowsBeside(icon),
         () => {
           warn('No anchor of this Platform found in its composer, the icon is anchored on the editor instead', {
             hostname: this.state.hostname
@@ -1250,8 +1278,8 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Places the icon at the element the user picked for this Platform in Settings, when its
-   * toolbar is not found. False when there is no such element, or it is not on the page: the icon
+   * Places the icon at the element the user picked for this Platform in Settings, when the
+   * chain's first anchor is not found. False when there is no such element, or it is not on the page: the icon
    * then goes on the Anchored overlay, and Settings keeps offering to place it.
    */
   private placeAtOverride(icon: HTMLElement, textarea: HTMLElement): boolean {
@@ -1269,6 +1297,19 @@ export class PromptLibraryInjector {
     this.repair.report('override');
     debug('Icon placed at the element picked for this Platform', { relation: positioning.placement });
     return true;
+  }
+
+  /**
+   * True when the element the user picked is on the page: not the icon itself, nor an element
+   * inside it, that the pick's selector may find there
+   */
+  private pickShowsBeside(icon: HTMLElement): boolean {
+    if (!this.pickCounts) {
+      return false;
+    }
+    const anchor = this.repair.findAnchor();
+    this.pickShowed = anchor !== null && !icon.contains(anchor);
+    return this.pickShowed;
   }
 
   /** The user picked an element for this Platform, or the pick was dropped: the icon is placed again */
