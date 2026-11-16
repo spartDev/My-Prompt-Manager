@@ -30,11 +30,11 @@ Jev (TypeSafe's System One model) makes the judgments; code makes the ranking. R
 node .claude/skills/triage-beads/jev-rank.mjs <scratch>/backlog.json
 ```
 
-For each ticket but the epics, one request asks Jev five atomic judgments over the ticket's title, description and acceptance criteria (the field, or an "Acceptance criteria" section of the description when the field is empty): `user_visible`, `time_bound` and `ready` (Nouls), `severity` (Score 0-4), `effort` (Score 0-3). The same request asks, for each item of the acceptance criteria, whether someone could check it from a test, a command's output, a screenshot or a file to read, and, for step 4, which code areas the ticket would edit. More requests ask, for every pair of tickets whatever their type, whether they ask for the same change, 60 pairs per request (`--no-dups` skips them). The script combines the answers with the weights at its top, adds `dependent_count` from the snapshot as what the ticket unblocks, and prints one line per ticket, best first, then one line per epic (the best suggestion and the areas of its live children, `<epic>.<n>`), then the duplicates, then the areas step 4 reads:
+For each ticket but the epics, one request asks Jev five atomic judgments over the ticket's title, description and acceptance criteria (the field, or an "Acceptance criteria" section of the description when the field is empty): `user_visible`, `time_bound` and `ready` (Nouls), `severity` (Score 0-4), `effort` (Score 0-3). The same request asks, for each item of the acceptance criteria, whether someone could check it from a test, a command's output, a screenshot or a file to read, and, for step 4, which code areas the ticket would edit. More requests ask, for every pair of tickets whatever their type, whether they ask for the same change, 60 pairs per request (`--no-dups` skips them). The script combines the answers with the weights at its top, adds `dependent_count` from the snapshot as what the ticket unblocks, and prints one line per ticket, best first, then one line per epic (the best suggestion and the areas of its live children: the tickets `bd list --parent <epic>` returns, or the `<epic>.<n>` ids when bd cannot be asked), then the duplicates, then the areas step 4 reads:
 
 ```
 <id> P<current>->P<suggested> v=<value> sev= eff= vis= time= ready= | <flags>
-EPIC <id> P<current>->P<best child> children <ids> | areas <areas>
+EPIC <id> P<current>->P<best child> children <ids> | areas <areas> (maybe <areas>) | no confirmed areas | no files
 DUPLICATE? <id> ~ <id> p=<percent>
 AREAS <id>: <area>, … (maybe <area>) | no files
 ```
@@ -84,7 +84,7 @@ A file the ticket would create is not in the checkout yet: add it from the ticke
 
 - a ticket goes in the group of any ticket it shares a file with, and after any ticket it depends on (`dependencies` in the snapshot, `bd blocked`); the tickets of one group run one after another;
 - groups that share no file can run in parallel, each in its own session on its own branch;
-- an epic is placed by its children, not on its own: its `EPIC` line from step 2 names them and their areas.
+- an epic is placed by its children, not on its own: its `EPIC` line from step 2 names them and their areas. Without that line (no key, or a failed run), list its children with `bd list --parent <epic> --json` and place the epic with them, from their own placements above.
 
 Done when every live ticket is in exactly one group, each group lists its files, and the groups that can run at the same time are named.
 

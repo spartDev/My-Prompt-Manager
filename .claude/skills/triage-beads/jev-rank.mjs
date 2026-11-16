@@ -16,6 +16,7 @@
 // Needs TYPESAFE_API_KEY. TYPESAFE_API_URL and TYPESAFE_MODEL override the endpoint
 // and the model (default jev-latest). Exit 3: no key. Exit 1: a request failed.
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -435,21 +436,41 @@ async function rank(snapshotPath, opts) {
   const ranked = [...results].sort((x, y) => tier(y) - tier(x) || (y.value ?? -1) - (x.value ?? -1));
 
   // An epic is not judged on its own: it takes the best suggestion and the areas of its
-  // live children (ids "<epic>.<n>" in the snapshot), so the report and step 4 keep it.
+  // live children, so the report and step 4 keep it. Children are the tickets linked to
+  // it by a parent-child edge (bd list --parent); the "<epic>.<n>" id is a fallback when
+  // bd cannot be asked.
+  const childIds = (epicId) => {
+    try {
+      const out = execFileSync('bd', ['list', '--parent', epicId, '--status=open,in_progress,blocked,deferred', '--json', '--limit', '0'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      return new Set(JSON.parse(out).map((c) => c.id));
+    } catch {
+      return null;
+    }
+  };
   const epics = all
     .filter((t) => t.issue_type === 'epic')
     .map((e) => {
-      const children = results.filter((r) => r.id.startsWith(`${e.id}.`));
+      const linked = childIds(e.id);
+      const children = results.filter((r) => linked?.has(r.id) || r.id.startsWith(`${e.id}.`));
       const judged = children.filter((c) => !c.error);
-      const areas = [...new Set(judged.flatMap((c) => (noulReading(c.changes_files) === 'no' ? [] : c.areas.yes)))];
+      const changing = judged.filter((c) => noulReading(c.changes_files) !== 'no');
+      const areas = [...new Set(changing.flatMap((c) => c.areas.yes))];
+      const maybe = [...new Set(changing.flatMap((c) => c.areas.unsettled))].filter((a) => !areas.includes(a));
       return {
         id: e.id,
         priority: e.priority,
         status: e.status,
         title: e.title,
         children: children.map((c) => c.id),
+        children_from: linked ? 'parent-child edges' : 'id prefix (bd list --parent failed)',
         suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
+        // "no files" only when every judged child says so; otherwise what is known.
+        no_files: judged.length > 0 && changing.length === 0,
         areas,
+        maybe_areas: maybe,
       };
     });
   const out = join(dirname(snapshotPath), 'jev.json');
@@ -470,7 +491,7 @@ async function rank(snapshotPath, opts) {
     console.log(
       e.suggested === null
         ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand`
-        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.areas.join(', ') || 'no files'}`
+        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}`
     );
   }
   for (const d of duplicates) {
