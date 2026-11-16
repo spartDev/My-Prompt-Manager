@@ -1305,9 +1305,11 @@ export class PromptLibraryInjector {
         // A composer that gets its toolbar, or the element the user picked, later still takes the
         // icon, and the overlay report goes. Only the chain's first anchor counts then: a later one
         // may show only once the draft holds text (a send button), and would move the icon as the
-        // user types, then report the Toolbar and drop the repair. The pick is looked for by its
-        // selector only: its fingerprint scores every element of its tag, too much to do once a
-        // second. A pick whose selector no longer matches is not found late
+        // user types, then report the Toolbar and drop the repair. So a composer whose usual
+        // anchor is a later one (Fluent's actions on m365.cloud.microsoft) is not moved late. The
+        // pick is looked for by its selector only: its fingerprint scores every element of its
+        // tag, too much to do once a second. A pick whose selector no longer matches is not found
+        // late
         { keepWatching: () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon, true) }
       );
     }
