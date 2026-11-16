@@ -262,13 +262,17 @@ export type RemovalByEditor = 'removed' | 'unchanged' | 'changed';
  *
  * The events go to the field, where such an editor listens: the browser sends them at the caret,
  * from where they reach it, but the editor may have drawn the caret's node anew after the first.
+ * Only Lexical, which marks the element it edits with data-lexical-editor, is asked: other editors
+ * do not take such an event, or take it their own way. Lexical commits its update in a microtask,
+ * which this waits for.
  *
- * Null when this is not for the editor to do, and removeTypedTrigger removes the // instead: the
- * field is a text control, the caret is not right after the two slashes in one text node, or the
- * editor did not cancel the first event. Otherwise resolves, once the editor has drawn its change,
- * to what it did with the field (RemovalByEditor).
+ * Resolves to null when this is not for the editor to do, and removeTypedTrigger removes the //
+ * instead: the field is a text control or not a Lexical editor, the caret is not right after the
+ * two slashes in one text node, or the editor left the first event alone and the field as it was. Otherwise resolves, once
+ * the editor has drawn its change, to what it did with the field (RemovalByEditor): an editor that
+ * left the event alone but changed the field took it its own way, and nothing else may touch it.
  */
-export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<RemovalByEditor> | null {
+export async function deleteTypedTriggerByEditor(field: HTMLElement): Promise<RemovalByEditor | null> {
   if (isTextControl(field)) {
     return null;
   }
@@ -280,32 +284,54 @@ export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<RemovalB
     || (node.nodeValue ?? '').slice(offset - SELECTOR_TRIGGER.length, offset) !== SELECTOR_TRIGGER) {
     return null;
   }
+  const editor = node.parentElement?.closest('[data-lexical-editor="true"]');
+  if (!editor || !(field.contains(editor) || editor.contains(field))) {
+    return null;
+  }
   const removed = removalCheck(field, before);
   const backspace = (): boolean => {
     const event = new InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true });
     field.dispatchEvent(event);
     return event.defaultPrevented;
   };
-  if (!backspace()) {
-    return null;
+  // An editor that took the first slash, cancelling the event or changing the field as it heard
+  // it, is sent the second
+  const cancelled = backspace();
+  const took = cancelled || removed() !== 'unchanged';
+  if (took) {
+    backspace();
   }
-  backspace();
-  // An editor draws a change once its update is done: after the events, before the next task
-  return new Promise((resolve) => {
-    window.setTimeout(() => { resolve(removed()); }, 0);
-  });
+  // Lexical draws its change once its update is committed, in a microtask queued by the events
+  await Promise.resolve();
+  const removal = removed();
+  // An editor that left the event alone and the field as it was: the // is not its to remove
+  return !took && removal === 'unchanged' ? null : removal;
 }
 
 /**
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
- * When the editing command is missing or refused, the two characters are taken out of their text
- * node (only a // with no character the user does not see between or after its slashes:
- * otherwise the selector stays closed and the field as it was). The marks a Platform's menu leaves
- * after the slashes in hidden elements (HIDDEN_MARKS) go with them only by the editing command.
- * Returns whether they are gone: the selector does not open over a `//` it could not remove.
+ * The editor of a contenteditable is asked first to delete them itself (deleteTypedTriggerByEditor):
+ * Lexical (Perplexity, Microsoft 365 Copilot) puts back a // deleted behind its back. An editor that
+ * does not take that, or takes it and leaves the field as it was, gets the editing command. When
+ * that command is missing or refused, or the `//` is the whole text of an inline element, the two
+ * characters are taken out of their text node (only a // with no character the user does not see
+ * between or after its slashes: otherwise the selector stays closed and the field as it was). The
+ * marks a Platform's menu leaves after the slashes in hidden elements (HIDDEN_MARKS) go with them
+ * only by the editing command. Resolves to whether they are gone: the selector does not open over
+ * a `//` it could not remove. The editor may still have to tidy up after it: `editorSettled` says
+ * when it is done.
  */
-export function removeTypedTrigger(field: HTMLElement): boolean {
+export async function removeTypedTrigger(field: HTMLElement): Promise<boolean> {
+  const byEditor = await deleteTypedTriggerByEditor(field);
+  if (byEditor !== null && byEditor !== 'unchanged') {
+    return byEditor === 'removed';
+  }
+  return removeByCommand(field);
+}
+
+/** removeTypedTrigger without asking the editor: the editing command, or the text node. */
+function removeByCommand(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
   if (before === null || !visible(before).endsWith(SELECTOR_TRIGGER)) {
     return false;
@@ -339,7 +365,16 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   }
   const removed = removalCheck(field, before);
 
-  if (canExec && typeof selection.modify === 'function') {
+  // A // that is the whole text of an inline element (Lexical's <span data-lexical-text>, in a
+  // field that held nothing before it) is not removed by the editing command: the browser removes
+  // the element it empties, and an editor that owns the element renders it again, // and all.
+  // Its two characters are then taken out of the text node, which such an editor takes: Lexical
+  // 0.38 to 0.45 takes the emptied text node out a moment later (see editorSettled)
+  const focus = selection.focusNode;
+  const fillsInline = focus?.nodeType === Node.TEXT_NODE && focus.nodeValue === SELECTOR_TRIGGER
+    && focus.parentNode !== field && !isBlock(focus.parentNode);
+
+  if (canExec && typeof selection.modify === 'function' && !fillsInline) {
     // Back over the two slashes, and over a character the user does not see between them or
     // after them (Lexical's zero-width space)
     // The selection is read as the // is: the marks of a hidden element are not text
@@ -382,6 +417,40 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
   selection.collapse(node, start);
   field.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
   return removed() === 'removed';
+}
+
+/** How long `editorSettled` waits, at most, for the Platform's editor to take an emptied text out. */
+const EDITOR_SETTLE_MS = 100;
+
+/**
+ * Resolves once the Platform's editor is done with the removal of the `//`, so that the Prompt
+ * selector takes the focus after it. Most editors are done at once. A Lexical editor (Perplexity)
+ * whose field the `//` was the whole text of keeps the text node it was taken out of, empty, with
+ * the caret in it, and takes it out about 20 ms later, in an update whose commit puts the caret
+ * back in the field: in Chrome, that also takes the focus back from whatever has it. The removal
+ * is done once that text node has left the page, or after 100 ms for an editor that keeps it.
+ */
+export function editorSettled(field: HTMLElement): Promise<void> {
+  const caret = isTextControl(field) ? null : field.ownerDocument.getSelection()?.focusNode ?? null;
+  const emptied = caret !== null && caret.nodeType === Node.TEXT_NODE && caret.nodeValue === ''
+    && field.contains(caret) && caret.parentNode !== field && !isBlock(caret.parentNode);
+  if (!emptied) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const done = (): void => {
+      observer.disconnect();
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const observer = new MutationObserver(() => {
+      if (!caret.isConnected) {
+        done();
+      }
+    });
+    observer.observe(field, { childList: true, subtree: true });
+    const timer = window.setTimeout(done, EDITOR_SETTLE_MS);
+  });
 }
 
 /**
