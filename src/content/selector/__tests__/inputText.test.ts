@@ -264,9 +264,9 @@ describe('removeTypedTrigger', () => {
 
     describe('in M365 Copilot\'s editor while its slash menu is open', () => {
       /** The editor as read on the live page, the caret after the spans the menu left (fixture) */
-      const slashMenuEditor = () => {
+      const slashMenuEditor = (held = '\u200B\u200C') => {
         const markup = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-slash-menu.html'), 'utf8');
-        document.body.insertAdjacentHTML('beforeend', markup.replace(/<!--[\s\S]*?-->/, '').trim());
+        document.body.insertAdjacentHTML('beforeend', markup.replace(/<!--[\s\S]*?-->/, '').trim().replace('\u200B\u200C', held));
         const field = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
         const [slashes, , marks] = Array.from(field.querySelectorAll('span[data-lexical-text]'), (span) => span.firstChild as Text | null);
         document.getSelection()?.collapse(marks, (marks as Text).length);
@@ -283,8 +283,11 @@ describe('removeTypedTrigger', () => {
         expect(endsWithSelectorTrigger(textBeforeCaret(field) ?? '')).toBe(true);
       });
 
-      it('removes the // with the spans the menu left after it', () => {
-        const { field, slashes, marks } = slashMenuEditor();
+      it.each([
+        ['the marks read on the live page', '\u200B\u200C'],
+        ['two joiners', '\u200C\u200D']
+      ])('removes the // with the spans the menu left after it, holding %s', (_case, held) => {
+        const { field, slashes, marks } = slashMenuEditor(held);
         const restore = browserCommands([[marks, 1], [marks, 0], [slashes, 1], [slashes, 0]]);
 
         expect(removeTypedTrigger(field)).toBe(true);

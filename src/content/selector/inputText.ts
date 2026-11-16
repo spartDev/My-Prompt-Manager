@@ -215,8 +215,9 @@ function holdsOnlyText(selection: Selection): boolean {
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
  * When the editing command is missing or refused, the two characters are taken out of their text
  * node (only a // with no character the user does not see between or after its slashes:
- * otherwise the selector stays closed and the field as it was). Returns whether they are gone: the selector
- * does not open over a `//` it could not remove.
+ * otherwise the selector stays closed and the field as it was). The marks a Platform's menu leaves
+ * after the slashes in hidden elements (HIDDEN_MARKS) go with them only by the editing command.
+ * Returns whether they are gone: the selector does not open over a `//` it could not remove.
  */
 export function removeTypedTrigger(field: HTMLElement): boolean {
   const before = textBeforeCaret(field);
@@ -271,7 +272,17 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
     // Back over the two slashes, and over a character the user does not see between them or
     // after them (Lexical's zero-width space)
     // The selection is read as the // is: the marks of a hidden element are not text
-    const selected = (): string => (selection.rangeCount === 0 ? '' : visible(plainTextOf(selection.getRangeAt(0).cloneContents(), { hiddenMarks: false })));
+    // A selection wholly inside a hidden element is cloned without it: its marks are judged on the page
+    const selected = (): string => {
+      if (selection.rangeCount === 0) {
+        return '';
+      }
+      const range = selection.getRangeAt(0);
+      const text = plainTextOf(range.cloneContents(), { hiddenMarks: false });
+      const around = range.commonAncestorContainer;
+      const hiddenAround = (around.nodeType === Node.ELEMENT_NODE && (around as Element).getAttribute('aria-hidden') === 'true') || isHidden(around, field);
+      return visible(hiddenAround ? text.replace(HIDDEN_MARKS, '') : text);
+    };
     for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');
     }
