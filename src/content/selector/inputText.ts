@@ -249,29 +249,30 @@ function removalCheck(field: HTMLElement, before: string): () => boolean {
  * the browser's editing command deletes behind its back, as Microsoft 365 Copilot's does while its
  * slash menu is open (read live on 2026-11-16).
  *
+ * The events go to the field, where such an editor listens: the browser sends them at the caret,
+ * from where they reach it, but the editor may have drawn the caret's node anew after the first.
+ *
  * Null when this is not for the editor to do, and removeTypedTrigger removes the // instead: the
- * caret is not right after the two slashes in one text node, or the editor did not cancel the first
- * event. Otherwise resolves, once the editor has drawn its change, to whether the // is gone and
- * the rest of the field kept.
+ * field is a text control, the caret is not right after the two slashes in one text node, or the
+ * editor did not cancel the first event. Otherwise resolves, once the editor has drawn its change,
+ * to whether the // is gone and the rest of the field kept.
  */
 export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<boolean> | null {
+  if (isTextControl(field)) {
+    return null;
+  }
   const before = textBeforeCaret(field);
   const selection = field.ownerDocument.getSelection();
   const node = selection?.focusNode;
   const offset = selection?.focusOffset ?? 0;
-  // In a text control the caret is in no text node of the page
   if (before === null || node?.nodeType !== Node.TEXT_NODE
     || (node.nodeValue ?? '').slice(offset - SELECTOR_TRIGGER.length, offset) !== SELECTOR_TRIGGER) {
     return null;
   }
   const removed = removalCheck(field, before);
   const backspace = (): boolean => {
-    // At the caret, as the browser sends it: an editor that draws at once has replaced the node
-    // the first event went to
-    const at = selection?.focusNode?.parentElement;
-    const target = at && field.contains(at) ? at : field;
     const event = new InputEvent('beforeinput', { inputType: 'deleteContentBackward', bubbles: true, cancelable: true, composed: true });
-    target.dispatchEvent(event);
+    field.dispatchEvent(event);
     return event.defaultPrevented;
   };
   if (!backspace()) {
@@ -280,7 +281,14 @@ export function deleteTypedTriggerByEditor(field: HTMLElement): Promise<boolean>
   backspace();
   // An editor draws a change once its update is done: after the events, before the next task
   return new Promise((resolve) => {
-    field.ownerDocument.defaultView?.setTimeout(() => { resolve(removed()); }, 0) ?? resolve(removed());
+    window.setTimeout(() => {
+      // Whatever the field holds then, the promise settles: the injector waits on it
+      try {
+        resolve(removed());
+      } catch {
+        resolve(false);
+      }
+    }, 0);
   });
 }
 

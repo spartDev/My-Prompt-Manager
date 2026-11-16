@@ -69,6 +69,21 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await expect(page.locator('[data-lexical-editor] [aria-hidden="true"]')).toHaveCount(0);
   });
 
+  test('a // typed inside the draft goes, and the draft around it stays as it was', async ({ context }) => {
+    const page = await openPlatform(context, 'm365copilot-editor');
+    await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await page.keyboard.type('Hi there');
+    for (let step = 0; step < 5; step++) {
+      await page.keyboard.press('ArrowLeft');
+    }
+    await page.keyboard.type('//');
+
+    await expect(promptSelector(page)).toBeVisible();
+    await expect.poll(() => page.evaluate(readEditor), { message: 'the // is gone, the rest kept' }).toBe('Hi there');
+  });
+
   test('typing // opens the Prompt selector next to Copilot\'s own slash menu, which closes with the //', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
     await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');

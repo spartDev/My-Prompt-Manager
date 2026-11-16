@@ -311,6 +311,9 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
       let text = '';
       // The selection the editor knows of, as offsets in its text
       let known = { start: 0, end: 0 };
+      // A deletion is drawn in a microtask, as Lexical commits its updates: until then the editor
+      // goes by the selection it knows, not by the page's, which still shows the old text
+      let pending = false;
       // The spans the slash menu adds while it is open: not text of the editor
       const hidden = (node) => node.nodeType === Node.ELEMENT_NODE && node.getAttribute('aria-hidden') === 'true';
       const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : hidden(node) ? 0 : node.textContent.length);
@@ -382,7 +385,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         known = { start: position, end: position };
       };
       /** Text arrives where the known selection is, in place of what is selected. */
-      const write = (written) => {
+      const write = (written, later = false) => {
         text = text.slice(0, known.start) + written + text.slice(known.end);
         let caret = known.start + written.length;
         if (slashMenu && written === '/' && !menu) {
@@ -397,6 +400,18 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           menu.remove();
           menu = null;
         }
+        if (later) {
+          known = { start: caret, end: caret };
+          if (!pending) {
+            pending = true;
+            queueMicrotask(() => {
+              pending = false;
+              draw();
+              caretTo(known.end);
+            });
+          }
+          return;
+        }
         draw();
         caretTo(caret);
       };
@@ -407,7 +422,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
       document.addEventListener('selectionchange', () => {
         const selection = document.getSelection();
         const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        if (range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
           known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
         }
       });
@@ -422,7 +437,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
         // have come yet, the browser sends it later
         const selection = document.getSelection();
         const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
-        if (range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
+        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
           known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
         }
         if (event.inputType === 'insertText' && event.data) {
@@ -432,7 +447,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
           if (known.start === known.end && event.inputType === 'deleteContentBackward') {
             known = { start: Math.max(0, known.start - 1), end: known.end };
           }
-          write('');
+          write('', true);
         }
       });
       editor.addEventListener('input', (event) => {
@@ -614,11 +629,19 @@ export const promptRow = (page: Page, promptId: string) =>
 /** The titles the open Prompt selector lists, in order. */
 export const listedTitles = (page: Page) => promptSelector(page).locator('.mpm-row-title').allTextContents();
 
+/**
+ * How long an opening of the Prompt selector may take. The first one in a page also loads React
+ * and reads the Library: four to six times a later opening when the CPU is short (180 ms against
+ * 79, 4.5 s against 0.75 s at 40 times slower), which went past the 10 s of an assertion on a
+ * loaded machine (PR #576, 2026-11-16).
+ */
+const OPENING_TIMEOUT = 30_000;
+
 /** Opens the Prompt selector from the Prompts button and waits for it. */
 export async function openPromptSelector(page: Page): Promise<void> {
   await expect(promptsButton(page)).toHaveCount(1);
   await promptsButton(page).click();
-  await expect(promptSelector(page)).toBeVisible();
+  await expect(promptSelector(page)).toBeVisible({ timeout: OPENING_TIMEOUT });
 }
 
 /**

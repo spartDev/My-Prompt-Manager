@@ -420,13 +420,17 @@ export class PromptLibraryInjector {
           removing = true;
           void byEditor.then((removed) => {
             removing = false;
-            if (!removed) {
-              debug('The editor did not remove the typed //, the prompt selector stays closed');
+            // The field replaced, or the selector opened from the Prompts button, meanwhile
+            if (!field.isConnected || this.selector.isOpen) {
               return;
             }
-            if (field.isConnected && !this.selector.isOpen) {
+            // An editor that cancels the events and leaves the // (one that acts only on what the
+            // user does) may still let the editing command remove it
+            if (removed || removeTypedTrigger(field)) {
               this.openFromTyping(field);
+              return;
             }
+            debug('Could not remove the typed //, the prompt selector stays closed');
           });
           return;
         }

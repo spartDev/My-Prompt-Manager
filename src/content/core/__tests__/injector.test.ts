@@ -436,7 +436,7 @@ describe('PromptLibraryInjector', () => {
          * cancels each deleteContentBackward and deletes the character before the caret itself,
          * drawing its text a task later. Gives what it was sent and a way to hear a typed slash.
          */
-        const ownEditor = async ({ deletes = true } = {}) => {
+        const ownEditor = async ({ deletes = true, restores = false } = {}) => {
           const { open } = await listen();
           const editor = document.createElement('div');
           editor.contentEditable = 'true';
@@ -462,6 +462,13 @@ describe('PromptLibraryInjector', () => {
               text.data = text.data.slice(0, at) + text.data.slice(at + 1);
               document.getSelection()?.collapse(text, at);
             }, 0);
+          });
+          // As M365 Copilot's while its slash menu is open: what the browser deletes, it draws again
+          editor.addEventListener('input', () => {
+            if (restores) {
+              text.data = 'Draft //';
+              document.getSelection()?.collapse(text, 8);
+            }
           });
           const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
           const typeSlash = (): void => {
@@ -496,8 +503,19 @@ describe('PromptLibraryInjector', () => {
           editor.remove();
         });
 
-        it('keeps the selector closed when the editor leaves the // in place', async () => {
+        it('removes the // the older way when the editor cancels the events but leaves it, then opens', async () => {
           const { open, editor, sent, typeSlash } = await ownEditor({ deletes: false });
+
+          typeSlash();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(sent).toHaveLength(2);
+          expect(editor.textContent).toBe('Draft ');
+          editor.remove();
+        });
+
+        it('keeps the selector closed when neither the editor nor the older way can remove the //', async () => {
+          const { open, editor, sent, typeSlash } = await ownEditor({ deletes: false, restores: true });
 
           typeSlash();
           await vi.waitFor(() => { expect(sent).toHaveLength(2); });
@@ -506,6 +524,28 @@ describe('PromptLibraryInjector', () => {
 
           expect(open).not.toHaveBeenCalled();
           expect(editor.textContent).toBe('Draft //');
+          editor.remove();
+        });
+
+        it.each([
+          ['the Platform replaced the field', (editor: HTMLElement) => { editor.remove(); }],
+          ['the selector opened from the Prompts button', () => { selector().isOpen = true; }],
+        ])('opens nothing once the editor removed the // when %s meanwhile', async (_case, meanwhile) => {
+          const { open, editor, sent, typeSlash } = await ownEditor();
+          // Right after the second event, before the editor has drawn
+          editor.addEventListener('beforeinput', () => {
+            if (sent.length === 2) {
+              queueMicrotask(() => { meanwhile(editor); });
+            }
+          });
+
+          typeSlash();
+          await vi.waitFor(() => { expect(sent).toHaveLength(2); });
+          await handled();
+          await handled();
+
+          expect(open).not.toHaveBeenCalled();
+          selector().isOpen = false;
           editor.remove();
         });
       });
