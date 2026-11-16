@@ -500,6 +500,48 @@ describe('icon placement override on a built-in Platform', () => {
     expect(reports).not.toContain('overlay');
   });
 
+  it('sends no placement for this tab while its icon waits on the overlay, when another tab stores a repair', async () => {
+    grace(300);
+    // The icon was in the toolbar, then the Platform re-rendered the composer without it
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar');
+    renameToolbar('', 'renamed-');
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+
+    // Another tab of the Platform reports the overlay: the Toolbar of before is no longer this tab's placement
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay', tabId: 2 });
+    await settle();
+    expect(reports).toEqual([]);
+
+    await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+  });
+
+  it('places the icon at an element picked while it waits at a later anchor of the chain', async () => {
+    grace(1000);
+    renameToolbar('', 'renamed-');
+    showSecondAnchor();
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: '[data-testid="not-rendered-yet"]' }
+    });
+    await internals().repair.load();
+    await internals().injectIcon(editor);
+    expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
+
+    // The user picks an element on the page, in this tab or another
+    await changeIconPlacementRepairs({
+      type: 'setOverride',
+      hostname: 'claude.ai',
+      positioning: { mode: 'custom', placement: 'before', selector: PICKED }
+    });
+    await settle();
+
+    expect(icon().getAttribute('data-mpm-placement')).toBe('override');
+    expect(icon().nextElementSibling?.getAttribute('data-testid')).toBe('chat-input-send');
+  });
+
   it('puts the icon at a later anchor of the chain rendered within the grace period when the user has no pick', async () => {
     grace(1000);
     renameToolbar('', 'renamed-');

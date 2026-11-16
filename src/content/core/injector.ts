@@ -961,6 +961,7 @@ export class PromptLibraryInjector {
 
       // Forget the icon being replaced before it leaves the DOM, so its removal is not taken for a loss
       this.placement.reset();
+      this.repair.placing();
       this.pickCounts = !this.pickShowed;
       this.pickShowed = false;
 
@@ -1319,9 +1320,10 @@ export class PromptLibraryInjector {
       return;
     }
     // The chain resolves in this tab, and comes before the pick: placing again would only put the
-    // icon back in the same Toolbar
+    // icon back in the same Toolbar. Not while it waits at a later anchor of the chain for the
+    // picked element, which comes before that anchor
     const current = this.placement.current;
-    if (current?.kind === 'toolbar' && current.icon.isConnected) {
+    if (current?.kind === 'toolbar' && current.icon.isConnected && !this.placement.awaiting) {
       return;
     }
     this.injectIcon(editor).catch((err: unknown) => {

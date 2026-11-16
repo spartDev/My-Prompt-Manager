@@ -11,7 +11,8 @@
  * included; after a report the service worker did not save, unless it refused it for good; when
  * storage drops the repair while this tab was off the Toolbar (as by Clear All Data), or holds an
  * override with no status (a pick stored after the chain resolved); and when the page comes back from
- * the back/forward cache, since the service worker forgot the tab when it left.
+ * the back/forward cache, since the service worker forgot the tab when it left. While the icon waits
+ * within the grace period for a toolbar or a pick rendered late, the tab has no placement to send.
  */
 
 import {
@@ -208,6 +209,14 @@ export class PlacementRepair {
     }
     // In the Toolbar the chain comes before any pick: the placement stands
     this.reportPlaced();
+  }
+
+  /**
+   * The icon is placed again in this tab: until the placement reports, it has none to send. A
+   * placement that waits for the grace period sends nothing for it, not the one it replaced.
+   */
+  placing(): void {
+    this.placed = null;
   }
 
   /** Sends how the icon was last placed, when it was placed and not yet sent */
