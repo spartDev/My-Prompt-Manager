@@ -11,7 +11,7 @@ import type { SiteSettings } from '../../services/siteSettings';
 import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
-import { endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
+import { editorSettled, endsWithSelectorTrigger, MODIFIER_KEYS, removeTypedTrigger, textBeforeCaret } from '../selector/inputText';
 import type { SelectorLibrary } from '../selector/selectorData';
 import type { InsertionResult, Prompt } from '../types/index';
 import { BAR_SEARCH_DEPTH, fitPromptsPill, syncPromptsPillTheme, UIElementFactory } from '../ui/element-factory';
@@ -305,12 +305,16 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Opens the Prompt selector after a typed `//`. Reading the Library, and React the first time,
-   * can take a moment: a user who goes on typing in the field meanwhile, or clicks elsewhere,
-   * wants their text or that other field, not a selector that takes the focus from them, so the
-   * opening is then dropped.
+   * Removes the `//` just typed, then opens the Prompt selector once the Platform's editor is done
+   * with that removal (`editorSettled`): an editor that finishes later would take the focus back
+   * from the selector. A `//` that cannot be removed stays as typed text, and the selector closed:
+   * opening over it would leave it in the field when the selector is closed without an Insertion.
+   * The removal, the wait, then reading the Library, and React the first time, can take a moment:
+   * a user who goes on typing in the field meanwhile, or clicks elsewhere, wants their text or that
+   * other field, not a selector that takes the focus from them, so the opening is then dropped.
    */
   private openFromTyping(field: HTMLElement): void {
+    let dropped = false;
     // A key, a paste, a drop or a composed character in the field, or a click anywhere (another
     // field takes the focus): the user's own actions only, which are trusted events
     const onUserAction = (event: Event): void => {
@@ -319,6 +323,7 @@ export class PromptLibraryInjector {
       }
       if (event.type === 'pointerdown' || event.composedPath().includes(field)) {
         debug('The user went on while the prompt selector was loading, opening dropped', { action: event.type });
+        dropped = true;
         this.selector.close(false);
       }
     };
@@ -331,8 +336,18 @@ export class PromptLibraryInjector {
     for (const type of actions) {
       document.addEventListener(type, onUserAction, true);
     }
+    const open = async (): Promise<void> => {
+      if (!(await removeTypedTrigger(field))) {
+        debug('Could not remove the typed //, the prompt selector stays closed');
+        return;
+      }
+      await editorSettled(field);
+      if (!dropped) {
+        await this.selector.open(field, this.state.icon);
+      }
+    };
     // Once the selector shows, what the user does is its own business: the listeners go
-    this.selector.open(field, this.state.icon).then(stop, stop);
+    open().then(stop, stop);
   }
 
   /**
@@ -396,12 +411,6 @@ export class PromptLibraryInjector {
         scheduled = false;
         const before = field.isConnected ? textBeforeCaret(field) : null;
         if (before === null || !endsWithSelectorTrigger(before) || this.selector.isOpen) {
-          return;
-        }
-        // A // that cannot be removed stays as typed text: opening over it would leave it in the
-        // field when the selector is closed without an Insertion
-        if (!removeTypedTrigger(field)) {
-          debug('Could not remove the typed //, the prompt selector stays closed');
           return;
         }
         this.openFromTyping(field);

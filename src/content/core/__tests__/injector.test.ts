@@ -455,6 +455,140 @@ describe('PromptLibraryInjector', () => {
         expect(selector().close).not.toHaveBeenCalled();
       });
 
+      describe('in a field the // was the whole text of an inline element of (Lexical, Perplexity)', () => {
+        /**
+         * The field after a // typed in it empty: the // is the text of an inline element. A
+         * `beforeinput` that deletes backward, Lexical cancels, takes the selection out of its
+         * text and draws the field again in a microtask; an editor of the same shape that leaves
+         * that event alone (`lexical` false) is not marked with data-lexical-editor. Deleted
+         * another way, the text node the // is taken out of stays, empty, and the editor takes it
+         * out 20 ms later, with whatever was typed in it meanwhile, putting its caret back in the
+         * paragraph (Lexical 0.38 to 0.45; perplexity.ai runs 0.41).
+         */
+        const lexicalField = ({ lexical: marked = false } = {}) => {
+          const field = document.createElement('div');
+          field.contentEditable = 'true';
+          field.innerHTML = '<p><span data-lexical-text="true">//</span></p>';
+          document.body.appendChild(field);
+          const text = field.querySelector('span')?.firstChild as Text;
+          const paragraph = field.querySelector('p') as HTMLElement;
+          document.getSelection()?.collapse(text, 2);
+          let emptied = false;
+          const draw = (typed: string): void => {
+            if (typed === '') {
+              paragraph.replaceChildren(document.createElement('br'));
+              document.getSelection()?.setBaseAndExtent(paragraph, 0, paragraph, 0);
+            } else {
+              text.nodeValue = typed;
+              paragraph.replaceChildren(text.parentNode as Node);
+              document.getSelection()?.collapse(text, typed.length);
+            }
+          };
+          if (marked) {
+            field.setAttribute('data-lexical-editor', 'true');
+            field.addEventListener('beforeinput', (event) => {
+              if (event.inputType === 'deleteContentBackward') {
+                event.preventDefault();
+                queueMicrotask(() => { draw(''); });
+              }
+            });
+          }
+          field.addEventListener('input', () => {
+            if (text.nodeValue === '') {
+              emptied = true;
+              window.setTimeout(() => {
+                emptied = false;
+                draw('');
+              }, 20);
+            }
+          });
+          /** A key typed in the field: in the emptied text, it goes in that text, and with it. */
+          const type = (key: string): void => {
+            const event = new KeyboardEvent('keydown', { key, bubbles: true, composed: true });
+            Object.defineProperty(event, 'isTrusted', { value: true });
+            field.dispatchEvent(event);
+            if (emptied) {
+              text.appendData(key);
+            } else {
+              draw((field.querySelector('span')?.textContent ?? '') + key);
+            }
+          };
+          (injector as any).state.currentTextarea = field;
+          return Object.assign(field, { type });
+        };
+        const typeSlash = async (field: HTMLElement): Promise<void> => {
+          const { EventManager } = await import('../../ui/event-manager');
+          const eventManagerInstance = (EventManager as any).mock.results.at(-1).value;
+          const keydown = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === 'keydown');
+          const heard = (event: Event) => { keydown[2](event); };
+          document.addEventListener('keydown', heard);
+          field.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true, composed: true }));
+          document.removeEventListener('keydown', heard);
+        };
+        let lexical: ReturnType<typeof lexicalField> | null = null;
+        afterEach(() => {
+          lexical?.remove();
+          lexical = null;
+        });
+
+        it('opens the selector once the editor has taken the emptied text out: its focus comes back no more', async () => {
+          const { open } = await listen();
+          lexical = lexicalField();
+
+          await typeSlash(lexical);
+          await new Promise(resolve => window.setTimeout(resolve, 5));
+          expect(lexical.textContent).toBe('');
+          expect(open).not.toHaveBeenCalled();
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(open.mock.calls[0][0]).toBe(lexical);
+          expect(lexical.querySelector('span')).toBeNull();
+        });
+
+        it('drops the opening when the user goes on typing while the editor tidies up', async () => {
+          const { open } = await listen();
+          lexical = lexicalField();
+
+          await typeSlash(lexical);
+          await new Promise(resolve => window.setTimeout(resolve, 5));
+          const event = new KeyboardEvent('keydown', { key: 'a', bubbles: true, composed: true });
+          Object.defineProperty(event, 'isTrusted', { value: true });
+          lexical.dispatchEvent(event);
+          await new Promise(resolve => window.setTimeout(resolve, 150));
+
+          expect(open).not.toHaveBeenCalled();
+        });
+
+        it('in Lexical, opens the selector with no wait: Lexical took the // out itself', async () => {
+          const { open } = await listen();
+          lexical = lexicalField({ lexical: true });
+
+          await typeSlash(lexical);
+
+          await vi.waitFor(() => { expect(open).toHaveBeenCalledTimes(1); });
+          expect(lexical.innerHTML).toBe('<p><br></p>');
+        });
+
+        it('in Lexical, keeps a key typed right after the // is gone, and drops the opening', async () => {
+          const { open } = await listen();
+          // The selector is still loading when the key comes
+          open.mockReturnValue(new Promise(() => { /* still loading */ }));
+          lexical = lexicalField({ lexical: true });
+
+          await typeSlash(lexical);
+          // The // is gone, a moment after the key, well within the 20 ms of an emptied text
+          await handled();
+          await new Promise(resolve => window.setTimeout(resolve, 1));
+          expect(lexical.textContent).toBe('');
+          selector().close.mockClear();
+          lexical.type('t');
+          await new Promise(resolve => window.setTimeout(resolve, 50));
+
+          expect(lexical.textContent).toBe('t');
+          expect(selector().close).toHaveBeenCalledWith(false);
+        });
+      });
+
       it('opens over the input field the Platform has just put in place of the detected one', async () => {
         const { open, typeSlashes } = await listen();
         const fresh = addField();
