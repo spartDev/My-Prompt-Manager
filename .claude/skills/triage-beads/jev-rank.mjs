@@ -473,7 +473,8 @@ async function rank(snapshotPath, opts) {
         children_from: linked ? 'parent-child edges' : 'id prefix (bd list --parent failed)',
         suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
         // "no files" only when every judged child says so; otherwise what is known.
-        no_files: judged.length > 0 && changing.length === 0,
+        // Every child, failed ones included, must read "no": an unknown child is not a "no".
+        no_files: children.length > 0 && judged.length === children.length && changing.length === 0,
         areas,
         maybe_areas: maybe,
       };
