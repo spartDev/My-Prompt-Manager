@@ -33,13 +33,17 @@ const visible = (text: string): string => text.replace(INVISIBLE, '');
  * Zero-width characters, the joiners included, in an element of the field hidden from assistive
  * technology: the marks a Platform's own menu leaves there, not the user's text. M365 Copilot's
  * slash menu ends the paragraph with `<span aria-hidden="true">` holding U+200B U+200C while it is
- * open. A joiner the user writes sits in the editor's ordinary text.
+ * open. A joiner the user writes sits in the editor's ordinary text: an editable hidden span that
+ * holds only joiners between two slashes is taken for such marks, as one holding U+200B is.
  */
 const HIDDEN_MARKS = /[\u200B-\u200D\u2060\uFEFF]/g;
 
-/** Whether `node` is inside an element hidden from assistive technology, up to `root` */
+/**
+ * Whether `node` is, or is inside, an element hidden from assistive technology, below `root`: what
+ * is around the root itself is not looked at
+ */
 const isHidden = (node: Node, root: Node): boolean => {
-  for (let current = node.parentNode; current && current !== root; current = current.parentNode) {
+  for (let current: Node | null = node; current && current !== root; current = current.parentNode) {
     if (current.nodeType === Node.ELEMENT_NODE && (current as Element).getAttribute('aria-hidden') === 'true') {
       return true;
     }
@@ -189,8 +193,9 @@ export function endsWithSelectorTrigger(before: string): boolean {
 /**
  * True when the selection holds text only: no element without text (an image, an icon drawn by
  * the page, a chip the user cannot edit that holds only a zero-width space) that deleting it
- * would take with the slashes. An editor's own span around a zero-width space holds text. The page's elements are judged, not a copy of the selection: a copy holds an
- * empty piece of the element the selection starts at the end of (bold text before the slashes).
+ * would take with the slashes. An editor's own span around a zero-width space holds text. The
+ * page's elements are judged, not a copy of the selection: a copy holds an empty piece of the
+ * element the selection starts at the end of (bold text before the slashes).
  */
 function holdsOnlyText(selection: Selection): boolean {
   if (selection.rangeCount === 0) {
@@ -279,9 +284,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
       }
       const range = selection.getRangeAt(0);
       const text = plainTextOf(range.cloneContents(), { hiddenMarks: false });
-      const around = range.commonAncestorContainer;
-      const hiddenAround = (around.nodeType === Node.ELEMENT_NODE && (around as Element).getAttribute('aria-hidden') === 'true') || (around !== field && isHidden(around, field));
-      return visible(hiddenAround ? text.replace(HIDDEN_MARKS, '') : text);
+      return visible(isHidden(range.commonAncestorContainer, field) ? text.replace(HIDDEN_MARKS, '') : text);
     };
     for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {
       selection.modify('extend', 'backward', 'character');

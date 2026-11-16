@@ -306,7 +306,7 @@ const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
     <script>
       const editor = document.querySelector(${JSON.stringify(field)});
       const slashMenu = ${String(slashMenu)};
-      // The slash menu while it is open (SLASH_MENU)
+      // The slash menu while it is open (slashMenu)
       let menu = null;
       let text = '';
       // The selection the editor knows of, as offsets in its text
