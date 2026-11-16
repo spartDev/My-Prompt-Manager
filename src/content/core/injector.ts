@@ -1301,7 +1301,8 @@ export class PromptLibraryInjector {
         },
         // A composer that gets its toolbar, or the element the user picked, later still takes the
         // icon, and the overlay report goes. The pick is looked for by its selector only: its
-        // fingerprint scores every element of its tag, too much to do once a second
+        // fingerprint scores every element of its tag, too much to do once a second. A pick whose
+        // selector no longer matches is not found late
         { keepWatching: () => toolbarShows(true) || this.pickShowsBeside(icon, true) }
       );
     }

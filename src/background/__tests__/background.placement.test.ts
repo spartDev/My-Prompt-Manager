@@ -466,6 +466,27 @@ describe('background: a picker that could not be activated leaves no session', (
       await vi.waitFor(() => { expect(activations()).toHaveLength(1); });
       vi.mocked(chrome.tabs.get).mockRejectedValue(new Error(`No tab with id: ${String(CLAUDE_TAB.id)}.`));
 
+      expect(await started).toEqual({ success: false, error: 'The tab was closed' });
+      expect(activations()).toHaveLength(1);
+    });
+
+    it('sends no activation again once the start is stopped while it checks the tab is open', async () => {
+      const listener = await startServiceWorker();
+      notInjected();
+      vi.mocked(chrome.tabs.sendMessage).mockImplementation(async (_tabId: number, message: unknown) => {
+        if ((message as { type: string }).type === 'ACTIVATE_ELEMENT_PICKER') {
+          throw new Error(NO_LISTENER);
+        }
+        return undefined;
+      });
+      const started = send(listener, { type: 'START_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id, repairHostname: 'claude.ai' } });
+      await vi.waitFor(() => { expect(activations()).toHaveLength(1); });
+      // The stop lands while the start asks whether the tab is still open
+      vi.mocked(chrome.tabs.get).mockImplementation((async () => {
+        await send(listener, { type: 'STOP_ELEMENT_PICKER', data: { tabId: CLAUDE_TAB.id } });
+        return { ...CLAUDE_TAB, status: 'complete' };
+      }) as never);
+
       expect(await started).toMatchObject({ success: false });
       expect(activations()).toHaveLength(1);
     });

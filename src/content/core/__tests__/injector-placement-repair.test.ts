@@ -15,8 +15,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
 import { changeIconPlacementRepairs, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
+import type { ElementFingerprint } from '../../../types';
 import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
 import { IconPlacementController } from '../icon-placement';
 import { PromptLibraryInjector } from '../injector';
@@ -506,7 +506,7 @@ describe('icon placement override on a built-in Platform', () => {
     afterEach(() => { lateChecks(LATE); });
 
     /** A pick stored whose element is not on the page, the chain finding nothing: the icon ends on the overlay */
-    const leftOnOverlay = async ({ fingerprint }: { fingerprint?: never } = {}) => {
+    const leftOnOverlay = async ({ fingerprint }: { fingerprint?: ElementFingerprint } = {}) => {
       grace(300);
       renameToolbar('', 'renamed-');
       const picked = page.querySelector(PICKED) as HTMLElement;
@@ -535,9 +535,11 @@ describe('icon placement override on a built-in Platform', () => {
 
     it('looks for the missing picked element by its selector only, not scoring the page by its fingerprint', async () => {
       const findElement = vi.spyOn(getElementFingerprintGenerator(), 'findElement').mockReturnValue(null);
+      const findAnchor = vi.spyOn(internals().repair, 'findAnchor');
       try {
-        const { parent } = await leftOnOverlay({ fingerprint: { primary: {} } as never });
+        const { parent } = await leftOnOverlay({ fingerprint: { primary: {} } as unknown as ElementFingerprint });
         findElement.mockClear();
+        findAnchor.mockClear();
 
         // The page keeps changing, the picked element still missing: each change is looked at
         for (let change = 0; change < 3; change++) {
@@ -545,8 +547,11 @@ describe('icon placement override on a built-in Platform', () => {
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
 
+        // The late watch looked, and by the selector
+        expect(findAnchor).toHaveBeenCalledWith({ bySelectorOnly: true });
         expect(findElement).not.toHaveBeenCalled();
       } finally {
+        findAnchor.mockRestore();
         findElement.mockRestore();
       }
     });

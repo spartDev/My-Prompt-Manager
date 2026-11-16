@@ -1388,6 +1388,7 @@ async function handleOpenPickerWindow(
 
 /** The answer to a start a stop ended while it activated */
 const PICKER_STOPPED = "The element picker was stopped";
+const PICKER_TAB_CLOSED = "The tab was closed";
 
 /**
  * How long a content script just injected is given to listen for the picker's activation. Its loader
@@ -1546,12 +1547,21 @@ async function handleStartElementPicker(
           }
         }
         await new Promise((resolve) => setTimeout(resolve, PICKER_LISTENER_RETRY_MS));
+        // A closed tab will never listen
+        const open = await chrome.tabs.get(targetTabId).then(() => true, () => false);
+        if (!open) {
+          Logger.warn("The tab closed before the element picker could be activated", {
+            component: "Background",
+            tabId: targetTabId,
+          });
+          sendResponse({ success: false, error: PICKER_TAB_CLOSED });
+          return;
+        }
+        // Checked last, with nothing awaited until the send: a stop during the wait sends nothing
         if (start.stopped) {
           sendResponse({ success: false, error: PICKER_STOPPED });
           return;
         }
-        // Rejects once the tab is closed: then nothing will ever listen
-        await chrome.tabs.get(targetTabId);
         start.activation = nextPickerActivation();
       }
     } catch (messageError) {
