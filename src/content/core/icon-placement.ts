@@ -46,12 +46,22 @@ export class IconPlacementController {
    */
   static readonly TOOLBAR_GRACE_MS = 5000;
 
+  /**
+   * After the grace period, how often at most an icon left on the Anchored overlay looks for its
+   * toolbar again (keepWatching): a page that changes all the time, a reply being written, costs a
+   * look a second. Copilot at copilot.cloud.microsoft, on a loaded machine, showed a composer
+   * without its toolbar first, and the one with it 44 s later (live check, 2026-11-16)
+   */
+  static readonly LATE_TOOLBAR_CHECK_MS = 1000;
+
   private record: PlacementRecord | null = null;
   private observer: MutationObserver | null = null;
   private replaceTimer: number | null = null;
   /** While the icon waits for where it belongs: whether that place is now found */
   private toolbarFound: ((settled: boolean) => boolean) | null = null;
   private toolbarTimer: number | null = null;
+  /** The grace period is over and the icon still looks for its toolbar (keepWatching) */
+  private watchingLate = false;
   private graceTimer: number | null = null;
   private readonly onLost: (editor: HTMLElement) => void;
 
@@ -94,9 +104,10 @@ export class IconPlacementController {
    * `onKept`, if given, runs when it is still false: only then is the overlay reported, or the
    * pick whose element never showed dropped. The caller says what counts as found (for an icon at
    * a pick, only the chain's first anchor). The grace period starts again with each placement of the
-   * icon.
+   * icon. With `keepWatching`, the wait goes on after that, `found(true)` read on the settled
+   * changes at most every LATE_TOOLBAR_CHECK_MS, until the icon is placed again.
    */
-  awaitToolbar(found: (settled: boolean) => boolean, onKept?: () => void): void {
+  awaitToolbar(found: (settled: boolean) => boolean, onKept?: () => void, { keepWatching = false }: { keepWatching?: boolean } = {}): void {
     const record = this.record;
     if (!record) {
       return;
@@ -122,6 +133,10 @@ export class IconPlacementController {
       }
       this.stopAwaitingToolbar();
       onKept?.();
+      if (keepWatching && this.record === record) {
+        this.toolbarFound = () => found(true);
+        this.watchingLate = true;
+      }
     };
     this.graceTimer = window.setTimeout(endOfGrace, IconPlacementController.TOOLBAR_GRACE_MS);
     // A toolbar rendered while the icon was being placed (Floating UI loading) made no change
@@ -212,7 +227,7 @@ export class IconPlacementController {
         return;
       }
       this.moveIntoToolbar(record);
-    }, IconPlacementController.REPLACE_DELAY_MS);
+    }, this.watchingLate ? IconPlacementController.LATE_TOOLBAR_CHECK_MS : IconPlacementController.REPLACE_DELAY_MS);
   }
 
   /** The toolbar the icon waited for is found: the icon is placed again, into it */
@@ -225,6 +240,7 @@ export class IconPlacementController {
 
   private stopAwaitingToolbar(): void {
     this.toolbarFound = null;
+    this.watchingLate = false;
     for (const timer of [this.toolbarTimer, this.graceTimer]) {
       if (timer !== null) {
         window.clearTimeout(timer);

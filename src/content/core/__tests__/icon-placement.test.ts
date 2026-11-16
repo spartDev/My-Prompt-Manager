@@ -205,6 +205,76 @@ describe('IconPlacementController', () => {
       expect(onLost).not.toHaveBeenCalled();
     });
 
+    it('with keepWatching, still places the icon again when the toolbar shows long after the grace period', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept, { keepWatching: true });
+      await elapse(GRACE);
+      expect(onKept).toHaveBeenCalledTimes(1);
+
+      // A composer without the toolbar, then the one with it 40 s later
+      await elapse(40_000);
+      found = true;
+      change();
+      await elapse(DELAY);
+      expect(onLost).not.toHaveBeenCalled();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS);
+
+      expect(onLost).toHaveBeenCalledWith(editor);
+      expect(controller.current).toBeNull();
+    });
+
+    it('with keepWatching, looks at most once a second after the grace period on a page that keeps changing', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => { checks++; return found; }, onKept, { keepWatching: true });
+      await elapse(GRACE);
+      checks = 0;
+
+      for (let index = 0; index < 30; index++) {
+        change();
+        await elapse(DELAY);
+      }
+
+      expect(checks).toBeLessThanOrEqual(3);
+      expect(checks).toBeGreaterThan(0);
+    });
+
+    it('with keepWatching, does not watch for an icon placed anew when the grace period ended', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => { checks++; return found; }, () => { controller.track(icon, editor, 'toolbar', 0); }, { keepWatching: true });
+      await elapse(GRACE);
+      checks = 0;
+
+      found = true;
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS * 2);
+
+      expect(checks).toBe(0);
+      expect(onLost).not.toHaveBeenCalled();
+    });
+
+    it('with keepWatching, stops looking once the icon is placed anew', async () => {
+      let checks = 0;
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => { checks++; return found; }, onKept, { keepWatching: true });
+      await elapse(GRACE);
+      controller.track(icon, editor, 'toolbar', 0);
+      checks = 0;
+
+      change();
+      await elapse(IconPlacementController.LATE_TOOLBAR_CHECK_MS * 2);
+
+      expect(checks).toBe(0);
+
+      // Its next wait looks at the pace of the grace period again
+      controller.awaitToolbar(() => found, onKept);
+      found = true;
+      change();
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledWith(editor);
+    });
+
     it('stops looking at the end of the grace period for an icon at a pick, which a later anchor no longer moves', async () => {
       controller.track(icon, editor, 'override');
       controller.awaitToolbar(() => found);

@@ -55,6 +55,20 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
   });
 
+  test('the Prompts button still goes into the toolbar when Copilot renders it long after the grace period', async ({ context }) => {
+    // Past the grace period (IconPlacementController.TOOLBAR_GRACE_MS, 5 s): the button is left on
+    // the overlay and the overlay is reported, then the toolbar shows
+    await context.addInitScript(() => { (window as Window & { __toolbarDelay?: number }).__toolbarDelay = 7_000; });
+    const page = await openPlatform(context, 'm365copilot-editor');
+
+    const button = promptsButton(page);
+    await expect(button).toHaveAttribute('data-mpm-placement', 'overlay');
+    await expect(button).toHaveAttribute('data-mpm-placement', 'toolbar', { timeout: 20_000 });
+    expect(await page.evaluate(() => (window as Window & { __placementBeforeToolbar?: string | null }).__placementBeforeToolbar)).toBe('overlay');
+    await expect(button).toHaveAttribute('data-mpm-anchor', '0');
+    expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
+  });
+
   test('typing // in one go opens the Prompt selector next to Copilot\'s own slash menu, which closes with the //', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
     await expect(promptsButton(page)).toHaveAttribute('data-mpm-placement', 'toolbar');

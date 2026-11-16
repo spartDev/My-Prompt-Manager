@@ -75,10 +75,11 @@ const nextContent = (node: Node): Node | null => {
 /**
  * The text under `root`, one line per block. A <br> breaks the line, except the one an editor
  * leaves at the end of a block to keep it open (an empty paragraph is `<p><br></p>`).
- * `hiddenMarks: false` leaves out the zero-width characters of elements hidden from assistive
- * technology (HIDDEN_MARKS), as the `//` is read.
+ * The zero-width characters of elements hidden from assistive technology (HIDDEN_MARKS) are left
+ * out: a Platform's menu leaves them, wherever its editor then moves them (M365 Copilot puts its
+ * slash menu's span after an inserted Prompt, read live on 2026-11-16), and they are not the user's.
  */
-export function plainTextOf(root: Node, { hiddenMarks = true }: { hiddenMarks?: boolean } = {}): string {
+export function plainTextOf(root: Node): string {
   const lines: string[] = [''];
   // A block has just ended: what comes next starts a new line
   let blockEnded = false;
@@ -94,7 +95,7 @@ export function plainTextOf(root: Node, { hiddenMarks = true }: { hiddenMarks?: 
     for (const child of Array.from(node.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
         const raw = child.nodeValue ?? '';
-        const text = hiddenMarks || !isHidden(child, root) ? raw : raw.replace(HIDDEN_MARKS, '');
+        const text = isHidden(child, root) ? raw.replace(HIDDEN_MARKS, '') : raw;
         // Indentation of the markup between two blocks is not text of the field
         const betweenBlocks = text.trim() === '' && (isBlock(child.previousSibling) || isBlock(child.nextSibling));
         if (text !== '' && !betweenBlocks) {
@@ -151,7 +152,7 @@ export function textBeforeCaret(field: HTMLElement): string | null {
   const range = field.ownerDocument.createRange();
   range.setStart(field, 0);
   range.setEnd(selection.focusNode, selection.focusOffset);
-  return plainTextOf(range.cloneContents(), { hiddenMarks: false });
+  return plainTextOf(range.cloneContents());
 }
 
 /**
@@ -231,13 +232,13 @@ function holdsOnlyText(selection: Selection, field: HTMLElement): boolean {
  */
 function removalCheck(field: HTMLElement, before: string): () => boolean {
   const spaces = (text: string): string => text.replace(/\u00a0/g, ' ');
-  const original = visible(plainTextOf(field, { hiddenMarks: false }));
+  const original = visible(plainTextOf(field));
   const typed = visible(before);
   const expected = spaces(original.slice(0, typed.length - SELECTOR_TRIGGER.length) + original.slice(typed.length));
   // Only a // with nothing after it can leave such a break: elsewhere a missing line is a change
   const endedField = original.length === typed.length;
   return () => {
-    const now = spaces(visible(plainTextOf(field, { hiddenMarks: false })));
+    const now = spaces(visible(plainTextOf(field)));
     return now === expected || (endedField && expected.endsWith('\n') && now === expected.slice(0, -1));
   };
 }
@@ -345,7 +346,7 @@ export function removeTypedTrigger(field: HTMLElement): boolean {
         return '';
       }
       const range = selection.getRangeAt(0);
-      const text = plainTextOf(range.cloneContents(), { hiddenMarks: false });
+      const text = plainTextOf(range.cloneContents());
       return visible(isHidden(range.commonAncestorContainer, field) ? text.replace(HIDDEN_MARKS, '') : text);
     };
     for (let i = 0; i < SELECTOR_TRIGGER.length + 4 && selected().length < SELECTOR_TRIGGER.length; i++) {

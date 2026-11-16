@@ -233,21 +233,28 @@ const M365COPILOT_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M
  * The live page renders the plus menu and the dictation button after the editor (live check,
  * 2026-11-15): this stand-in takes them out before the content script runs, and puts them back a
  * moment after the Prompts button shows, noting in `window.__placementBeforeToolbar` where the
- * button was until then.
+ * button was until then. Meanwhile the composer holds what the live page first shows, a shell
+ * whose "+" is `chat-input-attach-button`, with no plus menu and no dictation button (live check,
+ * 2026-11-16). On a loaded machine the real toolbar came 44 s later: `window.__toolbarDelay`, set
+ * before the page loads, says after how many milliseconds it comes (500 otherwise).
  */
 const LATE_TOOLBAR = /* html */ `
     <script>
       const composer = document.querySelector('[data-lexical-editor]').parentElement.parentElement;
       const late = Array.from(composer.children).slice(1);
       for (const element of late) { element.remove(); }
+      const shell = document.createElement('div');
+      shell.innerHTML = '<button type="button" data-testid="chat-input-attach-button" aria-label="Add">+</button>';
+      composer.append(shell);
       const render = () => {
         window.__placementBeforeToolbar = document.querySelector('[data-mpm-placement]')?.getAttribute('data-mpm-placement') ?? null;
+        shell.remove();
         composer.append(...late);
       };
       const waitForButton = new MutationObserver(() => {
         if (document.querySelector('[data-mpm-placement]')) {
           waitForButton.disconnect();
-          window.setTimeout(render, 500);
+          window.setTimeout(render, window.__toolbarDelay ?? 500);
         }
       });
       waitForButton.observe(document.body, { childList: true, subtree: true, attributes: true });

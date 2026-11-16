@@ -1296,7 +1296,9 @@ export class PromptLibraryInjector {
             hostname: this.state.hostname
           });
           this.repair.report('overlay');
-        }
+        },
+        // A composer that gets its toolbar later still takes the icon, and the overlay report goes
+        { keepWatching: true }
       );
     }
     debug('Icon anchored on the editor', { method: method ?? 'static' });

@@ -78,7 +78,7 @@ describe('plainTextOf', () => {
     document.body.append(wrapper);
     const field = wrapper.firstElementChild as HTMLElement;
 
-    expect(plainTextOf(field, { hiddenMarks: false })).toBe('Hi /\u200C/');
+    expect(plainTextOf(field)).toBe('Hi /\u200C/');
     wrapper.remove();
   });
 
@@ -120,6 +120,22 @@ describe('plainTextOf', () => {
 });
 
 describe('readInputText', () => {
+  it('reads M365 Copilot\'s field after an Insertion as the Prompt, without the marks its menu left at the end', () => {
+    const template = document.createElement('template');
+    template.innerHTML = readFileSync(resolve(__dirname, '../../../../tests/fixtures/composers/m365copilot-after-insertion.html'), 'utf8');
+    const field = template.content.getElementById('m365-chat-editor-target-element') as HTMLElement;
+    document.body.append(field);
+
+    expect(readInputText(field)).toBe('Rewrite the paragraph below so it is shorter, then say what you cut and why.\n\nParagraph:\n');
+    field.remove();
+  });
+
+  it('keeps a joiner the user wrote in the editor\'s ordinary text', () => {
+    const field = editable('<p><span data-lexical-text="true">a\u200Cb</span></p>');
+
+    expect(readInputText(field)).toBe('a\u200Cb');
+  });
+
   it('reads the value of a textarea and of an input, exactly', () => {
     expect(readInputText(textarea('  Two lines\n  kept  '))).toBe('  Two lines\n  kept  ');
     const input = document.createElement('input');
@@ -610,7 +626,7 @@ describe('deleteTypedTriggerByEditor', () => {
     expect(removal).not.toBeNull();
     await expect(removal).resolves.toBe(true);
     expect(events).toEqual(['deleteContentBackward', 'deleteContentBackward']);
-    expect(plainTextOf(field, { hiddenMarks: false })).toBe('');
+    expect(plainTextOf(field)).toBe('');
   });
 
   it('reads the field once an editor that draws in a microtask, as Lexical, has drawn', async () => {
@@ -651,7 +667,7 @@ describe('deleteTypedTriggerByEditor', () => {
 
     expect(deleteTypedTriggerByEditor(field)).toBeNull();
     expect(events).toHaveLength(1);
-    expect(plainTextOf(field, { hiddenMarks: false })).toBe('//');
+    expect(plainTextOf(field)).toBe('//');
   });
 
   it.each([
