@@ -143,7 +143,7 @@ export class PlacementRepair {
    */
   report(placement: PlacementReport, atLaterAnchor = false): void {
     this.placed = placement;
-    this.atLaterAnchor = placement === 'toolbar' && atLaterAnchor;
+    this.atLaterAnchor = atLaterAnchor;
     if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
       return;
     }

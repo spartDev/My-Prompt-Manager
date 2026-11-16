@@ -430,6 +430,28 @@ describe('PromptLibraryInjector', () => {
         expect(mockTextarea.value).toBe('Draft ');
       });
 
+      it.each([
+        ['keydown', () => new KeyboardEvent('keydown', { key: '/', isComposing: true, bubbles: true, composed: true })],
+        ['beforeinput', () => new InputEvent('beforeinput', { data: '/', inputType: 'insertCompositionText', isComposing: true, bubbles: true, composed: true })]
+      ])('does not open on a slash an input method is still composing, heard by its %s', async (type, event) => {
+        const { open } = await listen();
+        const eventManagerInstance = (await import('../../ui/event-manager') as any).EventManager.mock.results.at(-1).value;
+        const listener = eventManagerInstance.addTrackedEventListener.mock.calls.find((call: any[]) => call[0] === document && call[1] === type)?.[2];
+        mockTextarea.value = 'Draft //';
+        mockTextarea.setSelectionRange(8, 8);
+
+        const heard = (received: Event) => { listener?.(received); };
+        document.addEventListener(type, heard);
+        mockTextarea.dispatchEvent(event());
+        document.removeEventListener(type, heard);
+        await handled();
+        await handled();
+
+        expect(listener).toBeDefined();
+        expect(open).not.toHaveBeenCalled();
+        expect(mockTextarea.value).toBe('Draft //');
+      });
+
       it('drops the opening when the user goes on typing in the field while the selector loads', async () => {
         const { open, typeSlashes } = await listen();
         typeSlashes(mockTextarea);

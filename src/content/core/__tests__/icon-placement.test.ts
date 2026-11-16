@@ -373,5 +373,19 @@ describe('IconPlacementController', () => {
       expect(onKept).not.toHaveBeenCalled();
       expect(onLost).toHaveBeenCalledTimes(1);
     });
+
+    it('ends the wait when the icon is lost, even when nothing is placed again (the site turned off)', async () => {
+      controller.track(icon, editor, 'overlay');
+      controller.awaitToolbar(() => found, onKept);
+
+      // onLost places nothing: no new record, no new wait
+      toolbar.remove();
+      await elapse(DELAY);
+      expect(onLost).toHaveBeenCalledTimes(1);
+      await elapse(GRACE * 2);
+
+      expect(vi.getTimerCount()).toBe(0);
+      expect(onKept).not.toHaveBeenCalled();
+    });
   });
 });
