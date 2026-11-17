@@ -5,7 +5,18 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import { resolveIconPlacement } from '../../src/content/core/icon-placement';
-import { addressAsPrinted, type CaptureResult, captureExitCode, headerUrl, parseCaptureArgs, redactUrls, rulesFor } from '../capture-composers';
+import { STRATEGY_CONSTRUCTORS } from '../../src/content/platforms/strategy-constructors';
+import {
+  addressAsPrinted,
+  type CaptureResult,
+  captureExitCode,
+  fixtureHeaderUrl,
+  headerUrl,
+  parseCaptureArgs,
+  redactUrls,
+  rulesFor,
+  strategyEditorSelectors
+} from '../capture-composers';
 import { composerFixturePath } from '../composers/fixtures';
 import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf, serializeComposer } from '../composers/sanitize';
 
@@ -116,6 +127,27 @@ describe('sanitizeComposer', () => {
     sanitizeComposer(composer, sanitizeRulesOf(['[aria-label$="message"]', '[aria-label^="Send"]']));
 
     expect(serializeComposer(composer)).toBe('<div>\n  <button aria-label="Send message"></button>\n</div>');
+  });
+
+  it('writes a value that meets a |= condition and a *= condition together', () => {
+    const composer = composerOf('<div><span lang="en-US"></span></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[lang|=en]', '[lang*=US]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span lang="en-US"></span>\n</div>');
+    expect(composer.querySelector('[lang|=en][lang*=US]')).not.toBeNull();
+  });
+
+  it.each([
+    ['a double-quoted value', String.raw`[aria-label*="say \"hi\" now"]`, 'Alice, say &quot;hi&quot; now', 'say &quot;hi&quot; now'],
+    ['a single-quoted value', String.raw`[aria-label*='say \'hi\' now']`, 'Alice, say \'hi\' now', 'say \'hi\' now'],
+    ['a hex escape', String.raw`[aria-label*="say \26  now"]`, 'Alice, say &amp; now', 'say &amp; now']
+  ])('reads an escaped character in %s as part of the value', (_case, selector, live, written) => {
+    const composer = composerOf(`<div><button aria-label="${live}"></button></div>`);
+
+    sanitizeComposer(composer, sanitizeRulesOf([selector]));
+
+    expect(serializeComposer(composer)).toBe(`<div>\n  <button aria-label="${written}"></button>\n</div>`);
   });
 
   it('keeps an attribute a selector names both bare and with a value, whatever its value', () => {
@@ -389,6 +421,11 @@ describe('headerUrl', () => {
     expect(headerUrl(url.href)).toBe('https://chat.example.com/c/123');
   });
 
+  it('names an address without its path when asked: a session id in a path segment is not committed', () => {
+    expect(headerUrl('https://claude.ai/chat/0b1c-session?x=1', { path: false })).toBe('https://claude.ai/');
+    expect(headerUrl('file:///Users/alice/stand-ins/session-0b1c.html', { path: false })).toBe('file://<stand-in>');
+  });
+
   it('names an address it cannot parse as a stand-in, not as it is', () => {
     expect(headerUrl('not a url?token=abc')).toBe('<stand-in>');
   });
@@ -405,6 +442,36 @@ describe('headerUrl', () => {
 
     expect(headerUrl('data:text/html,<p>alice</p>')).toBe('<stand-in>');
     expect(headerUrl(mailto)).toBe('<stand-in>');
+  });
+});
+
+describe('fixtureHeaderUrl', () => {
+  it('writes a --url without its path segments in the fixture header', () => {
+    const options = parseCaptureArgs(['--url', 'claude=https://claude.ai/chat/0b1c-session-id?t=SECRET'], {});
+
+    expect(fixtureHeaderUrl('claude', SUPPORTED_PLATFORMS.claude, options)).toBe('https://claude.ai/');
+  });
+
+  it('writes the Platform\'s own start address with its path: it is the script\'s, not the operator\'s', () => {
+    expect(fixtureHeaderUrl('claude', SUPPORTED_PLATFORMS.claude, parseCaptureArgs([], {}))).toBe('https://claude.ai/new');
+  });
+});
+
+describe('strategyEditorSelectors', () => {
+  it('reads the class selectors of every platform strategy, so a strategy\'s editor class is kept', () => {
+    const named = Object.values(STRATEGY_CONSTRUCTORS)
+      .flatMap((Strategy) => new Strategy('strategies.test').getSelectors())
+      .filter((selector) => classNamesOf([selector]).length > 0);
+
+    expect(named.length).toBeGreaterThan(0);
+    expect(strategyEditorSelectors()).toEqual(expect.arrayContaining(named));
+    for (const platform of Object.values(SUPPORTED_PLATFORMS)) {
+      expect([...rulesFor(platform).classes]).toEqual(expect.arrayContaining(classNamesOf(named)));
+    }
+  });
+
+  it('holds only selectors that name a class', () => {
+    expect(strategyEditorSelectors().every((selector) => classNamesOf([selector]).length > 0)).toBe(true);
   });
 });
 

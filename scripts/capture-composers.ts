@@ -29,9 +29,10 @@ import { JSDOM } from 'jsdom';
 import { type BrowserContext, chromium, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
+import { STRATEGY_CONSTRUCTORS } from '../src/content/platforms/strategy-constructors';
 
 import { CAPTURED_DIR_ENV, CAPTURED_IDS_ENV } from './composers/fixtures';
-import { composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf } from './composers/sanitize';
+import { classNamesOf, composerFixture, EDITOR_MARKER, sanitizeComposer, sanitizeRulesOf } from './composers/sanitize';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_OUT = path.join(ROOT, 'tests', 'fixtures', 'composers');
@@ -144,17 +145,24 @@ const urlOf = (id: string, platform: PlatformDefinition, options: CaptureOptions
   options.urls[id] ?? `https://${platform.hostname}${START_PATHS[id] ?? '/'}`;
 
 /**
- * The class selectors the platform strategies find editors by, beyond the config's
- * (claude-strategy, mistral-strategy, gemini-strategy): the editor keeps those class names
+ * The selectors naming a class that the platform strategies find editors by, beyond the config's
+ * (`.ProseMirror`, `.ql-editor`): read from the strategies themselves, so a fixture keeps every
+ * editor class a strategy looks for. Of every strategy, since Mistral's tells its ProseMirror
+ * editor by its class in code, not by a selector.
  */
-const STRATEGY_EDITOR_SELECTORS = ['.ProseMirror[contenteditable="true"]', 'rich-textarea .ql-editor'];
+export const strategyEditorSelectors = (): string[] => [...new Set(
+  Object.values(STRATEGY_CONSTRUCTORS)
+    // A hostname given, so a strategy does not read window.location, which Node has not
+    .flatMap((Strategy) => new Strategy('composers.capture').getSelectors())
+    .filter((selector) => classNamesOf([selector]).length > 0)
+)];
 
 /** What a Platform's fixture keeps: what its editor selectors and its anchor chain read */
 export const rulesFor = (platform: PlatformDefinition) => {
   const chain = platform.iconPlacement;
   return sanitizeRulesOf([
     ...platform.selectors,
-    ...STRATEGY_EDITOR_SELECTORS,
+    ...strategyEditorSelectors(),
     ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])
   ]);
 };
@@ -163,9 +171,10 @@ export const rulesFor = (platform: PlatformDefinition) => {
  * The address a fixture's header names, from the parsed address, never the raw string: a local
  * stand-in file only by its name, not its home path; a web address only by its protocol, host and
  * path, so no user name, password, query or fragment is committed; anything else (data:, mailto:,
- * an address that does not parse) only as `<stand-in>`
+ * an address that does not parse) only as `<stand-in>`. With `path: false`, a web address by its
+ * protocol and host only, and a local file not even by its name.
  */
-export function headerUrl(url: string): string {
+export function headerUrl(url: string, { path: withPath = true }: { path?: boolean } = {}): string {
   let parsed: URL;
   try {
     parsed = new URL(url.trim());
@@ -175,14 +184,22 @@ export function headerUrl(url: string): string {
   const { protocol, host, pathname } = parsed;
   switch (protocol) {
     case 'file:':
-      return `file://<stand-in>/${pathname.split('/').pop() ?? ''}`;
+      return withPath ? `file://<stand-in>/${pathname.split('/').pop() ?? ''}` : 'file://<stand-in>';
     case 'http:':
     case 'https:':
-      return `${protocol}//${host}${pathname}`;
+      return `${protocol}//${host}${withPath ? pathname : '/'}`;
     default:
       return '<stand-in>';
   }
 }
+
+/**
+ * The address a fixture's header names: the Platform's own start address with its path (the
+ * script's, `/new`); an operator's --url without it, since a path segment may hold a session id
+ * and the header is committed
+ */
+export const fixtureHeaderUrl = (id: string, platform: PlatformDefinition, options: CaptureOptions): string =>
+  headerUrl(urlOf(id, platform, options), { path: !(id in options.urls) });
 
 /** What may stand right before or after an address in a message: a space, a quote, a bracket, a parenthesis, or punctuation that ends a sentence */
 const BEFORE_ADDRESS = '(?<=^|[\\s"\'(<])';
@@ -282,6 +299,9 @@ export function captureExitCode(results: readonly CaptureResult[], testsStatus?:
 /** Tried after a Platform's own selectors, in this order */
 const GENERIC_EDITORS = ['[contenteditable="true"][role="textbox"]', '[contenteditable="true"]', 'textarea'];
 
+/** How long to wait for the editor again after the settle, in ms */
+const REFIND_TIMEOUT = 5_000;
+
 /** Ancestors of the editor captured when the chain's composer selector finds nothing */
 const FALLBACK_DEPTH = 5;
 
@@ -294,7 +314,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   // The first visible editor, by the selectors' order. Any visible match: waitForSelector would wait
   // on the first match only, and a hidden textarea earlier in the page (a search field) would then
   // hide the editor. Visible means rendered, not visibility:hidden, and of nonzero width and height.
-  const findEditor = async () => {
+  const findEditor = async (timeout: number) => {
     try {
       const handle = await page.waitForFunction(
         (selectors) => {
@@ -311,21 +331,22 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
           return false;
         },
         editorSelectors,
-        { timeout: options.timeout, polling: 250 }
+        { timeout, polling: 250 }
       );
       return handle.asElement();
     } catch {
       return null;
     }
   };
-  const firstEditor = await findEditor();
+  const firstEditor = await findEditor(options.timeout);
   if (!firstEditor) {
     return { id, outcome: 'no-editor', url };
   }
   await firstEditor.dispose();
   await page.waitForTimeout(options.settle);
-  // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile
-  const editorHandle = await findEditor();
+  // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile.
+  // The page has loaded by now, so an editor that does not come back soon is gone: no second full wait
+  const editorHandle = await findEditor(Math.min(options.timeout, REFIND_TIMEOUT));
   if (!editorHandle) {
     return { id, outcome: 'no-editor', url };
   }
@@ -362,7 +383,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   const file = path.join(options.out, `${id}.html`);
   writeFileSync(file, composerFixture(root, {
     platformName: platform.displayName,
-    url: headerUrl(url),
+    url: fixtureHeaderUrl(id, platform, options),
     date: new Date().toISOString().slice(0, 10),
     composerFound: live.composerFound
   }));

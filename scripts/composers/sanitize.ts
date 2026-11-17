@@ -100,7 +100,13 @@ export function classNamesOf(selectors: readonly string[]): string[] {
   return [...new Set(selectors.flatMap((selector) => Array.from(selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g), (match) => match[1])))];
 }
 
-const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
+/** A quoted value may hold an escaped character, an escaped quote included: `[aria-label="say \"hi\""]` */
+const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
+
+/** A quoted selector value as CSS reads it: a hex escape (`\26 `) is its code point, any other escaped character itself */
+const unescapeCss = (value: string): string =>
+  value.replace(/\\(?:([0-9a-fA-F]{1,6})\s?|(.))/g, (_escape, hex: string | undefined, char: string | undefined) =>
+    hex ? String.fromCodePoint(parseInt(hex, 16)) : (char ?? ''));
 const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
 
 /** The rules for a Platform, from its editor selectors and its anchor chain */
@@ -117,7 +123,8 @@ export function sanitizeRulesOf(selectors: readonly string[]): SanitizeRules {
   };
   for (const selector of selectors) {
     for (const [, name, operator, double, single, bare, flag] of selector.matchAll(ATTRIBUTE_SELECTOR)) {
-      const value = double ?? single ?? bare;
+      const quoted = double ?? single;
+      const value = quoted === undefined ? bare : unescapeCss(quoted);
       condition(name.toLowerCase(), operator && value !== undefined ? { operator, value, ignoreCase: flag?.toLowerCase() === 'i' } : undefined);
     }
     // An id in a selector (#userInput) is a condition on the id attribute
@@ -152,10 +159,11 @@ function selectorValue(actual: string, conditions: readonly ValueCondition[]): s
   if (met.length === 0) {
     return null;
   }
-  // Joined, a prefix goes first and a suffix last: `^="Send"` and `$="message"` give "Send message"
-  const order = (operator: string) => (operator === '^=' ? 0 : operator === '$=' ? 2 : 1);
-  const joined = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value).join(' ');
-  const candidates = [...met.map(({ value }) => value), joined];
+  // Joined, a prefix goes first and a suffix last: `^="Send"` and `$="message"` give "Send message";
+  // a language prefix is followed by a hyphen: `|=en` and `*=US` give "en-US"
+  const order = (operator: string) => (operator === '^=' || operator === '|=' ? 0 : operator === '$=' ? 2 : 1);
+  const values = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value);
+  const candidates = [...met.map(({ value }) => value), values.join(' '), values.join('-')];
   return candidates.find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
 }
 
