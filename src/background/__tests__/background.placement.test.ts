@@ -207,6 +207,8 @@ describe('background: the icon placement of each tab of a Platform', () => {
     const update = async (tabs: chrome.tabs.Tab[]) => {
       await chrome.storage.session.clear();
       vi.mocked(chrome.tabs.query).mockResolvedValue(tabs as never);
+      // The tabs are still open as the update found them
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
       const listener = await startServiceWorker();
       const onInstalled = vi.mocked(getChromeMock().runtime.onInstalled.addListener).mock.calls.at(-1)?.[0];
       onInstalled?.({ reason: 'update', previousVersion: '1.0.0' } as chrome.runtime.InstalledDetails);
@@ -237,11 +239,11 @@ describe('background: the icon placement of each tab of a Platform', () => {
       const before = await startServiceWorker();
       await report(before, OTHER_CLAUDE_TAB, 'toolbar');
       await pickInClaudeTab(before);
-      // What the service worker knew of the tabs when it started re-injecting each one
+      // What the service worker knew of the tabs when it started re-injecting one (its permission check)
       const knownAtInjection: unknown[] = [];
-      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => {
+      vi.mocked(chrome.permissions.contains).mockImplementation((async () => {
         knownAtInjection.push((await chrome.storage.session.get('iconPlacementTabs')).iconPlacementTabs);
-        return tabId === CLAUDE_TAB.id ? CLAUDE_TAB : OTHER_CLAUDE_TAB;
+        return false;
       }) as never);
 
       await update([OTHER_CLAUDE_TAB, CLAUDE_TAB]);
