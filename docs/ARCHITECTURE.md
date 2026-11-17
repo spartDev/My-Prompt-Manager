@@ -244,8 +244,7 @@ export const SUPPORTED_PLATFORMS = {
     iconPlacement: {
       composer: 'fieldset, input-area-v2', // Found with editor.closest()
       anchors: [                           // Tried in order inside it; the first found wins
-        { find: 'speech-dictation-mic-button', relation: 'after' },
-        { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' },
+        { find: '.input-buttons-wrapper-bottom', relation: 'before' },
         { find: '.trailing-actions-wrapper', relation: 'inside-end' }
       ]
     },

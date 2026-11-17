@@ -13,7 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { composerFixturePath } from '../../../../scripts/composers/fixtures';
 import { SUPPORTED_PLATFORMS } from '../../../config/platforms';
-import { resolveIconPlacement } from '../icon-placement';
+import { placeAtAnchor, resolveIconPlacement } from '../icon-placement';
 
 const FIXTURES = resolve(__dirname, '../../../../tests/fixtures/composers');
 
@@ -141,6 +141,33 @@ describe('icon placement chains on the live composers', () => {
     const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
 
     expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)).toBeNull();
+  });
+
+  it('gemini places the icon in the trailing actions, before the microphone and outside its wrapper', () => {
+    // The microphone's container (.mic-button-container, in the wrapper) is 3rem wide, as wide as
+    // the microphone: an icon put next to the microphone overflows past the field's rounded right
+    // edge, which clips it (seen live on 2026-11-17)
+    const editor = loadComposer('gemini');
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.gemini.iconPlacement);
+    expect(resolution).not.toBeNull();
+    const icon = document.createElement('button');
+
+    placeAtAnchor(icon, resolution as NonNullable<typeof resolution>);
+
+    const microphone = document.querySelector('.input-buttons-wrapper-bottom');
+    expect(icon.parentElement).toBe(document.querySelector('.trailing-actions-wrapper'));
+    expect(icon.nextElementSibling).toBe(microphone);
+    expect(microphone?.contains(icon)).toBe(false);
+  });
+
+  it('gemini puts the icon at the end of the trailing actions once the microphone wrapper is gone', () => {
+    document.body.innerHTML = readFileSync(fixtureOf('gemini'), 'utf8').replace('class="input-buttons-wrapper-bottom"', '');
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.gemini.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('.trailing-actions-wrapper'));
+    expect(resolution?.relation).toBe('inside-end');
   });
 
   it('never takes an anchor outside the composer, such as a message action bar above it', () => {

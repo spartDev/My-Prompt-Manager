@@ -458,9 +458,8 @@ window.__promptLibraryDebug?.strategies
 iconPlacement: {
   composer: 'fieldset, input-area-v2',
   anchors: [
-    { find: 'speech-dictation-mic-button', relation: 'after' },        // Try first
-    { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' }, // Then this
-    { find: '.trailing-actions-wrapper', relation: 'inside-end' }      // Last
+    { find: '.input-buttons-wrapper-bottom', relation: 'before' },     // Try first
+    { find: '.trailing-actions-wrapper', relation: 'inside-end' }      // Then this
   ]
 }
 ```
