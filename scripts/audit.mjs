@@ -3,21 +3,25 @@
  *
  * `npm audit` has no way to waive one advisory, and an advisory with no patched release fails every CI run
  * until upstream ships a fix. A waiver names the advisory, says why the risk is accepted, and expires: past
- * its date it fails the audit again, so someone looks at the advisory once more.
+ * its date it fails the audit again, so someone looks at the advisory once more. A waiver with `devOnly`
+ * applies only while package-lock.json marks every installation of the vulnerable package `dev`: once a
+ * runtime dependency brings it in, the advisory blocks again, since the risk accepted was build and test time.
  *
  * Usage: node scripts/audit.mjs. It exits 1 and names each advisory that blocks, or each expired waiver.
  * CI runs it in place of `npm audit --audit-level=moderate` (pr-checks, main-deploy, release).
  */
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-/** @type {{ id: string; reason: string; until: string }[]} */
+/** @type {{ id: string; reason: string; until: string; devOnly?: boolean }[]} */
 export const WAIVERS = [
   {
     id: 'GHSA-fc5q-39xc-vjpf',
     reason:
       'picomatch <=4.0.7 ReDoS, no patched release. Dev dependency only (vite, vitest, lint-staged, @crxjs): it runs on our own globs at build and test time and does not ship in the extension.',
-    until: '2027-02-17'
+    until: '2027-02-17',
+    devOnly: true
   }
 ];
 
@@ -38,26 +42,41 @@ export function advisoriesOf(report) {
         continue;
       }
       const id = ghsaOf(via.url);
-      const advisory = advisories.get(id) ?? { id, title: via.title, severity: via.severity, packages: [] };
+      const advisory = advisories.get(id) ?? { id, title: via.title, severity: via.severity, packages: [], nodes: [] };
       advisory.packages.push(name);
+      advisory.nodes.push(...(vulnerability.nodes ?? []));
       advisories.set(id, advisory);
     }
   }
   return [...advisories.values()];
 }
 
-/** The advisories that fail the audit and the waivers past their date, on `today` (YYYY-MM-DD). */
-export function auditVerdict(report, waivers, today) {
+/** Whether package-lock.json marks every installation the advisory names as a dev dependency only. */
+const isDevOnly = (advisory, lockfile) =>
+  advisory.nodes.length > 0 && advisory.nodes.every((node) => lockfile?.packages?.[node]?.dev === true);
+
+/**
+ * The advisories that fail the audit and the waivers past their date, on `today` (YYYY-MM-DD). `lockfile` is the
+ * parsed package-lock.json, read for the waivers marked `devOnly`.
+ */
+export function auditVerdict(report, waivers, today, lockfile) {
   const expired = waivers.filter((waiver) => waiver.until < today);
-  const active = new Set(waivers.filter((waiver) => waiver.until >= today).map((waiver) => waiver.id));
+  const active = waivers.filter((waiver) => waiver.until >= today);
+  const isWaived = (advisory) =>
+    active.some((waiver) => waiver.id === advisory.id && (!waiver.devOnly || isDevOnly(advisory, lockfile)));
   const blocking = advisoriesOf(report).filter(
-    (advisory) => (SEVERITY_RANK[advisory.severity] ?? SEVERITY_RANK.critical) >= MIN_RANK && !active.has(advisory.id)
+    (advisory) => (SEVERITY_RANK[advisory.severity] ?? SEVERITY_RANK.critical) >= MIN_RANK && !isWaived(advisory)
   );
   return { blocking, expired };
 }
 
 function main() {
-  const result = spawnSync('npm', ['audit', '--json'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 });
+  // On Windows npm is a .cmd launcher, which Node starts only through a shell; the arguments are fixed.
+  const result = spawnSync('npm', ['audit', '--json'], {
+    encoding: 'utf-8',
+    maxBuffer: 64 * 1024 * 1024,
+    shell: process.platform === 'win32'
+  });
   let report;
   try {
     report = JSON.parse(result.stdout);
@@ -70,7 +89,8 @@ function main() {
     process.exit(2);
   }
   const today = new Date().toISOString().slice(0, 10);
-  const { blocking, expired } = auditVerdict(report, WAIVERS, today);
+  const lockfile = JSON.parse(readFileSync('package-lock.json', 'utf-8'));
+  const { blocking, expired } = auditVerdict(report, WAIVERS, today, lockfile);
   for (const waiver of expired) {
     process.stderr.write(
       `audit: the waiver of ${waiver.id} expired on ${waiver.until}. Check the advisory again, then update or remove it in scripts/audit.mjs.\n`
