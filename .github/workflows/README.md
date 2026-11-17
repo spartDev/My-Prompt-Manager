@@ -28,7 +28,8 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 │       └── after type-check, lint and test:
 │           ├── 🏗️ Build Verification (build)         npm run build, npm run package
 │           └── 🎯 End-to-End Tests (e2e)             npm run test:e2e (Playwright, ~10 min)
-└── 🔒 Security & Dependencies (security)             npm audit --audit-level=moderate,
+└── 🔒 Security & Dependencies (security)             node scripts/audit.mjs (npm audit,
+                                                      moderate, minus waivers),
                                                       dependency review, manifest check
 🌈 Workflow Lint (workflow-lint)                      zizmor over .github/workflows; needs
                                                       no Setup, fails on any finding
@@ -37,6 +38,8 @@ All workflows enforce the **MANDATORY** requirements from `CLAUDE.md`:
 ```
 
 The Quality Gate passes only when every one of the eight jobs ends in `success`. A job that is skipped (every job but Workflow Lint is skipped once Setup fails) or cancelled fails the gate. A run cancelled by a newer push fails on a commit that is no longer the head of the PR, so it blocks nothing.
+
+**Security audit.** `node scripts/audit.mjs` runs `npm audit` and fails on any advisory of moderate severity or higher, in the Security & Dependencies job, in `main-deploy.yml` and in `release.yml`. `npm audit` cannot waive one advisory, so an advisory with no patched release would fail every run until upstream ships a fix. The script's `WAIVERS` list names such an advisory, the reason its risk is accepted, and an expiry date; past that date the waiver fails the audit, so the advisory gets looked at again. It holds one: GHSA-fc5q-39xc-vjpf, the picomatch ReDoS (picomatch 4.0.7 and earlier, no patched release), until 2027-02-17. picomatch is a dev dependency only and does not ship in the extension.
 
 **Workflow Lint** runs [zizmor](https://docs.zizmor.sh/) over `.github/workflows` and fails on any finding: a `${{ }}` expression inside a `run:` script, an action not pinned to a commit, a job with more permissions than it uses, a cache read in a release workflow, a checkout that keeps its credentials. The action pins the zizmor release it runs (1.32.0 at v0.8.1), so Renovate's bump of the action is the bump of zizmor. A finding kept on purpose carries `# zizmor: ignore[rule]` and a one-line reason, as a comment on the line zizmor points at or on a line of the step (`release.yml` keeps `softprops/action-gh-release`, `pr-coverage-comment.yml` its `workflow_run` trigger). Locally, with [uv](https://docs.astral.sh/uv/) installed:
 
@@ -109,7 +112,7 @@ npm test             # All tests must pass
 npm run test:coverage # Generate coverage reports
 npm run build        # Production build
 npm run package      # Chrome extension packaging
-npm audit --audit-level=moderate # Security check
+node scripts/audit.mjs # Security check: npm audit at moderate, minus the waivers
 npm run lint:renovate # Validate renovate.json (pinned Renovate, via npx)
 uvx zizmor .github/workflows # Workflow lint (zizmor, via uv)
 ```
