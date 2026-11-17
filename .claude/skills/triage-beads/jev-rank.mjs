@@ -8,7 +8,7 @@
 //   node jev-rank.mjs <scratch>/backlog.json [--no-dups] [--exclude <id>,<id>]
 //       Step 2 (rank, flag, acceptance check, duplicates) and step 4 (code areas).
 //       Writes <scratch>/jev.json.
-//   node jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json
+//   node jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json [--exclude <id>,<id>]
 //       Step 3: does the evidence show a deferred ticket's condition now holds?
 //       evidence.json is {"<id>": "<the command run and its output>"}.
 //       Writes <scratch>/jev-deferred.json.
@@ -578,12 +578,15 @@ async function rank(snapshotPath, opts) {
   if (ranked.some((r) => r.error && !r.held) || duplicates.some((d) => d.error)) process.exitCode = 1;
 }
 
-async function deferred(snapshotPath, evidencePath) {
+async function deferred(snapshotPath, evidencePath, opts) {
+  const excluded = excludedIds(opts);
   const all = JSON.parse(readFileSync(snapshotPath, 'utf8'));
   const evidence = JSON.parse(readFileSync(evidencePath, 'utf8'));
   const tickets = all.filter((t) => t.status === 'deferred');
   const results = await pool(tickets, async (t) => {
     const base = { id: t.id, title: t.title };
+    // The same exclusions as the ranking: an excluded ticket is never sent.
+    if (excluded.has(t.id)) return { ...base, decision: 'excluded: decide it by hand' };
     if (!evidence[t.id]) return { ...base, decision: 'no evidence fetched: open it by hand' };
     const kinds = sensitiveKinds(
       `${t.title}\n${t.description ?? ''}\n${t.acceptance_criteria ?? ''}\n${evidence[t.id]}`
@@ -619,7 +622,7 @@ async function deferred(snapshotPath, evidencePath) {
 
 const args = process.argv.slice(2);
 const usage =
-  'usage: jev-rank.mjs <scratch>/backlog.json [--no-dups] [--exclude <id>,<id>]\n       jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json';
+  'usage: jev-rank.mjs <scratch>/backlog.json [--no-dups] [--exclude <id>,<id>]\n       jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json [--exclude <id>,<id>]';
 if (!args.length || (args[0] === 'deferred' && args.length < 3)) {
   console.error(usage);
   process.exit(2);
@@ -636,5 +639,5 @@ if (!KEY) {
   console.error('TYPESAFE_API_KEY is not set: do this step by hand, as SKILL.md says.');
   process.exit(3);
 }
-if (args[0] === 'deferred') await deferred(args[1], args[2]);
+if (args[0] === 'deferred') await deferred(args[1], args[2], args.slice(3));
 else await rank(args[0], args.slice(1));

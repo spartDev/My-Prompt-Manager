@@ -66,8 +66,10 @@ Run `bd show <id>` on each flagged ticket, and on no other. Decide each flag fro
 A deferred ticket waits on a condition outside the project: an upstream issue, a release, a pull request. For each one, fetch the evidence of that condition, one command for each issue, pull request or release the ticket names (`gh issue view <n> --repo <owner/repo> --json state,closedAt,title`, `npm view <package> versions --json | tail`, `gh pr view <n> --json state,mergedAt`), and keep the command and its output, under 2 KB, in `<scratch>/evidence.json` as `{"<id>": "$ <command>\n<output>\n$ <command>\n<output>"}`. Evidence that leaves out one of the things the ticket names (the fix PRs as well as the issue) comes back as not settled. The evidence is sent to the TypeSafe API unfiltered too, and `gh` reads private repositories with your credentials: remove every secret and every piece of personal data (names, e-mail addresses, phone numbers, credentials, customer text) from `evidence.json` first, or leave that ticket out of the deferred step and decide it by hand. The script holds back evidence that matches the same patterns as ticket text, and says so on the ticket's line. Then:
 
 ```bash
-node .claude/skills/triage-beads/jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json
+node .claude/skills/triage-beads/jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json --exclude <the ids excluded in step 2>
 ```
+
+Pass the same `--exclude` list as in step 2 (drop the flag when it is empty): an excluded ticket is never sent, and its line says to decide it by hand.
 
 Jev judges whether the evidence is about the ticket's condition and whether the condition has happened; the script turns that into one of: condition met (propose reopening), still waiting (stays deferred), evidence does not settle it (fetch better evidence or read it yourself), unsettled (read it yourself). A ticket with no evidence fetched, no key, or an `ERROR` line is decided by hand from the evidence.
 
