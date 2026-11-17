@@ -153,8 +153,43 @@ export function parseLiveCheckArgs(argv: readonly string[], env: NodeJS.ProcessE
   return options;
 }
 
+/** The field's text without the zero-width characters an editor keeps, a no-break space as a space, whitespace kept */
+const withoutInvisibles = (text: string): string => text.replace(/[​-‍﻿]/g, '').replace(/ /g, ' ');
+
 /** The field's text as the user reads it: without the zero-width characters an editor keeps, a no-break space as a space, trimmed */
-export const normalizeFieldText = (text: string): string => text.replace(/[​-‍﻿]/g, '').replace(/ /g, ' ').trim();
+export const normalizeFieldText = (text: string): string => withoutInvisibles(text).trim();
+
+/** Whether a field holds nothing a user wrote: no text but the zero-width characters an editor keeps. Not trimmed: a draft of spaces or line breaks is still a draft */
+export const isEmptyField = (text: string): boolean => withoutInvisibles(text) === '';
+
+/**
+ * The field's text, line by line as the user sees it, read in the page: a textarea's value, or a
+ * rich-text editor's innermost blocks (<p>, <div>, <li>…) one line each, a <br> a line break only
+ * when something follows it in its block. An empty editor's lone paragraph (<p><br></p>) reads "",
+ * three empty paragraphs "\n\n". Read from the DOM, not textContent, which drops the lines, nor
+ * innerText, which depends on layout. Sent to the page as it is: no named inner function.
+ */
+export const fieldTextOf = (element: Element): string => {
+  if (element instanceof HTMLTextAreaElement) {
+    return element.value;
+  }
+  const blockSelector = 'p, div, li, h1, h2, h3, h4, h5, h6, pre, blockquote';
+  const innermost = Array.from(element.querySelectorAll(blockSelector)).filter((block) => block.querySelector(blockSelector) === null);
+  const lines: string[] = [];
+  for (const block of innermost.length > 0 ? innermost : [element]) {
+    let line = '';
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        line += node.nodeValue ?? '';
+      } else if (node.nodeName === 'BR' && node.nextSibling !== null) {
+        line += '\n';
+      }
+    }
+    lines.push(line);
+  }
+  return lines.join('\n');
+};
 
 export interface SlashObservation {
   selectorOpen: boolean;
@@ -280,7 +315,7 @@ async function readField(page: Page, platform: PlatformDefinition): Promise<stri
   if (!editor) {
     return null;
   }
-  const text = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
+  const text = await editor.evaluate(fieldTextOf);
   await editor.dispose();
   return text;
 }
@@ -308,9 +343,9 @@ async function focusEmptyField(page: Page, platform: PlatformDefinition, timeout
   }
   await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
   await editor.click();
-  const text = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
+  const text = await editor.evaluate(fieldTextOf);
   await editor.dispose();
-  return normalizeFieldText(text) === '' ? 'ready' : 'draft';
+  return isEmptyField(text) ? 'ready' : 'draft';
 }
 
 /** The chain as the extension resolves it from the editor (resolveIconPlacement), read in the page */
@@ -326,11 +361,6 @@ async function probeChain(page: Page, platform: PlatformDefinition): Promise<Cha
   }, { composer: chain.composer, anchors: chain.anchors.map(({ find }) => find) });
   await editor.dispose();
   return probe;
-}
-
-async function emptyField(page: Page): Promise<void> {
-  await page.keyboard.press('ControlOrMeta+A');
-  await page.keyboard.press('Backspace');
 }
 
 /** Waits until the // case reads as it should, or the timeout; the caller judges what it reads then */
@@ -356,16 +386,13 @@ async function settlePlacement(page: Page, timeout: number): Promise<void> {
     .catch(() => undefined);
 }
 
-/** A case's text without its slashes, spaces collapsed: what the field holds of it, wherever the // went */
-const withoutSlashes = (text: string): string => normalizeFieldText(text).replace(/\//g, '').replace(/\s+/g, ' ').trim();
-
 /**
- * Whether the field holds only what the case typed: its text, with or without its //, wherever
- * the // went. Anything else, a draft the Platform restored during the case, is not the script's
- * to delete.
+ * Whether the field holds only what the case typed: nothing, or exactly one of the texts the case
+ * can leave (CaseProgress.owned). Anything else, a draft the Platform restored during the case,
+ * spaces, line breaks or slashes included, is not the script's to delete.
  */
-export const holdsOnlyCaseText = (fieldText: string, caseText: string): boolean =>
-  withoutSlashes(fieldText) === '' || withoutSlashes(fieldText) === withoutSlashes(caseText);
+export const ownsField = (fieldText: string, owned: readonly string[]): boolean =>
+  isEmptyField(fieldText) || owned.includes(withoutInvisibles(fieldText));
 
 /** How a cleanup ended: the field emptied, not emptied (or gone), or left alone as it held text the case did not type */
 export type CleanUpResult = 'emptied' | 'not emptied' | 'not ours';
@@ -373,9 +400,12 @@ export type CleanUpResult = 'emptied' | 'not emptied' | 'not ours';
 /**
  * Leaves nothing behind, since a Platform may keep a draft: closes the Prompt selector, waits for
  * it to go (until then the keys reach its search box, not the field), puts the caret back in the
- * field and empties it, only when it holds nothing but the case's own text (holdsOnlyCaseText).
+ * field and empties it, only when it holds nothing but what the case typed (ownsField). The field is
+ * read after the click and again after Select All, just before the Backspace that deletes. Still
+ * lost with no note: a draft restored in the one round trip between that last read and the
+ * Backspace, and a draft that is exactly a text the case owns (a lone / during the / menu case).
  */
-export async function cleanUp(page: Page, platform: PlatformDefinition, caseText: string): Promise<CleanUpResult> {
+export async function cleanUp(page: Page, platform: PlatformDefinition, owned: readonly string[]): Promise<CleanUpResult> {
   await page.keyboard.press('Escape');
   await page.locator(SELECTOR_DIALOG).waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => undefined);
   const editor = await findEditor(page, editorSelectorsOf(platform), 2_000);
@@ -383,14 +413,19 @@ export async function cleanUp(page: Page, platform: PlatformDefinition, caseText
     // Replaced or removed: the keys would go nowhere, and a draft may be kept
     return 'not emptied';
   }
-  const before = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
-  if (!holdsOnlyCaseText(before, caseText)) {
+  await editor.click();
+  if (!ownsField(await editor.evaluate(fieldTextOf), owned)) {
     await editor.dispose();
     return 'not ours';
   }
-  await editor.click();
+  await page.keyboard.press('ControlOrMeta+A');
+  // Nothing between this read and the Backspace but its own round trip: the handle goes after
+  if (!ownsField(await editor.evaluate(fieldTextOf), owned)) {
+    await editor.dispose();
+    return 'not ours';
+  }
+  await page.keyboard.press('Backspace');
   await editor.dispose();
-  await emptyField(page);
   const left = await readField(page, platform);
   return left !== null && normalizeFieldText(left) === '' ? 'emptied' : 'not emptied';
 }
@@ -413,8 +448,8 @@ export const cleanUpNote = (typed: boolean, result: CleanUpResult): string => {
 export interface CaseProgress {
   /** Set once the caret is in the field, before the first key */
   typed: boolean;
-  /** The text the case types, its // aside: the only text the cleanup may delete */
-  text: string;
+  /** The texts the case can have left in the field so far (CASE_FIELDS): the only ones the cleanup may delete */
+  owned: readonly string[];
 }
 
 /**
@@ -427,15 +462,22 @@ export async function afterCase(page: Page, platform: PlatformDefinition, progre
     await page.keyboard.press('Escape').catch(() => undefined);
     return '';
   }
-  return cleanUpNote(true, await cleanUp(page, platform, progress.text).catch((): CleanUpResult => 'not emptied'));
+  return cleanUpNote(true, await cleanUp(page, platform, progress.owned).catch((): CleanUpResult => 'not emptied'));
 }
 
-/** The text each typing case types, its // aside */
-const CASE_TEXT: Record<Exclude<CaseId, 'late-toolbar'>, string> = {
-  'slash-empty': '',
-  'slash-menu': '',
-  'slash-inside': 'Hi there',
-  'icon-steady': 'Hello world'
+/** Every start of a text but the whole: what typing it leaves when cut short */
+const startsOf = (text: string): string[] => Array.from({ length: text.length - 1 }, (_, end) => text.slice(0, end + 1));
+
+/**
+ * The texts each typing case can leave in its field, the extension's taking out of the // aside
+ * (an empty field is always the case's): once its keys are all typed, and while typing (cut short
+ * when the case throws). Copilot's / menu may take a slash, so slash-menu can leave one.
+ */
+export const CASE_FIELDS: Record<Exclude<CaseId, 'late-toolbar'>, { typed: readonly string[]; typing: readonly string[] }> = {
+  'slash-empty': { typed: ['//'], typing: ['/'] },
+  'slash-menu': { typed: ['/', '//'], typing: [] },
+  'slash-inside': { typed: ['Hi there', 'Hi //there'], typing: [...startsOf('Hi there'), 'Hi /there'] },
+  'icon-steady': { typed: ['Hello world'], typing: startsOf('Hello world') }
 };
 
 /**
@@ -444,7 +486,7 @@ const CASE_TEXT: Record<Exclude<CaseId, 'late-toolbar'>, string> = {
  * @param progress - Set to typed, with the case's text, once the caret is in the field, before the
  *   first key: read by the cleanup even when the case throws
  */
-export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number, progress: CaseProgress = { typed: false, text: '' }): Promise<Verdict> {
+export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number, progress: CaseProgress = { typed: false, owned: [] }): Promise<Verdict> {
   if (id === 'late-toolbar') {
     await settlePlacement(page, timeout);
     const pageLanguage = await page.evaluate(() => document.documentElement.lang);
@@ -465,17 +507,24 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
   if (field === 'draft') {
     return { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
   }
-  progress.text = CASE_TEXT[id];
+  const fields = CASE_FIELDS[id];
+  progress.owned = [...fields.typed, ...fields.typing];
   progress.typed = true;
+  // Once every key is typed, a field cut short is not the case's any more
+  const allTyped = (): void => {
+    progress.owned = fields.typed;
+  };
   switch (id) {
     case 'slash-empty':
       await page.keyboard.type('//');
+      allTyped();
       return judgeSlash(await settleSlash(page, platform, '', timeout), '');
     case 'slash-menu':
       // The first slash opens Copilot's menu, which then takes the keys typed: the second comes on its own
       await page.keyboard.type('/');
       await page.waitForTimeout(600);
       await page.keyboard.type('/');
+      allTyped();
       return judgeSlash(await settleSlash(page, platform, '', timeout), '');
     case 'slash-inside':
       await page.keyboard.type('Hi there');
@@ -484,10 +533,12 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
         await page.keyboard.press('ArrowLeft');
       }
       await page.keyboard.type('//');
+      allTyped();
       return judgeSlash(await settleSlash(page, platform, 'Hi there', timeout), 'Hi there');
     case 'icon-steady': {
       const before = await readIcon(page);
       await page.keyboard.type('Hello world', { delay: 50 });
+      allTyped();
       await page.waitForTimeout(500);
       return judgeSteady(before, await readIcon(page));
     }
@@ -515,7 +566,7 @@ async function checkPlatform(context: BrowserContext, id: string, options: LiveC
   const results: CaseResult[] = [];
   for (const { id: caseId } of CASES) {
     let page: Page | undefined;
-    const progress: CaseProgress = { typed: false, text: '' };
+    const progress: CaseProgress = { typed: false, owned: [] };
     try {
       page = await openPage(context, id, platform, options);
       results.push({ platform: id, case: caseId, ...(await runCase(page, platform, caseId, options.timeout, progress)) });
