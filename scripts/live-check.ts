@@ -356,54 +356,95 @@ async function settlePlacement(page: Page, timeout: number): Promise<void> {
     .catch(() => undefined);
 }
 
+/** A case's text without its slashes, spaces collapsed: what the field holds of it, wherever the // went */
+const withoutSlashes = (text: string): string => normalizeFieldText(text).replace(/\//g, '').replace(/\s+/g, ' ').trim();
+
+/**
+ * Whether the field holds only what the case typed: its text, with or without its //, wherever
+ * the // went. Anything else, a draft the Platform restored during the case, is not the script's
+ * to delete.
+ */
+export const holdsOnlyCaseText = (fieldText: string, caseText: string): boolean =>
+  withoutSlashes(fieldText) === '' || withoutSlashes(fieldText) === withoutSlashes(caseText);
+
+/** How a cleanup ended: the field emptied, not emptied (or gone), or left alone as it held text the case did not type */
+export type CleanUpResult = 'emptied' | 'not emptied' | 'not ours';
+
 /**
  * Leaves nothing behind, since a Platform may keep a draft: closes the Prompt selector, waits for
  * it to go (until then the keys reach its search box, not the field), puts the caret back in the
- * field and empties it. True when the field reads empty after.
+ * field and empties it, only when it holds nothing but the case's own text (holdsOnlyCaseText).
  */
-export async function cleanUp(page: Page, platform: PlatformDefinition): Promise<boolean> {
+export async function cleanUp(page: Page, platform: PlatformDefinition, caseText: string): Promise<CleanUpResult> {
   await page.keyboard.press('Escape');
   await page.locator(SELECTOR_DIALOG).waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => undefined);
   const editor = await findEditor(page, editorSelectorsOf(platform), 2_000);
   if (!editor) {
     // Replaced or removed: the keys would go nowhere, and a draft may be kept
-    return false;
+    return 'not emptied';
+  }
+  const before = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
+  if (!holdsOnlyCaseText(before, caseText)) {
+    await editor.dispose();
+    return 'not ours';
   }
   await editor.click();
   await editor.dispose();
   await emptyField(page);
   const left = await readField(page, platform);
-  return left !== null && normalizeFieldText(left) === '';
+  return left !== null && normalizeFieldText(left) === '' ? 'emptied' : 'not emptied';
 }
 
 /**
- * What a case's line adds about its cleanup: a warning only when the case typed into a field and
- * that field could not be emptied after, a field gone since included; nothing when no key was
- * typed (no field, signed out, the late-composer case)
+ * What a case's line adds about its cleanup: a warning when the case typed into a field and that
+ * field could not be emptied after (a field gone since included), or held text the case did not
+ * type, left as it was; nothing when no key was typed (no field, signed out, the late-composer case)
  */
-export const cleanUpNote = (typed: boolean, emptied: boolean): string =>
-  (typed && !emptied ? '; field NOT emptied after, check for a draft' : '');
+export const cleanUpNote = (typed: boolean, result: CleanUpResult): string => {
+  if (!typed || result === 'emptied') {
+    return '';
+  }
+  return result === 'not ours'
+    ? '; field holds text the case did not type, left as it was: check for a draft'
+    : '; field NOT emptied after, check for a draft';
+};
+
+/** What a case did to its field, read by the cleanup even when the case throws */
+export interface CaseProgress {
+  /** Set once the caret is in the field, before the first key */
+  typed: boolean;
+  /** The text the case types, its // aside: the only text the cleanup may delete */
+  text: string;
+}
 
 /**
- * What follows a case: the field emptied when the case typed into it, the Prompt selector only
- * closed when it did not. Returns what the case's line adds (cleanUpNote): said, not hidden, since
- * the maintainer's account may keep the draft
+ * What follows a case: the field emptied when the case typed into it and it holds only the case's
+ * text, the Prompt selector only closed when nothing was typed. Returns what the case's line adds
+ * (cleanUpNote): said, not hidden, since the maintainer's account may keep the draft
  */
-export async function afterCase(page: Page, platform: PlatformDefinition, typed: boolean): Promise<string> {
-  if (!typed) {
+export async function afterCase(page: Page, platform: PlatformDefinition, progress: CaseProgress): Promise<string> {
+  if (!progress.typed) {
     await page.keyboard.press('Escape').catch(() => undefined);
     return '';
   }
-  return cleanUpNote(true, await cleanUp(page, platform).catch(() => false));
+  return cleanUpNote(true, await cleanUp(page, platform, progress.text).catch((): CleanUpResult => 'not emptied'));
 }
+
+/** The text each typing case types, its // aside */
+const CASE_TEXT: Record<Exclude<CaseId, 'late-toolbar'>, string> = {
+  'slash-empty': '',
+  'slash-menu': '',
+  'slash-inside': 'Hi there',
+  'icon-steady': 'Hello world'
+};
 
 /**
  * Runs one case on its page
  *
- * @param progress - Set to typed once the caret is in the field, before the first key: read by the
- *   cleanup even when the case throws
+ * @param progress - Set to typed, with the case's text, once the caret is in the field, before the
+ *   first key: read by the cleanup even when the case throws
  */
-export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number, progress = { typed: false }): Promise<Verdict> {
+export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number, progress: CaseProgress = { typed: false, text: '' }): Promise<Verdict> {
   if (id === 'late-toolbar') {
     await settlePlacement(page, timeout);
     const pageLanguage = await page.evaluate(() => document.documentElement.lang);
@@ -424,6 +465,7 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
   if (field === 'draft') {
     return { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
   }
+  progress.text = CASE_TEXT[id];
   progress.typed = true;
   switch (id) {
     case 'slash-empty':
@@ -473,7 +515,7 @@ async function checkPlatform(context: BrowserContext, id: string, options: LiveC
   const results: CaseResult[] = [];
   for (const { id: caseId } of CASES) {
     let page: Page | undefined;
-    const progress = { typed: false };
+    const progress: CaseProgress = { typed: false, text: '' };
     try {
       page = await openPage(context, id, platform, options);
       results.push({ platform: id, case: caseId, ...(await runCase(page, platform, caseId, options.timeout, progress)) });
@@ -482,7 +524,7 @@ async function checkPlatform(context: BrowserContext, id: string, options: LiveC
       results.push({ platform: id, case: caseId, pass: false, detail: `error: ${redactUrls(message, startUrlOf(id, platform))}` });
     } finally {
       if (page) {
-        results[results.length - 1].detail += await afterCase(page, platform, progress.typed);
+        results[results.length - 1].detail += await afterCase(page, platform, progress);
         await page.close().catch(() => undefined);
       }
     }

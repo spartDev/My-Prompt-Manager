@@ -11,6 +11,7 @@ import {
   cleanUp,
   cleanUpNote,
   formatReport,
+  holdsOnlyCaseText,
   judgeLateToolbar,
   judgeSlash,
   judgeSteady,
@@ -136,20 +137,21 @@ describe('cleanUp', () => {
       waitForFunction: () => Promise.reject(new Error('Timeout 2000ms exceeded'))
     } as unknown as Page;
 
-    await expect(cleanUp(page, SUPPORTED_PLATFORMS.claude)).resolves.toBe(false);
+    await expect(cleanUp(page, SUPPORTED_PLATFORMS.claude, '')).resolves.toBe('not emptied');
   });
 });
 
 /**
  * A page for the case runner with no browser: an editor found or not, each key recorded, and
- * typing that throws when asked. The field holds text from the start, or gets a draft restored by
- * the Platform later: while the script waits for the Prompts button, or during a pause
+ * typing that throws when asked. The field keeps what is typed and Backspace empties it. It holds
+ * text from the start, or gets a draft restored by the Platform later: while the script waits for
+ * the Prompts button, during a pause, or while the case types (put before the case's text)
  */
 function fakePage({ editor, typeThrows = false, text = '', restore }: {
   editor: boolean;
   typeThrows?: boolean;
   text?: string;
-  restore?: { draft: string; on: 'icon' | 'pause' };
+  restore?: { draft: string; on: 'icon' | 'pause' | 'type' };
 }) {
   const keys: string[] = [];
   let field = text;
@@ -163,20 +165,33 @@ function fakePage({ editor, typeThrows = false, text = '', restore }: {
   const waitForFunction = vi.fn(() => (editor ? Promise.resolve({ asElement: () => element }) : Promise.reject(new Error('Timeout exceeded'))));
   const page = {
     keyboard: {
-      press: vi.fn((key: string) => { keys.push(key); return Promise.resolve(); }),
-      type: vi.fn(() => (typeThrows ? Promise.reject(new Error('Target page closed')) : Promise.resolve()))
+      press: vi.fn((key: string) => {
+        keys.push(key);
+        if (key === 'Backspace') {
+          field = '';
+        }
+        return Promise.resolve();
+      }),
+      type: vi.fn((typed: string) => {
+        if (typeThrows) {
+          return Promise.reject(new Error('Target page closed'));
+        }
+        field = restore?.on === 'type' ? `${restore.draft} ${field}${typed}` : `${field}${typed}`;
+        return Promise.resolve();
+      })
     },
     locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => restoreOn('icon') }) }),
+    evaluate: () => Promise.resolve(null),
     waitForTimeout: vi.fn(() => restoreOn('pause')),
     waitForFunction
   } as unknown as Page;
-  return { page, keys, waitForFunction };
+  return { page, keys, waitForFunction, field: () => field };
 }
 
 describe('runCase progress', () => {
   it('leaves typed false when no field shows, so nothing is cleaned up or warned about', async () => {
     const { page } = fakePage({ editor: false });
-    const progress = { typed: false };
+    const progress = { typed: false, text: '' };
 
     const verdict = await runCase(page, SUPPORTED_PLATFORMS.claude, 'slash-empty', 10, progress);
 
@@ -186,7 +201,7 @@ describe('runCase progress', () => {
 
   it('sets typed before the first key, so it holds when the case throws while typing', async () => {
     const { page } = fakePage({ editor: true, typeThrows: true });
-    const progress = { typed: false };
+    const progress = { typed: false, text: '' };
 
     await expect(runCase(page, SUPPORTED_PLATFORMS.claude, 'slash-empty', 10, progress)).rejects.toThrow('Target page closed');
     expect(progress.typed).toBe(true);
@@ -196,7 +211,7 @@ describe('runCase progress', () => {
     'does not run %s on a field that holds a draft, and leaves the field as it was',
     async (caseId) => {
       const { page, keys } = fakePage({ editor: true, text: 'My saved draft​' });
-      const progress = { typed: false };
+      const progress = { typed: false, text: '' };
 
       const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, caseId, 10, progress);
 
@@ -215,7 +230,7 @@ describe('runCase progress', () => {
     'does not run %s when the Platform restores a draft after the field shows (while waiting for the %s)',
     async (caseId, on) => {
       const { page, keys } = fakePage({ editor: true, restore: { draft: 'Mon brouillon', on } });
-      const progress = { typed: false };
+      const progress = { typed: false, text: '' };
 
       const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, caseId, 10, progress);
 
@@ -284,10 +299,12 @@ describe('runCase late-toolbar reads the chain in the page', () => {
 });
 
 describe('afterCase', () => {
+  const NOT_OURS = '; field holds text the case did not type, left as it was: check for a draft';
+
   it('only closes the selector when nothing was typed: no cleanup, no warning', async () => {
     const { page, keys, waitForFunction } = fakePage({ editor: false });
 
-    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, false)).resolves.toBe('');
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: false, text: '' })).resolves.toBe('');
     expect(keys).toEqual(['Escape']);
     expect(waitForFunction).not.toHaveBeenCalled();
   });
@@ -295,26 +312,78 @@ describe('afterCase', () => {
   it('warns when the case typed and its field is gone after', async () => {
     const { page } = fakePage({ editor: false });
 
-    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, true)).resolves.toBe('; field NOT emptied after, check for a draft');
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, text: '' })).resolves.toBe('; field NOT emptied after, check for a draft');
   });
 
   it('says nothing when the case typed and the field was emptied', async () => {
     const { page } = fakePage({ editor: true });
 
-    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, true)).resolves.toBe('');
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, text: '' })).resolves.toBe('');
+  });
+
+  it('empties a field that holds only what the case typed, its // included', async () => {
+    const { page, keys, field } = fakePage({ editor: true, text: 'Hi //there​' });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, text: 'Hi there' })).resolves.toBe('');
+    expect(keys).toContain('Backspace');
+    expect(field()).toBe('');
+  });
+
+  it('leaves a field that holds text the case did not type, and says so', async () => {
+    const { page, keys, field } = fakePage({ editor: true, text: 'Mon brouillon Hi //there' });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, text: 'Hi there' })).resolves.toBe(NOT_OURS);
+    expect(keys).toEqual(['Escape']);
+    expect(field()).toBe('Mon brouillon Hi //there');
+  });
+
+  it('keeps a draft the Platform restores while the case types: the case runs, the draft stays', async () => {
+    const { page, keys, field } = fakePage({ editor: true, restore: { draft: 'Mon brouillon', on: 'type' } });
+    const progress = { typed: false, text: '' };
+
+    await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10, progress);
+
+    expect(progress).toEqual({ typed: true, text: 'Hello world' });
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.chatgpt, progress)).resolves.toBe(NOT_OURS);
+    expect(keys).toEqual(['Escape']);
+    expect(field()).toBe('Mon brouillon Hello world');
+  });
+});
+
+describe('holdsOnlyCaseText', () => {
+  it.each([
+    ['an empty field', '', ''],
+    ['the // left behind', '//', ''],
+    ['the case text with the // inside it', 'Hi // there', 'Hi there'],
+    ['the case text with the // at its end, and a zero-width space', 'Hi there//​', 'Hi there'],
+    ['the case text and the Platform\'s non-breaking space', 'Hello world', 'Hello world']
+  ])('is true for %s', (_case, fieldText, caseText) => {
+    expect(holdsOnlyCaseText(fieldText, caseText)).toBe(true);
+  });
+
+  it.each([
+    ['a draft and nothing typed', 'Mon brouillon', ''],
+    ['a draft before the case text', 'Mon brouillon Hello world', 'Hello world'],
+    ['the case text cut short', 'Hello', 'Hello world']
+  ])('is false for %s', (_case, fieldText, caseText) => {
+    expect(holdsOnlyCaseText(fieldText, caseText)).toBe(false);
   });
 });
 
 describe('cleanUpNote', () => {
   it('warns when the case typed into a field it could not empty after, a field gone included', () => {
-    expect(cleanUpNote(true, false)).toBe('; field NOT emptied after, check for a draft');
+    expect(cleanUpNote(true, 'not emptied')).toBe('; field NOT emptied after, check for a draft');
+  });
+
+  it('warns when the field held text the case did not type, left as it was', () => {
+    expect(cleanUpNote(true, 'not ours')).toBe('; field holds text the case did not type, left as it was: check for a draft');
   });
 
   it.each([
-    ['nothing was typed (no field, signed out, or the late-composer case)', false, false],
-    ['the field was emptied', true, true]
-  ])('says nothing when %s', (_case, typed, emptied) => {
-    expect(cleanUpNote(typed, emptied)).toBe('');
+    ['nothing was typed (no field, signed out, or the late-composer case)', false, 'not emptied'],
+    ['the field was emptied', true, 'emptied']
+  ] as const)('says nothing when %s', (_case, typed, result) => {
+    expect(cleanUpNote(typed, result)).toBe('');
   });
 });
 
