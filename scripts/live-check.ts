@@ -189,15 +189,26 @@ export function judgeSlash(observed: SlashObservation, expectedText: string): Ve
 const describeIcon = (icon: IconState | null): string =>
   (icon ? `placement ${icon.placement ?? 'none'}, anchor ${icon.anchor ?? 'none'}` : 'no Prompts button');
 
+/** What the Platform's chain finds from the editor on the page, as the extension resolves it (resolveIconPlacement) */
+export interface ChainProbe {
+  /** The chain's composer selector matches an ancestor of the editor */
+  composerFound: boolean;
+  /** One of the chain's anchors is in that composer */
+  anchorFound: boolean;
+}
+
 /**
  * Whether the Anchored overlay is the designed end of the Platform's chain on this page: the chain
- * finds an anchor by an English ARIA label (ChatGPT, Mistral, Perplexity), and the page says it is in another
- * language, where src/config/platforms.ts lets the icon fall to the anchor on the editor. Not on a
- * page that names no language: the overlay there may be a chain that drifted.
+ * finds an anchor by an English ARIA label (ChatGPT, Mistral, Perplexity), the page says it is in
+ * another language, and on the page the chain finds its composer but none of its anchors, where
+ * src/config/platforms.ts lets the icon fall to the anchor on the editor. Not on a page that names
+ * no language, nor where the chain still resolves (ChatGPT's send-button test id on a French page)
+ * or its composer is not found: the overlay there is a regression or a chain that drifted.
  */
-export function overlayIsFallback(platform: PlatformDefinition, pageLanguage: string): boolean {
+export function overlayIsFallback(platform: PlatformDefinition, pageLanguage: string, chain: ChainProbe): boolean {
   const readsLabels = platform.iconPlacement?.anchors.some(({ find }) => /\[aria-label\s*[*^$|~]?=/i.test(find)) ?? false;
-  return readsLabels && pageLanguage.trim() !== '' && !/^en(-|$)/i.test(pageLanguage.trim());
+  const otherLanguage = pageLanguage.trim() !== '' && !/^en(-|$)/i.test(pageLanguage.trim());
+  return readsLabels && otherLanguage && chain.composerFound && !chain.anchorFound;
 }
 
 /**
@@ -283,17 +294,38 @@ async function observeSlash(page: Page, platform: PlatformDefinition): Promise<S
   };
 }
 
-/** Puts the caret in the empty field, once the Prompts button shows (the content script is ready); false when there is no field */
-async function focusEmptyField(page: Page, platform: PlatformDefinition, timeout: number): Promise<boolean> {
+/**
+ * Puts the caret in the field, once the Prompts button shows (the content script is ready). The
+ * field is never emptied: a Platform may restore a saved draft, which a case would otherwise
+ * delete, and it may do so after the field first shows. So the field is read last, after every
+ * wait, just before the case's first key. 'no-field' when there is none, 'draft' when it holds
+ * text, left as it was.
+ */
+async function focusEmptyField(page: Page, platform: PlatformDefinition, timeout: number): Promise<'ready' | 'no-field' | 'draft'> {
   const editor = await findEditor(page, editorSelectorsOf(platform), timeout);
   if (!editor) {
-    return false;
+    return 'no-field';
   }
   await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
   await editor.click();
+  const text = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
   await editor.dispose();
-  await emptyField(page);
-  return true;
+  return normalizeFieldText(text) === '' ? 'ready' : 'draft';
+}
+
+/** The chain as the extension resolves it from the editor (resolveIconPlacement), read in the page */
+async function probeChain(page: Page, platform: PlatformDefinition): Promise<ChainProbe> {
+  const chain = platform.iconPlacement;
+  const editor = chain ? await findEditor(page, editorSelectorsOf(platform), 1_000) : null;
+  if (!chain || !editor) {
+    return { composerFound: false, anchorFound: false };
+  }
+  const probe = await editor.evaluate((element, { composer, anchors }) => {
+    const found = element.closest(composer);
+    return { composerFound: found !== null, anchorFound: found !== null && anchors.some((find) => found.querySelector(find) !== null) };
+  }, { composer: chain.composer, anchors: chain.anchors.map(({ find }) => find) });
+  await editor.dispose();
+  return probe;
 }
 
 async function emptyField(page: Page): Promise<void> {
@@ -375,10 +407,22 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
   if (id === 'late-toolbar') {
     await settlePlacement(page, timeout);
     const pageLanguage = await page.evaluate(() => document.documentElement.lang);
-    return judgeLateToolbar(await readIcon(page), overlayIsFallback(platform, pageLanguage) ? pageLanguage : undefined);
+    const fallback = overlayIsFallback(platform, pageLanguage, await probeChain(page, platform));
+    return judgeLateToolbar(await readIcon(page), fallback ? pageLanguage : undefined);
   }
-  if (!(await focusEmptyField(page, platform, timeout))) {
+  if (id === 'icon-steady') {
+    // Settled first, as the late-composer case waits for it: the case is about typing, not about
+    // when a late toolbar arrives. Then a second for the toolbar's own re-renders. Before the field
+    // is read, so no wait comes between that read and the first key
+    await settlePlacement(page, timeout);
+    await page.waitForTimeout(1_000);
+  }
+  const field = await focusEmptyField(page, platform, timeout);
+  if (field === 'no-field') {
     return { pass: false, detail: 'no field (signed out?)' };
+  }
+  if (field === 'draft') {
+    return { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
   }
   progress.typed = true;
   switch (id) {
@@ -400,10 +444,6 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
       await page.keyboard.type('//');
       return judgeSlash(await settleSlash(page, platform, 'Hi there', timeout), 'Hi there');
     case 'icon-steady': {
-      // Settled first, as the late-composer case waits for it: the case is about typing, not about
-      // when a late toolbar arrives. Then a second for the toolbar's own re-renders
-      await settlePlacement(page, timeout);
-      await page.waitForTimeout(1_000);
       const before = await readIcon(page);
       await page.keyboard.type('Hello world', { delay: 50 });
       await page.waitForTimeout(500);

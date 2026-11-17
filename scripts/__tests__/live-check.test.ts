@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import type { Page } from 'playwright';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 import {
@@ -106,19 +106,25 @@ describe('judgeLateToolbar', () => {
 });
 
 describe('overlayIsFallback', () => {
-  it('holds for a chain that reads English ARIA labels, on a page in another language', () => {
-    expect(overlayIsFallback(SUPPORTED_PLATFORMS.chatgpt, 'fr-FR')).toBe(true);
-    expect(overlayIsFallback(SUPPORTED_PLATFORMS.mistral, 'de')).toBe(true);
-    expect(overlayIsFallback(SUPPORTED_PLATFORMS.perplexity, 'fr-FR')).toBe(true);
+  // What the chain finds on the page: its composer, and none of its anchors in it
+  const unresolved = { composerFound: true, anchorFound: false };
+
+  it('holds for a chain that reads English ARIA labels and finds no anchor, on a page in another language', () => {
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.chatgpt, 'fr-FR', unresolved)).toBe(true);
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.mistral, 'de', unresolved)).toBe(true);
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.perplexity, 'fr-FR', unresolved)).toBe(true);
   });
 
   it.each([
-    ['an English page', SUPPORTED_PLATFORMS.chatgpt, 'en-US'],
-    ['a page that names no language', SUPPORTED_PLATFORMS.mistral, ''],
-    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.m365copilot, 'fr'],
-    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.claude, 'fr']
-  ])('does not hold for %s', (_case, platform, lang) => {
-    expect(overlayIsFallback(platform, lang)).toBe(false);
+    ['an English page', SUPPORTED_PLATFORMS.chatgpt, 'en-US', unresolved],
+    ['a page that names no language', SUPPORTED_PLATFORMS.mistral, '', unresolved],
+    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.m365copilot, 'fr', unresolved],
+    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.claude, 'fr', unresolved],
+    // ChatGPT's send-button test id on a French page: the chain resolves, so an overlay is a regression
+    ['a chain that still finds an anchor on the page', SUPPORTED_PLATFORMS.chatgpt, 'fr-FR', { composerFound: true, anchorFound: true }],
+    ['a composer the chain does not find', SUPPORTED_PLATFORMS.chatgpt, 'fr-FR', { composerFound: false, anchorFound: false }]
+  ])('does not hold for %s', (_case, platform, lang, chain) => {
+    expect(overlayIsFallback(platform, lang, chain)).toBe(false);
   });
 });
 
@@ -136,18 +142,32 @@ describe('cleanUp', () => {
 
 /**
  * A page for the case runner with no browser: an editor found or not, each key recorded, and
- * typing that throws when asked
+ * typing that throws when asked. The field holds text from the start, or gets a draft restored by
+ * the Platform later: while the script waits for the Prompts button, or during a pause
  */
-function fakePage({ editor, typeThrows = false }: { editor: boolean; typeThrows?: boolean }) {
+function fakePage({ editor, typeThrows = false, text = '', restore }: {
+  editor: boolean;
+  typeThrows?: boolean;
+  text?: string;
+  restore?: { draft: string; on: 'icon' | 'pause' };
+}) {
   const keys: string[] = [];
-  const element = { click: () => Promise.resolve(), dispose: () => Promise.resolve(), evaluate: () => Promise.resolve('') };
+  let field = text;
+  const restoreOn = (when: 'icon' | 'pause') => {
+    if (restore?.on === when) {
+      field = restore.draft;
+    }
+    return Promise.resolve();
+  };
+  const element = { click: () => Promise.resolve(), dispose: () => Promise.resolve(), evaluate: () => Promise.resolve(field) };
   const waitForFunction = vi.fn(() => (editor ? Promise.resolve({ asElement: () => element }) : Promise.reject(new Error('Timeout exceeded'))));
   const page = {
     keyboard: {
       press: vi.fn((key: string) => { keys.push(key); return Promise.resolve(); }),
       type: vi.fn(() => (typeThrows ? Promise.reject(new Error('Target page closed')) : Promise.resolve()))
     },
-    locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => Promise.resolve() }) }),
+    locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => restoreOn('icon') }) }),
+    waitForTimeout: vi.fn(() => restoreOn('pause')),
     waitForFunction
   } as unknown as Page;
   return { page, keys, waitForFunction };
@@ -170,6 +190,96 @@ describe('runCase progress', () => {
 
     await expect(runCase(page, SUPPORTED_PLATFORMS.claude, 'slash-empty', 10, progress)).rejects.toThrow('Target page closed');
     expect(progress.typed).toBe(true);
+  });
+
+  it.each(CASES.filter(({ id }) => id !== 'late-toolbar').map(({ id }) => id))(
+    'does not run %s on a field that holds a draft, and leaves the field as it was',
+    async (caseId) => {
+      const { page, keys } = fakePage({ editor: true, text: 'My saved draft​' });
+      const progress = { typed: false };
+
+      const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, caseId, 10, progress);
+
+      expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
+      expect(progress.typed).toBe(false);
+      expect(keys).toEqual([]);
+      expect(page.keyboard.type).not.toHaveBeenCalled();
+    }
+  );
+
+  const typingCases = CASES.filter(({ id }) => id !== 'late-toolbar').map(({ id }) => id);
+  it.each([
+    ...typingCases.map((caseId) => [caseId, 'icon'] as const),
+    ['icon-steady', 'pause'] as const
+  ])(
+    'does not run %s when the Platform restores a draft after the field shows (while waiting for the %s)',
+    async (caseId, on) => {
+      const { page, keys } = fakePage({ editor: true, restore: { draft: 'Mon brouillon', on } });
+      const progress = { typed: false };
+
+      const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, caseId, 10, progress);
+
+      expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
+      expect(progress.typed).toBe(false);
+      expect(keys).toEqual([]);
+      expect(page.keyboard.type).not.toHaveBeenCalled();
+    }
+  );
+});
+
+/**
+ * A page for the case runner backed by the test's own DOM: the page evaluates against `document`,
+ * the editor handle against the editor element, so the chain is read as the browser would read it
+ */
+function domPage(html: string, lang: string) {
+  document.documentElement.lang = lang;
+  document.body.innerHTML = html;
+  const editor = document.querySelector<HTMLElement>('textarea, [contenteditable="true"]');
+  const handle = {
+    click: () => Promise.resolve(),
+    dispose: () => Promise.resolve(),
+    evaluate: (fn: (element: HTMLElement, arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(editor as HTMLElement, arg))
+  };
+  return {
+    evaluate: (fn: (arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(arg)),
+    waitForFunction: () => (editor ? Promise.resolve({ asElement: () => handle }) : Promise.reject(new Error('Timeout exceeded'))),
+    keyboard: { press: () => Promise.resolve(), type: () => Promise.resolve() },
+    locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => Promise.resolve() }) }),
+    waitForTimeout: () => Promise.resolve()
+  } as unknown as Page;
+}
+
+describe('runCase late-toolbar reads the chain in the page', () => {
+  const overlayIcon = '<button class="prompt-library-integrated-icon" data-mpm-placement="overlay">P</button>';
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    document.documentElement.lang = '';
+  });
+
+  it('fails on the overlay of a French page whose form still holds the send button, an anchor of the chain', async () => {
+    const page = domPage(`<form><textarea data-testid="chat-input"></textarea><button data-testid="send-button">Envoyer</button></form>${overlayIcon}`, 'fr');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'late-toolbar', 10);
+
+    expect(verdict.pass).toBe(false);
+  });
+
+  it('passes on the overlay of a French page whose form holds none of the anchors: the designed fallback', async () => {
+    const page = domPage(`<form><textarea data-testid="chat-input"></textarea><button aria-label="Dicter">m</button></form>${overlayIcon}`, 'fr');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'late-toolbar', 10);
+
+    expect(verdict.pass).toBe(true);
+    expect(verdict.detail).toContain('the fallback of a chain read by English labels, page language fr');
+  });
+
+  it('fails on the overlay of a French page whose editor is in no form or fieldset: the composer drifted', async () => {
+    const page = domPage(`<div><textarea data-testid="chat-input"></textarea><button aria-label="Dicter">m</button></div>${overlayIcon}`, 'fr');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'late-toolbar', 10);
+
+    expect(verdict.pass).toBe(false);
   });
 });
 
