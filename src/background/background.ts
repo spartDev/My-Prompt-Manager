@@ -1177,7 +1177,7 @@ async function handleExtensionUpdate(): Promise<void> {
 
     // Get all tabs and identify those that need re-injection
     const tabs = await chrome.tabs.query({});
-    await expectPlacementReports(tabs, allEnabledHosts);
+    await expectPlacementReports(async () => ({ tabs, enabledHosts: allEnabledHosts }));
     const reinjectionResults: Array<{
       tabId: number;
       hostname: string;
@@ -1241,19 +1241,21 @@ async function handleExtensionUpdate(): Promise<void> {
  * An extension update or a browser restart emptied the icon placement of each tab (session storage)
  * while the repairs stay: each open tab of an enabled Platform, discarded ones included, counts as
  * waiting until its content script reports, so the first report does not drop a pick another tab
- * needs. On update, before the re-injection, so no report comes first. A failure is logged: the
- * re-injection, or the startup, goes on.
+ * needs. On update, before the re-injection, so no report comes first; the update read the open tabs
+ * before, for the re-injection. At startup, `readOpenTabs` reads them under the repairs lock, with the
+ * count. A failure is logged: the re-injection, or the startup, goes on.
  */
-async function expectPlacementReports(tabs: chrome.tabs.Tab[], enabledHosts: readonly string[]): Promise<void> {
-  const expected = tabs.flatMap((tab) => {
-    const hostname = repairablePlatformHostname(tab.url);
-    return tab.id !== undefined && hostname && enabledHosts.includes(hostname) ? [{ tabId: tab.id, hostname }] : [];
-  });
-  if (expected.length === 0) {
-    return;
-  }
+async function expectPlacementReports(
+  readOpenTabs: () => Promise<{ tabs: chrome.tabs.Tab[]; enabledHosts: readonly string[] }>,
+): Promise<void> {
   try {
-    await expectIconPlacementReports(expected);
+    await expectIconPlacementReports(async () => {
+      const { tabs, enabledHosts } = await readOpenTabs();
+      return tabs.flatMap((tab) => {
+        const hostname = repairablePlatformHostname(tab.url);
+        return tab.id !== undefined && hostname && enabledHosts.includes(hostname) ? [{ tabId: tab.id, hostname }] : [];
+      });
+    });
   } catch (error) {
     Logger.warn("Could not count the open tabs of the Platforms after an update or a restart", {
       component: "Background",
@@ -1266,18 +1268,15 @@ async function expectPlacementReports(tabs: chrome.tabs.Tab[], enabledHosts: rea
  * A browser restart empties the icon placement of each tab (session storage) as an update does: the
  * restored tabs of an enabled Platform with a repair count as waiting until their content scripts
  * report, so a tab at another host of the Platform that reports first does not drop their repair as
- * one no tab is open for. A tab Chrome restores after this read is not counted (design §6).
+ * one no tab is open for. The Site settings and the open tabs are read under the repairs lock, so no
+ * report runs between that read and the count. A tab Chrome restores after this read is not counted
+ * (design §6).
  */
-async function expectPlacementReportsOnStartup(): Promise<void> {
-  try {
-    const enabledHosts = enabledHostnames(await readSiteSettings());
-    await expectPlacementReports(await chrome.tabs.query({}), enabledHosts);
-  } catch (error) {
-    Logger.warn("Could not count the open tabs of the Platforms at startup", {
-      component: "Background",
-      error: getErrorMessage(error),
-    });
-  }
+function expectPlacementReportsOnStartup(): Promise<void> {
+  return expectPlacementReports(async () => ({
+    enabledHosts: enabledHostnames(await readSiteSettings()),
+    tabs: await chrome.tabs.query({}),
+  }));
 }
 
 /**

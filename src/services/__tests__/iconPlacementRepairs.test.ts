@@ -258,7 +258,7 @@ describe('the placements of several tabs of a Platform', () => {
         return { id: tabId, url: tabId === 3 ? 'https://example.com/' : 'https://claude.ai/new' };
       }) as never);
 
-      await expectIconPlacementReports([{ tabId: 1, hostname: 'claude.ai' }, { tabId: 2, hostname: 'claude.ai' }, { tabId: 3, hostname: 'claude.ai' }]);
+      await expectIconPlacementReports(async () => [{ tabId: 1, hostname: 'claude.ai' }, { tabId: 2, hostname: 'claude.ai' }, { tabId: 3, hostname: 'claude.ai' }]);
 
       expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': { 2: 'waiting' } });
       // So the Toolbar of the one tab left drops the pick no open tab needs
@@ -268,7 +268,7 @@ describe('the placements of several tabs of a Platform', () => {
 
     it('keeps the pick when a re-injected tab reports its Toolbar before the tab on the override reports', async () => {
       await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+      await expectIconPlacementReports(async () => [{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
 
       await report(2, 'toolbar');
 
@@ -277,7 +277,7 @@ describe('the placements of several tabs of a Platform', () => {
 
     it('drops the pick once every tab reported again and none is off the Toolbar', async () => {
       await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+      await expectIconPlacementReports(async () => [{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
 
       await report(2, 'toolbar');
       await report(1, 'toolbar');
@@ -287,7 +287,7 @@ describe('the placements of several tabs of a Platform', () => {
 
     it('drops the pick once the tab it waited for closes, the others in their Toolbar', async () => {
       await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+      await expectIconPlacementReports(async () => [{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
       await report(2, 'toolbar');
 
       await forgetIconPlacementTab(1);
@@ -299,7 +299,7 @@ describe('the placements of several tabs of a Platform', () => {
       await updated();
       await report(1, 'override');
 
-      await expectIconPlacementReports([{ tabId: 1, hostname: 'claude.ai' }, { tabId: 3, hostname: 'chatgpt.com' }]);
+      await expectIconPlacementReports(async () => [{ tabId: 1, hostname: 'claude.ai' }, { tabId: 3, hostname: 'chatgpt.com' }]);
 
       expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': { 1: 'override' } });
     });

@@ -333,10 +333,18 @@ async function isStillOn(tabId: number, hostname: string): Promise<boolean> {
  * yet re-injected or discarded by Memory Saver, still needs. A tab that already reported keeps its
  * placement. A tab that closes or leaves the Platform is forgotten as any other, and one that
  * closed or left since the open tabs were read is not counted.
+ *
+ * @param readTabs - Reads the open tabs, by Platform host. Called under the lock, so no report runs
+ *   between that read and the count: a report from another host of the Platform would otherwise drop
+ *   the repair of a tab not yet counted
  */
-export function expectIconPlacementReports(tabs: ReadonlyArray<{ tabId: number; hostname: string }>): Promise<void> {
+export function expectIconPlacementReports(readTabs: () => Promise<ReadonlyArray<{ tabId: number; hostname: string }>>): Promise<void> {
   return withIconPlacementRepairsLock(async () => {
     const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
+    if (Object.keys(repairs).length === 0) {
+      return;
+    }
+    const tabs = await readTabs();
     const placements = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
     let changed = false;
     for (const { tabId, hostname } of tabs) {
