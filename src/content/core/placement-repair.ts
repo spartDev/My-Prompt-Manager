@@ -18,14 +18,14 @@
  * once its wait ends.
  */
 
-import { getPlatformByHostname, platformHostnames } from '../../config/platforms';
 import {
   ICON_PLACEMENT_REPAIRS_KEY,
   type IconPlacementRepairs,
   type PlacementReport,
   type PlacementReportResponse,
   parseIconPlacementRepairs,
-  readIconPlacementRepairs
+  readIconPlacementRepairs,
+  redirectSourcesOf
 } from '../../services/iconPlacementRepairs';
 import type { CustomSitePositioning } from '../../types';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
@@ -43,12 +43,12 @@ export class PlacementRepair {
   /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
   private atLaterAnchor = false;
   /**
-   * Whether storage holds a repair for this Platform, at this host or another of its hosts: until it
-   * does, a Toolbar needs no report. A repair at a host that redirects here (m365.cloud.microsoft to
-   * copilot.cloud.microsoft) is cleared only by a report of this one
+   * Whether storage holds a repair for this Platform, at this host or at a host that redirects here:
+   * until it does, a Toolbar needs no report. A repair at a host that redirects here
+   * (m365.cloud.microsoft to copilot.cloud.microsoft) is cleared only by a report of this one
    */
   private hasRepair = false;
-  /** The hosts of this tab's Platform, this one first */
+  /** This host, then the hosts that redirect here (redirectSourcesOf) */
   private readonly platformHostnames: readonly string[];
   /** How many changes of the repairs this page followed */
   private changes = 0;
@@ -63,8 +63,7 @@ export class PlacementRepair {
    */
   constructor(hostname: string, onOverrideChange: () => void) {
     this.hostname = hostname;
-    const platform = getPlatformByHostname(hostname);
-    this.platformHostnames = [hostname, ...(platform ? platformHostnames(platform).filter((other) => other !== hostname) : [])];
+    this.platformHostnames = [hostname, ...redirectSourcesOf(hostname)];
     this.onOverrideChange = onOverrideChange;
   }
 

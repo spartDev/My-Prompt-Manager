@@ -24,7 +24,7 @@
  * `StorageManager` nor React, so the content script can read it.
  */
 
-import { getPlatformByHostname, platformHostnames } from '../config/platforms';
+import { getPlatformByHostname } from '../config/platforms';
 import type { CustomSitePositioning, ElementFingerprint } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 
@@ -364,14 +364,24 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
 }
 
 /**
- * A tab reported from one host of a Platform: the repair of another of its hosts with no tab known
- * is dropped. That host redirects to this one (m365.cloud.microsoft sends a work account to
- * copilot.cloud.microsoft), so no tab of it would ever clear it, and Settings would offer a repair
- * for a host that cannot be opened. A host with a tab still open keeps its own. Called under the lock.
+ * The hosts that redirect to this one: the Platform's main hostname, for one of its other hostnames
+ * (m365.cloud.microsoft sends a work account to copilot.cloud.microsoft). None for the main hostname,
+ * nor for a host of no Platform. The redirect goes one way only.
+ */
+export function redirectSourcesOf(hostname: string): string[] {
+  const platform = getPlatformByHostname(hostname);
+  return platform && platform.hostname !== hostname ? [platform.hostname] : [];
+}
+
+/**
+ * A tab reported from a host a Platform redirects to: the repair of the host that redirects there,
+ * with no tab known, is dropped. No tab of it would ever clear it, and Settings would offer a repair
+ * for a host that cannot be opened. A host with a tab still open keeps its own, and a report from the
+ * host that redirects drops nothing: the repair of the host it redirects to waits for that host's next
+ * tab. Called under the lock.
  */
 async function dropStaleSiblingHosts(repairs: IconPlacementRepairs, hostname: string): Promise<IconPlacementRepairs> {
-  const platform = getPlatformByHostname(hostname);
-  const siblings = platform ? platformHostnames(platform).filter((other) => other !== hostname && repairs[other]) : [];
+  const siblings = redirectSourcesOf(hostname).filter((source) => repairs[source]);
   if (siblings.length === 0) {
     return repairs;
   }

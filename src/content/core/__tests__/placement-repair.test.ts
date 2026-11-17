@@ -84,6 +84,20 @@ describe('PlacementRepair.report', () => {
     }
   });
 
+  it('stays silent in its Toolbar at m365.cloud.microsoft while only copilot.cloud.microsoft, where it redirects, has a repair', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'copilot.cloud.microsoft': { status: 'overlay' } } });
+    const atSource = new PlacementRepair('m365.cloud.microsoft', vi.fn());
+    try {
+      await atSource.load();
+
+      atSource.report('toolbar');
+
+      expect(sent()).toEqual([]);
+    } finally {
+      atSource.dispose();
+    }
+  });
+
   it('stays silent in its Toolbar while only a linked Platform has a repair', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'copilot.microsoft.com': { status: 'overlay' } } });
     const atRedirect = new PlacementRepair('copilot.cloud.microsoft', vi.fn());

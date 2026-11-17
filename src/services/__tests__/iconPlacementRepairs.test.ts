@@ -534,6 +534,17 @@ describe('the hosts of one Platform (M365 Copilot at m365.cloud.microsoft and co
     expect(await readIconPlacementRepairs()).toEqual({});
   });
 
+  it('keeps the repair of copilot.cloud.microsoft, whose tab closed, on a report from m365.cloud.microsoft: the redirect goes the other way', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'overlay', tabId: 1 });
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'copilot.cloud.microsoft', positioning: PICK });
+    await forgetIconPlacementTab(1);
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'toolbar', tabId: 2 });
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 3 });
+
+    expect((await readIconPlacementRepairs())['copilot.cloud.microsoft']).toEqual({ status: 'overlay', override: PICK });
+  });
+
   it('keeps the repair of a host whose tab is still open', async () => {
     await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 1 });
 
