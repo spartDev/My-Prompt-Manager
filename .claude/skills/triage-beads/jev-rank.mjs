@@ -206,7 +206,7 @@ const WEIGHTS = {
   severity: 0.45, // severity / 4
   user_visible: 0.2, // Noul probability
   time_bound: 0.2, // Noul probability
-  unblocks: 0.15, // min(dependent_count, 3) / 3, from the snapshot
+  unblocks: 0.15, // min(live tickets it blocks, 3) / 3, from the snapshot's gating edges
   effort_penalty: 0.15, // subtracted: effort / 3
 };
 const THRESHOLDS = {
@@ -346,13 +346,13 @@ function withLeadIns(items) {
   return out.length ? out : items;
 }
 
-function decide(t, answers, acItems) {
+function decide(t, answers, acItems, blocks = 0) {
   const sev = answers.severity.score;
   const eff = answers.effort.score;
   const vis = answers.user_visible.noul;
   const time = answers.time_bound.noul;
   const ready = answers.ready.noul;
-  const unblocks = Math.min(t.dependent_count ?? 0, 3) / 3;
+  const unblocks = Math.min(blocks, 3) / 3;
   const value =
     WEIGHTS.severity * (sev / 4) +
     WEIGHTS.user_visible * vis +
@@ -418,6 +418,10 @@ function excludedIds(opts) {
   return new Set(i >= 0 && opts[i + 1] ? opts[i + 1].split(',').map((s) => s.trim()).filter(Boolean) : []);
 }
 
+// Dependency types that hold a ticket back until the other one closes (beads' gating
+// edges). parent-child, related, discovered-from and the like gate nothing.
+const GATING_EDGES = new Set(['blocks', 'conditional-blocks', 'waits-for']);
+
 async function rank(snapshotPath, opts) {
   const excluded = excludedIds(opts);
   // Excluded tickets are never sent, but stay in `all` so an epic still counts them as
@@ -432,6 +436,18 @@ async function rank(snapshotPath, opts) {
   const heldIds = new Set(held.map((h) => h.t.id));
   const tickets = live.filter((t) => !heldIds.has(t.id));
 
+  // What a ticket unblocks: the live tickets that wait on it through a gating edge.
+  // `dependent_count` counts every edge type (related, discovered-from…), which unblock
+  // nothing, so it is not used.
+  const blockedBy = new Map();
+  for (const t of all) {
+    for (const d of t.dependencies ?? []) {
+      if (d.issue_id !== t.id || !GATING_EDGES.has(d.type)) continue;
+      if (!blockedBy.has(d.depends_on_id)) blockedBy.set(d.depends_on_id, new Set());
+      blockedBy.get(d.depends_on_id).add(t.id);
+    }
+  }
+
   const results = await pool(tickets, async (t) => {
     const acItems = acceptanceItems(acceptanceText(t));
     // Speculative fan-out: every question shares the ticket as state, so one request.
@@ -443,7 +459,7 @@ async function rank(snapshotPath, opts) {
     const base = { id: t.id, priority: t.priority, status: t.status, title: t.title };
     try {
       const { payload, response } = await ask({ project: PROJECT, ticket: ticketBrief(t) }, questions);
-      return { ...base, payload, answers: response.answers, ...decide(t, response.answers, acItems) };
+      return { ...base, payload, answers: response.answers, ...decide(t, response.answers, acItems, blockedBy.get(t.id)?.size ?? 0) };
     } catch (e) {
       if (!(e instanceof ApiError) && !(e instanceof TypeError)) throw e;
       return { ...base, error: String(e.message ?? e) };
@@ -456,7 +472,12 @@ async function rank(snapshotPath, opts) {
   // of questions: even at one token per character a request stays under the 64k-token
   // request context, and one question far under the 32k per-question context. A failed
   // batch lists every pair it held, never read as "no duplicate".
+  // Every duplicate request (its exact payload and raw answers, or its error) and every
+  // pair's probability are kept in jev.json, so any pair can be rerun or reviewed;
+  // `duplicates` is only the pairs above the "no" threshold and the failures.
   let duplicates = [];
+  const duplicateRequests = [];
+  let duplicatePairs = [];
   if (!opts.includes('--no-dups')) {
     const brief = (t) => ({ title: t.title.slice(0, 200), description: (t.description ?? '').slice(0, 600) });
     const pairQuestion = (a, b) => ({
@@ -487,10 +508,12 @@ async function rank(snapshotPath, opts) {
     const askBatch = async (b) => {
       const questions = Object.fromEntries(b.map((p, k) => [`pair_${k}`, p.q]));
       try {
-        const { response } = await ask({ project: PROJECT }, questions);
+        const { payload, response } = await ask({ project: PROJECT }, questions);
+        duplicateRequests.push({ pairs: b.map((p, k) => ({ question: `pair_${k}`, a: p.a, b: p.b })), payload, answers: response.answers });
         return b.map((p, k) => ({ a: p.a, b: p.b, p: response.answers[`pair_${k}`].noul }));
       } catch (e) {
         if (!(e instanceof ApiError) && !(e instanceof TypeError)) throw e;
+        duplicateRequests.push({ pairs: b.map((p, k) => ({ question: `pair_${k}`, a: p.a, b: p.b })), payload: { model: MODEL, state: { project: PROJECT }, questions }, error: String(e.message ?? e) });
         if (e instanceof ApiError && REJECTED_REQUEST.has(e.status) && b.length > 1) {
           const half = Math.ceil(b.length / 2);
           return [...(await askBatch(b.slice(0, half))), ...(await askBatch(b.slice(half)))];
@@ -499,6 +522,7 @@ async function rank(snapshotPath, opts) {
       }
     };
     const answered = await pool(batches, askBatch);
+    duplicatePairs = answered.flat().filter((d) => !d.error);
     duplicates = answered
       .flat()
       .filter((d) => d.error || d.p > THRESHOLDS.no)
@@ -525,10 +549,26 @@ async function rank(snapshotPath, opts) {
     t.parent === epicId ||
     (t.dependencies ?? []).some((d) => d.type === 'parent-child' && d.issue_id === t.id && d.depends_on_id === epicId);
   const byId = new Map(results.map((r) => [r.id, r]));
+  // A child epic is walked through, so its own children roll up into the parent epic.
+  const descendants = (epicId, seen = new Set([epicId])) => {
+    const leaves = [];
+    const subEpics = [];
+    for (const t of all.filter((c) => isChildOf(c, epicId) && !seen.has(c.id))) {
+      seen.add(t.id);
+      if (t.issue_type !== 'epic') leaves.push(t);
+      else {
+        subEpics.push(t.id);
+        const sub = descendants(t.id, seen);
+        leaves.push(...sub.leaves);
+        subEpics.push(...sub.subEpics);
+      }
+    }
+    return { leaves, subEpics };
+  };
   const epics = all
     .filter((t) => t.issue_type === 'epic')
     .map((e) => {
-      const kids = all.filter((t) => t.issue_type !== 'epic' && isChildOf(t, e.id));
+      const { leaves: kids, subEpics } = descendants(e.id);
       const children = kids.map(
         (t) => byId.get(t.id) ?? { id: t.id, excluded: true, error: 'excluded: judge it by hand' }
       );
@@ -543,6 +583,7 @@ async function rank(snapshotPath, opts) {
         status: e.status,
         title: e.title,
         children: children.map((c) => c.id),
+        child_epics: subEpics,
         excluded_children: excludedKids,
         suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
         // "no files" only when every judged child says so; otherwise what is known.
@@ -554,7 +595,7 @@ async function rank(snapshotPath, opts) {
     });
   const out = join(dirname(snapshotPath), 'jev.json');
   const areaPaths = Object.fromEntries(Object.entries(AREAS).map(([n, a]) => [n, a.paths]));
-  writeFileSync(out, JSON.stringify({ model: MODEL, weights: WEIGHTS, thresholds: THRESHOLDS, areas: areaPaths, ranked, epics, duplicates }, null, 2));
+  writeFileSync(out, JSON.stringify({ model: MODEL, weights: WEIGHTS, thresholds: THRESHOLDS, areas: areaPaths, ranked, epics, duplicates, duplicate_pairs: duplicatePairs, duplicate_requests: duplicateRequests }, null, 2));
 
   for (const r of ranked) {
     if (r.held) {
@@ -574,7 +615,7 @@ async function rank(snapshotPath, opts) {
     console.log(
       e.suggested === null
         ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand`
-        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}${e.excluded_children.length ? ` | excluded, place by hand: ${e.excluded_children.join(', ')}` : ''}`
+        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')}${e.child_epics.length ? ` (through ${e.child_epics.join(', ')})` : ''} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}${e.excluded_children.length ? ` | excluded, place by hand: ${e.excluded_children.join(', ')}` : ''}`
     );
   }
   for (const d of duplicates) {
