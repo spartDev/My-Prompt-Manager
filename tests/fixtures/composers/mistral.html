@@ -5,6 +5,11 @@
   removed; of the attributes, only contenteditable, role and type of the web platform's values, and
   what the Platform's selectors read, with the selector's value; wrappers with no attribute and one
   child folded into that child.
+  Edited by hand on 2026-11-17 (My-Prompt-Manager-spc), not recaptured: the <div> the voice button
+  sits alone in is put back, as the sanitizer now keeps a wrapper an anchor finds. Read on the live
+  composer: signed in with an empty draft, and signed out with an empty draft, each button of the
+  action row has a <div> of its own; signed out with text in the draft, the send button gets its own
+  <div> too.
 -->
 <form>
   <div>
@@ -15,7 +20,9 @@
     </div>
     <div>
       <button type="button"></button>
-      <button aria-label="voice" type="button"></button>
+      <div>
+        <button aria-label="voice" type="button"></button>
+      </div>
     </div>
   </div>
 </form>

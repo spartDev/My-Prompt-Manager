@@ -90,6 +90,8 @@ interface AttributeRule {
 export interface SanitizeRules {
   classes: ReadonlySet<string>;
   attributes: ReadonlyMap<string, AttributeRule>;
+  /** The anchors of the chain: a wrapper one of them finds is not folded, or the chain would miss it */
+  anchors: readonly string[];
 }
 
 /**
@@ -120,8 +122,12 @@ const unescapeCss = (value: string): string =>
     hex ? escapedCodePoint(hex) : (char ?? ''));
 const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
 
-/** The rules for a Platform, from its editor selectors and its anchor chain */
-export function sanitizeRulesOf(selectors: readonly string[]): SanitizeRules {
+/**
+ * The rules for a Platform, from its editor selectors and its anchor chain: what the anchors read is
+ * kept as what the selectors read is, and an element an anchor finds is not folded away
+ */
+export function sanitizeRulesOf(editorSelectors: readonly string[], anchors: readonly string[] = []): SanitizeRules {
+  const selectors = [...editorSelectors, ...anchors];
   const attributes = new Map<string, AttributeRule>();
   const condition = (name: string, found?: ValueCondition) => {
     const rule = attributes.get(name) ?? { bare: false, conditions: [] };
@@ -143,7 +149,7 @@ export function sanitizeRulesOf(selectors: readonly string[]): SanitizeRules {
       condition('id', { operator: '=', value: id, ignoreCase: false });
     }
   }
-  return { classes: new Set(classNamesOf(selectors)), attributes };
+  return { classes: new Set(classNamesOf(selectors)), attributes, anchors };
 }
 
 function meets(actual: string, { operator, value, ignoreCase }: ValueCondition): boolean {
@@ -226,13 +232,29 @@ function strip(node: Node, isInsideSvg: boolean, rules: SanitizeRules): void {
   }
 }
 
-/** Folds each attribute-less div or span with exactly one child into that child, deepest first */
-function fold(element: Element, isRoot: boolean): void {
+/** Whether an anchor of the chain finds this element */
+function isAnchor(element: Element, anchors: readonly string[]): boolean {
+  return anchors.some((anchor) => {
+    try {
+      return element.matches(anchor);
+    } catch {
+      // A selector this DOM cannot parse finds nothing in it
+      return false;
+    }
+  });
+}
+
+/**
+ * Folds each attribute-less div or span with exactly one child into that child, deepest first,
+ * unless an anchor of the chain finds it (Mistral's voice button sits alone in a <div> the chain
+ * places the icon before)
+ */
+function fold(element: Element, isRoot: boolean, anchors: readonly string[]): void {
   for (const child of Array.from(element.children)) {
-    fold(child, false);
+    fold(child, false, anchors);
   }
   const only = element.children.length === 1 ? element.firstElementChild : null;
-  if (!isRoot && only && element.attributes.length === 0 && FOLDED_TAGS.has(element.tagName.toLowerCase())) {
+  if (!isRoot && only && element.attributes.length === 0 && FOLDED_TAGS.has(element.tagName.toLowerCase()) && !isAnchor(element, anchors)) {
     element.replaceWith(only);
   }
 }
@@ -247,7 +269,7 @@ function fold(element: Element, isRoot: boolean): void {
 export function sanitizeComposer(root: Element, rules: SanitizeRules = sanitizeRulesOf([])): void {
   sanitizeAttributes(root, rules);
   strip(root, root.tagName.toLowerCase() === 'svg', rules);
-  fold(root, true);
+  fold(root, true, rules.anchors);
 }
 
 const escapeAttribute = (value: string): string => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
@@ -302,7 +324,7 @@ export function composerFixture(root: Element, header: FixtureHeader): string {
     `  ${header.platformName} composer, captured from ${header.url} on ${header.date} by npm run composers:capture.${origin}`,
     '  Sanitized: text, links, media and SVG content removed; of the attributes, only contenteditable, role',
     '  and type of the web platform\'s values, and what the Platform\'s selectors read, with the selector\'s value;',
-    '  wrappers with no attribute and one child folded into that child.',
+    '  wrappers with no attribute and one child folded into that child, unless an anchor of the chain finds them.',
     '-->',
     serializeComposer(root),
     ''

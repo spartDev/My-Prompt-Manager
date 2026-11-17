@@ -160,11 +160,10 @@ export const strategyEditorSelectors = (): string[] => [...new Set(
 /** What a Platform's fixture keeps: what its editor selectors and its anchor chain read */
 export const rulesFor = (platform: PlatformDefinition) => {
   const chain = platform.iconPlacement;
-  return sanitizeRulesOf([
-    ...platform.selectors,
-    ...strategyEditorSelectors(),
-    ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])
-  ]);
+  return sanitizeRulesOf(
+    [...platform.selectors, ...strategyEditorSelectors(), ...(chain ? [chain.composer] : [])],
+    chain ? chain.anchors.map(({ find }) => find) : []
+  );
 };
 
 /**

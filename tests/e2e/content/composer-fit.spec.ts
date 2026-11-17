@@ -10,6 +10,9 @@
  *   wide, as wide as the microphone. A button put next to the microphone overflowed past the rounded
  *   right edge, which clipped it. The stand-in fixes the width of the wrapper around that container
  *   too; live, the wrapper grows with its content.
+ * - Mistral (My-Prompt-Manager-spc, read on 2026-11-17, signed in with an empty draft, signed out
+ *   with an empty draft and with text): each button of the action row sits alone in a block <div>. A button put before the voice button, in its <div>,
+ *   stacked above it and pushed it below the row.
  */
 
 import type { BrowserContext, Page } from '@playwright/test';
@@ -95,6 +98,49 @@ const geminiComposer = (theme: Theme): string => {
 </html>`;
 };
 
+const MISTRAL_COLORS = {
+  light: { page: '#fbfaf8', composer: '#ffffff', text: '#1f1f1f', border: '#e2e0dc' },
+  dark: { page: '#18181b', composer: '#27272a', text: '#f4f4f5', border: '#3f3f46' },
+};
+
+/** Mistral's composer, as it was laid out on the live site on 2026-11-17 with an empty draft */
+const mistralComposer = (theme: Theme): string => {
+  const colors = MISTRAL_COLORS[theme];
+  return /* html */ `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Le Chat</title>
+    <style>
+      body { margin: 0; padding: 48px 32px; background: ${colors.page}; color: ${colors.text}; font-family: sans-serif; }
+      form { width: 736px; }
+      .card { display: flex; flex-direction: column; overflow: hidden; padding: 12px; border-radius: 16px; background: ${colors.composer}; border: 1px solid ${colors.border}; }
+      .input-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+      .editor-box { flex-grow: 1; min-width: 0; }
+      .ProseMirror { min-height: 24px; padding: 4px 0; outline: none; white-space: pre-wrap; }
+      .actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+      button.platform { display: flex; align-items: center; justify-content: center; height: 32px; min-width: 32px; border: 0; border-radius: 8px; background: transparent; color: inherit; font: inherit; }
+      button.platform.voice { width: 32px; background: ${colors.text}; color: ${colors.composer}; }
+    </style>
+  </head>
+  <body>
+    <form>
+      <div class="card">
+        <div class="input-row">
+          <div><button type="button" class="platform" aria-label="Open settings menu">+</button></div>
+          <div class="editor-box"><div class="ProseMirror" contenteditable="true"><p><br></p></div></div>
+          <div class="actions">
+            <div><button type="button" class="platform" aria-label="Choose model">Fast</button></div>
+            <div><button type="button" class="platform voice" aria-label="Voice Mode">V</button></div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </body>
+</html>`;
+};
+
 const CASES: ComposerCase[] = [
   {
     platform: 'gemini',
@@ -102,6 +148,13 @@ const CASES: ComposerCase[] = [
     html: geminiComposer,
     composer: '.text-input-field',
     neighbour: 'speech-dictation-mic-button',
+  },
+  {
+    platform: 'mistral',
+    url: 'https://chat.mistral.ai/chat',
+    html: mistralComposer,
+    composer: '.card',
+    neighbour: 'button[aria-label="Voice Mode"]',
   },
 ];
 
