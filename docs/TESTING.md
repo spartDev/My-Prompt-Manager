@@ -71,6 +71,26 @@ The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.
 - Linux CI renders wider fonts than the Mac (DejaVu Sans): a layout assertion that passes locally can fail there. `npm run test:e2e:linux -- <spec>` runs a spec the way CI renders it, in Docker; `tests/e2e/README.md` says how.
 - A locator assertion (`toHaveAttribute`, `toHaveText`, `toHaveClass`…) takes a string or a RegExp. An asymmetric matcher such as `expect.stringContaining(...)` makes it pass whatever the value, and `npm run lint` rejects it in `tests/e2e/` (the GritQL plugin in `biome-plugins/`).
 
+## On the live Platforms: `npm run live:check`
+
+The e2e suite runs the content script on stand-in pages. A change to `src/content` can still pass there and fail on a live Platform, as the `//` of PR #576 did on Copilot's Lexical editor. `npm run live:check` (`scripts/live-check.ts`) runs the hand checks for you. It builds `dist/`, loads it into Chromium with a persistent profile, opens each Platform, and prints one PASS or FAIL line per case:
+
+| Case | Passes when |
+|------|-------------|
+| `//` in an empty field | the Prompt selector is open and the field is empty |
+| `//` with a pause (Copilot's `/` menu open) | the same, with the second slash typed after the first one has opened Copilot's menu at copilot.cloud.microsoft |
+| `'Hi //there'` | the selector is open and the field reads `Hi there` |
+| icon on the toolbar after a late composer | `button.prompt-library-integrated-icon` ends with `data-mpm-placement="toolbar"` |
+| icon not moving while typing | the button keeps its placement, its `data-mpm-anchor` and its position (within 1 px) while `Hello world` is typed |
+
+Each line also says what was read: whether the selector was open, the field's text, any insertion feedback, and the placement and anchor. The script types only its own text and empties the field after each case; if it cannot, the line ends with "field NOT emptied after", so check that Platform for a leftover draft. The two icon cases first wait for the settled placement: the toolbar, or the Anchored overlay once the extension's 5 s grace for a late toolbar has passed. It exits 1 if any case fails.
+
+- Most Platforms need sign-in. Sign in once with `npm run live:check -- --login`, then close the browser. The profile is `~/.my-prompt-manager/live-check-profile`; `--profile` or `LIVE_CHECK_PROFILE` changes it. The script runs bundled Chromium (`--channel` changes it) because branded Chrome no longer loads an unpacked extension from the command line. That is also why this profile is separate from the one `composers:capture` signs into with Chrome.
+- `--only copilot,perplexity` checks some of the Platforms. `copilot` reaches Copilot's Lexical editor and its `/` menu at copilot.cloud.microsoft only when the profile is signed in with a work account, which redirects there. `m365copilot` opens m365.cloud.microsoft/chat, which redirects a work account to copilot.cloud.microsoft too, so it needs the same work-account sign-in. `--dist <dir>` checks another build without building, for example an older commit built in a separate checkout.
+- Expected, not yet seen live: against a build from before 15eed47, the `//` cases on copilot.cloud.microsoft print FAIL, and at `main` they print PASS. Offline, on the stand-ins, the build from before 15eed47 fails the three `//` cases of `m365copilot` and two of `perplexity`; `copilot`'s textarea stand-in passes at both builds. The live run is still to do.
+- `--stand-in --headless` runs the same cases on the e2e stand-in pages. It checks the script itself, with no sign-in needed.
+- A maintainer chore like `composers:capture`, not a CI job: CI has no signed-in profile.
+
 ## CI
 
 `.github/workflows/pr-checks.yml` runs on every pull request: type check, lint, `npm run test:coverage` (the coverage threshold is in `vitest.config.ts`), build, the Playwright suite and a security audit. The end-to-end job takes about ten minutes.
