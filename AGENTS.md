@@ -12,6 +12,8 @@ Building, restyling or reviewing anything the user sees in the popup, side panel
 
 After a code change, `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes before you call the work done. `npm run lint` tolerates the warnings `main` already has; `lint:changed` fails on any warning in a file the branch changes, old ones included, so fix those in the files you touch.
 
+For a change to `src/content`, also run `npm run live:check` (signed-in profile, see `docs/TESTING.md`): it checks `//` and the Prompts button's placement on the live Platforms.
+
 A pull request is done when its CI checks are green. The e2e job takes about 10 minutes, longer than a foreground command may run: watch `gh pr checks <number> --watch` in the background.
 
 ## Work tracking

@@ -26,7 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { JSDOM } from 'jsdom';
-import { type BrowserContext, chromium, type Page } from 'playwright';
+import { type BrowserContext, chromium, type ElementHandle, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
 import { STRATEGY_CONSTRUCTORS } from '../src/content/platforms/strategy-constructors';
@@ -141,8 +141,11 @@ export function parseCaptureArgs(argv: readonly string[], env: NodeJS.ProcessEnv
   return options;
 }
 
+/** The live page a Platform's composer is on */
+export const startUrlOf = (id: string, platform: PlatformDefinition): string => `https://${platform.hostname}${START_PATHS[id] ?? '/'}`;
+
 const urlOf = (id: string, platform: PlatformDefinition, options: CaptureOptions): string =>
-  options.urls[id] ?? `https://${platform.hostname}${START_PATHS[id] ?? '/'}`;
+  options.urls[id] ?? startUrlOf(id, platform);
 
 /**
  * The selectors naming a class that the platform strategies find editors by, beyond the config's
@@ -304,40 +307,49 @@ const REFIND_TIMEOUT = 5_000;
 /** Ancestors of the editor captured when the chain's composer selector finds nothing */
 const FALLBACK_DEPTH = 5;
 
+/**
+ * Where a Platform's editor is looked for: the config's selectors first; the strategies find some
+ * editors by other means (ChatGPT's and Perplexity's are contenteditable, their selectors name
+ * textareas), so then any editable element
+ */
+export const editorSelectorsOf = (platform: PlatformDefinition): string[] => [...platform.selectors, ...GENERIC_EDITORS];
+
+/**
+ * The first visible editor, by the selectors' order, or null when none shows within the timeout.
+ * Any visible match: waitForSelector would wait on the first match only, and a hidden textarea
+ * earlier in the page (a search field) would then hide the editor. Visible means rendered, not
+ * visibility:hidden, and of nonzero width and height.
+ */
+export async function findEditor(page: Page, editorSelectors: readonly string[], timeout: number): Promise<ElementHandle<HTMLElement> | null> {
+  try {
+    const handle = await page.waitForFunction(
+      (selectors) => {
+        for (const selector of selectors) {
+          const editor = Array.from(document.querySelectorAll<HTMLElement>(selector))
+            .find((candidate) => {
+              const box = candidate.getBoundingClientRect();
+              return box.width > 0 && box.height > 0 && candidate.checkVisibility({ visibilityProperty: true });
+            });
+          if (editor) {
+            return editor;
+          }
+        }
+        return false;
+      },
+      editorSelectors,
+      { timeout, polling: 250 }
+    );
+    return handle.asElement();
+  } catch {
+    return null;
+  }
+}
+
 export async function capture(page: Page, id: string, platform: PlatformDefinition, options: CaptureOptions): Promise<CaptureResult> {
   const url = urlOf(id, platform, options);
   await page.goto(url, { waitUntil: 'domcontentloaded' });
-  // The config's selectors first; the strategies find some editors by other means (ChatGPT's and
-  // Perplexity's are contenteditable, their selectors name textareas), so then any editable element
-  const editorSelectors = [...platform.selectors, ...GENERIC_EDITORS];
-  // The first visible editor, by the selectors' order. Any visible match: waitForSelector would wait
-  // on the first match only, and a hidden textarea earlier in the page (a search field) would then
-  // hide the editor. Visible means rendered, not visibility:hidden, and of nonzero width and height.
-  const findEditor = async (timeout: number) => {
-    try {
-      const handle = await page.waitForFunction(
-        (selectors) => {
-          for (const selector of selectors) {
-            const editor = Array.from(document.querySelectorAll<HTMLElement>(selector))
-              .find((candidate) => {
-                const box = candidate.getBoundingClientRect();
-                return box.width > 0 && box.height > 0 && candidate.checkVisibility({ visibilityProperty: true });
-              });
-            if (editor) {
-              return editor;
-            }
-          }
-          return false;
-        },
-        editorSelectors,
-        { timeout, polling: 250 }
-      );
-      return handle.asElement();
-    } catch {
-      return null;
-    }
-  };
-  const firstEditor = await findEditor(options.timeout);
+  const editorSelectors = editorSelectorsOf(platform);
+  const firstEditor = await findEditor(page, editorSelectors, options.timeout);
   if (!firstEditor) {
     return { id, outcome: 'no-editor', url };
   }
@@ -345,7 +357,7 @@ export async function capture(page: Page, id: string, platform: PlatformDefiniti
   await page.waitForTimeout(options.settle);
   // Found again once the toolbar has rendered: the page may have replaced the editor meanwhile.
   // The page has loaded by now, so an editor that does not come back soon is gone: no second full wait
-  const editorHandle = await findEditor(Math.min(options.timeout, REFIND_TIMEOUT));
+  const editorHandle = await findEditor(page, editorSelectors, Math.min(options.timeout, REFIND_TIMEOUT));
   if (!editorHandle) {
     return { id, outcome: 'no-editor', url };
   }
