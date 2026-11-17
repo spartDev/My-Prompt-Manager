@@ -411,8 +411,8 @@ gemini: {
   iconPlacement: {
     composer: 'fieldset, input-area-v2',
     anchors: [
-      { find: 'speech-dictation-mic-button', relation: 'after' },
-      { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' }
+      { find: '.input-buttons-wrapper-bottom', relation: 'before' },
+      { find: '.trailing-actions-wrapper', relation: 'inside-end' }
     ]
   },
   strategyClass: 'GeminiStrategy',

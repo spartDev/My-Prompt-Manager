@@ -350,23 +350,18 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
 export { YourPlatformStrategy } from './your-platform-strategy';
 ```
 
-#### 3b. Register in `src/content/platforms/platform-manager.ts`:
+#### 3b. Register in `src/content/platforms/strategy-constructors.ts`:
 
 ```typescript
 // Add import at top
 import { YourPlatformStrategy } from './your-platform-strategy';
 
-// In the constructor, add to the strategies array:
-constructor(options: PlatformManagerOptions = {}) {
-  this.strategies = [
-    new ClaudeStrategy(),
-    new ChatGPTStrategy(), 
-    new PerplexityStrategy(),
-    new YourPlatformStrategy(), // Add your strategy here
-    new DefaultStrategy()       // Keep DefaultStrategy last
-  ];
-  // ... rest of constructor
-}
+// Add it under the strategyClass name it has in platforms.ts; the manager builds its registry from this map
+export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
+  // ... existing strategies ...
+  'YourPlatformStrategy': YourPlatformStrategy,
+  'DefaultStrategy': DefaultStrategy
+};
 ```
 
 ### Step 4: Test the Integration
@@ -499,7 +494,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 **Button doesn't appear:**
 - Check `canHandle()` method returns true
 - Verify `selectors` match actual DOM elements
-- Check strategy is registered in platform-manager.ts
+- Check strategy is registered in strategy-constructors.ts
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
