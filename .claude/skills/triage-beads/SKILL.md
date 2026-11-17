@@ -86,7 +86,7 @@ A file the ticket would create is not in the checkout yet: add it from the ticke
 
 - a ticket goes in the group of any ticket it shares a file with, and after any ticket it depends on (`dependencies` in the snapshot, `bd blocked`); the tickets of one group run one after another;
 - groups that share no file can run in parallel, each in its own session on its own branch;
-- an epic is placed by its children, not on its own: its `EPIC` line from step 2 names them and their areas. Without that line (no key, or a failed run), list its children from the snapshot (`jq -r '.[] | select(.parent == "<epic>") | .id' <scratch>/backlog.json`) and place the epic with them, from their own placements above.
+- an epic is placed by its children, not on its own: its `EPIC` line from step 2 names them and their areas. Without that line (no key, or a failed run), list its children from the snapshot, by its `parent` field or a parent-child dependency, as the script does (`jq -r --arg e <epic> '.[] | select(.parent == $e or any(.dependencies[]?; .type == "parent-child" and .depends_on_id == $e)) | .id' <scratch>/backlog.json`; run it again on a child that is itself an epic) and place the epic with them, from their own placements above.
 
 Done when every live ticket is in exactly one group, each group lists its files, and the groups that can run at the same time are named.
 
