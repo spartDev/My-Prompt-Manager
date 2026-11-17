@@ -164,28 +164,56 @@ export const isEmptyField = (text: string): boolean => withoutInvisibles(text) =
 
 /**
  * The field's text, line by line as the user sees it, read in the page: a textarea's value, or a
- * rich-text editor's innermost blocks (<p>, <div>, <li>…) one line each, a <br> a line break only
- * when something follows it in its block. An empty editor's lone paragraph (<p><br></p>) reads "",
- * three empty paragraphs "\n\n". Read from the DOM, not textContent, which drops the lines, nor
- * innerText, which depends on layout. Sent to the page as it is: no named inner function.
+ * rich-text editor walked in document order, every text node kept, its own and its blocks'. A
+ * block (<p>, <div>, <li>…) starts and ends a line, and a <br> ends one: so an empty paragraph,
+ * its lone <br> the line, is an empty line, and a <br> that ends a line already ended adds none.
+ * An empty editor (<p><br></p>) reads "", three empty paragraphs "\n\n", "My draft<div><br></div>"
+ * "My draft\n". Read from the DOM, not textContent, which drops the lines, nor innerText, which
+ * depends on layout. Sent to the page as it is: no inner function.
  */
 export const fieldTextOf = (element: Element): string => {
   if (element instanceof HTMLTextAreaElement) {
     return element.value;
   }
-  const blockSelector = 'p, div, li, h1, h2, h3, h4, h5, h6, pre, blockquote';
-  const innermost = Array.from(element.querySelectorAll(blockSelector)).filter((block) => block.querySelector(blockSelector) === null);
+  const blocks = ['P', 'DIV', 'LI', 'UL', 'OL', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'PRE', 'BLOCKQUOTE'];
   const lines: string[] = [];
-  for (const block of innermost.length > 0 ? innermost : [element]) {
-    let line = '';
-    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
-    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        line += node.nodeValue ?? '';
-      } else if (node.nodeName === 'BR' && node.nextSibling !== null) {
-        line += '\n';
+  let line = '';
+  // Whether the current line holds anything yet: a block boundary ends it only then
+  let open = false;
+  // Each node is visited on the way in, and a block again on the way out
+  const stack: { node: Node; leaving: boolean }[] = [{ node: element, leaving: false }];
+  while (stack.length > 0) {
+    const entry = stack.pop();
+    if (!entry) {
+      break;
+    }
+    const { node, leaving } = entry;
+    const block = node !== element && blocks.includes(node.nodeName);
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.nodeValue ?? '';
+      if (text !== '') {
+        line += text;
+        open = true;
+      }
+    } else if (node.nodeName === 'BR') {
+      lines.push(line);
+      line = '';
+      open = false;
+    } else if (block && open) {
+      lines.push(line);
+      line = '';
+      open = false;
+    }
+    if (!leaving && node.nodeType === Node.ELEMENT_NODE && node.nodeName !== 'BR') {
+      if (block) {
+        stack.push({ node, leaving: true });
+      }
+      for (let index = node.childNodes.length - 1; index >= 0; index--) {
+        stack.push({ node: node.childNodes[index], leaving: false });
       }
     }
+  }
+  if (open) {
     lines.push(line);
   }
   return lines.join('\n');
@@ -427,7 +455,8 @@ export async function cleanUp(page: Page, platform: PlatformDefinition, owned: r
   await page.keyboard.press('Backspace');
   await editor.dispose();
   const left = await readField(page, platform);
-  return left !== null && normalizeFieldText(left) === '' ? 'emptied' : 'not emptied';
+  // Not trimmed: spaces or line breaks left behind are still in the field
+  return left !== null && isEmptyField(left) ? 'emptied' : 'not emptied';
 }
 
 /**

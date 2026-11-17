@@ -149,11 +149,13 @@ describe('cleanUp', () => {
  * text from the start, or gets a draft restored by the Platform later: while the script waits for
  * the Prompts button, during a pause, or while the case types (put before the case's text)
  */
-function fakePage({ editor, typeThrows = false, text = '', restore }: {
+function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLeaves = '' }: {
   editor: boolean;
   typeThrows?: boolean;
   text?: string;
   restore?: { draft: string; on: 'icon' | 'pause' | 'type' | 'click' | 'selectAll' };
+  /** What the field still holds after Backspace: an editor may keep spaces or line breaks */
+  backspaceLeaves?: string;
 }) {
   const keys: string[] = [];
   let field = text;
@@ -170,7 +172,7 @@ function fakePage({ editor, typeThrows = false, text = '', restore }: {
       press: vi.fn((key: string) => {
         keys.push(key);
         if (key === 'Backspace') {
-          field = '';
+          field = backspaceLeaves;
         }
         return key === 'ControlOrMeta+A' ? restoreOn('selectAll') : Promise.resolve();
       }),
@@ -322,7 +324,13 @@ describe('fieldTextOf', () => {
     ['two lines', '<p>Hi</p><p>there</p>', 'Hi\nthere'],
     ['a line broken inside its paragraph', '<p>Hi<br>there</p>', 'Hi\nthere'],
     ['paragraphs in a wrapper', '<div><p>Hi</p><p><br></p></div>', 'Hi\n'],
-    ['text with no block', 'Hi there', 'Hi there']
+    ['text with no block', 'Hi there', 'Hi there'],
+    ['text before a block', 'My saved draft<div>//</div>', 'My saved draft\n//'],
+    ['text before an empty block', 'My saved draft<div><br></div>', 'My saved draft\n'],
+    ['text between blocks', '<p>Hi</p>there<p>again</p>', 'Hi\nthere\nagain'],
+    ['text after a block', '<p>Hi</p>there', 'Hi\nthere'],
+    ['a line of its own broken twice', '<p>Hi<br><br></p>', 'Hi\n'],
+    ['Lexical lines of <br> alone', '<p><br><br><br></p>', '\n\n']
   ])('reads %s line by line', (_case, html, text) => {
     expect(fieldTextOf(editorWith(html))).toBe(text);
   });
@@ -346,6 +354,27 @@ describe('runCase reads a rich-text field line by line', () => {
     const progress = { typed: false, owned: [] as readonly string[] };
 
     const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, caseId, 10, progress);
+
+    expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
+    expect(progress.typed).toBe(false);
+  });
+
+  it.each([
+    ['text before a block holding the //', 'My saved draft<div>//</div>'],
+    ['text alone, outside any block', 'saved draft']
+  ])('leaves after the case a draft of %s, and says so', async (_case, html) => {
+    const page = domPage(`<form><div contenteditable="true">${html}</div></form>`, 'en');
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.chatgpt, { typed: true, owned: CASE_FIELDS['slash-empty'].typed }))
+      .resolves.toBe('; field holds text the case did not type, left as it was: check for a draft');
+    expect(document.querySelector('[contenteditable]')?.innerHTML).toBe(html);
+  });
+
+  it.each(['My saved draft<div><br></div>', 'saved draft'])('does not run a case on an editor holding %j', async (html) => {
+    const page = domPage(`<form><div contenteditable="true">${html}</div></form>`, 'en');
+    const progress = { typed: false, owned: [] as readonly string[] };
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'slash-empty', 10, progress);
 
     expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
     expect(progress.typed).toBe(false);
@@ -479,6 +508,13 @@ describe('afterCase', () => {
     await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, owned: CASE_FIELDS['slash-empty'].typed })).resolves.toBe(NOT_OURS);
     expect(keys).toEqual(['Escape']);
     expect(field()).toBe(text);
+  });
+
+  it.each([' ', '\n', ' \n '])('warns when the field still holds %j after the Backspace', async (left) => {
+    const { page } = fakePage({ editor: true, text: '//', backspaceLeaves: left });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, { typed: true, owned: CASE_FIELDS['slash-empty'].typed }))
+      .resolves.toBe('; field NOT emptied after, check for a draft');
   });
 
   it('empties what a case cut short typed', async () => {
