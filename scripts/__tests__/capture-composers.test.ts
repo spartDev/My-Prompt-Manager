@@ -150,6 +150,34 @@ describe('sanitizeComposer', () => {
     expect(serializeComposer(composer)).toBe(`<div>\n  <button aria-label="${written}"></button>\n</div>`);
   });
 
+  it('ends a hex escape at CSS whitespace only: a no-break space after it stays in the value', () => {
+    const composer = composerOf('<div><b data-x="&amp;\u00A0x"></b><b data-x="&amp;x"></b></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[data-x="\\26\u00A0x"]', '[data-x="\\26\tx"]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <b data-x="&amp;\u00A0x"></b>\n  <b data-x="&amp;x"></b>\n</div>');
+  });
+
+  it('ends a hex escape at a CR LF taken as one whitespace, not at the CR alone', () => {
+    const composer = composerOf('<div><b data-x="&amp;x"></b></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['[data-x="\\26\r\nx"]']));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <b data-x="&amp;x"></b>\n</div>');
+  });
+
+  it.each([
+    ['above U+10FFFF', '\\110000'],
+    ['zero', '\\0'],
+    ['a surrogate', '\\D800']
+  ])('reads a hex escape %s as U+FFFD, as CSS does, without throwing', (_case, hexEscape) => {
+    const composer = composerOf('<div><b data-x="\uFFFD"></b></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf([`[data-x="${hexEscape}"]`]));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <b data-x="\uFFFD"></b>\n</div>');
+  });
+
   it('keeps an attribute a selector names both bare and with a value, whatever its value', () => {
     const composer = composerOf('<div><span data-mode="alice-draft"></span><span data-mode="compact"></span></div>');
 

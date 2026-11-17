@@ -103,10 +103,21 @@ export function classNamesOf(selectors: readonly string[]): string[] {
 /** A quoted value may hold an escaped character, an escaped quote included: `[aria-label="say \"hi\""]` */
 const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
 
-/** A quoted selector value as CSS reads it: a hex escape (`\26 `) is its code point, any other escaped character itself */
+/** The code point CSS reads a hex escape as: U+FFFD for zero, a surrogate, or a value above U+10FFFF */
+const escapedCodePoint = (hex: string): string => {
+  const codePoint = parseInt(hex, 16);
+  const valid = codePoint > 0 && codePoint <= 0x10ffff && (codePoint < 0xd800 || codePoint > 0xdfff);
+  return String.fromCodePoint(valid ? codePoint : 0xfffd);
+};
+
+/**
+ * A quoted selector value as CSS reads it: a hex escape (`\26 `) is its code point, ended by one
+ * CSS whitespace (space, tab, line feed, form feed, carriage return, or CR LF), never by a
+ * no-break space; any other escaped character is itself
+ */
 const unescapeCss = (value: string): string =>
-  value.replace(/\\(?:([0-9a-fA-F]{1,6})\s?|(.))/g, (_escape, hex: string | undefined, char: string | undefined) =>
-    hex ? String.fromCodePoint(parseInt(hex, 16)) : (char ?? ''));
+  value.replace(/\\(?:([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\f\r])?|(.))/g, (_escape, hex: string | undefined, char: string | undefined) =>
+    hex ? escapedCodePoint(hex) : (char ?? ''));
 const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
 
 /** The rules for a Platform, from its editor selectors and its anchor chain */
