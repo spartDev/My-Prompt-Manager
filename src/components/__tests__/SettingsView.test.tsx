@@ -558,7 +558,8 @@ describe('SettingsView', () => {
       expect(screen.getByRole('radio', { name: 'Side panel' })).toBeEnabled();
     });
 
-    it('saves a switch the user flips at once, shows it and sends it to the tabs', async () => {
+    // My-Prompt-Manager-tvd: the tabs follow the key in storage, so none is sent a message
+    it('saves a switch the user flips at once and shows it, with no message to the tabs', async () => {
       const chromeMock = getChromeMockFunctions();
 
       await renderSettings();
@@ -573,8 +574,7 @@ describe('SettingsView', () => {
       expect(writes).toHaveLength(1);
       const saved = (writes[0][0] as { promptLibrarySettings: unknown }).promptLibrarySettings;
       expect(enabledPlatforms(parseSiteSettings(saved))).toEqual(['claude.ai', 'chatgpt.com']);
-      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
-      expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, { action: 'settingsUpdated', settings: parseSiteSettings(saved) });
+      expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
     });
 
     it('puts the switch back and says so when the save fails', async () => {
@@ -771,7 +771,7 @@ describe('SettingsView', () => {
       });
 
       // Clear All Data and a reset leave no Site settings stored: the defaults. When the load after them fails,
-      // Settings shows the defaults, not the settings from before, and the tabs are sent the defaults
+      // Settings shows the defaults, not the settings from before; the tabs see the key go from storage, with no message
       // Clear All Data leaves no interface mode, which reads as the default; a reset writes the popup window
       it.each([
         ['Clear All Data', 'Side panel', async () => {
@@ -782,7 +782,7 @@ describe('SettingsView', () => {
           await userEvent.click(await screen.findByRole('button', { name: /reset to defaults/i }));
           await userEvent.click(await screen.findByRole('button', { name: /yes, reset settings/i }));
         }]
-      ])('shows the default Site settings when the load after %s fails, and sends them to the tabs', async (_action, interfaceModeShown, runAction) => {
+      ])('shows the default Site settings when the load after %s fails, with no message to the tabs', async (_action, interfaceModeShown, runAction) => {
         const chromeMock = getChromeMockFunctions();
         await openSettingsThenFailSiteSettingsReads();
 
@@ -792,11 +792,7 @@ describe('SettingsView', () => {
         expect(screen.queryByRole('switch', { name: 'My AI' })).not.toBeInTheDocument();
         expect(screen.getByRole('switch', { name: 'Claude' })).toHaveAttribute('aria-checked', 'true');
         expect(screen.getByRole('radio', { name: interfaceModeShown })).toBeChecked();
-        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledTimes(1);
-        expect(chromeMock.tabs.sendMessage).toHaveBeenCalledWith(7, {
-          action: 'settingsUpdated',
-          settings: { platformChoices: {}, customSites: [], debugMode: false }
-        });
+        expect(chromeMock.tabs.sendMessage).not.toHaveBeenCalled();
       });
     });
   });
@@ -940,45 +936,6 @@ describe('SettingsView', () => {
       expect(saveCall).toBeDefined();
     });
 
-  });
-
-  it('saves settings and notifies content scripts in open tabs', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const chromeMock = getChromeMockFunctions();
-    const storageMock = getMockStorageManager();
-
-    // Mock tabs.query to return some HTTP tabs
-    (chromeMock.tabs.query as Mock).mockResolvedValue([
-      { id: 1, url: 'https://chatgpt.com/chat' },
-      { id: 2, url: 'https://claude.ai' },
-      { id: 3, url: 'chrome://extensions/' } // Should be filtered out
-    ]);
-    (chromeMock.tabs.sendMessage as Mock).mockResolvedValue(undefined);
-
-    await renderSettings();
-    await waitFor(() => {
-      expect(storageMock.getPrompts).toHaveBeenCalled();
-    });
-
-    // Toggle a site to trigger saveSettings
-    const chatgptToggle = screen.getByRole('switch', { name: 'ChatGPT' });
-    await userEvent.click(chatgptToggle);
-
-    // Wait for save to complete and tabs to be queried
-    await waitFor(() => {
-      expect(chromeMock.tabs.query).toHaveBeenCalledWith({});
-    });
-
-    // Verify sendMessage was called for HTTP tabs only (tab ids 1 and 2)
-    await waitFor(() => {
-      const sendMessageCalls = (chromeMock.tabs.sendMessage as Mock).mock.calls;
-      const settingsUpdateCalls = sendMessageCalls.filter(
-        (call: any[]) => call[1]?.action === 'settingsUpdated'
-      );
-      expect(settingsUpdateCalls.length).toBe(2);
-    });
-
-    vi.useRealTimers();
   });
 
   it('turns debug mode on and saves it', async () => {

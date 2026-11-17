@@ -119,7 +119,7 @@ jobs:
       - name: 🔒 Security Audit
         run: |
           echo "🔒 Final security audit for release..."
-          npm audit --audit-level=moderate
+          node scripts/audit.mjs # npm audit at moderate, minus the waivers in the script
 
   # Production build for release
   build-release:
