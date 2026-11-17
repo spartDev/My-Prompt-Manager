@@ -298,6 +298,50 @@ async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], k
 }
 
 /**
+ * Whether the tab is still open on this Platform's host. A tab that closed, or left, after the open
+ * tabs were read had its forget run first, with nothing to forget: counted now, it would wait for a
+ * report that never comes.
+ */
+async function isStillOn(tabId: number, hostname: string): Promise<boolean> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    return repairablePlatformHostname(tab.url) === hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After an extension update or reload, which empties session storage while the repairs stay: counts
+ * each open tab of a Platform with a repair as waiting until its new content script reports how it
+ * placed the icon, so the first tab that reports its Toolbar does not drop a pick another tab, not
+ * yet re-injected or discarded by Memory Saver, still needs. A tab that already reported keeps its
+ * placement. A tab that closes or leaves the Platform is forgotten as any other, and one that
+ * closed or left since the open tabs were read is not counted.
+ */
+export function expectIconPlacementReports(tabs: ReadonlyArray<{ tabId: number; hostname: string }>): Promise<void> {
+  return withIconPlacementRepairsLock(async () => {
+    const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
+    const placements = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+    let changed = false;
+    for (const { tabId, hostname } of tabs) {
+      if (!repairs[hostname]) {
+        continue;
+      }
+      placements[hostname] ??= {};
+      const byTab = placements[hostname];
+      if (!(String(tabId) in byTab) && (await isStillOn(tabId, hostname))) {
+        byTab[String(tabId)] = 'waiting';
+        changed = true;
+      }
+    }
+    if (changed) {
+      await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: placements });
+    }
+  });
+}
+
+/**
  * Moves a tab's placement on a Platform to the id Chrome gave the tab when it swapped its page (a
  * prerender, a discard), when the new page is on that Platform: it is the same tab, and still needs
  * what it needed. A placement the new id already reported is its own, and kept.

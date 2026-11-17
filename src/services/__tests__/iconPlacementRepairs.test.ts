@@ -4,6 +4,7 @@ import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
   applyIconPlacementRepairChange,
   changeIconPlacementRepairs,
+  expectIconPlacementReports,
   forgetIconPlacementTab,
   ICON_PLACEMENT_REPAIRS_KEY,
   ICON_PLACEMENT_TABS_KEY,
@@ -229,6 +230,76 @@ describe('the placements of several tabs of a Platform', () => {
     await report(3, 'waiting');
     await report(2, 'toolbar');
     expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ override: PICK });
+  });
+
+  describe('after an extension update or reload, which empties session storage', () => {
+    /** Tab 1 on its pick, tab 2 in its Toolbar; then the update forgets both */
+    const updated = async () => {
+      await report(2, 'toolbar');
+      await pickInTab1();
+      await chrome.storage.session.clear();
+    };
+    /** Each tab is still open on Claude, as the update found it */
+    beforeEach(() => {
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => ({ id: tabId, url: 'https://claude.ai/new' })) as never);
+    });
+
+    it('expects no report of a tab that closed, or left the Platform, since the open tabs were read', async () => {
+      await updated();
+      // Tab 1 closed and tab 3 went to another site after the open tabs were read: their forget found
+      // nothing to forget, and ran before the count
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => {
+        if (tabId === 1) {
+          throw new Error(`No tab with id: ${String(tabId)}.`);
+        }
+        return { id: tabId, url: tabId === 3 ? 'https://example.com/' : 'https://claude.ai/new' };
+      }) as never);
+
+      await expectIconPlacementReports([{ tabId: 1, hostname: 'claude.ai' }, { tabId: 2, hostname: 'claude.ai' }, { tabId: 3, hostname: 'claude.ai' }]);
+
+      expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': { 2: 'waiting' } });
+      // So the Toolbar of the one tab left drops the pick no open tab needs
+      await report(2, 'toolbar');
+      expect(await readIconPlacementRepairs()).toEqual({});
+    });
+
+    it('keeps the pick when a re-injected tab reports its Toolbar before the tab on the override reports', async () => {
+      await updated();
+      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+
+      await report(2, 'toolbar');
+
+      expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
+    });
+
+    it('drops the pick once every tab reported again and none is off the Toolbar', async () => {
+      await updated();
+      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+
+      await report(2, 'toolbar');
+      await report(1, 'toolbar');
+
+      expect(await readIconPlacementRepairs()).toEqual({});
+    });
+
+    it('drops the pick once the tab it waited for closes, the others in their Toolbar', async () => {
+      await updated();
+      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
+      await report(2, 'toolbar');
+
+      await forgetIconPlacementTab(1);
+
+      expect(await readIconPlacementRepairs()).toEqual({});
+    });
+
+    it('keeps a placement a tab reported before the update was handled, and expects none for a Platform with no repair', async () => {
+      await updated();
+      await report(1, 'override');
+
+      await expectIconPlacementReports([{ tabId: 1, hostname: 'claude.ai' }, { tabId: 3, hostname: 'chatgpt.com' }]);
+
+      expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': { 1: 'override' } });
+    });
   });
 
   it('drops the pick once every tab places the icon in its Toolbar', async () => {
