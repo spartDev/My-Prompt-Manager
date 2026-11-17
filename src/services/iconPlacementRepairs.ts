@@ -279,8 +279,8 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
 /**
  * Brings the status of these Platforms to what their known tabs call for, once a tab was forgotten
  * or moved: as if one of them had just reported. Kept when no tab of the Platform is known, or when
- * the repair has no status (an override waiting for one), unless a forgotten tab's wait was what
- * kept it (`keptByWait`). Called under the lock.
+ * the repair has no status (an override waiting for one), unless the wait of a tab forgotten, or of
+ * a tab's old id once moved, was what kept it (`keptByWait`). Called under the lock.
  */
 async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], keptByWait: readonly string[] = []): Promise<void> {
   const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
@@ -313,8 +313,9 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
     delete byTab[String(fromTabId)];
     byTab[String(toTabId)] ??= placement;
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-    // The new id's own placement replaced the old one: the status follows the tabs known
-    await settleStatus(tabs, [hostname]);
+    // The new id's own placement replaced the old one: the status follows the tabs known, and a
+    // pick only the old id's wait kept is settled, as when a tab is forgotten
+    await settleStatus(tabs, [hostname], placement === 'waiting' ? [hostname] : []);
   });
 }
 
