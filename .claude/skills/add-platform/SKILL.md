@@ -199,14 +199,14 @@ export class YourPlatformStrategy extends PlatformStrategy {
 export { YourPlatformStrategy } from './yourplatform-strategy';
 ```
 
-**File:** `src/content/platforms/platform-manager.ts`
+**File:** `src/content/platforms/strategy-constructors.ts`
 
 **Action:** Import it and add it to `STRATEGY_CONSTRUCTORS`, under the `strategyClass` name you gave it in `platforms.ts`. The manager builds its registry from that map and the platform config, and adds `DefaultStrategy` as the fallback itself:
 
 ```typescript
 import { YourPlatformStrategy } from './yourplatform-strategy';
 
-const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
+export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
   // ... existing strategies ...
   'YourPlatformStrategy': YourPlatformStrategy,
   'DefaultStrategy': DefaultStrategy
@@ -433,7 +433,7 @@ export class YourPlatformStrategy extends PlatformStrategy {
 **Solutions:**
 1. Check `canHandle()` returns true for your domain
 2. Verify selectors match actual DOM elements using DevTools
-3. Ensure strategy is registered in `platform-manager.ts`
+3. Ensure strategy is registered in `strategy-constructors.ts`
 4. Check browser console for injection errors
 5. Verify hostname in `platforms.ts` matches exactly
 
@@ -621,7 +621,7 @@ Use this checklist when adding a new platform:
 - [ ] **Step 2:** Added platform to `src/config/platforms.ts`
 - [ ] **Step 2.1:** Added the Platform's row in Settings (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
-- [ ] **Step 4:** Registered strategy in `platform-manager.ts` and `index.ts`
+- [ ] **Step 4:** Registered strategy in `strategy-constructors.ts` and `index.ts`
 - [ ] **Step 5:** Added the origin to `host_permissions` and `content_scripts` matches
 - [ ] **Step 6:** Created unit tests
 - [ ] **Step 7:** Tested manually in browser

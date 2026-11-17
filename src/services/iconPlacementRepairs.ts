@@ -12,7 +12,8 @@
  * 3. Once a release fixes the chain, or the toolbar the icon waited for renders, the content
  *    script finds its anchor again and reports `toolbar`: the Platform's entry, override
  *    included, is dropped, unless another tab of the Platform still has the icon on the overlay
- *    or the override (another variant of its UI). A tab that closes, or leaves the Platform, is
+ *    or the override (another variant of its UI), or waits for its toolbar or pick within the
+ *    grace period (it reports `waiting`, which keeps the repair as it is and is never a status). A tab that closes, or leaves the Platform, is
  *    forgotten, and the status follows the tabs left (forgetIconPlacementTab). While the picked
  *    element is on the page, only the chain's first anchor ends the pick: a later one may show
  *    only at times (a send button), and ends it only once the grace period is over without the
@@ -30,8 +31,19 @@ import { AsyncMutex } from '../utils/asyncMutex';
 /** The `chrome.storage.local` key the repairs are stored under */
 export const ICON_PLACEMENT_REPAIRS_KEY = 'iconPlacementRepairs';
 
-/** How a content script placed the icon on a built-in Platform */
-export type PlacementReport = 'toolbar' | 'overlay' | 'override';
+/**
+ * How a content script placed the icon on a built-in Platform. `waiting`: the icon waits within the
+ * grace period for a toolbar or a pick rendered late. The tab may need the repair once its wait
+ * ends, so a Toolbar elsewhere does not drop it meanwhile; a wait is never a status.
+ */
+export type PlacementReport = 'toolbar' | 'overlay' | 'override' | 'waiting';
+
+const PLACEMENT_REPORTS: ReadonlyArray<PlacementReport> = ['toolbar', 'overlay', 'override', 'waiting'];
+
+/** True for a placement a content script may report */
+export function isPlacementReport(value: unknown): value is PlacementReport {
+  return PLACEMENT_REPORTS.includes(value as PlacementReport);
+}
 
 /**
  * The service worker's answer to a placement report. `permanent` marks a report it will refuse
@@ -40,7 +52,10 @@ export type PlacementReport = 'toolbar' | 'overlay' | 'override';
 export type PlacementReportResponse = { success: true } | { success: false; error: string; permanent?: boolean };
 
 /** What Settings shows for a Platform: absent while the icon is in its Toolbar */
-export type RepairStatus = Exclude<PlacementReport, 'toolbar'>;
+export type RepairStatus = Exclude<PlacementReport, 'toolbar' | 'waiting'>;
+
+/** What the tabs of a Platform need of its repair: a status, or only to keep it while one waits */
+export type RepairNeed = RepairStatus | 'waiting';
 
 export interface PlatformPlacementRepair {
   status?: RepairStatus;
@@ -80,7 +95,7 @@ function parsePlacementTabs(value: unknown): PlacementTabs {
     }
     const kept: Record<string, PlacementReport> = {};
     for (const [tabId, placement] of Object.entries(byTab)) {
-      if (placement === 'toolbar' || placement === 'overlay' || placement === 'override') {
+      if (isPlacementReport(placement)) {
         kept[tabId] = placement;
       }
     }
@@ -89,18 +104,21 @@ function parsePlacementTabs(value: unknown): PlacementTabs {
   return tabs;
 }
 
-/** The status the placements of these tabs call for: the overlay first, then the override; null when all are in the Toolbar */
-function statusOf(placements: Iterable<PlacementReport>): RepairStatus | null {
-  let status: RepairStatus | null = null;
+/**
+ * What the placements of these tabs need of the repair: the overlay first, then the override, then
+ * a wait, which keeps the repair as it is; null when all are in the Toolbar
+ */
+function needOf(placements: Iterable<PlacementReport | RepairNeed>): RepairNeed | null {
+  let need: RepairNeed | null = null;
   for (const placement of placements) {
     if (placement === 'overlay') {
       return 'overlay';
     }
-    if (placement === 'override') {
-      status = 'override';
+    if (placement === 'override' || (placement === 'waiting' && need === null)) {
+      need = placement;
     }
   }
-  return status;
+  return need;
 }
 
 const PLACEMENTS: ReadonlyArray<CustomSitePositioning['placement']> = ['before', 'after', 'inside-start', 'inside-end'];
@@ -154,23 +172,28 @@ export function parseIconPlacementRepairs(value: unknown): IconPlacementRepairs 
  * The repairs after a change. Pure: the same repairs come back, unchanged, when the change
  * changes nothing, so the caller can skip the write.
  *
- * @param others - For a placement report, the status the other tabs of the Platform call for
- *   (statusOf their last placements), null when none is off the Toolbar
+ * @param others - For a placement report, what the other tabs of the Platform need of the repair
+ *   (needOf their last placements), null when none is off the Toolbar or waiting
  */
 export function applyIconPlacementRepairChange(
   repairs: IconPlacementRepairs,
   change: IconPlacementRepairChange,
-  others: RepairStatus | null = null
+  others: RepairNeed | null = null
 ): IconPlacementRepairs {
   const current = repairs[change.hostname];
   if (change.type === 'setOverride') {
     return { ...repairs, [change.hostname]: { ...current, override: change.positioning } };
   }
-  if (change.placement === 'toolbar' && !current) {
-    // Nothing to drop; the other tabs' status is theirs to report, as after Clear All Data
+  if ((change.placement === 'toolbar' || change.placement === 'waiting') && !current) {
+    // Nothing to drop, and a wait keeps only what exists; the other tabs' status is theirs to
+    // report, as after Clear All Data
     return repairs;
   }
-  const status = change.placement === 'toolbar' ? others : statusOf([change.placement, ...(others ? [others] : [])]);
+  const status = change.placement === 'toolbar' ? others : needOf([change.placement, ...(others ? [others] : [])]);
+  if (status === 'waiting') {
+    // A tab waits for its toolbar or its pick: the repair stays as it is, created by no wait
+    return repairs;
+  }
   if (!status) {
     // The chain resolves again in every tab known: the fallback is over, and the override with it
     if (!current) {
@@ -206,16 +229,16 @@ export function withIconPlacementRepairsLock<T>(operation: () => Promise<T>): Pr
 }
 
 /**
- * Records a tab's placement and returns the status the Platform's other tabs call for. Called
+ * Records a tab's placement and returns what the Platform's other tabs need of the repair. Called
  * under the lock. A report with no tab records nothing, and counts no other tab.
  */
-async function recordTabPlacement(hostname: string, placement: PlacementReport, tabId: number | undefined): Promise<RepairStatus | null> {
+async function recordTabPlacement(hostname: string, placement: PlacementReport, tabId: number | undefined): Promise<RepairNeed | null> {
   if (tabId === undefined) {
     return null;
   }
   const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
   const byTab = tabs[hostname] ?? {};
-  const others = statusOf(Object.entries(byTab).filter(([id]) => id !== String(tabId)).map(([, other]) => other));
+  const others = needOf(Object.entries(byTab).filter(([id]) => id !== String(tabId)).map(([, other]) => other));
   if (byTab[String(tabId)] !== placement) {
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: { ...tabs, [hostname]: { ...byTab, [String(tabId)]: placement } } });
   }
@@ -235,8 +258,12 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
   return withIconPlacementRepairsLock(async () => {
     const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
     const left: string[] = [];
+    const keptByWait: string[] = [];
     for (const [hostname, byTab] of Object.entries(tabs)) {
       if (hostname !== keepHostname && String(tabId) in byTab) {
+        if (byTab[String(tabId)] === 'waiting') {
+          keptByWait.push(hostname);
+        }
         delete byTab[String(tabId)];
         left.push(hostname);
       }
@@ -245,28 +272,73 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
       return;
     }
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-    await settleStatus(tabs, left);
+    await settleStatus(tabs, left, keptByWait);
   });
 }
 
 /**
  * Brings the status of these Platforms to what their known tabs call for, once a tab was forgotten
  * or moved: as if one of them had just reported. Kept when no tab of the Platform is known, or when
- * the repair has no status (an override waiting for one). Called under the lock.
+ * the repair has no status (an override waiting for one), unless the wait of a tab forgotten, or of
+ * a tab's old id once moved, was what kept it (`keptByWait`). Called under the lock.
  */
-async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[]): Promise<void> {
+async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], keptByWait: readonly string[] = []): Promise<void> {
   const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
   let next = repairs;
   for (const hostname of hostnames) {
     const remaining = Object.values(tabs[hostname] ?? {});
-    if (remaining.length > 0 && next[hostname]?.status) {
-      const status = statusOf(remaining);
-      next = applyIconPlacementRepairChange(next, { type: 'reportPlacement', hostname, placement: status ?? 'toolbar' }, status);
+    if (remaining.length > 0 && next[hostname] && (next[hostname].status || keptByWait.includes(hostname))) {
+      const need = needOf(remaining);
+      next = applyIconPlacementRepairChange(next, { type: 'reportPlacement', hostname, placement: need ?? 'toolbar' }, need);
     }
   }
   if (next !== repairs) {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: next });
   }
+}
+
+/**
+ * Whether the tab is still open on this Platform's host. A tab that closed, or left, after the open
+ * tabs were read had its forget run first, with nothing to forget: counted now, it would wait for a
+ * report that never comes.
+ */
+async function isStillOn(tabId: number, hostname: string): Promise<boolean> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    return repairablePlatformHostname(tab.url) === hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * After an extension update or reload, which empties session storage while the repairs stay: counts
+ * each open tab of a Platform with a repair as waiting until its new content script reports how it
+ * placed the icon, so the first tab that reports its Toolbar does not drop a pick another tab, not
+ * yet re-injected or discarded by Memory Saver, still needs. A tab that already reported keeps its
+ * placement. A tab that closes or leaves the Platform is forgotten as any other, and one that
+ * closed or left since the open tabs were read is not counted.
+ */
+export function expectIconPlacementReports(tabs: ReadonlyArray<{ tabId: number; hostname: string }>): Promise<void> {
+  return withIconPlacementRepairsLock(async () => {
+    const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
+    const placements = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+    let changed = false;
+    for (const { tabId, hostname } of tabs) {
+      if (!repairs[hostname]) {
+        continue;
+      }
+      placements[hostname] ??= {};
+      const byTab = placements[hostname];
+      if (!(String(tabId) in byTab) && (await isStillOn(tabId, hostname))) {
+        byTab[String(tabId)] = 'waiting';
+        changed = true;
+      }
+    }
+    if (changed) {
+      await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: placements });
+    }
+  });
 }
 
 /**
@@ -285,8 +357,9 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
     delete byTab[String(fromTabId)];
     byTab[String(toTabId)] ??= placement;
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-    // The new id's own placement replaced the old one: the status follows the tabs known
-    await settleStatus(tabs, [hostname]);
+    // The new id's own placement replaced the old one: the status follows the tabs known, and a
+    // pick only the old id's wait kept is settled, as when a tab is forgotten
+    await settleStatus(tabs, [hostname], placement === 'waiting' ? [hostname] : []);
   });
 }
 

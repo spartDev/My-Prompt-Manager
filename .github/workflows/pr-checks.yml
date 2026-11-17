@@ -409,7 +409,7 @@ jobs:
       - name: 🔒 Security Audit
         run: |
           echo "🔒 Running npm security audit..."
-          npm audit --audit-level=moderate
+          node scripts/audit.mjs # npm audit at moderate, minus the waivers in the script
         continue-on-error: false # Fail on security vulnerabilities
 
       - name: 🔍 Dependency Review

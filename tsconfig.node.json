@@ -1,7 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node", "chrome", "vite/client"]
   },
   "include": ["vite.config.ts", "vitest.config.ts", "scripts/capture-composers.ts", "scripts/composers/*.ts"]
 }

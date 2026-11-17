@@ -5,7 +5,9 @@
 
 import {
   changeIconPlacementRepairs,
+  expectIconPlacementReports,
   forgetIconPlacementTab,
+  isPlacementReport,
   moveIconPlacementTab,
   overrideFromPick,
   type PlacementReport,
@@ -1029,7 +1031,7 @@ async function handleIconPlacementReported(
     return;
   }
   const hostname = repairablePlatformHostname(sender.tab?.url);
-  if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
+  if (!hostname || !isPlacementReport(placement)) {
     sendResponse({ success: false, error: "Not a placement report of a built-in platform", permanent: true });
     return;
   }
@@ -1175,6 +1177,7 @@ async function handleExtensionUpdate(): Promise<void> {
 
     // Get all tabs and identify those that need re-injection
     const tabs = await chrome.tabs.query({});
+    await expectPlacementReports(tabs, allEnabledHosts);
     const reinjectionResults: Array<{
       tabId: number;
       hostname: string;
@@ -1230,6 +1233,30 @@ async function handleExtensionUpdate(): Promise<void> {
     Logger.error("Error handling extension update", toError(error), {
       component: "Background",
       phase: "extension_update",
+    });
+  }
+}
+
+/**
+ * The update emptied the icon placement of each tab (session storage) while the repairs stay: each
+ * open tab of an enabled Platform, discarded ones included, counts as waiting until its new content
+ * script reports, so the first Toolbar reported does not drop a pick another tab needs. Before the
+ * re-injection, so no report comes first. A failure is logged: the re-injection goes on.
+ */
+async function expectPlacementReports(tabs: chrome.tabs.Tab[], enabledHosts: readonly string[]): Promise<void> {
+  const expected = tabs.flatMap((tab) => {
+    const hostname = repairablePlatformHostname(tab.url);
+    return tab.id !== undefined && hostname && enabledHosts.includes(hostname) ? [{ tabId: tab.id, hostname }] : [];
+  });
+  if (expected.length === 0) {
+    return;
+  }
+  try {
+    await expectIconPlacementReports(expected);
+  } catch (error) {
+    Logger.warn("Could not count the open tabs of the Platforms after the update", {
+      component: "Background",
+      error: getErrorMessage(error),
     });
   }
 }

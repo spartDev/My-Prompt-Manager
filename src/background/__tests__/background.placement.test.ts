@@ -202,6 +202,74 @@ describe('background: the icon placement of each tab of a Platform', () => {
     expect(await storedRepairs()).toEqual({});
   });
 
+  describe('after an extension update, which empties session storage', () => {
+    /** The update: session storage is emptied, the service worker starts again, Chrome tells it of the update */
+    const update = async (tabs: chrome.tabs.Tab[]) => {
+      await chrome.storage.session.clear();
+      vi.mocked(chrome.tabs.query).mockResolvedValue(tabs as never);
+      // The tabs are still open as the update found them
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
+      const listener = await startServiceWorker();
+      const onInstalled = vi.mocked(getChromeMock().runtime.onInstalled.addListener).mock.calls.at(-1)?.[0];
+      onInstalled?.({ reason: 'update', previousVersion: '1.0.0' } as chrome.runtime.InstalledDetails);
+      await vi.waitFor(async () => {
+        expect((await chrome.storage.session.get('iconPlacementTabs')).iconPlacementTabs).toBeDefined();
+      });
+      return listener;
+    };
+
+    it.each([
+      ['re-injected later', { ...CLAUDE_TAB }],
+      ['discarded by Memory Saver', { ...CLAUDE_TAB, discarded: true }]
+    ])('keeps the pick when a tab reports its Toolbar while the tab on the override, %s, has not reported', async (_case, onOverride) => {
+      const before = await startServiceWorker();
+      await report(before, OTHER_CLAUDE_TAB, 'toolbar');
+      await pickInClaudeTab(before);
+
+      const listener = await update([OTHER_CLAUDE_TAB, onOverride as chrome.tabs.Tab]);
+      await report(listener, OTHER_CLAUDE_TAB, 'toolbar');
+      expect(await storedRepairs()).toMatchObject({ 'claude.ai': { status: 'override' } });
+
+      // Every tab reported again, none off the Toolbar: the pick is dropped as before
+      await report(listener, CLAUDE_TAB, 'toolbar');
+      expect(await storedRepairs()).toEqual({});
+    });
+
+    it('counts the open tabs before it re-injects any, so no new content script reports first', async () => {
+      const before = await startServiceWorker();
+      await report(before, OTHER_CLAUDE_TAB, 'toolbar');
+      await pickInClaudeTab(before);
+      // What the service worker knew of the tabs when it started re-injecting one (its permission check)
+      const knownAtInjection: unknown[] = [];
+      vi.mocked(chrome.permissions.contains).mockImplementation((async () => {
+        knownAtInjection.push((await chrome.storage.session.get('iconPlacementTabs')).iconPlacementTabs);
+        return false;
+      }) as never);
+
+      await update([OTHER_CLAUDE_TAB, CLAUDE_TAB]);
+      await vi.waitFor(() => { expect(knownAtInjection.length).toBeGreaterThan(0); });
+
+      expect(knownAtInjection[0]).toEqual({ 'claude.ai': { [String(OTHER_CLAUDE_TAB.id)]: 'waiting', [String(CLAUDE_TAB.id)]: 'waiting' } });
+    });
+
+    it('counts no tab of a Platform the user turned off: no content script of it reports again', async () => {
+      const before = await startServiceWorker();
+      await report(before, OTHER_CLAUDE_TAB, 'toolbar');
+      await pickInClaudeTab(before);
+      await chrome.storage.local.set({ promptLibrarySettings: { platformChoices: { 'claude.ai': false }, customSites: [] } });
+      await chrome.storage.session.clear();
+      vi.mocked(chrome.tabs.query).mockResolvedValue([OTHER_CLAUDE_TAB, CLAUDE_TAB] as never);
+      await startServiceWorker();
+      const onInstalled = vi.mocked(getChromeMock().runtime.onInstalled.addListener).mock.calls.at(-1)?.[0];
+
+      onInstalled?.({ reason: 'update', previousVersion: '1.0.0' } as chrome.runtime.InstalledDetails);
+      await vi.waitFor(() => { expect(chrome.tabs.query).toHaveBeenCalledWith({}); });
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+
+      expect((await chrome.storage.session.get('iconPlacementTabs')).iconPlacementTabs).toBeUndefined();
+    });
+  });
+
   it('forgets a tab that leaves the Platform, not one that moves within it', async () => {
     const listener = await startServiceWorker();
     await pickInClaudeTab(listener);

@@ -14,29 +14,8 @@ import { debug, warn } from '../utils/logger';
 import { getSettings } from '../utils/storage';
 
 import type { PlatformStrategy } from './base-strategy';
-import { ChatGPTStrategy } from './chatgpt-strategy';
-import { ClaudeStrategy } from './claude-strategy';
-import { CopilotStrategy } from './copilot-strategy';
 import { DefaultStrategy } from './default-strategy';
-import { GeminiStrategy } from './gemini-strategy';
-import { M365CopilotStrategy } from './m365copilot-strategy';
-import { MistralStrategy } from './mistral-strategy';
-import { PerplexityStrategy } from './perplexity-strategy';
-
-/**
- * Strategy class name to constructor mapping
- * Maps strategyClass names from platforms.ts to actual constructor functions
- */
-const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
-  'ClaudeStrategy': ClaudeStrategy,
-  'ChatGPTStrategy': ChatGPTStrategy,
-  'CopilotStrategy': CopilotStrategy,
-  'GeminiStrategy': GeminiStrategy,
-  'M365CopilotStrategy': M365CopilotStrategy,
-  'MistralStrategy': MistralStrategy,
-  'PerplexityStrategy': PerplexityStrategy,
-  'DefaultStrategy': DefaultStrategy
-};
+import { STRATEGY_CONSTRUCTORS } from './strategy-constructors';
 
 /**
  * Build strategy registry from platform configuration

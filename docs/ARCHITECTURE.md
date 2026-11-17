@@ -354,23 +354,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       injector.cleanup();
       sendResponse({ success: true });
       break;
-    case 'reinitialize':
-      injector.initialize();
-      sendResponse({ success: true });
-      break;
   }
 });
 
-// Extension UI → Content Script broadcast
-chrome.tabs.query({ active: true }, (tabs) => {
-  chrome.tabs.sendMessage(tabs[0].id, { type: 'settingsUpdated' });
+// Site settings → Content Script: no message, the content script follows the key in storage
+onSiteSettingsChanged((settings) => {
+  // start on the site, stop, or start over when its Custom site changed
 });
 ```
 
 **Event Types**:
 - `cleanup`: Remove all injected UI elements
-- `reinitialize`: Re-run platform detection
-- `settingsUpdated`: Reload configuration
 - `testSelector`: Preview custom positioning
 
 ---
@@ -843,27 +837,17 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
 
 #### 4. Register Strategy in Factory
 
-**File**: `src/content/platforms/platform-manager.ts`
+**File**: `src/content/platforms/strategy-constructors.ts` (the manager builds its registry from this map and the `strategyClass` of each platform in `platforms.ts`)
 
 ```typescript
 // Add to imports
 import { NewPlatformStrategy } from './newplatform-strategy';
 
-export class PlatformManager {
-  private static readonly STRATEGY_REGISTRY: Record<
-    string,
-    new (hostname?: string) => PlatformStrategy
-  > = {
-    'claude': ClaudeStrategy,
-    'chatgpt': ChatGPTStrategy,
-    'gemini': GeminiStrategy,
-    'mistral': MistralStrategy,
-    'perplexity': PerplexityStrategy,
-    'newplatform': NewPlatformStrategy, // ✅ Add here
-  };
-
-  // ... rest of implementation
-}
+export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
+  // ... existing strategies ...
+  'NewPlatformStrategy': NewPlatformStrategy, // ✅ Add here
+  'DefaultStrategy': DefaultStrategy
+};
 ```
 
 ---
