@@ -1194,33 +1194,6 @@ describe('PromptLibraryInjector', () => {
       messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
     });
 
-    it('should respond to settingsUpdated messages', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-
-      const sendResponse = vi.fn();
-      const result = messageCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
-        {},
-        sendResponse
-      );
-
-      expect(result).toBe(true); // keeps channel open
-      expect(sendResponse).toHaveBeenCalledWith({ success: true });
-    });
-
-    it('should respond to reinitialize messages', () => {
-      const sendResponse = vi.fn();
-      const result = messageCallback(
-        { action: 'reinitialize', reason: 'test' },
-        {},
-        sendResponse
-      );
-
-      expect(result).toBe(true);
-      expect(sendResponse).toHaveBeenCalledWith({ success: true });
-    });
-
     it('should respond to testSelector messages with no matching elements', () => {
       const sendResponse = vi.fn();
       messageCallback(
@@ -1315,87 +1288,142 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('settings update handling via messages', () => {
-    let messageCallback: (message: Record<string, unknown>, sender: unknown, sendResponse: (response: unknown) => void) => boolean;
-
-    beforeEach(async () => {
+  // My-Prompt-Manager-tvd: the content script follows the Site settings in storage; no surface sends it a message
+  describe('following the Site settings in storage', () => {
+    const LOCAL_SITE = { hostname: 'localhost', displayName: 'Local', enabled: true, dateAdded: 1 };
+    const storeSiteSettings = (customSites: unknown[], extra: Record<string, unknown> = {}) =>
+      chrome.storage.local.set({ promptLibrarySettings: { platformChoices: {}, customSites, debugMode: false, ...extra } });
+    const settle = (ms = 50) => new Promise(resolve => { setTimeout(resolve, ms); });
+    const platformManager = async () => {
+      const { PlatformInsertionManager } = await import('../insertion-manager');
+      return (PlatformInsertionManager as any).mock.results.at(-1).value;
+    };
+    const startOn = async (enabled: boolean) => {
+      const { getSettings, isSiteEnabled } = await import('../../utils/storage');
+      vi.mocked(getSettings).mockResolvedValueOnce({ platformChoices: {}, customSites: enabled ? [LOCAL_SITE] : [], debugMode: false });
+      vi.mocked(isSiteEnabled).mockResolvedValueOnce(enabled);
       await injector.initialize();
-      messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
+      await settle(150);
+    };
+    const messageListener = () => vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
+
+    it('a change that turns this site off cleans the Prompts button up, with no message sent', async () => {
+      await startOn(true);
+      const icon = (injector as any).state.icon as HTMLElement;
+      expect(icon).not.toBeNull();
+      const remove = vi.spyOn(icon, 'remove');
+
+      await storeSiteSettings([]);
+      await settle();
+
+      expect((injector as any).state.isSiteEnabled).toBe(false);
+      expect((injector as any).state.icon).toBeNull();
+      expect(remove).toHaveBeenCalled();
+      expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+      remove.mockRestore();
     });
 
-    it('should handle site being disabled via settings update', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      const { refreshDebugMode } = await import('../../utils/logger');
-
-      // First the site is enabled (from initialize), then disabled
-      vi.mocked(isSiteEnabled).mockResolvedValue(false);
-
-      const sendResponse = vi.fn();
-      messageCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } },
-        {},
-        sendResponse
-      );
-
-      // Wait for async handler
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      expect(refreshDebugMode).toHaveBeenCalled();
-    });
-
-    // PR #567, review round 2 (Codex): two surfaces can send their settings close together
-    it('handles settings updates one at a time, so the last one applies what storage holds', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      // The first update reads slowly and finds the site off; the second finds it on again, as stored
-      vi.mocked(isSiteEnabled)
-        .mockImplementationOnce(() => new Promise(resolve => { setTimeout(() => { resolve(false); }, 40); }))
-        .mockResolvedValue(true);
-      const update = { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } };
-
-      messageCallback(update, {}, vi.fn());
-      messageCallback(update, {}, vi.fn());
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      expect((injector as any).state.isSiteEnabled).toBe(true);
-    });
-
-    it('should handle site being re-enabled via settings update', async () => {
-      const { isSiteEnabled, getSettings } = await import('../../utils/storage');
+    it('a change that turns this site on places the Prompts button, with no message sent', async () => {
       const { injectCSS } = await import('../../utils/styles');
-
-      // First disable the site
-      vi.mocked(isSiteEnabled).mockResolvedValue(false);
-      vi.mocked(getSettings).mockResolvedValue({
-        platformChoices: {},
-        customSites: [],
-        debugMode: false
-      });
-
-      const disabledInjector = new PromptLibraryInjector();
-      await disabledInjector.initialize();
-
-      const msgCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[
-        vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.length - 1
-      ][0] as any;
-
-      // Now re-enable
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
+      await startOn(false);
+      expect((injector as any).state.icon).toBeNull();
       vi.mocked(injectCSS).mockClear();
 
-      const sendResponse = vi.fn();
-      msgCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
-        {},
-        sendResponse
-      );
+      await storeSiteSettings([LOCAL_SITE]);
+      await settle(600);
 
-      // Wait for async handler
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // CSS should be injected when site is re-enabled
+      expect((injector as any).state.isSiteEnabled).toBe(true);
       expect(injectCSS).toHaveBeenCalled();
+      expect((injector as any).state.icon).not.toBeNull();
+      expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+    });
 
-      disabledInjector.cleanup();
+    it('a write that leaves this site on and its Custom site as it was, like the upgrade of stored data, changes nothing', async () => {
+      const { refreshDebugMode } = await import('../../utils/logger');
+      await startOn(true);
+      const icon = (injector as any).state.icon;
+      const manager = await platformManager();
+      vi.mocked(manager.initializeStrategies).mockClear();
+
+      // A store of an earlier release, the list of the Platforms that were on, beside the same Custom site
+      await storeSiteSettings([LOCAL_SITE], { platformChoices: undefined, enabledSites: ['claude.ai', 'chatgpt.com'] });
+      await settle();
+
+      expect(refreshDebugMode).toHaveBeenCalled();
+      expect((injector as any).state.icon).toBe(icon);
+      expect(manager.initializeStrategies).not.toHaveBeenCalled();
+    });
+
+    it('starts over when the Custom site of this hostname changes while it is on', async () => {
+      await startOn(true);
+      const manager = await platformManager();
+      vi.mocked(manager.initializeStrategies).mockClear();
+      const partialCleanup = vi.spyOn(injector as any, 'partialCleanup');
+
+      await storeSiteSettings([{ ...LOCAL_SITE, positioning: { mode: 'custom', selector: '#notes', placement: 'after' } }]);
+      await settle(600);
+
+      // The Prompts button is taken down, then placed again by the start that reads the new positioning
+      expect(partialCleanup).toHaveBeenCalledTimes(1);
+      expect(manager.initializeStrategies).toHaveBeenCalledTimes(1);
+      expect((injector as any).state.isSiteEnabled).toBe(true);
+      expect((injector as any).state.icon).not.toBeNull();
+    });
+
+    it('handles a change saved while it starts once the start is done', async () => {
+      const { getSettings, isSiteEnabled } = await import('../../utils/storage');
+      let finishRead: (enabled: boolean) => void = () => undefined;
+      vi.mocked(getSettings).mockResolvedValueOnce({ platformChoices: {}, customSites: [LOCAL_SITE], debugMode: false });
+      vi.mocked(isSiteEnabled).mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; }));
+
+      const starting = injector.initialize();
+      await settle(0);
+      await storeSiteSettings([]);
+      finishRead(true);
+      await starting;
+      await settle(150);
+
+      expect((injector as any).state.isSiteEnabled).toBe(false);
+      expect((injector as any).state.icon).toBeNull();
+    });
+
+    it('stops following storage on a full cleanup', async () => {
+      await startOn(false);
+      const manager = await platformManager();
+      injector.cleanup();
+
+      await storeSiteSettings([LOCAL_SITE]);
+      await settle();
+
+      expect(manager.initializeStrategies).not.toHaveBeenCalled();
+      expect((injector as any).state.isSiteEnabled).toBe(false);
+    });
+
+    it('logs a start that fails, and handles the next change', async () => {
+      const Logger = await import('../../utils/logger');
+      await startOn(false);
+      const manager = await platformManager();
+      vi.mocked(manager.initializeStrategies).mockRejectedValueOnce(new Error('strategies'));
+
+      await storeSiteSettings([LOCAL_SITE]);
+      await settle();
+
+      expect(Logger.error).toHaveBeenCalledWith('Failed to handle a change of the Site settings', expect.any(Error));
+
+      await storeSiteSettings([]);
+      await settle();
+      expect((injector as any).state.isSiteEnabled).toBe(false);
+    });
+
+    it('takes no settingsUpdated or reinitialize message', async () => {
+      await injector.initialize();
+      const sendResponse = vi.fn();
+
+      messageListener()({ action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } }, {}, sendResponse);
+      messageListener()({ action: 'reinitialize', reason: 'custom_site_added' }, {}, sendResponse);
+
+      expect(sendResponse).toHaveBeenNthCalledWith(1, { success: false, error: 'Unknown message action' });
+      expect(sendResponse).toHaveBeenNthCalledWith(2, { success: false, error: 'Unknown message action' });
     });
   });
 
@@ -1692,96 +1720,6 @@ describe('PromptLibraryInjector', () => {
     });
   });
 
-  describe('reinitialize handling', () => {
-    it('should respond successfully to reinitialize message', async () => {
-      await injector.initialize();
-
-      const messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
-
-      const sendResponse = vi.fn();
-      const result = messageCallback(
-        { action: 'reinitialize', reason: 'extension-update' },
-        {},
-        sendResponse
-      );
-
-      expect(result).toBe(true);
-      expect(sendResponse).toHaveBeenCalledWith({ success: true });
-    });
-  });
-
-  describe('partialCleanup via settings update', () => {
-    it('should perform partial cleanup when site is disabled via settings', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      const Logger = await import('../../utils/logger');
-
-      // Initialize with site enabled
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-      await injector.initialize();
-
-      // Get message callback
-      const messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
-
-      // Now disable the site
-      vi.mocked(isSiteEnabled).mockResolvedValue(false);
-
-      const sendResponse = vi.fn();
-      messageCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: {}, customSites: [], debugMode: false } },
-        {},
-        sendResponse
-      );
-
-      // Wait for async handler
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Should have logged partial cleanup
-      expect(Logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('partial cleanup'),
-        expect.any(Object)
-      );
-    });
-
-    it('should keep settings unchanged when enablement status does not change', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      const Logger = await import('../../utils/logger');
-
-      // Ensure isSiteEnabled returns true for initialization
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-
-      // Use a fresh injector so internal state is clean
-      const freshInjector = new PromptLibraryInjector();
-      await freshInjector.initialize();
-
-      const lastCallIdx = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls.length - 1;
-      const messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[lastCallIdx][0] as any;
-
-      // Send settings update but site remains enabled
-      vi.mocked(isSiteEnabled).mockResolvedValue(true);
-
-      // Clear debug calls from initialization so we only see new ones
-      vi.mocked(Logger.debug).mockClear();
-
-      const sendResponse = vi.fn();
-      messageCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: true } },
-        {},
-        sendResponse
-      );
-
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Check that any debug call contains the "No site enablement change" message
-      const debugCalls = vi.mocked(Logger.debug).mock.calls;
-      const hasNoChangeMessage = debugCalls.some(
-        (call) => typeof call[0] === 'string' && call[0].includes('No site enablement change')
-      );
-      expect(hasNoChangeMessage).toBe(true);
-
-      freshInjector.cleanup();
-    });
-  });
-
   describe('removeAllExistingIcons - detailed cleanup', () => {
     it('should clean up copilot icons with cleanup functions', () => {
       const copilotIcon = document.createElement('button');
@@ -1882,35 +1820,6 @@ describe('PromptLibraryInjector', () => {
       // No error should have occurred
       const Logger = await import('../../utils/logger');
       expect(Logger.error).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('settings error handling', () => {
-    it('should handle errors during settings update gracefully', async () => {
-      const { isSiteEnabled } = await import('../../utils/storage');
-      const Logger = await import('../../utils/logger');
-
-      await injector.initialize();
-
-      const messageCallback = vi.mocked(chrome.runtime.onMessage.addListener).mock.calls[0][0] as any;
-
-      // Make isSiteEnabled throw during settings update
-      vi.mocked(isSiteEnabled).mockRejectedValue(new Error('Storage error'));
-
-      const sendResponse = vi.fn();
-      messageCallback(
-        { action: 'settingsUpdated', settings: { platformChoices: { localhost: true }, customSites: [], debugMode: false } },
-        {},
-        sendResponse
-      );
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Error should have been logged
-      expect(Logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error handling settings update'),
-        expect.any(Error)
-      );
     });
   });
 

@@ -161,8 +161,10 @@ chrome.action.onClicked.addListener((tab) => {
 
 The service worker decides whether a tab gets the content script from the Site settings, read with
 `readSiteSettings()` and `isHostnameEnabled()` of `src/services/siteSettings.ts`, the same rule the
-content script applies when it starts. A change of the Site settings reaches the open tabs as a
-`settingsUpdated` message from `changeSiteSettings()`; the service worker takes no message for it.
+content script applies when it starts. The content script then follows the key in storage
+(`onSiteSettingsChanged()`): it starts on its site when a change turns the site on, stops when one
+turns it off, and starts over when the Custom site of its hostname changes. No surface sends the tabs
+a message for it.
 
 ### Content Script Adaptation
 
