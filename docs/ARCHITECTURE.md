@@ -244,8 +244,7 @@ export const SUPPORTED_PLATFORMS = {
     iconPlacement: {
       composer: 'fieldset, input-area-v2', // Found with editor.closest()
       anchors: [                           // Tried in order inside it; the first found wins
-        { find: 'speech-dictation-mic-button', relation: 'after' },
-        { find: '.input-buttons-wrapper-bottom', relation: 'inside-end' },
+        { find: '.input-buttons-wrapper-bottom', relation: 'before' },
         { find: '.trailing-actions-wrapper', relation: 'inside-end' }
       ]
     },
@@ -355,23 +354,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       injector.cleanup();
       sendResponse({ success: true });
       break;
-    case 'reinitialize':
-      injector.initialize();
-      sendResponse({ success: true });
-      break;
   }
 });
 
-// Extension UI → Content Script broadcast
-chrome.tabs.query({ active: true }, (tabs) => {
-  chrome.tabs.sendMessage(tabs[0].id, { type: 'settingsUpdated' });
+// Site settings → Content Script: no message, the content script follows the key in storage
+onSiteSettingsChanged((settings) => {
+  // start on the site, stop, or start over when its Custom site changed
 });
 ```
 
 **Event Types**:
 - `cleanup`: Remove all injected UI elements
-- `reinitialize`: Re-run platform detection
-- `settingsUpdated`: Reload configuration
 - `testSelector`: Preview custom positioning
 
 ---

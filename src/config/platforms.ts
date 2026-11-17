@@ -199,12 +199,14 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       '[data-placeholder*="Gemini"]',
       'div[contenteditable="true"]',
     ],
-    // Custom elements and named classes, which do not follow the user's language as the labels do
+    // Named classes, which do not follow the user's language as the labels do. The icon goes
+    // before the microphone's wrapper, not in it: in there it lands next to the microphone in its
+    // container, which is 3rem wide, as wide as the microphone, so the icon overflows past the
+    // field's rounded edge, which clips it (seen on 2026-11-17)
     iconPlacement: {
       composer: "fieldset, input-area-v2",
       anchors: [
-        { find: "speech-dictation-mic-button", relation: "after" },
-        { find: ".input-buttons-wrapper-bottom", relation: "inside-end" },
+        { find: ".input-buttons-wrapper-bottom", relation: "before" },
         { find: ".trailing-actions-wrapper", relation: "inside-end" },
       ],
     },

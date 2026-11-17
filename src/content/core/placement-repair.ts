@@ -12,10 +12,10 @@
  * storage drops the repair while this tab was off the Toolbar (as by Clear All Data), or holds an
  * override with no status (a pick stored after the chain resolved); and when the page comes back from
  * the back/forward cache, since the service worker forgot the tab when it left. While the icon waits
- * within the grace period for a toolbar or a pick rendered late, the tab has no placement to send. A
- * tab opened in that wait is not counted yet, and one whose last report was the Toolbar is counted
- * there: a Toolbar reported by another tab meanwhile drops the repair, pick included, and this one
- * reports the overlay once its wait ends.
+ * within the grace period for a toolbar or a pick rendered late, the tab reports `waiting`, as a
+ * Toolbar only while the Platform has a repair: the service worker keeps the repair as it is for
+ * that tab, so a Toolbar reported by another tab meanwhile does not drop the pick this one may need
+ * once its wait ends.
  */
 
 import {
@@ -37,7 +37,7 @@ export class PlacementRepair {
   private override: CustomSitePositioning | null = null;
   /** The placement last sent for this tab; null when the service worker may hold none, or another */
   private sent: PlacementReport | null = null;
-  /** How the icon was last placed in this tab, sent or not; null until a placement reports: before the first, and while one waits on the overlay or at a later anchor */
+  /** How the icon was last placed in this tab, sent or not, `waiting` while it waits on the overlay or at a later anchor; null until a placement reports */
   private placed: PlacementReport | null = null;
   /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
   private atLaterAnchor = false;
@@ -140,12 +140,14 @@ export class PlacementRepair {
    * before the override, so it is not used while the Toolbar is found, unless the icon is at a later
    * anchor of the chain: a pick on the page comes before that one.
    *
+   * A wait, like a Toolbar, is sent only while the Platform has a repair: it only keeps one.
+   *
    * @param atLaterAnchor - The icon is in the Toolbar at an anchor of the chain after the first
    */
   report(placement: PlacementReport, atLaterAnchor = false): void {
     this.placed = placement;
     this.atLaterAnchor = atLaterAnchor;
-    if (placement === this.sent || (placement === 'toolbar' && !this.hasRepair)) {
+    if (placement === this.sent || ((placement === 'toolbar' || placement === 'waiting') && !this.hasRepair)) {
       return;
     }
     if ((document as Document & { prerendering?: boolean }).prerendering) {
@@ -225,8 +227,8 @@ export class PlacementRepair {
   }
 
   /**
-   * The icon is placed again in this tab: until the placement reports, it has none to send. A
-   * placement that waits for the grace period sends nothing for it, not the one it replaced.
+   * The icon is placed again in this tab: until the placement reports, it has none to send, not the
+   * one it replaced. A placement that waits for the grace period reports `waiting`.
    */
   placing(): void {
     this.placed = null;

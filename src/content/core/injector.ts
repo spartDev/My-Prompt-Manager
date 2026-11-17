@@ -7,7 +7,7 @@
  */
 
 import { getPlatformByHostname, type IconPlacement } from '../../config/platforms';
-import type { SiteSettings } from '../../services/siteSettings';
+import { isHostnameEnabled, onSiteSettingsChanged, type SiteSettings } from '../../services/siteSettings';
 import type { CustomSite } from '../../types/index';
 import { PromptSelectorController } from '../selector/controller';
 import { loadSelectorFont } from '../selector/font';
@@ -174,6 +174,16 @@ export class PromptLibraryInjector {
   async initialize(): Promise<void> {
     if (this.state.isInitialized) {return;}
 
+    // Follows the Site settings before reading them: a change saved during the read is handled
+    // once the start is done, in the order storage made the changes
+    this.followSiteSettings();
+    const started = this.start();
+    this.siteSettingsChanges = started.catch(() => undefined);
+    await started;
+  }
+
+  /** Reads the Site settings and starts on the site when it is on */
+  private async start(): Promise<void> {
     try {
       debug('Initializing my prompt manager for site', { hostname: this.state.hostname });
 
@@ -186,13 +196,12 @@ export class PromptLibraryInjector {
         isSiteEnabled: this.state.isSiteEnabled
       });
 
-      // ALWAYS setup message listener first - even for disabled sites
-      // This ensures we can respond to settings updates when sites are re-enabled
+      // Set up even on a site that is off: the element picker's selector test reaches the page through it
       this.setupMessageListener();
 
-      // If site is disabled, stop here but keep the message listener active
+      // A site that is off waits for a change of the Site settings that turns it on
       if (!this.state.isSiteEnabled) {
-        debug('Site is disabled, minimal initialization only (message listener active)', { hostname: this.state.hostname });
+        debug('Site is disabled, minimal initialization only (following the Site settings)', { hostname: this.state.hostname });
         this.state.isInitialized = true; // Mark as initialized to prevent re-initialization
         return;
       }
@@ -453,7 +462,7 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Sets up message listener for settings updates from popup
+   * Sets up the message listener for the element picker's selector test
    */
   private setupMessageListener(): void {
     debug('Setting up message listener', { hostname: this.state.hostname });
@@ -461,22 +470,7 @@ export class PromptLibraryInjector {
     chrome.runtime.onMessage.addListener((message: Record<string, unknown>, _sender, sendResponse) => {
       debug('Received message', { action: message.action });
 
-      if (message.action === 'settingsUpdated' && message.settings) {
-        // One at a time, in the order received: each reads from storage whether the site is on, so
-        // the last one applies what storage holds, whatever order two surfaces' messages came in
-        const settings = message.settings as SiteSettings;
-        this.settingsUpdates = this.settingsUpdates
-          .then(() => this.handleSettingsUpdate(settings))
-          .catch((err: unknown) => {
-            error('Failed to handle settings update', err as Error);
-          });
-        sendResponse({ success: true });
-      } else if (message.action === 'reinitialize' && message.reason) {
-        this.handleReinitialize(message.reason as string).catch((err: unknown) => {
-          error('Failed to handle reinitialize', err as Error);
-        });
-        sendResponse({ success: true });
-      } else if (message.action === 'testSelector') {
+      if (message.action === 'testSelector') {
         const result = this.handleSelectorTest(message as { selector: string; placement: string; offset: { x: number; y: number }; zIndex: number });
         sendResponse(result);
       } else {
@@ -489,75 +483,87 @@ export class PromptLibraryInjector {
     debug('Message listener setup completed');
   }
 
-  /** The settings updates being handled, each after the one before it */
-  private settingsUpdates: Promise<void> = Promise.resolve();
+  /** Stops following the Site settings in storage; null while they are not followed */
+  private stopFollowingSiteSettings: (() => void) | null = null;
+  /** The changes of the Site settings being handled, each after the one before it */
+  private siteSettingsChanges: Promise<void> = Promise.resolve();
   /** Counts the cleanups: an opening that started before one is not for the page after it. */
   private teardowns = 0;
 
   /**
-   * Handle settings update from popup
+   * Follows the Site settings in storage, whoever changes them: the popup, the side panel, Clear
+   * All Data, the upgrade of stored data. Each change is handled after the one before it.
    */
-  private async handleSettingsUpdate(newSettings: SiteSettings): Promise<void> {
-    try {
-      debug('Received settings update', { hostname: this.state.hostname });
-
-      // Refresh debug mode cache when settings are updated
-      refreshDebugMode();
-
-      this.state.settings = newSettings;
-      const wasSiteEnabled = this.state.isSiteEnabled;
-      this.state.isSiteEnabled = await isSiteEnabled(this.state.hostname);
-
-      debug('Site enablement status changed', {
-        hostname: this.state.hostname,
-        enabled: this.state.isSiteEnabled
-      });
-
-      if (wasSiteEnabled && !this.state.isSiteEnabled) {
-        // Site was disabled - partial cleanup but keep message listener
-        debug('Site disabled, performing partial cleanup', { hostname: this.state.hostname });
-        this.partialCleanup();
-      } else if (!wasSiteEnabled && this.state.isSiteEnabled) {
-        // Site was enabled - perform full initialization
-        debug('Site re-enabled, performing full initialization', { hostname: this.state.hostname });
-        
-        // Clear the cache to ensure fresh detection
-        this.selectorCache.clear();
-        this.lastCacheTime = 0;
-        
-        // Perform full initialization for the newly enabled site (includes strategy initialization)
-        await this.initializeForEnabledSite();
-        
-        // Force immediate detection after a short delay to ensure DOM is ready
-        setTimeout(() => {
-          this.detectAndInjectIcon();
-        }, 100);
-        
-        // Also try after a longer delay as fallback
-        setTimeout(() => {
-          if (!this.state.icon) {
-            this.detectAndInjectIcon();
-          }
-        }, 500);
-      } else {
-        debug('No site enablement change, updating settings only');
-      }
-    } catch (err) {
-      error('Error handling settings update', err as Error);
-    }
+  private followSiteSettings(): void {
+    if (this.stopFollowingSiteSettings) {return;}
+    this.stopFollowingSiteSettings = onSiteSettingsChanged((settings) => {
+      this.siteSettingsChanges = this.siteSettingsChanges
+        .then(() => this.handleSiteSettingsChange(settings))
+        .catch((err: unknown) => {
+          error('Failed to handle a change of the Site settings', err as Error);
+        });
+    });
   }
 
   /**
-   * Handle reinitialize request
+   * Starts on the site when a change turns it on, stops when one turns it off, and starts over when
+   * the Custom site of this hostname changes while it is on. A change that leaves both as they were,
+   * like the upgrade of stored data, only updates the settings.
    */
-  private async handleReinitialize(reason: string): Promise<void> {
-    try {
-      debug('Received reinitialize request', { reason, hostname: this.state.hostname });
-      this.cleanup();
-      await this.initialize();
-    } catch (err) {
-      error('Error handling reinitialize request', err as Error);
+  private async handleSiteSettingsChange(newSettings: SiteSettings): Promise<void> {
+    // A change queued before a full cleanup is not for this page any more
+    if (!this.stopFollowingSiteSettings) {return;}
+    debug('Site settings changed', { hostname: this.state.hostname });
+
+    // Refresh debug mode cache when settings are updated
+    refreshDebugMode();
+
+    const customSiteBefore = this.customSiteOf(this.state.settings);
+    this.state.settings = newSettings;
+    const wasSiteEnabled = this.state.isSiteEnabled;
+    this.state.isSiteEnabled = isHostnameEnabled(newSettings, this.state.hostname);
+
+    if (wasSiteEnabled && !this.state.isSiteEnabled) {
+      debug('Site disabled, performing partial cleanup', { hostname: this.state.hostname });
+      this.partialCleanup();
+    } else if (!wasSiteEnabled && this.state.isSiteEnabled) {
+      debug('Site enabled, performing full initialization', { hostname: this.state.hostname });
+      await this.startOnEnabledSite();
+    } else if (this.state.isSiteEnabled && customSiteBefore !== this.customSiteOf(newSettings)) {
+      // Its positioning is read when the site starts
+      debug('Custom site changed, starting over', { hostname: this.state.hostname });
+      this.partialCleanup();
+      await this.startOnEnabledSite();
+    } else {
+      debug('No site enablement change, updating settings only');
     }
+  }
+
+  /** The Custom site of this hostname as text, to tell whether a change changed it */
+  private customSiteOf(settings: SiteSettings | null): string | undefined {
+    const site = settings?.customSites.find((custom) => custom.hostname === this.state.hostname);
+    return site ? JSON.stringify(site) : undefined;
+  }
+
+  /** Full initialization on a site a change turned on, then a detection once the page has settled */
+  private async startOnEnabledSite(): Promise<void> {
+    // Clear the cache to ensure fresh detection
+    this.selectorCache.clear();
+    this.lastCacheTime = 0;
+
+    await this.initializeForEnabledSite();
+
+    // Force immediate detection after a short delay to ensure DOM is ready
+    setTimeout(() => {
+      this.detectAndInjectIcon();
+    }, 100);
+
+    // Also try after a longer delay as fallback
+    setTimeout(() => {
+      if (!this.state.icon) {
+        this.detectAndInjectIcon();
+      }
+    }, 500);
   }
 
   /**
@@ -1059,7 +1065,8 @@ export class PromptLibraryInjector {
         if (resolution.index > 0 && this.repair.positioning !== null) {
           // At a later anchor while the picked element is not on the page: it may render late, or
           // come back after a re-render. The pick ends only once the grace period is over without
-          // it (or without the chain's first anchor)
+          // it (or without the chain's first anchor). Meanwhile this tab may still need the pick
+          this.repair.report('waiting');
           this.placement.awaitToolbar(
             () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon),
             () => { this.repair.report('toolbar', true); }
@@ -1277,6 +1284,11 @@ export class PromptLibraryInjector {
     button?.classList.add('prompt-library-icon-base');
     icon.setAttribute('data-prompt-library-floating', 'true');
 
+    if (iconPlacement) {
+      // Before the overlay is placed, which may wait for Floating UI to load: meanwhile this tab may
+      // need the repair, and a Toolbar in another tab must not drop it
+      this.repair.report('waiting');
+    }
     const method = await this.overlay.place(icon, textarea, { placement: 'inside-bottom-end' });
     if (this.dropIfStale(icon, textarea)) {
       return;
@@ -1808,11 +1820,12 @@ export class PromptLibraryInjector {
   }
 
   /**
-   * Partial cleanup - removes UI elements but preserves message listener for re-enabling
+   * Partial cleanup - removes UI elements on a site turned off, and keeps following the Site settings
+   * and the selector test messages, so a change that turns the site on again starts it
    */
   private partialCleanup(): void {
     this.teardowns++;
-    debug('Starting partial cleanup (preserving message listener)', { instanceId: this.state.instanceId });
+    debug('Starting partial cleanup (still following the Site settings)', { instanceId: this.state.instanceId });
 
     // Clear timeouts and intervals
     if (this.state.detectionTimeout) {
@@ -1853,17 +1866,17 @@ export class PromptLibraryInjector {
 
     this.selector.destroy();
 
-    // Clean up managers (but not message listeners)
+    // Clean up managers (the storage subscription and the message listener stay)
     this.eventManager.cleanup();
     this.platformManager.cleanup();
 
     // Clear caches
     this.selectorCache.clear();
 
-    // Reset state but keep isInitialized true to maintain message listener
+    // Reset state but keep isInitialized true: the injector still follows the Site settings
     this.state.currentTextarea = null;
 
-    debug('Partial cleanup completed (message listener preserved)', { instanceId: this.state.instanceId });
+    debug('Partial cleanup completed (still following the Site settings)', { instanceId: this.state.instanceId });
   }
 
   /**
@@ -1922,6 +1935,8 @@ export class PromptLibraryInjector {
     this.selectorCache.clear();
 
     this.repair.dispose();
+    this.stopFollowingSiteSettings?.();
+    this.stopFollowingSiteSettings = null;
 
     // Reset state
     this.state.isInitialized = false;
