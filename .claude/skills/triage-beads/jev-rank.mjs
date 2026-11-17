@@ -223,6 +223,9 @@ const THRESHOLDS = {
 };
 const CONCURRENCY = 4;
 const DUPLICATE_BATCH = 60; // at most this many pairs per request
+// Per-ticket text in a pair question: a pair stays under ~19k characters, inside the
+// 32k-token per-question context even at one token per character.
+const DUPLICATE_TEXT = { title: 300, description: 6000, acceptance_criteria: 3000 };
 const DUPLICATE_BATCH_CHARS = 45000; // and this many characters of questions (see rank())
 
 // ---------------------------------------------------------------------------
@@ -467,8 +470,10 @@ async function rank(snapshotPath, opts) {
     }
   });
 
-  // Every pair of sent tickets is asked, whatever its issue_type. Each pair question is
-  // bounded (title 200 + description 600 characters per ticket), and pairs are packed
+  // Every pair of sent tickets is asked, whatever its issue_type, over everything that
+  // defines the change: title, description and acceptance criteria. Each is cut only past
+  // DUPLICATE_TEXT (far beyond any ticket so far), and a pair whose text was cut says so
+  // on its DUPLICATE? line, never silently. Pairs are packed
   // into requests of at most DUPLICATE_BATCH pairs and DUPLICATE_BATCH_CHARS characters
   // of questions: even at one token per character a request stays under the 64k-token
   // request context, and one question far under the 32k per-question context. A failed
@@ -480,7 +485,15 @@ async function rank(snapshotPath, opts) {
   const duplicateRequests = [];
   let duplicatePairs = [];
   if (!opts.includes('--no-dups')) {
-    const brief = (t) => ({ title: t.title.slice(0, 200), description: (t.description ?? '').slice(0, 600) });
+    const cutIds = new Set();
+    const brief = (t) => {
+      const out = {};
+      for (const [k, text] of [['title', t.title ?? ''], ['description', t.description ?? ''], ['acceptance_criteria', acceptanceText(t)]]) {
+        if (text.length > DUPLICATE_TEXT[k]) cutIds.add(t.id);
+        out[k] = text.slice(0, DUPLICATE_TEXT[k]);
+      }
+      return out;
+    };
     const pairQuestion = (a, b) => ({
       type: 'noul',
       instructions: { task: 'Do `first` and `second` ask for the same change?', first: brief(a), second: brief(b) },
@@ -523,6 +536,7 @@ async function rank(snapshotPath, opts) {
       }
     };
     const answered = await pool(batches, askBatch);
+    for (const d of answered.flat()) if (!d.error && (cutIds.has(d.a) || cutIds.has(d.b))) d.cut = true;
     duplicatePairs = answered.flat().filter((d) => !d.error);
     duplicates = answered
       .flat()
@@ -625,7 +639,7 @@ async function rank(snapshotPath, opts) {
   }
   for (const d of duplicates) {
     if (!d.error) {
-      console.log(`DUPLICATE? ${d.a} ~ ${d.b} p=${pct(d.p)} (${noulReading(d.p)})`);
+      console.log(`DUPLICATE? ${d.a} ~ ${d.b} p=${pct(d.p)} (${noulReading(d.p)})${d.cut ? ' | text cut: read both tickets in full' : ''}`);
       continue;
     }
     console.log(`DUPLICATES ERROR ${d.error} (${d.unchecked.length} pairs not checked)`);
