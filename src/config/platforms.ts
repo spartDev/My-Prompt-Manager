@@ -57,6 +57,11 @@ export interface PlatformDefinition {
   /** CSS selectors for finding input elements */
   selectors: string[];
   /**
+   * Paths of the Platform's pages that have no composer (`/settings` covers `/settings/...`): no
+   * input field is looked for there, so a search box or a form field of the page gets no Prompts button
+   */
+  pagesWithoutComposer?: string[];
+  /**
    * Where the icon goes in the composer: see IconPlacement. The single source: no strategy keeps a
    * copy. When no anchor is found, the icon is anchored on the editor (src/content/core/anchored-overlay.ts).
    */
@@ -115,6 +120,8 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'textarea[data-testid="chat-input"]',
       'textarea[placeholder*="Message"]',
     ],
+    // The settings pages' Search box matched the input selectors (seen on 2026-11-15)
+    pagesWithoutComposer: ["/settings"],
     // No test id left in the trailing actions: the ARIA labels are English, so another locale
     // falls to the anchor on the editor
     iconPlacement: {
