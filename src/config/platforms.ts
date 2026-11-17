@@ -145,10 +145,13 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       '[role="textbox"]',
     ],
     // The mode button has no label and the submit button hides while the draft is empty: the
-    // ARIA labels are English, so another locale falls to the anchor on the editor
+    // ARIA labels are English, so another locale falls to the anchor on the editor. Each button of
+    // the action row sits alone in a block <div>: the icon goes before the voice button's <div>,
+    // since in it the icon stacks above the button and wraps the row (seen on 2026-11-17)
     iconPlacement: {
       composer: "form",
       anchors: [
+        { find: 'div:has(> button[aria-label*="voice" i]:only-child)', relation: "before" },
         { find: 'button[aria-label*="voice" i]', relation: "before" },
         { find: 'button[aria-label*="settings" i]', relation: "after" },
       ],

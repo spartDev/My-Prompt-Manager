@@ -170,6 +170,37 @@ describe('icon placement chains on the live composers', () => {
     expect(resolution?.relation).toBe('inside-end');
   });
 
+  it('mistral places the icon in the action row, before the voice button\'s wrapper and not in it', () => {
+    // The voice button sits alone in a block <div>: an icon put in there stacks above the button
+    // and wraps the row (seen live on 2026-11-15 and 2026-11-17)
+    const editor = loadComposer('mistral');
+    const voice = document.querySelector('button[aria-label*="voice" i]') as HTMLElement;
+    const wrapper = voice.parentElement as HTMLElement;
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.mistral.iconPlacement);
+    expect(resolution).not.toBeNull();
+    const icon = document.createElement('button');
+
+    placeAtAnchor(icon, resolution as NonNullable<typeof resolution>);
+
+    expect(icon.nextElementSibling).toBe(wrapper);
+    expect(icon.parentElement).toBe(wrapper.parentElement);
+    expect(wrapper.contains(icon)).toBe(false);
+  });
+
+  it('mistral puts the icon before the voice button when it is straight in the action row', () => {
+    document.body.innerHTML = `
+      <form>
+        <div class="ProseMirror" contenteditable="true"></div>
+        <div id="row"><button type="button"></button><button aria-label="Voice Mode" type="button"></button></div>
+      </form>`;
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.mistral.iconPlacement);
+
+    expect(resolution?.anchor).toBe(document.querySelector('button[aria-label="Voice Mode"]'));
+    expect(resolution?.relation).toBe('before');
+  });
+
   it('never takes an anchor outside the composer, such as a message action bar above it', () => {
     const editor = loadComposer('claude');
     const messageBar = document.createElement('div');
