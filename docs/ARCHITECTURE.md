@@ -837,27 +837,17 @@ export class NewReactPlatformStrategy extends ReactPlatformStrategy {
 
 #### 4. Register Strategy in Factory
 
-**File**: `src/content/platforms/platform-manager.ts`
+**File**: `src/content/platforms/strategy-constructors.ts` (the manager builds its registry from this map and the `strategyClass` of each platform in `platforms.ts`)
 
 ```typescript
 // Add to imports
 import { NewPlatformStrategy } from './newplatform-strategy';
 
-export class PlatformManager {
-  private static readonly STRATEGY_REGISTRY: Record<
-    string,
-    new (hostname?: string) => PlatformStrategy
-  > = {
-    'claude': ClaudeStrategy,
-    'chatgpt': ChatGPTStrategy,
-    'gemini': GeminiStrategy,
-    'mistral': MistralStrategy,
-    'perplexity': PerplexityStrategy,
-    'newplatform': NewPlatformStrategy, // ✅ Add here
-  };
-
-  // ... rest of implementation
-}
+export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => PlatformStrategy> = {
+  // ... existing strategies ...
+  'NewPlatformStrategy': NewPlatformStrategy, // ✅ Add here
+  'DefaultStrategy': DefaultStrategy
+};
 ```
 
 ---
