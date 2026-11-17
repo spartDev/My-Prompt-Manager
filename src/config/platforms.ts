@@ -45,7 +45,8 @@ export interface PlatformDefinition {
   hostname: string;
   /**
    * Other hosts the same Platform is served on, such as the host a sign-in redirects to. Each is
-   * in the manifest beside `hostname`, and follows the Platform choice of the Platform.
+   * in the manifest beside `hostname`, and follows the Platform choice of the Platform. Icon placement
+   * repairs take `hostname` to redirect to them, never the reverse (redirectSourcesOf).
    */
   otherHostnames?: string[];
   /** Human-readable platform name */

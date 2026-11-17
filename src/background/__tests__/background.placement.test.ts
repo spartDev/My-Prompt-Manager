@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../services/iconPlacementRepairs';
+import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
 import { getChromeMock } from '../../test/mocks';
 
 vi.mock('../../utils/logger', () => ({
@@ -42,7 +43,7 @@ function send(listener: MessageListener, message: { type: string; attempt?: stri
   });
 }
 
-const storedRepairs = async (): Promise<unknown> => (await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY];
+const storedRepairs = async (): Promise<unknown> => withoutWritten((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
 
 describe('background: placing the icon of a built-in Platform', () => {
   beforeEach(() => {
@@ -267,6 +268,67 @@ describe('background: the icon placement of each tab of a Platform', () => {
       await new Promise((resolve) => { setTimeout(resolve, 50); });
 
       expect((await chrome.storage.session.get('iconPlacementTabs')).iconPlacementTabs).toBeUndefined();
+    });
+  });
+
+  describe('after a browser restart, which empties session storage', () => {
+    const M365_TAB = { id: 11, windowId: 3, url: 'https://m365.cloud.microsoft/chat', active: false } as chrome.tabs.Tab;
+    const REDIRECTED_TAB = { id: 12, windowId: 3, url: 'https://copilot.cloud.microsoft/chat', active: true } as chrome.tabs.Tab;
+    const M365_PICK = { mode: 'custom', placement: 'before', selector: SEND_BUTTON };
+
+    /** The browser starts again with the tabs restored: the service worker starts, then Chrome tells it of the startup */
+    const restart = async (tabs: chrome.tabs.Tab[]) => {
+      await chrome.storage.session.clear();
+      vi.mocked(chrome.tabs.query).mockResolvedValue(tabs as never);
+      // The restored tabs are still open as the service worker read them
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
+      const listener = await startServiceWorker();
+      for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
+        (onStartup as () => void)();
+      }
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      return listener;
+    };
+
+    it('keeps the pick of a restored M365 Copilot tab when a tab at its other host reports first', async () => {
+      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+
+      const listener = await restart([M365_TAB, REDIRECTED_TAB]);
+      await report(listener, REDIRECTED_TAB, 'overlay');
+
+      expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+    });
+
+    it('keeps the pick of a restored M365 Copilot tab when the tab at its other host reports while the open tabs are read', async () => {
+      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+      await chrome.storage.session.clear();
+      const tabs = [M365_TAB, REDIRECTED_TAB];
+      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
+      const listener = await startServiceWorker();
+      // The restored tab at copilot.cloud.microsoft reports while the service worker reads the open tabs
+      let reported: Promise<unknown> = Promise.resolve();
+      vi.mocked(chrome.tabs.query).mockImplementation((async () => {
+        reported = report(listener, REDIRECTED_TAB, 'overlay');
+        await new Promise((resolve) => { setTimeout(resolve, 10); });
+        return tabs;
+      }) as never);
+
+      for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
+        (onStartup as () => void)();
+      }
+      await vi.waitFor(() => { expect(chrome.tabs.query).toHaveBeenCalled(); });
+      expect(await reported).toEqual({ success: true });
+
+      expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+    });
+
+    it('drops it once the restored tab reports its Toolbar, as before the restart', async () => {
+      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+
+      const listener = await restart([M365_TAB]);
+      await report(listener, M365_TAB, 'toolbar');
+
+      expect(await storedRepairs()).toEqual({});
     });
   });
 

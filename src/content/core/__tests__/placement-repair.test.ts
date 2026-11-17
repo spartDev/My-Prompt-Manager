@@ -52,6 +52,66 @@ describe('PlacementRepair.report', () => {
     }
   };
 
+  it('sends its Toolbar while another host of its Platform has a repair, which only this report can clear', async () => {
+    // m365.cloud.microsoft redirects a work account here: its repair waits for a report of this host
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'overlay' } } });
+    const atRedirect = new PlacementRepair('copilot.cloud.microsoft', vi.fn());
+    try {
+      await atRedirect.load();
+      expect(atRedirect.positioning).toBeNull();
+
+      atRedirect.report('toolbar');
+
+      expect(sent()).toEqual(['toolbar']);
+    } finally {
+      atRedirect.dispose();
+    }
+  });
+
+  it('sends its Toolbar once another host of its Platform gets a repair', async () => {
+    const atRedirect = new PlacementRepair('copilot.cloud.microsoft', vi.fn());
+    try {
+      await atRedirect.load();
+      atRedirect.report('toolbar');
+      expect(sent()).toEqual([]);
+
+      storageChange({ 'm365.cloud.microsoft': { status: 'overlay' } });
+      await flush();
+
+      expect(sent()).toEqual(['toolbar']);
+    } finally {
+      atRedirect.dispose();
+    }
+  });
+
+  it('stays silent in its Toolbar at m365.cloud.microsoft while only copilot.cloud.microsoft, where it redirects, has a repair', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'copilot.cloud.microsoft': { status: 'overlay' } } });
+    const atSource = new PlacementRepair('m365.cloud.microsoft', vi.fn());
+    try {
+      await atSource.load();
+
+      atSource.report('toolbar');
+
+      expect(sent()).toEqual([]);
+    } finally {
+      atSource.dispose();
+    }
+  });
+
+  it('stays silent in its Toolbar while only a linked Platform has a repair', async () => {
+    await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'copilot.microsoft.com': { status: 'overlay' } } });
+    const atRedirect = new PlacementRepair('copilot.cloud.microsoft', vi.fn());
+    try {
+      await atRedirect.load();
+
+      atRedirect.report('toolbar');
+
+      expect(sent()).toEqual([]);
+    } finally {
+      atRedirect.dispose();
+    }
+  });
+
   it('sends the toolbar report that drops an override stored with no status, as after a late pick', async () => {
     await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'claude.ai': { override: PICK } } });
     await repair.load();
