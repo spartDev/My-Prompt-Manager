@@ -269,6 +269,42 @@ describe('background: the icon placement of each tab of a Platform', () => {
     });
   });
 
+  describe('after a browser restart, which empties session storage', () => {
+    const M365_TAB = { id: 11, windowId: 3, url: 'https://m365.cloud.microsoft/chat', active: false } as chrome.tabs.Tab;
+    const REDIRECTED_TAB = { id: 12, windowId: 3, url: 'https://copilot.cloud.microsoft/chat', active: true } as chrome.tabs.Tab;
+    const M365_PICK = { mode: 'custom', placement: 'before', selector: SEND_BUTTON };
+
+    /** The browser starts again with the tabs restored: the service worker starts, then Chrome tells it of the startup */
+    const restart = async (tabs: chrome.tabs.Tab[]) => {
+      await chrome.storage.session.clear();
+      vi.mocked(chrome.tabs.query).mockResolvedValue(tabs as never);
+      const listener = await startServiceWorker();
+      for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
+        (onStartup as () => void)();
+      }
+      await new Promise((resolve) => { setTimeout(resolve, 50); });
+      return listener;
+    };
+
+    it('keeps the pick of a restored M365 Copilot tab when a tab at its other host reports first', async () => {
+      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+
+      const listener = await restart([M365_TAB, REDIRECTED_TAB]);
+      await report(listener, REDIRECTED_TAB, 'overlay');
+
+      expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+    });
+
+    it('drops it once the restored tab reports its Toolbar, as before the restart', async () => {
+      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+
+      const listener = await restart([M365_TAB]);
+      await report(listener, M365_TAB, 'toolbar');
+
+      expect(await storedRepairs()).toEqual({});
+    });
+  });
+
   it('forgets a tab that leaves the Platform, not one that moves within it', async () => {
     const listener = await startServiceWorker();
     await pickInClaudeTab(listener);

@@ -1238,10 +1238,11 @@ async function handleExtensionUpdate(): Promise<void> {
 }
 
 /**
- * The update emptied the icon placement of each tab (session storage) while the repairs stay: each
- * open tab of an enabled Platform, discarded ones included, counts as waiting until its new content
- * script reports, so the first Toolbar reported does not drop a pick another tab needs. Before the
- * re-injection, so no report comes first. A failure is logged: the re-injection goes on.
+ * An extension update or a browser restart emptied the icon placement of each tab (session storage)
+ * while the repairs stay: each open tab of an enabled Platform, discarded ones included, counts as
+ * waiting until its content script reports, so the first report does not drop a pick another tab
+ * needs. On update, before the re-injection, so no report comes first. A failure is logged: the
+ * re-injection, or the startup, goes on.
  */
 async function expectPlacementReports(tabs: chrome.tabs.Tab[], enabledHosts: readonly string[]): Promise<void> {
   const expected = tabs.flatMap((tab) => {
@@ -1254,7 +1255,25 @@ async function expectPlacementReports(tabs: chrome.tabs.Tab[], enabledHosts: rea
   try {
     await expectIconPlacementReports(expected);
   } catch (error) {
-    Logger.warn("Could not count the open tabs of the Platforms after the update", {
+    Logger.warn("Could not count the open tabs of the Platforms after an update or a restart", {
+      component: "Background",
+      error: getErrorMessage(error),
+    });
+  }
+}
+
+/**
+ * A browser restart empties the icon placement of each tab (session storage) as an update does: the
+ * restored tabs of an enabled Platform with a repair count as waiting until their content scripts
+ * report, so a tab at another host of the Platform that reports first does not drop their repair as
+ * one no tab is open for. A tab Chrome restores after this read is not counted (design §6).
+ */
+async function expectPlacementReportsOnStartup(): Promise<void> {
+  try {
+    const enabledHosts = enabledHostnames(await readSiteSettings());
+    await expectPlacementReports(await chrome.tabs.query({}), enabledHosts);
+  } catch (error) {
+    Logger.warn("Could not count the open tabs of the Platforms at startup", {
       component: "Background",
       error: getErrorMessage(error),
     });
@@ -1899,6 +1918,7 @@ chrome.runtime.onStartup.addListener(() => {
   // Retry the upgrade pass: one that failed or was cut short on update left stored data uncleaned
   void upgradeStoredData();
   void upgradeSiteSettings();
+  void expectPlacementReportsOnStartup();
 
   void (async () => {
     try {

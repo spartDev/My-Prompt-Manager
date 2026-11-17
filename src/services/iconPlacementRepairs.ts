@@ -313,7 +313,7 @@ async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], k
 }
 
 /**
- * After an extension update or reload, which empties session storage while the repairs stay: counts
+ * After an extension update or reload, or a browser restart, which empty session storage while the repairs stay: counts
  * each open tab of a Platform with a repair as waiting until its new content script reports how it
  * placed the icon, so the first tab that reports its Toolbar does not drop a pick another tab, not
  * yet re-injected or discarded by Memory Saver, still needs. A tab that already reported keeps its
