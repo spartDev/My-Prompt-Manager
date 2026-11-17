@@ -210,6 +210,18 @@ describe('the placements of several tabs of a Platform', () => {
     expect(await readIconPlacementRepairs()).toEqual({});
   });
 
+  it('drops a pick with no status that only a waiting tab kept, once that tab moves to an id whose page is in its Toolbar', async () => {
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+    await report(3, 'waiting');
+    // Chrome swapped the tab's page: the new page, under id 4, already placed the icon in its Toolbar
+    await report(4, 'toolbar');
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ override: PICK });
+
+    await moveIconPlacementTab(3, 4, 'claude.ai');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
   it('never shows a wait as a status, nor records a repair for it', async () => {
     await report(3, 'waiting');
     expect(await readIconPlacementRepairs()).toEqual({});
