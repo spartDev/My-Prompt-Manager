@@ -170,11 +170,16 @@ function selectorValue(actual: string, conditions: readonly ValueCondition[]): s
   if (met.length === 0) {
     return null;
   }
-  // Joined, a prefix goes first and a suffix last: `^="Send"` and `$="message"` give "Send message";
-  // a language prefix is followed by a hyphen: `|=en` and `*=US` give "en-US"
-  const order = (operator: string) => (operator === '^=' || operator === '|=' ? 0 : operator === '$=' ? 2 : 1);
-  const values = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value);
-  const candidates = [...met.map(({ value }) => value), values.join(' '), values.join('-')];
+  // Joined by a space, a prefix first and a suffix last, the rest in selector order: `^="Send"` and
+  // `$="message"` give "Send message"; `*="en-US"`, `|="en"` and `~="foo"` give "en-US en foo".
+  // Tried first, so a value the sanitizer wrote before stays as it was.
+  const joined = (priority: Readonly<Record<string, number>>, separator: string) =>
+    [...met].sort((a, b) => (priority[a.operator] ?? 1) - (priority[b.operator] ?? 1)).map(({ value }) => value).join(separator);
+  const BY_PREFIX = { '^=': 0, '$=': 2 };
+  // Then with a language prefix ahead of the rest, by a space and by a hyphen: `|=en` and `*=US`
+  // give "en-US"; a ^= prefix still goes ahead of it
+  const BY_LANGUAGE = { '^=': 0, '|=': 0.5, '$=': 2 };
+  const candidates = [...met.map(({ value }) => value), joined(BY_PREFIX, ' '), joined(BY_LANGUAGE, ' '), joined(BY_LANGUAGE, '-')];
   return candidates.find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
 }
 

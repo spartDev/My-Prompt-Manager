@@ -138,6 +138,132 @@ describe('sanitizeComposer', () => {
     expect(composer.querySelector('[lang|=en][lang*=US]')).not.toBeNull();
   });
 
+  it('puts a ^= prefix ahead of a |= one, so a value meeting both and a *= condition is kept', () => {
+    const composer = composerOf('<div><span data-x="en-US foo"></span></div>');
+    const selectors = ['[data-x|="en"]', '[data-x^="en-US"]', '[data-x*="foo"]'];
+
+    sanitizeComposer(composer, sanitizeRulesOf(selectors));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span data-x="en-US en foo"></span>\n</div>');
+    expect(composer.querySelector(selectors.join(''))).not.toBeNull();
+  });
+
+  it.each([
+    [['[data-x*="en-US"]', '[data-x|="en"]', '[data-x~="foo"]']],
+    [['[data-x~="en-US"]', '[data-x|="en"]', '[data-x~="foo"]']],
+    [['[data-x$="foo"]', '[data-x~="en-US"]', '[data-x|="en"]']]
+  ])('keeps a |= value an earlier condition gives its prefix to, joined in selector order: %j', (selectors) => {
+    const composer = composerOf('<div><span data-x="en-US foo"></span></div>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(selectors));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span data-x="en-US en foo"></span>\n</div>');
+    expect(composer.querySelector(selectors.join(''))).not.toBeNull();
+  });
+
+  it('joins by a hyphen with a ^= prefix first, then the |= one, then a $= suffix, whatever the selector order', () => {
+    const composer = composerOf('<div><span data-x="en-US"></span></div>');
+    // The |= listed first: putting it level with the ^= (selector order) or ahead of it writes "EN-en-US"
+    const selectors = ['[data-x|="EN" i]', '[data-x^="en"]', '[data-x$="US"]'];
+
+    sanitizeComposer(composer, sanitizeRulesOf(selectors));
+
+    expect(serializeComposer(composer)).toBe('<div>\n  <span data-x="en-EN-US"></span>\n</div>');
+    expect(composer.querySelector(selectors.join(''))).not.toBeNull();
+  });
+
+  describe('against the values main (before My-Prompt-Manager-tuh.6) wrote', () => {
+    interface Condition { operator: string; value: string }
+
+    // Main's rule, kept here as the oracle: of the met values, the first that meets them all,
+    // else them joined by a space, a ^= value first and a $= value last, the rest in selector order
+    const meets = (actual: string, { operator, value }: Condition): boolean => {
+      switch (operator) {
+        case '=': return actual === value;
+        case '*=': return value !== '' && actual.includes(value);
+        case '^=': return value !== '' && actual.startsWith(value);
+        case '$=': return value !== '' && actual.endsWith(value);
+        case '~=': return actual.split(/\s+/).includes(value);
+        default: return actual === value || actual.startsWith(`${value}-`);
+      }
+    };
+    const mainValue = (actual: string, conditions: readonly Condition[]): string | null => {
+      const met = conditions.filter((condition) => meets(actual, condition));
+      if (met.length === 0) {
+        return null;
+      }
+      const order = (operator: string) => (operator === '^=' ? 0 : operator === '$=' ? 2 : 1);
+      const joined = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value).join(' ');
+      return [...met.map(({ value }) => value), joined].find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
+    };
+
+    /** The conditions the value meets, cut at its word and hyphen boundaries */
+    const conditionsOf = (actual: string): Condition[] => {
+      const cuts = [0, actual.length, ...[...actual].flatMap((char, index) => (/[\s-]/.test(char) ? [index, index + 1] : []))];
+      const bounds = [...new Set(cuts)].sort((a, b) => a - b);
+      const found = new Map<string, Condition>();
+      const add = (operator: string, value: string) => {
+        if (value.trim() !== '' && meets(actual, { operator, value })) {
+          found.set(`${operator}${value}`, { operator, value });
+        }
+      };
+      add('=', actual);
+      for (const start of bounds) {
+        for (const end of bounds) {
+          if (end > start) {
+            add('*=', actual.slice(start, end));
+          }
+        }
+        add('^=', actual.slice(0, start));
+        add('$=', actual.slice(start));
+      }
+      actual.split(/\s+/).forEach((token) => { add('~=', token); });
+      add('|=', actual);
+      [...actual].forEach((char, index) => { if (char === '-') { add('|=', actual.slice(0, index)); } });
+      return [...found.values()];
+    };
+
+    function* ordered(conditions: Condition[], size: number, prefix: Condition[] = []): Generator<Condition[]> {
+      if (prefix.length === size) {
+        yield prefix;
+        return;
+      }
+      for (const condition of conditions) {
+        if (!prefix.includes(condition)) {
+          yield* ordered(conditions, size, [...prefix, condition]);
+        }
+      }
+    }
+
+    it.each(['en-US foo', 'foo en-US', 'en-US en', 'Send the message', 'a-b c-d', 'de-CH x'])(
+      'writes what main wrote for every ordered pair and triple of conditions %j meets that main kept',
+      { timeout: 15_000 },
+      (actual) => {
+        const differences: string[] = [];
+        const conditions = conditionsOf(actual);
+        // One element for every combination, its value set again each time: about 200k sanitizations
+        const element = document.createElement('span');
+        for (const size of [1, 2, 3]) {
+          for (const combination of ordered(conditions, size)) {
+            const expected = mainValue(actual, combination);
+            if (expected === null) {
+              continue;
+            }
+            const selectors = combination.map(({ operator, value }) => `[data-x${operator}"${value}"]`);
+            element.setAttribute('data-x', actual);
+            sanitizeComposer(element, sanitizeRulesOf(selectors));
+            const written = element.getAttribute('data-x');
+            if (written !== expected) {
+              differences.push(`${selectors.join('')}: main ${JSON.stringify(expected)}, now ${JSON.stringify(written)}`);
+            }
+          }
+        }
+
+        expect(differences.slice(0, 5)).toEqual([]);
+      }
+    );
+  });
+
   it.each([
     ['a double-quoted value', String.raw`[aria-label*="say \"hi\" now"]`, 'Alice, say &quot;hi&quot; now', 'say &quot;hi&quot; now'],
     ['a single-quoted value', String.raw`[aria-label*='say \'hi\' now']`, 'Alice, say \'hi\' now', 'say \'hi\' now'],
