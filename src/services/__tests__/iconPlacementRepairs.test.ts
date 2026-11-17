@@ -189,6 +189,26 @@ describe('the placements of several tabs of a Platform', () => {
     expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
   });
 
+  it('creates no repair from a wait, though another tab is known on the Anchored overlay, as after Clear All Data', async () => {
+    await report(1, 'overlay');
+    await chrome.storage.local.remove(ICON_PLACEMENT_REPAIRS_KEY);
+
+    await report(3, 'waiting');
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('drops a pick with no status that only a waiting tab kept, once that tab closes and the others are in their Toolbar', async () => {
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
+    await report(3, 'waiting');
+    await report(2, 'toolbar');
+    expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ override: PICK });
+
+    await forgetIconPlacementTab(3);
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
   it('never shows a wait as a status, nor records a repair for it', async () => {
     await report(3, 'waiting');
     expect(await readIconPlacementRepairs()).toEqual({});

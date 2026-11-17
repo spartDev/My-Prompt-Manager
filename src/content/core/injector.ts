@@ -1278,6 +1278,11 @@ export class PromptLibraryInjector {
     button?.classList.add('prompt-library-icon-base');
     icon.setAttribute('data-prompt-library-floating', 'true');
 
+    if (iconPlacement) {
+      // Before the overlay is placed, which may wait for Floating UI to load: meanwhile this tab may
+      // need the repair, and a Toolbar in another tab must not drop it
+      this.repair.report('waiting');
+    }
     const method = await this.overlay.place(icon, textarea, { placement: 'inside-bottom-end' });
     if (this.dropIfStale(icon, textarea)) {
       return;
@@ -1291,8 +1296,6 @@ export class PromptLibraryInjector {
       // icon goes there. While the user has a pick, a later anchor of the chain waits for the end
       // of the grace period: the pick may still render, and comes before it. Once the page has
       // settled without the pick, any anchor of the chain takes the icon
-      // Meanwhile this tab may need the repair: a Toolbar in another tab does not drop it
-      this.repair.report('waiting');
       const toolbarShows = (settled: boolean): boolean => {
         const resolution = resolveIconPlacement(textarea, iconPlacement);
         return resolution !== null && (resolution.index === 0 || settled || this.repair.positioning === null);

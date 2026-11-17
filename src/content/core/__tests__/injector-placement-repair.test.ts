@@ -624,6 +624,27 @@ describe('icon placement override on a built-in Platform', () => {
     await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'overlay']); }, { timeout: 1000 });
   });
 
+  it('sends its wait before the overlay is placed, which may wait for Floating UI to load', async () => {
+    grace(300);
+    renameToolbar('', 'renamed-');
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay', tabId: 2 });
+    await settle();
+    await internals().repair.load();
+    reports.length = 0;
+    let loaded: (method: null) => void = () => undefined;
+    const place = vi.spyOn(internals().overlay, 'place').mockReturnValue(new Promise((resolve) => { loaded = resolve; }));
+    try {
+      const injecting = internals().injectIcon(editor);
+      await settle();
+      expect(reports).toEqual(['waiting']);
+
+      loaded(null);
+      await injecting;
+    } finally {
+      place.mockRestore();
+    }
+  });
+
   it('keeps the pick while its icon waits on the overlay and another tab places the icon in its Toolbar', async () => {
     grace(300);
     renameToolbar('', 'renamed-');

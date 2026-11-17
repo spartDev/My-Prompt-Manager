@@ -184,8 +184,9 @@ export function applyIconPlacementRepairChange(
   if (change.type === 'setOverride') {
     return { ...repairs, [change.hostname]: { ...current, override: change.positioning } };
   }
-  if (change.placement === 'toolbar' && !current) {
-    // Nothing to drop; the other tabs' status is theirs to report, as after Clear All Data
+  if ((change.placement === 'toolbar' || change.placement === 'waiting') && !current) {
+    // Nothing to drop, and a wait keeps only what exists; the other tabs' status is theirs to
+    // report, as after Clear All Data
     return repairs;
   }
   const status = change.placement === 'toolbar' ? others : needOf([change.placement, ...(others ? [others] : [])]);
@@ -257,8 +258,12 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
   return withIconPlacementRepairsLock(async () => {
     const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
     const left: string[] = [];
+    const keptByWait: string[] = [];
     for (const [hostname, byTab] of Object.entries(tabs)) {
       if (hostname !== keepHostname && String(tabId) in byTab) {
+        if (byTab[String(tabId)] === 'waiting') {
+          keptByWait.push(hostname);
+        }
         delete byTab[String(tabId)];
         left.push(hostname);
       }
@@ -267,21 +272,22 @@ export function forgetIconPlacementTab(tabId: number, keepHostname: string | nul
       return;
     }
     await chrome.storage.session.set({ [ICON_PLACEMENT_TABS_KEY]: tabs });
-    await settleStatus(tabs, left);
+    await settleStatus(tabs, left, keptByWait);
   });
 }
 
 /**
  * Brings the status of these Platforms to what their known tabs call for, once a tab was forgotten
  * or moved: as if one of them had just reported. Kept when no tab of the Platform is known, or when
- * the repair has no status (an override waiting for one). Called under the lock.
+ * the repair has no status (an override waiting for one), unless a forgotten tab's wait was what
+ * kept it (`keptByWait`). Called under the lock.
  */
-async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[]): Promise<void> {
+async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], keptByWait: readonly string[] = []): Promise<void> {
   const repairs = parseIconPlacementRepairs((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
   let next = repairs;
   for (const hostname of hostnames) {
     const remaining = Object.values(tabs[hostname] ?? {});
-    if (remaining.length > 0 && next[hostname]?.status) {
+    if (remaining.length > 0 && next[hostname] && (next[hostname].status || keptByWait.includes(hostname))) {
       const need = needOf(remaining);
       next = applyIconPlacementRepairChange(next, { type: 'reportPlacement', hostname, placement: need ?? 'toolbar' }, need);
     }
