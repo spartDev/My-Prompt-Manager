@@ -415,12 +415,6 @@ describe('changeSiteSettings', () => {
   const readStorage = vi.mocked(chrome.storage.local.get).getMockImplementation() as never;
   const stored = async (): Promise<unknown> => (await chrome.storage.local.get([SITE_SETTINGS_KEY]))[SITE_SETTINGS_KEY];
   const store = (settings: unknown) => chrome.storage.local.set({ [SITE_SETTINGS_KEY]: settings });
-  const openTabs = (tabs: Array<Partial<chrome.tabs.Tab>>) => {
-    vi.mocked(chrome.tabs.query).mockImplementation((async (query: chrome.tabs.QueryInfo) =>
-      tabs.filter((tab) => query.url === undefined || (tab.url ?? '').includes(String(query.url).replace(/^\*:\/\/|\/\*$/g, '')))
-    ) as never);
-  };
-  const sent = () => vi.mocked(chrome.tabs.sendMessage).mock.calls.map(([tabId, message]) => ({ tabId, message }));
 
   it('applies the change to what storage holds and resolves with the result', async () => {
     await store({ platformChoices: { 'gemini.google.com': false }, customSites: [], debugMode: true });
@@ -485,85 +479,53 @@ describe('changeSiteSettings', () => {
     await expect(changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: true })).rejects.toThrow('storage unavailable');
 
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
-    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
     expect(await stored()).toEqual(before);
   });
 
-  it('rejects and sends nothing when storage refuses the write', async () => {
-    await store({ platformChoices: {}, customSites: [], debugMode: false });
+  it('rejects when storage refuses the write', async () => {
+    const before = { platformChoices: {}, customSites: [], debugMode: false };
+    await store(before);
     vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('quota'));
 
     await expect(changeSiteSettings({ type: 'setDebugMode', enabled: true })).rejects.toThrow('quota');
 
-    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
+    expect(await stored()).toEqual(before);
   });
 
-  it('writes nothing and sends nothing for a change that changes nothing', async () => {
+  it('writes nothing for a change that changes nothing', async () => {
     await store({ platformChoices: {}, customSites: [], debugMode: false });
     vi.mocked(chrome.storage.local.set).mockClear();
-    openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
 
     await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: true });
 
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
-    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
   });
 
-  it('sends the new Site settings to every web tab, and to no other', async () => {
-    await store({ platformChoices: {}, customSites: [], debugMode: false });
-    openTabs([
-      { id: 1, url: 'https://claude.ai/chat' },
-      { id: 2, url: 'http://localhost:3000/' },
-      { id: 3, url: 'chrome://extensions' },
-      { url: 'https://no-id.example.com/' }
-    ]);
-
-    const settings = await changeSiteSettings({ type: 'setDebugMode', enabled: true });
-
-    expect(sent()).toEqual([
-      { tabId: 1, message: { action: 'settingsUpdated', settings } },
-      { tabId: 2, message: { action: 'settingsUpdated', settings } }
-    ]);
-  });
-
+  // My-Prompt-Manager-tvd: the content script follows the key in storage, so no tab is listed or told
   it.each([
-    ['added', { type: 'addCustomSite', site: { hostname: 'chat.example.com', displayName: 'Example chat', enabled: true } }],
-    ['turned off', { type: 'setCustomSiteEnabled', hostname: 'chat.example.com', enabled: false }],
-    ['removed', { type: 'removeCustomSite', hostname: 'chat.example.com' }]
-  ] as const)('asks the tabs of a Custom site to start over when it is %s', async (label, change) => {
-    await store({ platformChoices: {}, customSites: label === 'added' ? [] : [customSite()], debugMode: false });
-    openTabs([{ id: 1, url: 'https://claude.ai/chat' }, { id: 2, url: 'https://chat.example.com/thread' }]);
+    ['a Platform switch', { type: 'setPlatformEnabled', hostname: 'claude.ai', enabled: false }],
+    ['a Custom site added', { type: 'addCustomSite', site: { hostname: 'chat.example.com', displayName: 'Example chat', enabled: true } }],
+    ['a Custom site turned off', { type: 'setCustomSiteEnabled', hostname: 'chat.example.com', enabled: false }],
+    ['a Custom site removed', { type: 'removeCustomSite', hostname: 'chat.example.com' }],
+    ['the debug switch', { type: 'setDebugMode', enabled: true }],
+    ['a reset', { type: 'reset' }]
+  ] as const)('lists no tab and sends no message for %s', async (_label, change) => {
+    await store({ platformChoices: {}, customSites: [customSite()], debugMode: false });
 
     await changeSiteSettings(change);
 
-    expect(sent().filter(({ message }) => (message as { action: string }).action === 'reinitialize')).toEqual([
-      { tabId: 2, message: { action: 'reinitialize', reason: 'custom_site_added' } }
-    ]);
-  });
-
-  it('keeps the change when a tab does not answer or the tabs cannot be listed', async () => {
-    await store({ platformChoices: {}, customSites: [], debugMode: false });
-    openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
-    vi.mocked(chrome.tabs.sendMessage).mockRejectedValue(new Error('no receiver'));
-
-    await expect(changeSiteSettings({ type: 'setDebugMode', enabled: true })).resolves.toMatchObject({ debugMode: true });
-
-    vi.mocked(chrome.tabs.query).mockRejectedValue(new Error('tabs unavailable'));
-
-    await expect(changeSiteSettings({ type: 'setDebugMode', enabled: false })).resolves.toMatchObject({ debugMode: false });
-    expect(await stored()).toMatchObject({ debugMode: false });
+    expect(chrome.tabs.query).not.toHaveBeenCalled();
+    expect(chrome.tabs.sendMessage).not.toHaveBeenCalled();
   });
 
   describe('reset', () => {
-    it('leaves nothing stored, resolves with the defaults and sends them to the tabs', async () => {
+    it('leaves nothing stored and resolves with the defaults', async () => {
       await store({ platformChoices: {}, customSites: [customSite()], debugMode: true });
-      openTabs([{ id: 1, url: 'https://claude.ai/chat' }]);
 
       const settings = await changeSiteSettings({ type: 'reset' });
 
       expect(settings).toEqual(defaultSiteSettings());
       expect(await chrome.storage.local.get(null)).not.toHaveProperty(SITE_SETTINGS_KEY);
-      expect(sent()).toEqual([{ tabId: 1, message: { action: 'settingsUpdated', settings } }]);
     });
 
     it('works on a store that cannot be read, since it reads nothing', async () => {

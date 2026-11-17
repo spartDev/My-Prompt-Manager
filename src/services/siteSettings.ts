@@ -14,7 +14,8 @@
  * Reading: `parseSiteSettings` and the rules are pure; `readSiteSettings` reads storage.
  *
  * Saving: a save is a change (`changeSiteSettings`), applied to what storage holds at that moment
- * under a lock shared by every context of the extension, then sent to the open tabs. Nothing
+ * under a lock shared by every context of the extension. The open tabs follow the key in storage
+ * (`onSiteSettingsChanged`), so nothing is sent to them. Nothing
  * saves a whole copy of the Site settings it read earlier, so a copy that is stale, or that a
  * failed read replaced with the defaults, can never be written over what is stored.
  *
@@ -337,19 +338,6 @@ export function applySiteSettingsChange(settings: SiteSettings, change: SiteSett
   }
 }
 
-/** The hostname of the Custom site a change is about, whose tabs start or stop the content script */
-function customSiteOf(change: SiteSettingsChange): string | null {
-  switch (change.type) {
-    case 'addCustomSite':
-      return change.site.hostname;
-    case 'removeCustomSite':
-    case 'setCustomSiteEnabled':
-      return change.hostname;
-    default:
-      return null;
-  }
-}
-
 // Shared with the popup, the side panel and the service worker through the Web Locks API, like
 // the locks of StorageManager (ADR-001): two surfaces changing the Site settings at once lose
 // neither change, and Clear All Data, which takes this lock after SETTINGS and before the icon
@@ -361,82 +349,39 @@ export function withSiteSettingsLock<T>(operation: () => Promise<T>): Promise<T>
   return siteSettingsLock.withLock(SITE_SETTINGS_KEY, operation);
 }
 
-const isWebTab = (tab: chrome.tabs.Tab): tab is chrome.tabs.Tab & { id: number } =>
-  tab.id !== undefined && tab.url !== undefined && (tab.url.startsWith('http://') || tab.url.startsWith('https://'));
-
 /**
- * Sends the Site settings to the content script of every open tab. A tab without the content
- * script does not answer, and a browser that refuses the query changes nothing: the settings
- * are saved either way, and a tab reads them when it next loads.
- */
-export async function sendSiteSettingsToTabs(settings: SiteSettings): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({});
-    await Promise.allSettled(
-      tabs.filter(isWebTab).map((tab) => chrome.tabs.sendMessage(tab.id, { action: 'settingsUpdated', settings }))
-    );
-  } catch {
-    // Nothing to undo: the Site settings are saved
-  }
-}
-
-/** Asks the tabs of a Custom site to start over, since the content script decides there whether it runs */
-async function restartCustomSiteTabs(hostname: string): Promise<void> {
-  try {
-    const tabs = await chrome.tabs.query({ url: `*://${hostname}/*` });
-    await Promise.allSettled(
-      tabs
-        .filter((tab): tab is chrome.tabs.Tab & { id: number } => tab.id !== undefined)
-        .map((tab) => chrome.tabs.sendMessage(tab.id, { action: 'reinitialize', reason: 'custom_site_added' }))
-    );
-  } catch {
-    // Nothing to undo: the Site settings are saved
-  }
-}
-
-/**
- * Applies a change to the Site settings storage holds, saves the result and sends it to the open
- * tabs. Resolves with the Site settings as they now are.
+ * Applies a change to the Site settings storage holds and saves the result. Resolves with the Site
+ * settings as they now are. The open tabs follow the key in storage (onSiteSettingsChanged): no
+ * message is sent to them.
  *
  * Rejects, with storage untouched, when storage cannot be read or written: a change is never
  * applied to the defaults in place of what is stored. A change that changes nothing writes
- * nothing and sends nothing. A reset reads nothing, so it works on a store that cannot be read.
+ * nothing. A reset reads nothing, so it works on a store that cannot be read.
  */
-export async function changeSiteSettings(change: SiteSettingsChange): Promise<SiteSettings> {
-  const { settings, changed } = await withSiteSettingsLock(async () => {
+export function changeSiteSettings(change: SiteSettingsChange): Promise<SiteSettings> {
+  return withSiteSettingsLock(async () => {
     if (change.type === 'reset') {
       // Nothing stored is what the defaults mean: a stored copy of them would keep today's
       // Platforms and miss the ones a later version adds
       await chrome.storage.local.remove(SITE_SETTINGS_KEY);
-      return { settings: defaultSiteSettings(), changed: true };
+      return defaultSiteSettings();
     }
 
     const before = await readSiteSettings();
     const after = applySiteSettingsChange(before, change, Date.now());
-    const changed = JSON.stringify(after) !== JSON.stringify(before);
-    if (changed) {
+    if (JSON.stringify(after) !== JSON.stringify(before)) {
       await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: storedShape(after) });
     }
-    return { settings: after, changed };
+    return after;
   });
-
-  // Outside the lock: nothing under it waits for another context
-  if (changed) {
-    await sendSiteSettingsToTabs(settings);
-    const customSite = customSiteOf(change);
-    if (customSite !== null) {
-      await restartCustomSiteTabs(customSite);
-    }
-  }
-  return settings;
 }
 
 /**
  * The upgrade of stored data for the Site settings: a store an earlier release wrote with the list
  * of the Platforms that were on, or one whose list it changed after a rollback, is written back as
  * the Platform choices it stands for, under the Site settings lock. Resolves with whether it wrote. Writes nothing on any other store, so it
- * is safe to run any number of times; sends nothing, since what the extension works on is the same
- * before and after. Rejects when storage cannot be read or written, leaving the store as it was.
+ * is safe to run any number of times. The tabs see the write, and change nothing on it: what the
+ * extension works on is the same before and after. Rejects when storage cannot be read or written, leaving the store as it was.
  */
 export function upgradeStoredSiteSettings(): Promise<boolean> {
   return withSiteSettingsLock(async () => {
