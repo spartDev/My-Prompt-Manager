@@ -11,8 +11,7 @@ import {
   onSiteSettingsChanged,
   readSiteSettings,
   type SiteSettings,
-  type SiteSettingsChange, 
-  sendSiteSettingsToTabs
+  type SiteSettingsChange
 } from '../services/siteSettings';
 import { StorageManager } from '../services/storage';
 import type { AppError, Category, CustomSite, Prompt, SortOrder, Settings as UserSettings } from '../types';
@@ -201,15 +200,15 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
   }), []);
 
   /**
-   * Makes one change to the Site settings. The module applies it to what storage holds, saves it and
-   * tells the tabs; Settings shows the result. A change that fails leaves the switch where storage has
+   * Makes one change to the Site settings. The module applies it to what storage holds and saves it;
+   * the tabs follow storage, and Settings shows the result. A change that fails leaves the switch where storage has
    * it and says so.
    */
   const changeSettings = useCallback(async (change: SiteSettingsChange) => {
     setSaving(true);
     const revision = siteSettingsRevision.current;
     try {
-      // The module tells the tabs before it answers. What storage held after the write has already
+      // What storage held after the write has already
       // been shown, from storage: this change, or a later one from another surface, which this
       // older answer must not replace
       showSiteSettingsSince(revision, await changeSiteSettings(change));
@@ -349,15 +348,14 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
 
   const dismissImportReport = useCallback(() => { setImportReport(null); }, []);
 
-  // Clear All Data leaves no Site settings stored: the defaults. The tabs are told too, since a
-  // Platform the user had turned off is on again.
+  // Clear All Data leaves no Site settings stored: the defaults. The tabs see the key go from
+  // storage, so a Platform the user had turned off is on again there too.
   const handleClearData = async () => {
     try {
       await storageManager.clearAllData();
       // Shown before the reload, so they stay shown when it fails
       setSettings(defaultSiteSettings());
       setInterfaceMode(DEFAULT_SETTINGS.interfaceMode as 'popup' | 'sidepanel');
-      await sendSiteSettingsToTabs(defaultSiteSettings());
       await loadSettings();
       showToast('All data cleared', 'success');
     } catch (error) {
