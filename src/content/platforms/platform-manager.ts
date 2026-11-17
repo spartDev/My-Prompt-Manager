@@ -264,14 +264,28 @@ export class PlatformManager {
     return bestStrategy;
   }
 
+  /** Whether the page is one the Platform names as having no composer: `/settings` covers `/settings/...` */
+  private isPageWithoutComposer(): boolean {
+    const pages = getPlatformByHostname(this.hostname)?.pagesWithoutComposer ?? [];
+    const { pathname } = window.location;
+    return pages.some((page) => pathname === page || pathname.startsWith(`${page}/`));
+  }
+
   /**
    * Gets all available selectors from loaded strategies, including custom selectors
    * Performance: Result is cached after first computation (~95% reduction in repeated calls)
-   * @returns Combined array of all selectors, empty if not initialized
+   * @returns Combined array of all selectors, empty if not initialized or on a page of the
+   *   Platform that has no composer (its pagesWithoutComposer)
    */
   getAllSelectors(): string[] {
     // Return empty array if not initialized (disabled site) or no strategies loaded
     if (!this.isInitialized || this.strategies.length === 0) {
+      return [];
+    }
+
+    // A page of the Platform with no composer: none of its fields is for a Prompt. Read on each
+    // call, since the Platform moves between its pages without reloading
+    if (this.isPageWithoutComposer()) {
       return [];
     }
 
