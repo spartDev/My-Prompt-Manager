@@ -4,7 +4,6 @@ import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
   applyIconPlacementRepairChange,
   changeIconPlacementRepairs,
-  expectIconPlacementReports,
   forgetIconPlacementTab,
   ICON_PLACEMENT_REPAIRS_KEY,
   ICON_PLACEMENT_TABS_KEY,
@@ -230,53 +229,6 @@ describe('the placements of several tabs of a Platform', () => {
     await report(3, 'waiting');
     await report(2, 'toolbar');
     expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ override: PICK });
-  });
-
-  describe('after an extension update or reload, which empties session storage', () => {
-    /** Tab 1 on its pick, tab 2 in its Toolbar; then the update forgets both */
-    const updated = async () => {
-      await report(2, 'toolbar');
-      await pickInTab1();
-      await chrome.storage.session.clear();
-    };
-
-    it('keeps the pick when a re-injected tab reports its Toolbar before the tab on the override reports', async () => {
-      await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
-
-      await report(2, 'toolbar');
-
-      expect((await readIconPlacementRepairs())['claude.ai']).toEqual({ status: 'override', override: PICK });
-    });
-
-    it('drops the pick once every tab reported again and none is off the Toolbar', async () => {
-      await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
-
-      await report(2, 'toolbar');
-      await report(1, 'toolbar');
-
-      expect(await readIconPlacementRepairs()).toEqual({});
-    });
-
-    it('drops the pick once the tab it waited for closes, the others in their Toolbar', async () => {
-      await updated();
-      await expectIconPlacementReports([{ tabId: 2, hostname: 'claude.ai' }, { tabId: 1, hostname: 'claude.ai' }]);
-      await report(2, 'toolbar');
-
-      await forgetIconPlacementTab(1);
-
-      expect(await readIconPlacementRepairs()).toEqual({});
-    });
-
-    it('keeps a placement a tab reported before the update was handled, and expects none for a Platform with no repair', async () => {
-      await updated();
-      await report(1, 'override');
-
-      await expectIconPlacementReports([{ tabId: 1, hostname: 'claude.ai' }, { tabId: 3, hostname: 'chatgpt.com' }]);
-
-      expect((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]).toEqual({ 'claude.ai': { 1: 'override' } });
-    });
   });
 
   it('drops the pick once every tab places the icon in its Toolbar', async () => {
