@@ -268,7 +268,8 @@ async function ask(state, questions) {
       redirect: 'error',
       body: JSON.stringify(payload),
     });
-    if (res.status === 429 && attempt < 3) {
+    // 429 (rate limit) and 529 (overload) are temporary: back off and retry, three times.
+    if ((res.status === 429 || res.status === 529) && attempt < 3) {
       const wait = Number(res.headers.get('retry-after')) || 2 ** attempt;
       await new Promise((r) => setTimeout(r, wait * 1000));
       continue;
@@ -585,6 +586,8 @@ async function rank(snapshotPath, opts) {
         children: children.map((c) => c.id),
         child_epics: subEpics,
         excluded_children: excludedKids,
+        // Excluded, held or failed: no judgment, so step 4 places them by hand.
+        unjudged_children: children.filter((c) => c.error).map((c) => c.id),
         suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
         // "no files" only when every judged child says so; otherwise what is known.
         // Every child, failed ones included, must read "no": an unknown child is not a "no".
@@ -612,10 +615,12 @@ async function rank(snapshotPath, opts) {
     );
   }
   for (const e of epics) {
+    const through = e.child_epics.length ? ` (through ${e.child_epics.join(', ')})` : '';
+    const unjudged = e.unjudged_children.length ? ` | not judged, place by hand: ${e.unjudged_children.join(', ')}` : '';
     console.log(
       e.suggested === null
-        ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand`
-        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')}${e.child_epics.length ? ` (through ${e.child_epics.join(', ')})` : ''} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}${e.excluded_children.length ? ` | excluded, place by hand: ${e.excluded_children.join(', ')}` : ''}`
+        ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand | children ${e.children.join(', ') || 'none'}${through}${unjudged}`
+        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')}${through} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}${unjudged}`
     );
   }
   for (const d of duplicates) {
