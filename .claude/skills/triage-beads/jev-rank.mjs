@@ -249,7 +249,15 @@ const sensitiveKinds = (text) =>
 
 // ---------------------------------------------------------------------------
 
-class ApiError extends Error {}
+class ApiError extends Error {
+  constructor(message, options = {}) {
+    super(message, options);
+    this.status = options.status;
+  }
+}
+// What the API answers to a request it will not take as sent, such as one over the
+// model's context: the duplicate batches split and retry on these.
+const REJECTED_REQUEST = new Set([400, 413, 422]);
 
 async function ask(state, questions) {
   const payload = { model: MODEL, state, questions };
@@ -268,7 +276,7 @@ async function ask(state, questions) {
     }
     if (!res.ok) {
       // A failed call is an error, never an answer.
-      throw new ApiError(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      throw new ApiError(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`, { status: res.status });
     }
     try {
       return { payload, response: await res.json() };
@@ -466,16 +474,24 @@ async function rank(snapshotPath, opts) {
       }
     }
     if (batch.length) batches.push(batch);
-    const answered = await pool(batches, async (b) => {
+    // The size caps are an estimate, not a token count: a batch the API rejects (400,
+    // 413, 422, as for a request over the context) is split in two and each half
+    // retried, down to a single pair; a pair still rejected is reported as unchecked.
+    const askBatch = async (b) => {
       const questions = Object.fromEntries(b.map((p, k) => [`pair_${k}`, p.q]));
       try {
         const { response } = await ask({ project: PROJECT }, questions);
         return b.map((p, k) => ({ a: p.a, b: p.b, p: response.answers[`pair_${k}`].noul }));
       } catch (e) {
         if (!(e instanceof ApiError) && !(e instanceof TypeError)) throw e;
+        if (e instanceof ApiError && REJECTED_REQUEST.has(e.status) && b.length > 1) {
+          const half = Math.ceil(b.length / 2);
+          return [...(await askBatch(b.slice(0, half))), ...(await askBatch(b.slice(half)))];
+        }
         return [{ error: String(e.message ?? e), unchecked: b.map((p) => [p.a, p.b]) }];
       }
-    });
+    };
+    const answered = await pool(batches, askBatch);
     duplicates = answered
       .flat()
       .filter((d) => d.error || d.p > THRESHOLDS.no)
