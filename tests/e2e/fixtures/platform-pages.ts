@@ -179,10 +179,14 @@ const plainPage = (title: string, field: string, bar: string, composer = 'form')
 </html>
 `;
 
+/** Mistral's action row: each button in a <div> of its own, as on the live composer (2026-11-17) */
+const MISTRAL_BAR =
+  '<div class="bar" data-e2e="toolbar"><div><button type="button">Fast</button></div><div><button type="button" aria-label="Voice Mode">Voice</button></div></div>';
+
 const MISTRAL_HTML = plainPage(
   'Le Chat',
   '<div class="field" contenteditable="true" aria-label="Ask Le Chat"></div>',
-  '<div class="bar" data-e2e="toolbar"><button type="button">Fast</button><button type="button" aria-label="Voice Mode">Voice</button></div>'
+  MISTRAL_BAR
 );
 
 const GEMINI_HTML = plainPage(
@@ -291,7 +295,7 @@ const CHATGPT_EDITOR_HTML = paragraphEditorPage(
 const MISTRAL_EDITOR_HTML = paragraphEditorPage(
   'Le Chat',
   '<div class="field ProseMirror" contenteditable="true" aria-label="Ask Le Chat"><p><br></p></div>',
-  '<div class="bar" data-e2e="toolbar"><button type="button">Fast</button><button type="button" aria-label="Voice Mode">Voice</button></div>'
+  MISTRAL_BAR
 );
 
 /**

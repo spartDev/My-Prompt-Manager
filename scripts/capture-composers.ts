@@ -152,11 +152,10 @@ const STRATEGY_EDITOR_SELECTORS = ['.ProseMirror[contenteditable="true"]', 'rich
 /** What a Platform's fixture keeps: what its editor selectors and its anchor chain read */
 export const rulesFor = (platform: PlatformDefinition) => {
   const chain = platform.iconPlacement;
-  return sanitizeRulesOf([
-    ...platform.selectors,
-    ...STRATEGY_EDITOR_SELECTORS,
-    ...(chain ? [chain.composer, ...chain.anchors.map(({ find }) => find)] : [])
-  ]);
+  return sanitizeRulesOf(
+    [...platform.selectors, ...STRATEGY_EDITOR_SELECTORS, ...(chain ? [chain.composer] : [])],
+    chain ? chain.anchors.map(({ find }) => find) : []
+  );
 };
 
 /**

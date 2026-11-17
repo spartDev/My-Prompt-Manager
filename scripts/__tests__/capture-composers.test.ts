@@ -163,6 +163,23 @@ describe('sanitizeComposer', () => {
     expect(serializeComposer(composer)).toBe('<div>\n  <button aria-label="Send"></button>\n</div>');
   });
 
+  it('keeps a wrapper an anchor of the chain finds, even with one child, so the chain still finds it', () => {
+    const composer = composerOf('<form><div class="row"><div class="a"><button></button></div><div class="b"><button aria-label="Voice Mode"></button></div></div></form>');
+
+    sanitizeComposer(composer, sanitizeRulesOf(['button[aria-label*="voice" i]'], ['div:has(> button[aria-label*="voice" i])']));
+
+    // The class names go; the voice button's wrapper stays, the other one folds into its button
+    expect(serializeComposer(composer).replace(/\n\s*/g, '')).toBe('<form><div><button></button><div><button aria-label="voice"></button></div></div></form>');
+  });
+
+  it('keeps the wrappers the anchors of a Platform find, read from its chain', () => {
+    const composer = composerOf('<form><div><div><button aria-label="Voice Mode" type="button"></button></div></div></form>');
+
+    sanitizeComposer(composer, rulesFor(SUPPORTED_PLATFORMS.mistral));
+
+    expect(serializeComposer(composer).replace(/\n\s*/g, '')).toBe('<form><div><button aria-label="voice" type="button"></button></div></form>');
+  });
+
   it.each(Object.keys(SUPPORTED_PLATFORMS))('the committed %s fixture is what the sanitizer writes: sanitized again, it is unchanged and its chain resolves', (platformId) => {
     // Parsed, not cut with a pattern: the header comment is a node the composer is not part of
     const composer = composerOf(readFileSync(path.join(FIXTURES, `${platformId}.html`), 'utf8'));
