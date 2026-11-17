@@ -313,11 +313,26 @@ async function settleStatus(tabs: PlacementTabs, hostnames: readonly string[], k
 }
 
 /**
+ * Whether the tab is still open on this Platform's host. A tab that closed, or left, after the open
+ * tabs were read had its forget run first, with nothing to forget: counted now, it would wait for a
+ * report that never comes.
+ */
+async function isStillOn(tabId: number, hostname: string): Promise<boolean> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    return repairablePlatformHostname(tab.url) === hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * After an extension update or reload, or a browser restart, which empty session storage while the repairs stay: counts
  * each open tab of a Platform with a repair as waiting until its new content script reports how it
  * placed the icon, so the first tab that reports its Toolbar does not drop a pick another tab, not
  * yet re-injected or discarded by Memory Saver, still needs. A tab that already reported keeps its
- * placement. A tab that closes or leaves the Platform is forgotten as any other.
+ * placement. A tab that closes or leaves the Platform is forgotten as any other, and one that
+ * closed or left since the open tabs were read is not counted.
  */
 export function expectIconPlacementReports(tabs: ReadonlyArray<{ tabId: number; hostname: string }>): Promise<void> {
   return withIconPlacementRepairsLock(async () => {
@@ -330,7 +345,7 @@ export function expectIconPlacementReports(tabs: ReadonlyArray<{ tabId: number; 
       }
       placements[hostname] ??= {};
       const byTab = placements[hostname];
-      if (!(String(tabId) in byTab)) {
+      if (!(String(tabId) in byTab) && (await isStillOn(tabId, hostname))) {
         byTab[String(tabId)] = 'waiting';
         changed = true;
       }
