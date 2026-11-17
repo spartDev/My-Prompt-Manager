@@ -5,7 +5,7 @@
 // Jev judges; this file decides. Every question, criterion, area, weight and threshold
 // is in the blocks at the top, so a reviewer edits one place.
 //
-//   node jev-rank.mjs <scratch>/backlog.json [--no-dups]
+//   node jev-rank.mjs <scratch>/backlog.json [--no-dups] [--exclude <id>,<id>]
 //       Step 2 (rank, flag, acceptance check, duplicates) and step 4 (code areas).
 //       Writes <scratch>/jev.json.
 //   node jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json
@@ -223,7 +223,29 @@ const THRESHOLDS = {
   mismatch: 2, // flag when |suggested - current| reaches this
 };
 const CONCURRENCY = 4;
-const DUPLICATE_BATCH = 60; // pairs per request: ~60 x 300 tokens, inside the 64k context
+const DUPLICATE_BATCH = 60; // at most this many pairs per request
+const DUPLICATE_BATCH_CHARS = 45000; // and this many characters of questions (see rank())
+
+// ---------------------------------------------------------------------------
+// Privacy guard: text that looks like a secret or personal data is never sent.
+// The ticket (or the evidence) is reported instead, to be cleaned or decided by hand.
+// A pattern can miss what it does not know: the skill still asks for a read first.
+// ---------------------------------------------------------------------------
+const SENSITIVE_PATTERNS = {
+  email: /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/,
+  phone: /(?<![\w+])\+\d{1,3}[\s.-]\(?\d{1,4}\)?(?:[\s.-]\d{2,4}){2,4}\b/,
+  private_key: /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  aws_key: /\bAKIA[0-9A-Z]{16}\b/,
+  github_token: /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,})\b/,
+  slack_token: /\bxox[abprs]-[A-Za-z0-9-]{10,}/,
+  api_key: /\b(?:sk|pk|rk)[-_](?:live|test|proj|ant)?[-_]?[A-Za-z0-9]{20,}/,
+  jwt: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\./,
+  credential_assignment: /\b(?:password|passwd|secret|token|api[_-]?key)\s*[:=]\s*['"]?[^\s'"]{8,}/i,
+};
+const sensitiveKinds = (text) =>
+  Object.entries(SENSITIVE_PATTERNS)
+    .filter(([, re]) => re.test(text))
+    .map(([k]) => k);
 
 // ---------------------------------------------------------------------------
 
@@ -376,10 +398,24 @@ function decide(t, answers, acItems) {
   };
 }
 
+// --exclude id,id: tickets never sent, applied to the snapshot as read, so a later
+// re-pull of the listing cannot bring them back.
+function excludedIds(opts) {
+  const i = opts.indexOf('--exclude');
+  return new Set(i >= 0 && opts[i + 1] ? opts[i + 1].split(',').map((s) => s.trim()).filter(Boolean) : []);
+}
+
 async function rank(snapshotPath, opts) {
-  const all = JSON.parse(readFileSync(snapshotPath, 'utf8'));
+  const excluded = excludedIds(opts);
+  const all = JSON.parse(readFileSync(snapshotPath, 'utf8')).filter((t) => !excluded.has(t.id));
   // An epic is ranked and placed by its children, not judged on its own.
-  const tickets = all.filter((t) => t.issue_type !== 'epic');
+  const live = all.filter((t) => t.issue_type !== 'epic');
+  // A ticket that looks like it holds a secret or personal data is not sent at all.
+  const held = live
+    .map((t) => ({ t, kinds: sensitiveKinds(`${t.title}\n${t.description ?? ''}\n${t.acceptance_criteria ?? ''}`) }))
+    .filter((h) => h.kinds.length);
+  const heldIds = new Set(held.map((h) => h.t.id));
+  const tickets = live.filter((t) => !heldIds.has(t.id));
 
   const results = await pool(tickets, async (t) => {
     const acItems = acceptanceItems(acceptanceText(t));
@@ -399,35 +435,45 @@ async function rank(snapshotPath, opts) {
     }
   });
 
-  // Every pair is asked, whatever its issue_type, in requests of at most
-  // DUPLICATE_BATCH pairs so each stays well inside the model's context. A failed
-  // batch is reported with the pairs it held, never read as "no duplicate".
+  // Every pair of sent tickets is asked, whatever its issue_type. Each pair question is
+  // bounded (title 200 + description 600 characters per ticket), and pairs are packed
+  // into requests of at most DUPLICATE_BATCH pairs and DUPLICATE_BATCH_CHARS characters
+  // of questions: even at one token per character a request stays under the 64k-token
+  // request context, and one question far under the 32k per-question context. A failed
+  // batch lists every pair it held, never read as "no duplicate".
   let duplicates = [];
   if (!opts.includes('--no-dups')) {
-    const pairs = [];
-    for (let i = 0; i < tickets.length; i++) {
-      for (let j = i + 1; j < tickets.length; j++) pairs.push([tickets[i], tickets[j]]);
-    }
-    const brief = (t) => ({ title: t.title, description: (t.description ?? '').slice(0, 600) });
+    const brief = (t) => ({ title: t.title.slice(0, 200), description: (t.description ?? '').slice(0, 600) });
+    const pairQuestion = (a, b) => ({
+      type: 'noul',
+      instructions: { task: 'Do `first` and `second` ask for the same change?', first: brief(a), second: brief(b) },
+      criteria: DUPLICATE_CRITERIA,
+    });
     const batches = [];
-    for (let s = 0; s < pairs.length; s += DUPLICATE_BATCH) batches.push(pairs.slice(s, s + DUPLICATE_BATCH));
-    const answered = await pool(batches, async (batch) => {
-      const questions = Object.fromEntries(
-        batch.map(([a, b], k) => [
-          `pair_${k}`,
-          {
-            type: 'noul',
-            instructions: { task: 'Do `first` and `second` ask for the same change?', first: brief(a), second: brief(b) },
-            criteria: DUPLICATE_CRITERIA,
-          },
-        ])
-      );
+    let batch = [];
+    let chars = 0;
+    for (let i = 0; i < tickets.length; i++) {
+      for (let j = i + 1; j < tickets.length; j++) {
+        const q = pairQuestion(tickets[i], tickets[j]);
+        const size = JSON.stringify(q).length;
+        if (batch.length && (batch.length >= DUPLICATE_BATCH || chars + size > DUPLICATE_BATCH_CHARS)) {
+          batches.push(batch);
+          batch = [];
+          chars = 0;
+        }
+        batch.push({ a: tickets[i].id, b: tickets[j].id, q });
+        chars += size;
+      }
+    }
+    if (batch.length) batches.push(batch);
+    const answered = await pool(batches, async (b) => {
+      const questions = Object.fromEntries(b.map((p, k) => [`pair_${k}`, p.q]));
       try {
         const { response } = await ask({ project: PROJECT }, questions);
-        return batch.map(([a, b], k) => ({ a: a.id, b: b.id, p: response.answers[`pair_${k}`].noul }));
+        return b.map((p, k) => ({ a: p.a, b: p.b, p: response.answers[`pair_${k}`].noul }));
       } catch (e) {
         if (!(e instanceof ApiError) && !(e instanceof TypeError)) throw e;
-        return [{ error: `${String(e.message ?? e)} (${batch.length} pairs not checked, from ${batch[0][0].id} ~ ${batch[0][1].id})` }];
+        return [{ error: String(e.message ?? e), unchecked: b.map((p) => [p.a, p.b]) }];
       }
     });
     duplicates = answered
@@ -436,6 +482,11 @@ async function rank(snapshotPath, opts) {
       .sort((x, y) => (y.error ? 2 : y.p) - (x.error ? 2 : x.p));
   }
 
+
+  // Held tickets were never sent: they stay in the output, unjudged, to be ranked by hand.
+  for (const { t, kinds } of held) {
+    results.push({ id: t.id, priority: t.priority, status: t.status, title: t.title, held: kinds, error: `not sent: may hold ${kinds.join(', ')}` });
+  }
 
   // Policy before weights: a ticket users would notice (user_visible not read as 'no')
   // ranks above every ticket they would not, whatever the weighted values say.
@@ -486,6 +537,10 @@ async function rank(snapshotPath, opts) {
   writeFileSync(out, JSON.stringify({ model: MODEL, weights: WEIGHTS, thresholds: THRESHOLDS, areas: areaPaths, ranked, epics, duplicates }, null, 2));
 
   for (const r of ranked) {
+    if (r.held) {
+      console.log(`${r.id} P${r.priority} HELD ${r.error}: clean the ticket, or --exclude it and rank it by hand`);
+      continue;
+    }
     if (r.error) {
       console.log(`${r.id} P${r.priority} ERROR ${r.error}`);
       continue;
@@ -503,7 +558,12 @@ async function rank(snapshotPath, opts) {
     );
   }
   for (const d of duplicates) {
-    console.log(d.error ? `DUPLICATES ERROR ${d.error}` : `DUPLICATE? ${d.a} ~ ${d.b} p=${pct(d.p)} (${noulReading(d.p)})`);
+    if (!d.error) {
+      console.log(`DUPLICATE? ${d.a} ~ ${d.b} p=${pct(d.p)} (${noulReading(d.p)})`);
+      continue;
+    }
+    console.log(`DUPLICATES ERROR ${d.error} (${d.unchecked.length} pairs not checked)`);
+    for (const [a, b] of d.unchecked) console.log(`UNCHECKED ${a} ~ ${b}`);
   }
   for (const r of ranked) {
     if (r.error) continue;
@@ -515,7 +575,7 @@ async function rank(snapshotPath, opts) {
     console.log(`AREAS ${r.id}: ${where}`);
   }
   console.log(`-> ${out}`);
-  if (ranked.some((r) => r.error) || duplicates.some((d) => d.error)) process.exitCode = 1;
+  if (ranked.some((r) => r.error && !r.held) || duplicates.some((d) => d.error)) process.exitCode = 1;
 }
 
 async function deferred(snapshotPath, evidencePath) {
@@ -525,6 +585,12 @@ async function deferred(snapshotPath, evidencePath) {
   const results = await pool(tickets, async (t) => {
     const base = { id: t.id, title: t.title };
     if (!evidence[t.id]) return { ...base, decision: 'no evidence fetched: open it by hand' };
+    const kinds = sensitiveKinds(
+      `${t.title}\n${t.description ?? ''}\n${t.acceptance_criteria ?? ''}\n${evidence[t.id]}`
+    );
+    if (kinds.length) {
+      return { ...base, decision: `not sent: the ticket or its evidence may hold ${kinds.join(', ')}; clean it or decide by hand` };
+    }
     try {
       const { payload, response } = await ask({ ticket: ticketBrief(t), evidence: evidence[t.id] }, DEFERRED_QUESTIONS);
       const onTopic = response.answers.evidence_on_topic.noul;
@@ -553,7 +619,7 @@ async function deferred(snapshotPath, evidencePath) {
 
 const args = process.argv.slice(2);
 const usage =
-  'usage: jev-rank.mjs <scratch>/backlog.json [--no-dups]\n       jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json';
+  'usage: jev-rank.mjs <scratch>/backlog.json [--no-dups] [--exclude <id>,<id>]\n       jev-rank.mjs deferred <scratch>/backlog.json <scratch>/evidence.json';
 if (!args.length || (args[0] === 'deferred' && args.length < 3)) {
   console.error(usage);
   process.exit(2);
