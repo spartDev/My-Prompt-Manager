@@ -16,6 +16,7 @@ import { resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { changeIconPlacementRepairs, forgetIconPlacementTab, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
+import { withoutWritten } from '../../../test/helpers/icon-placement-repairs';
 import type { ElementFingerprint } from '../../../types';
 import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
 import { IconPlacementController } from '../icon-placement';
@@ -128,7 +129,7 @@ describe('icon placement override on a built-in Platform', () => {
 
   const internals = (): any => injector as any;
   const icon = (): HTMLElement => internals().state.icon as HTMLElement;
-  const stored = async () => (await readIconPlacementRepairs())['claude.ai'];
+  const stored = async () => withoutWritten(await readIconPlacementRepairs())['claude.ai'];
   /** Lets the storage write, its change event and the placement it starts run */
   const settle = () => new Promise((done) => setTimeout(done, 20));
   /** Lets a batch of DOM changes settle, and the toolbar it rendered be looked for */

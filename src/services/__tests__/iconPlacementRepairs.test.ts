@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
+import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
 import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
   applyIconPlacementRepairChange,
@@ -13,11 +13,14 @@ import {
   overrideFromPick,
   type PlacementReport,
   parseIconPlacementRepairs,
-  readIconPlacementRepairs,
+  readIconPlacementRepairs as readStoredRepairs,
   repairablePlatformHostname,
   repairForHostnames
 } from '../iconPlacementRepairs';
 import { StorageManager } from '../storage';
+
+/** What storage holds, but for which entry was written last: most tests are about what a repair holds */
+const readIconPlacementRepairs = async (): Promise<IconPlacementRepairs> => withoutWritten(await readStoredRepairs());
 
 const PICK: CustomSitePositioning = { mode: 'custom', placement: 'before', selector: 'button[aria-label="Send"]' };
 
@@ -26,13 +29,13 @@ describe('applyIconPlacementRepairChange: the override lifecycle', () => {
     let repairs: IconPlacementRepairs = {};
 
     repairs = applyIconPlacementRepairChange(repairs, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay' });
-    expect(repairs).toEqual({ 'claude.ai': { status: 'overlay' } });
+    expect(withoutWritten(repairs)).toEqual({ 'claude.ai': { status: 'overlay' } });
 
     repairs = applyIconPlacementRepairChange(repairs, { type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
-    expect(repairs).toEqual({ 'claude.ai': { status: 'overlay', override: PICK } });
+    expect(withoutWritten(repairs)).toEqual({ 'claude.ai': { status: 'overlay', override: PICK } });
 
     repairs = applyIconPlacementRepairChange(repairs, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'override' });
-    expect(repairs).toEqual({ 'claude.ai': { status: 'override', override: PICK } });
+    expect(withoutWritten(repairs)).toEqual({ 'claude.ai': { status: 'override', override: PICK } });
 
     repairs = applyIconPlacementRepairChange(repairs, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'toolbar' });
     expect(repairs).toEqual({});
@@ -41,13 +44,13 @@ describe('applyIconPlacementRepairChange: the override lifecycle', () => {
   it('keeps the override when the picked element is not found and the icon falls back to the overlay', () => {
     const repairs = { 'claude.ai': { status: 'override' as const, override: PICK } };
 
-    expect(applyIconPlacementRepairChange(repairs, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay' }))
+    expect(withoutWritten(applyIconPlacementRepairChange(repairs, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay' })))
       .toEqual({ 'claude.ai': { status: 'overlay', override: PICK } });
   });
 
   it('drops an override picked while no status was stored once the Toolbar is reported', () => {
     const picked = applyIconPlacementRepairChange({}, { type: 'setOverride', hostname: 'claude.ai', positioning: PICK });
-    expect(picked).toEqual({ 'claude.ai': { override: PICK } });
+    expect(withoutWritten(picked)).toEqual({ 'claude.ai': { override: PICK } });
 
     expect(applyIconPlacementRepairChange(picked, { type: 'reportPlacement', hostname: 'claude.ai', placement: 'toolbar' })).toEqual({});
   });
@@ -464,6 +467,88 @@ describe('overrideFromPick', () => {
   it('is null for a pick that names no element', () => {
     expect(overrideFromPick({})).toBeNull();
     expect(overrideFromPick(undefined)).toBeNull();
+  });
+});
+
+describe('the hosts of one Platform (M365 Copilot at m365.cloud.microsoft and copilot.cloud.microsoft)', () => {
+  const COPILOT_ROW = ['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft'];
+  /** An overlay recorded at m365.cloud.microsoft before it redirected a work account, then one at copilot.cloud.microsoft */
+  const storeBoth = async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 1 });
+    await forgetIconPlacementTab(1);
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'overlay' });
+  };
+
+  /** Reads storage as Chrome returns it: the keys of a stored object sorted, not in the order written */
+  const readAsChrome = async () => {
+    const sorted = (value: unknown): unknown => (typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, sorted((value as Record<string, unknown>)[key])]))
+      : value);
+    return parseIconPlacementRepairs(sorted((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]));
+  };
+
+  it('offers the newest repair of the Copilot row: the one at copilot.cloud.microsoft', async () => {
+    await storeBoth();
+
+    expect(Object.keys(await readAsChrome())).toEqual(['copilot.cloud.microsoft', 'm365.cloud.microsoft']);
+    expect(repairForHostnames(await readAsChrome(), COPILOT_ROW)).toEqual({ hostname: 'copilot.cloud.microsoft', status: 'overlay' });
+  });
+
+  it('offers the repair of the tab reported last once an older host\'s tab closed', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 1 });
+    // m365.cloud.microsoft has a tab: its repair is kept
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'overlay', tabId: 2 });
+    await forgetIconPlacementTab(1);
+
+    expect(Object.keys(await readAsChrome())).toEqual(['copilot.cloud.microsoft', 'm365.cloud.microsoft']);
+    expect(repairForHostnames(await readAsChrome(), COPILOT_ROW)).toEqual({ hostname: 'copilot.cloud.microsoft', status: 'overlay' });
+  });
+
+  it('offers the newest repair over an older one of the linked Platform', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.microsoft.com', placement: 'overlay', tabId: 1 });
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'overlay', tabId: 2 });
+
+    expect(repairForHostnames(await readAsChrome(), COPILOT_ROW)).toEqual({ hostname: 'copilot.cloud.microsoft', status: 'overlay' });
+  });
+
+  it('keeps the order of the hostnames for repairs stored before their writes were counted', () => {
+    const repairs = parseIconPlacementRepairs({ 'copilot.cloud.microsoft': { status: 'overlay' }, 'm365.cloud.microsoft': { status: 'overlay' } });
+
+    expect(repairForHostnames(repairs, COPILOT_ROW)).toEqual({ hostname: 'm365.cloud.microsoft', status: 'overlay' });
+  });
+
+  it('clears the repair of m365.cloud.microsoft on a Toolbar reported from copilot.cloud.microsoft', async () => {
+    await storeBoth();
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'toolbar', tabId: 2 });
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('clears the repair of m365.cloud.microsoft on a Toolbar from copilot.cloud.microsoft, which has none of its own', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 1 });
+    await forgetIconPlacementTab(1);
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'toolbar', tabId: 2 });
+
+    expect(await readIconPlacementRepairs()).toEqual({});
+  });
+
+  it('keeps the repair of a host whose tab is still open', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'm365.cloud.microsoft', placement: 'overlay', tabId: 1 });
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'toolbar', tabId: 2 });
+
+    expect(await readIconPlacementRepairs()).toEqual({ 'm365.cloud.microsoft': { status: 'overlay' } });
+  });
+
+  it('keeps the repair of another Platform of the row', async () => {
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.microsoft.com', placement: 'overlay', tabId: 1 });
+    await forgetIconPlacementTab(1);
+
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'copilot.cloud.microsoft', placement: 'toolbar', tabId: 2 });
+
+    expect(await readIconPlacementRepairs()).toEqual({ 'copilot.microsoft.com': { status: 'overlay' } });
   });
 });
 

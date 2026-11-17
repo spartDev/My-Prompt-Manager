@@ -18,11 +18,12 @@
  * once its wait ends.
  */
 
+import { getPlatformByHostname, platformHostnames } from '../../config/platforms';
 import {
   ICON_PLACEMENT_REPAIRS_KEY,
+  type IconPlacementRepairs,
   type PlacementReport,
   type PlacementReportResponse,
-  type PlatformPlacementRepair,
   parseIconPlacementRepairs,
   readIconPlacementRepairs
 } from '../../services/iconPlacementRepairs';
@@ -41,8 +42,14 @@ export class PlacementRepair {
   private placed: PlacementReport | null = null;
   /** Whether the icon was last placed at a later anchor of the chain, where a pick comes first */
   private atLaterAnchor = false;
-  /** Whether storage holds a repair for this Platform: until it does, a Toolbar needs no report */
+  /**
+   * Whether storage holds a repair for this Platform, at this host or another of its hosts: until it
+   * does, a Toolbar needs no report. A repair at a host that redirects here (m365.cloud.microsoft to
+   * copilot.cloud.microsoft) is cleared only by a report of this one
+   */
   private hasRepair = false;
+  /** The hosts of this tab's Platform, this one first */
+  private readonly platformHostnames: readonly string[];
   /** How many changes of the repairs this page followed */
   private changes = 0;
   private listening = false;
@@ -56,6 +63,8 @@ export class PlacementRepair {
    */
   constructor(hostname: string, onOverrideChange: () => void) {
     this.hostname = hostname;
+    const platform = getPlatformByHostname(hostname);
+    this.platformHostnames = [hostname, ...(platform ? platformHostnames(platform).filter((other) => other !== hostname) : [])];
     this.onOverrideChange = onOverrideChange;
   }
 
@@ -78,12 +87,12 @@ export class PlacementRepair {
       this.listening = true;
     }
     const changesBefore = this.changes;
-    const repair = (await readIconPlacementRepairs())[this.hostname];
+    const repairs = await readIconPlacementRepairs();
     if (this.changes !== changesBefore) {
       return;
     }
-    this.override = repair?.override ?? null;
-    this.hasRepair = repair !== undefined;
+    this.override = repairs[this.hostname]?.override ?? null;
+    this.hasRepair = this.platformHasRepair(repairs);
   }
 
   /** Stops following storage */
@@ -197,14 +206,19 @@ export class PlacementRepair {
       return;
     }
     this.changes++;
-    const repair = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue)[this.hostname];
+    const repairs = parseIconPlacementRepairs(changes[ICON_PLACEMENT_REPAIRS_KEY]?.newValue);
+    const repair = repairs[this.hostname];
     // The service worker no longer counts this tab off the Toolbar (the repair was dropped, as by Clear
     // All Data), or an override waits for a status: this tab's placement is sent again
     if ((!repair && this.sent !== 'toolbar') || (repair && !repair.status)) {
       this.sent = null;
     }
-    this.follow(repair);
+    this.follow(repairs);
   };
+
+  private platformHasRepair(repairs: IconPlacementRepairs): boolean {
+    return this.platformHostnames.some((hostname) => repairs[hostname] !== undefined);
+  }
 
   /**
    * Takes the Platform's repair as storage holds it now. A tab whose icon is off the Toolbar, or not
@@ -212,9 +226,9 @@ export class PlacementRepair {
    * the user picked an element, and that placement is sent; any other tab sends
    * its placement, when not yet sent: a Toolbar from before the repair included.
    */
-  private follow(repair: PlatformPlacementRepair | undefined): void {
-    this.hasRepair = repair !== undefined;
-    const override = repair?.override ?? null;
+  private follow(repairs: IconPlacementRepairs): void {
+    this.hasRepair = this.platformHasRepair(repairs);
+    const override = repairs[this.hostname]?.override ?? null;
     const changed = JSON.stringify(override) !== JSON.stringify(this.override);
     this.override = override;
     // At a later anchor of the chain, a new pick comes first; a pick dropped leaves the icon where it is
@@ -278,7 +292,7 @@ export class PlacementRepair {
         this.reportPlaced();
         return;
       }
-      this.follow(parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY])[this.hostname]);
+      this.follow(parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY]));
     }, (err: unknown) => {
       // The repair this page holds stands; its placement is sent on it
       debug('Icon placement repair not read again', { reason, error: String(err) });

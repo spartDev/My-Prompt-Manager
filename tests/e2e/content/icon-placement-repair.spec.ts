@@ -14,6 +14,7 @@
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 
 import type { IconPlacementRepairs } from '../../../src/services/iconPlacementRepairs';
+import { withoutWritten } from '../../../src/test/helpers/icon-placement-repairs';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
 import { seedLibrary } from '../utils/storage';
@@ -79,8 +80,9 @@ const openClaude = async (context: BrowserContext, url = 'https://claude.ai/new'
   return page;
 };
 
+/** The repairs stored, without the write count of each entry: these tests are about what a repair holds */
 const repairsOf = async (storage: ExtensionStorage): Promise<IconPlacementRepairs> =>
-  (await storage.get<{ iconPlacementRepairs?: IconPlacementRepairs }>('iconPlacementRepairs')).iconPlacementRepairs ?? {};
+  withoutWritten((await storage.get<{ iconPlacementRepairs?: IconPlacementRepairs }>('iconPlacementRepairs')).iconPlacementRepairs ?? {});
 
 const claudeRow = (settings: Page): Locator =>
   settings.getByTestId('site-row').filter({ has: settings.getByRole('switch', { name: 'Claude', exact: true }) });

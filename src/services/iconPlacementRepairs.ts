@@ -24,7 +24,7 @@
  * `StorageManager` nor React, so the content script can read it.
  */
 
-import { getPlatformByHostname } from '../config/platforms';
+import { getPlatformByHostname, platformHostnames } from '../config/platforms';
 import type { CustomSitePositioning, ElementFingerprint } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 
@@ -61,10 +61,22 @@ export interface PlatformPlacementRepair {
   status?: RepairStatus;
   /** The element the user picked, the same shape as a Custom site's positioning */
   override?: CustomSitePositioning;
+  /**
+   * When the entry was last written, as a count above every other entry's: the newest repair of a
+   * row is the one Settings shows (repairForHostnames). Data, not the order of the keys, which
+   * chrome.storage does not keep (it returns them sorted). Absent on an entry from before it.
+   */
+  written?: number;
 }
 
 /** By hostname of the Platform */
 export type IconPlacementRepairs = Record<string, PlatformPlacementRepair>;
+
+/** The repairs with this entry written, newer than every other */
+function withEntry(repairs: IconPlacementRepairs, hostname: string, entry: PlatformPlacementRepair): IconPlacementRepairs {
+  const written = Math.max(0, ...Object.values(repairs).map((repair) => repair.written ?? 0)) + 1;
+  return { ...repairs, [hostname]: { ...entry, written } };
+}
 
 export type IconPlacementRepairChange =
   | {
@@ -162,6 +174,9 @@ export function parseIconPlacementRepairs(value: unknown): IconPlacementRepairs 
       repair.override = override;
     }
     if (repair.status || repair.override) {
+      if (typeof entry.written === 'number' && Number.isFinite(entry.written)) {
+        repair.written = entry.written;
+      }
       repairs[hostname] = repair;
     }
   }
@@ -182,7 +197,7 @@ export function applyIconPlacementRepairChange(
 ): IconPlacementRepairs {
   const current = repairs[change.hostname];
   if (change.type === 'setOverride') {
-    return { ...repairs, [change.hostname]: { ...current, override: change.positioning } };
+    return withEntry(repairs, change.hostname, { ...current, override: change.positioning });
   }
   if ((change.placement === 'toolbar' || change.placement === 'waiting') && !current) {
     // Nothing to drop, and a wait keeps only what exists; the other tabs' status is theirs to
@@ -205,7 +220,7 @@ export function applyIconPlacementRepairChange(
   if (current?.status === status) {
     return repairs;
   }
-  return { ...repairs, [change.hostname]: { ...current, status } };
+  return withEntry(repairs, change.hostname, { ...current, status });
 }
 
 /** Reads the repairs from storage; none when storage cannot be read */
@@ -348,6 +363,29 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
   });
 }
 
+/**
+ * A tab reported from one host of a Platform: the repair of another of its hosts with no tab known
+ * is dropped. That host redirects to this one (m365.cloud.microsoft sends a work account to
+ * copilot.cloud.microsoft), so no tab of it would ever clear it, and Settings would offer a repair
+ * for a host that cannot be opened. A host with a tab still open keeps its own. Called under the lock.
+ */
+async function dropStaleSiblingHosts(repairs: IconPlacementRepairs, hostname: string): Promise<IconPlacementRepairs> {
+  const platform = getPlatformByHostname(hostname);
+  const siblings = platform ? platformHostnames(platform).filter((other) => other !== hostname && repairs[other]) : [];
+  if (siblings.length === 0) {
+    return repairs;
+  }
+  const tabs = parsePlacementTabs((await chrome.storage.session.get(ICON_PLACEMENT_TABS_KEY))[ICON_PLACEMENT_TABS_KEY]);
+  let next = repairs;
+  for (const sibling of siblings) {
+    if (Object.keys(tabs[sibling] ?? {}).length === 0) {
+      const { [sibling]: _stale, ...rest } = next;
+      next = rest;
+    }
+  }
+  return next;
+}
+
 /** Applies a change to what storage holds, under the lock; writes only when something changed */
 export function changeIconPlacementRepairs(change: IconPlacementRepairChange): Promise<IconPlacementRepairs> {
   return withIconPlacementRepairsLock(async () => {
@@ -355,7 +393,10 @@ export function changeIconPlacementRepairs(change: IconPlacementRepairChange): P
     const result = await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY);
     const repairs = parseIconPlacementRepairs(result[ICON_PLACEMENT_REPAIRS_KEY]);
     const others = change.type === 'reportPlacement' ? await recordTabPlacement(change.hostname, change.placement, change.tabId) : null;
-    const next = applyIconPlacementRepairChange(repairs, change, others);
+    let next = applyIconPlacementRepairChange(repairs, change, others);
+    if (change.type === 'reportPlacement' && change.tabId !== undefined) {
+      next = await dropStaleSiblingHosts(next, change.hostname);
+    }
     if (next !== repairs) {
       await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: next });
     }
@@ -364,16 +405,21 @@ export function changeIconPlacementRepairs(change: IconPlacementRepairChange): P
 }
 
 /**
- * The repair a Platform row shows, of its own hostname or of its linked Platforms' (Copilot and
+ * The repair a Platform row shows, of its own hostnames or of its linked Platforms' (Copilot and
  * M365 Copilot share a row). The Anchored overlay comes first, wherever it is: it is the one that
- * asks the user to place the icon. Else the first override, by the order of the hostnames.
+ * asks the user to place the icon. Else an override. Of several, the newest written: an older one
+ * may be at a host that now redirects to the newer's.
  */
 export function repairForHostnames(repairs: IconPlacementRepairs, hostnames: readonly string[]): { hostname: string; status: RepairStatus } | null {
-  const found = hostnames.flatMap((hostname) => {
-    const status = repairs[hostname]?.status;
-    return status ? [{ hostname, status }] : [];
-  });
-  return found.find(({ status }) => status === 'overlay') ?? found[0] ?? null;
+  const found = hostnames
+    .flatMap((hostname) => {
+      const repair = repairs[hostname];
+      return repair?.status ? [{ hostname, status: repair.status, written: repair.written ?? 0 }] : [];
+    })
+    // Newest first; entries from before `written`, by the order of the hostnames
+    .sort((a, b) => b.written - a.written);
+  const shown = found.find(({ status }) => status === 'overlay') ?? found[0];
+  return shown ? { hostname: shown.hostname, status: shown.status } : null;
 }
 
 /**

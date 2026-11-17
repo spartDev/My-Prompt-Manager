@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../services/iconPlacementRepairs';
+import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
 import { getChromeMock } from '../../test/mocks';
 
 vi.mock('../../utils/logger', () => ({
@@ -42,7 +43,7 @@ function send(listener: MessageListener, message: { type: string; attempt?: stri
   });
 }
 
-const storedRepairs = async (): Promise<unknown> => (await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY];
+const storedRepairs = async (): Promise<unknown> => withoutWritten((await chrome.storage.local.get(ICON_PLACEMENT_REPAIRS_KEY))[ICON_PLACEMENT_REPAIRS_KEY]);
 
 describe('background: placing the icon of a built-in Platform', () => {
   beforeEach(() => {
