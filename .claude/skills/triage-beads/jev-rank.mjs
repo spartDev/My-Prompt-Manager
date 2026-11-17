@@ -16,7 +16,6 @@
 // Needs TYPESAFE_API_KEY. TYPESAFE_API_URL and TYPESAFE_MODEL override the endpoint
 // and the model (default jev-latest). Exit 3: no key. Exit 1: a request failed.
 
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
@@ -320,8 +319,14 @@ function acceptanceText(t) {
   return m ? m[1].trim() : '';
 }
 
+// A heading ("## Acceptance Criteria", "Acceptance criteria:") names the section, not a
+// criterion: it is dropped before the split, so it is never judged as an item.
 function acceptanceItems(text) {
-  const t = (text ?? '').trim();
+  const t = (text ?? '')
+    .split('\n')
+    .filter((line) => !/^\s*#{1,6}\s/.test(line) && !/^\s*acceptance(?: criteria)?\s*:?\s*$/i.test(line))
+    .join('\n')
+    .trim();
   if (!t) return [];
   const numbered = t.split(/(?:^|\s)\d+[.)]\s+/).map((s) => s.trim()).filter(Boolean);
   if (numbered.length > 1) return withLeadIns(numbered);
@@ -415,9 +420,11 @@ function excludedIds(opts) {
 
 async function rank(snapshotPath, opts) {
   const excluded = excludedIds(opts);
-  const all = JSON.parse(readFileSync(snapshotPath, 'utf8')).filter((t) => !excluded.has(t.id));
+  // Excluded tickets are never sent, but stay in `all` so an epic still counts them as
+  // children, unjudged.
+  const all = JSON.parse(readFileSync(snapshotPath, 'utf8'));
   // An epic is ranked and placed by its children, not judged on its own.
-  const live = all.filter((t) => t.issue_type !== 'epic');
+  const live = all.filter((t) => t.issue_type !== 'epic' && !excluded.has(t.id));
   // A ticket that looks like it holds a secret or personal data is not sent at all.
   const held = live
     .map((t) => ({ t, kinds: sensitiveKinds(`${t.title}\n${t.description ?? ''}\n${t.acceptance_criteria ?? ''}`) }))
@@ -510,25 +517,22 @@ async function rank(snapshotPath, opts) {
   const ranked = [...results].sort((x, y) => tier(y) - tier(x) || (y.value ?? -1) - (x.value ?? -1));
 
   // An epic is not judged on its own: it takes the best suggestion and the areas of its
-  // live children, so the report and step 4 keep it. Children are the tickets linked to
-  // it by a parent-child edge (bd list --parent); the "<epic>.<n>" id is used only when
-  // bd cannot be asked.
-  const childIds = (epicId) => {
-    try {
-      const out = execFileSync('bd', ['list', '--parent', epicId, '--status=open,in_progress,blocked,deferred', '--json', '--limit', '0'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
-      return new Set(JSON.parse(out).map((c) => c.id));
-    } catch {
-      return null;
-    }
-  };
+  // live children, so the report and step 4 keep it. Children come from the snapshot
+  // itself (its `parent` field or a parent-child dependency), never from a second bd
+  // call, so they describe the same backlog as the ranking. An excluded child is listed,
+  // unjudged: the epic is neither "no files" nor ranked without it.
+  const isChildOf = (t, epicId) =>
+    t.parent === epicId ||
+    (t.dependencies ?? []).some((d) => d.type === 'parent-child' && d.issue_id === t.id && d.depends_on_id === epicId);
+  const byId = new Map(results.map((r) => [r.id, r]));
   const epics = all
     .filter((t) => t.issue_type === 'epic')
     .map((e) => {
-      const linked = childIds(e.id);
-      const children = results.filter((r) => (linked ? linked.has(r.id) : r.id.startsWith(`${e.id}.`)));
+      const kids = all.filter((t) => t.issue_type !== 'epic' && isChildOf(t, e.id));
+      const children = kids.map(
+        (t) => byId.get(t.id) ?? { id: t.id, excluded: true, error: 'excluded: judge it by hand' }
+      );
+      const excludedKids = children.filter((c) => c.excluded).map((c) => c.id);
       const judged = children.filter((c) => !c.error);
       const changing = judged.filter((c) => noulReading(c.changes_files) !== 'no');
       const areas = [...new Set(changing.flatMap((c) => c.areas.yes))];
@@ -539,7 +543,7 @@ async function rank(snapshotPath, opts) {
         status: e.status,
         title: e.title,
         children: children.map((c) => c.id),
-        children_from: linked ? 'parent-child edges' : 'id prefix (bd list --parent failed)',
+        excluded_children: excludedKids,
         suggested: judged.length ? Math.min(...judged.map((c) => c.suggested)) : null,
         // "no files" only when every judged child says so; otherwise what is known.
         // Every child, failed ones included, must read "no": an unknown child is not a "no".
@@ -570,7 +574,7 @@ async function rank(snapshotPath, opts) {
     console.log(
       e.suggested === null
         ? `EPIC ${e.id} P${e.priority}: no judged live child, rank it by hand`
-        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}`
+        : `EPIC ${e.id} P${e.priority}->P${e.suggested} (best child) children ${e.children.join(', ')} | areas ${e.no_files ? 'no files' : e.areas.join(', ') || 'no confirmed areas'}${e.maybe_areas.length ? ` (maybe ${e.maybe_areas.join(', ')})` : ''}${e.excluded_children.length ? ` | excluded, place by hand: ${e.excluded_children.join(', ')}` : ''}`
     );
   }
   for (const d of duplicates) {
