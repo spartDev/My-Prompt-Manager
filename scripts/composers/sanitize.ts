@@ -102,7 +102,24 @@ export function classNamesOf(selectors: readonly string[]): string[] {
   return [...new Set(selectors.flatMap((selector) => Array.from(selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g), (match) => match[1])))];
 }
 
-const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"([^"]*)"|'([^']*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
+/** A quoted value may hold an escaped character, an escaped quote included: `[aria-label="say \"hi\""]` */
+const ATTRIBUTE_SELECTOR = /\[\s*([\w-]+)\s*(?:([*^$~|]?=)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^\]\s]+))\s*([iIsS])?\s*)?\]/g;
+
+/** The code point CSS reads a hex escape as: U+FFFD for zero, a surrogate, or a value above U+10FFFF */
+const escapedCodePoint = (hex: string): string => {
+  const codePoint = parseInt(hex, 16);
+  const valid = codePoint > 0 && codePoint <= 0x10ffff && (codePoint < 0xd800 || codePoint > 0xdfff);
+  return String.fromCodePoint(valid ? codePoint : 0xfffd);
+};
+
+/**
+ * A quoted selector value as CSS reads it: a hex escape (`\26 `) is its code point, ended by one
+ * CSS whitespace (space, tab, line feed, form feed, carriage return, or CR LF), never by a
+ * no-break space; any other escaped character is itself
+ */
+const unescapeCss = (value: string): string =>
+  value.replace(/\\(?:([0-9a-fA-F]{1,6})(?:\r\n|[ \t\n\f\r])?|(.))/g, (_escape, hex: string | undefined, char: string | undefined) =>
+    hex ? escapedCodePoint(hex) : (char ?? ''));
 const ID_SELECTOR = /#(-?[_a-zA-Z][\w-]*)/g;
 
 /**
@@ -123,7 +140,8 @@ export function sanitizeRulesOf(editorSelectors: readonly string[], anchors: rea
   };
   for (const selector of selectors) {
     for (const [, name, operator, double, single, bare, flag] of selector.matchAll(ATTRIBUTE_SELECTOR)) {
-      const value = double ?? single ?? bare;
+      const quoted = double ?? single;
+      const value = quoted === undefined ? bare : unescapeCss(quoted);
       condition(name.toLowerCase(), operator && value !== undefined ? { operator, value, ignoreCase: flag?.toLowerCase() === 'i' } : undefined);
     }
     // An id in a selector (#userInput) is a condition on the id attribute
@@ -158,10 +176,16 @@ function selectorValue(actual: string, conditions: readonly ValueCondition[]): s
   if (met.length === 0) {
     return null;
   }
-  // Joined, a prefix goes first and a suffix last: `^="Send"` and `$="message"` give "Send message"
-  const order = (operator: string) => (operator === '^=' ? 0 : operator === '$=' ? 2 : 1);
-  const joined = [...met].sort((a, b) => order(a.operator) - order(b.operator)).map(({ value }) => value).join(' ');
-  const candidates = [...met.map(({ value }) => value), joined];
+  // Joined by a space, a prefix first and a suffix last, the rest in selector order: `^="Send"` and
+  // `$="message"` give "Send message"; `*="en-US"`, `|="en"` and `~="foo"` give "en-US en foo".
+  // Tried first, so a value the sanitizer wrote before stays as it was.
+  const joined = (priority: Readonly<Record<string, number>>, separator: string) =>
+    [...met].sort((a, b) => (priority[a.operator] ?? 1) - (priority[b.operator] ?? 1)).map(({ value }) => value).join(separator);
+  const BY_PREFIX = { '^=': 0, '$=': 2 };
+  // Then with a language prefix ahead of the rest, by a space and by a hyphen: `|=en` and `*=US`
+  // give "en-US"; a ^= prefix still goes ahead of it
+  const BY_LANGUAGE = { '^=': 0, '|=': 0.5, '$=': 2 };
+  const candidates = [...met.map(({ value }) => value), joined(BY_PREFIX, ' '), joined(BY_LANGUAGE, ' '), joined(BY_LANGUAGE, '-')];
   return candidates.find((candidate) => met.every((condition) => meets(candidate, condition))) ?? null;
 }
 

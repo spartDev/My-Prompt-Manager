@@ -161,8 +161,19 @@ chrome.action.onClicked.addListener((tab) => {
 
 The service worker decides whether a tab gets the content script from the Site settings, read with
 `readSiteSettings()` and `isHostnameEnabled()` of `src/services/siteSettings.ts`, the same rule the
-content script applies when it starts. A change of the Site settings reaches the open tabs as a
-`settingsUpdated` message from `changeSiteSettings()`; the service worker takes no message for it.
+content script applies when it starts. The content script then follows the key in storage
+(`onSiteSettingsChanged()`): it starts on its site when a change turns the site on, stops when one
+turns it off, and starts over when the Custom site of its hostname changes. No surface sends the tabs
+a message for it.
+
+That needs a content script in the tab. A Platform's tabs get one from the manifest when they load,
+on or off (a tab open across an extension update while its Platform was off keeps only the old one,
+which no longer receives storage changes, until a click on the extension icon in side panel mode or
+an icon placement repair pick injects a fresh one), and adding a Custom site asks the service worker
+to inject into its open tabs (`REQUEST_INJECTION` from `AddCustomSiteForm`). A Custom site that was
+off when its tab loaded has none, unless one was injected since: in side panel mode (the default) a
+click on the extension icon injects one into its tab, and so does the Element picker. Turning its switch back on
+injects none: a tab with no content script starts on the next page load.
 
 ### Content Script Adaptation
 
