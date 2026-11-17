@@ -80,7 +80,7 @@ The e2e suite runs the content script on stand-in pages. A change to `src/conten
 | `//` in an empty field | the Prompt selector is open and the field is empty |
 | `//` with a pause (Copilot's `/` menu open) | the same, with the second slash typed after the first one has opened Copilot's menu at copilot.cloud.microsoft |
 | `'Hi //there'` | the selector is open and the field reads `Hi there` |
-| icon on the toolbar after a late composer | `button.prompt-library-integrated-icon` ends with `data-mpm-placement="toolbar"` |
+| icon on the toolbar after a late composer | `button.prompt-library-integrated-icon` ends with `data-mpm-placement="toolbar"`, or on the Anchored overlay where that is the designed fallback: a chain read by English ARIA labels (ChatGPT, Mistral, Perplexity) on a page whose `lang` is another language. The line then says so |
 | icon not moving while typing | the button keeps its placement, its `data-mpm-anchor` and its position (within 1 px) while `Hello world` is typed |
 
 Each line also says what was read: whether the selector was open, the field's text, any insertion feedback, and the placement and anchor. The script types only its own text and empties the field after each case; if it cannot, the line ends with "field NOT emptied after", so check that Platform for a leftover draft. The two icon cases first wait for the settled placement: the toolbar, or the Anchored overlay once the extension's 5 s grace for a late toolbar has passed. It exits 1 if any case fails.

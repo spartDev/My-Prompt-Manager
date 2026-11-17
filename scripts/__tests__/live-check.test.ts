@@ -1,8 +1,25 @@
 import path from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import type { Page } from 'playwright';
+import { describe, expect, it, vi } from 'vitest';
 
-import { CASES, type CaseResult, formatReport, judgeLateToolbar, judgeSlash, judgeSteady, liveCheckExitCode, normalizeFieldText, parseLiveCheckArgs } from '../live-check';
+import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
+import {
+  afterCase,
+  CASES,
+  type CaseResult,
+  cleanUp,
+  cleanUpNote,
+  formatReport,
+  judgeLateToolbar,
+  judgeSlash,
+  judgeSteady,
+  liveCheckExitCode,
+  normalizeFieldText,
+  overlayIsFallback,
+  parseLiveCheckArgs,
+  runCase
+} from '../live-check';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -64,6 +81,13 @@ describe('judgeSlash', () => {
   });
 });
 
+describe('judgeSlash with no field', () => {
+  it('fails when the editor cannot be found, even where an empty field is expected', () => {
+    expect(judgeSlash({ selectorOpen: true, fieldText: null, feedback: null }, ''))
+      .toEqual({ pass: false, detail: 'selector open, no field found' });
+  });
+});
+
 describe('judgeLateToolbar', () => {
   it('passes when the Prompts button ends on the toolbar', () => {
     expect(judgeLateToolbar({ placement: 'toolbar', anchor: '0', x: 0, y: 0 })).toEqual({ pass: true, detail: 'placement toolbar, anchor 0' });
@@ -72,6 +96,115 @@ describe('judgeLateToolbar', () => {
   it('fails on the Anchored overlay, and with no Prompts button', () => {
     expect(judgeLateToolbar({ placement: 'overlay', anchor: null, x: 0, y: 0 })).toEqual({ pass: false, detail: 'placement overlay, anchor none' });
     expect(judgeLateToolbar(null)).toEqual({ pass: false, detail: 'no Prompts button' });
+  });
+
+  it('passes on the Anchored overlay when it is the designed fallback, and says so', () => {
+    expect(judgeLateToolbar({ placement: 'overlay', anchor: null, x: 0, y: 0 }, 'fr'))
+      .toEqual({ pass: true, detail: 'placement overlay, anchor none (the fallback of a chain read by English labels, page language fr)' });
+    expect(judgeLateToolbar(null, 'fr')).toEqual({ pass: false, detail: 'no Prompts button' });
+  });
+});
+
+describe('overlayIsFallback', () => {
+  it('holds for a chain that reads English ARIA labels, on a page in another language', () => {
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.chatgpt, 'fr-FR')).toBe(true);
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.mistral, 'de')).toBe(true);
+    expect(overlayIsFallback(SUPPORTED_PLATFORMS.perplexity, 'fr-FR')).toBe(true);
+  });
+
+  it.each([
+    ['an English page', SUPPORTED_PLATFORMS.chatgpt, 'en-US'],
+    ['a page that names no language', SUPPORTED_PLATFORMS.mistral, ''],
+    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.m365copilot, 'fr'],
+    ['a chain read by test ids and classes only', SUPPORTED_PLATFORMS.claude, 'fr']
+  ])('does not hold for %s', (_case, platform, lang) => {
+    expect(overlayIsFallback(platform, lang)).toBe(false);
+  });
+});
+
+describe('cleanUp', () => {
+  it('reports the field not emptied when its editor cannot be found again', async () => {
+    const page = {
+      keyboard: { press: vi.fn(() => Promise.resolve()) },
+      locator: () => ({ waitFor: () => Promise.resolve() }),
+      waitForFunction: () => Promise.reject(new Error('Timeout 2000ms exceeded'))
+    } as unknown as Page;
+
+    await expect(cleanUp(page, SUPPORTED_PLATFORMS.claude)).resolves.toBe(false);
+  });
+});
+
+/**
+ * A page for the case runner with no browser: an editor found or not, each key recorded, and
+ * typing that throws when asked
+ */
+function fakePage({ editor, typeThrows = false }: { editor: boolean; typeThrows?: boolean }) {
+  const keys: string[] = [];
+  const element = { click: () => Promise.resolve(), dispose: () => Promise.resolve(), evaluate: () => Promise.resolve('') };
+  const waitForFunction = vi.fn(() => (editor ? Promise.resolve({ asElement: () => element }) : Promise.reject(new Error('Timeout exceeded'))));
+  const page = {
+    keyboard: {
+      press: vi.fn((key: string) => { keys.push(key); return Promise.resolve(); }),
+      type: vi.fn(() => (typeThrows ? Promise.reject(new Error('Target page closed')) : Promise.resolve()))
+    },
+    locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => Promise.resolve() }) }),
+    waitForFunction
+  } as unknown as Page;
+  return { page, keys, waitForFunction };
+}
+
+describe('runCase progress', () => {
+  it('leaves typed false when no field shows, so nothing is cleaned up or warned about', async () => {
+    const { page } = fakePage({ editor: false });
+    const progress = { typed: false };
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.claude, 'slash-empty', 10, progress);
+
+    expect(verdict).toEqual({ pass: false, detail: 'no field (signed out?)' });
+    expect(progress.typed).toBe(false);
+  });
+
+  it('sets typed before the first key, so it holds when the case throws while typing', async () => {
+    const { page } = fakePage({ editor: true, typeThrows: true });
+    const progress = { typed: false };
+
+    await expect(runCase(page, SUPPORTED_PLATFORMS.claude, 'slash-empty', 10, progress)).rejects.toThrow('Target page closed');
+    expect(progress.typed).toBe(true);
+  });
+});
+
+describe('afterCase', () => {
+  it('only closes the selector when nothing was typed: no cleanup, no warning', async () => {
+    const { page, keys, waitForFunction } = fakePage({ editor: false });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, false)).resolves.toBe('');
+    expect(keys).toEqual(['Escape']);
+    expect(waitForFunction).not.toHaveBeenCalled();
+  });
+
+  it('warns when the case typed and its field is gone after', async () => {
+    const { page } = fakePage({ editor: false });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, true)).resolves.toBe('; field NOT emptied after, check for a draft');
+  });
+
+  it('says nothing when the case typed and the field was emptied', async () => {
+    const { page } = fakePage({ editor: true });
+
+    await expect(afterCase(page, SUPPORTED_PLATFORMS.claude, true)).resolves.toBe('');
+  });
+});
+
+describe('cleanUpNote', () => {
+  it('warns when the case typed into a field it could not empty after, a field gone included', () => {
+    expect(cleanUpNote(true, false)).toBe('; field NOT emptied after, check for a draft');
+  });
+
+  it.each([
+    ['nothing was typed (no field, signed out, or the late-composer case)', false, false],
+    ['the field was emptied', true, true]
+  ])('says nothing when %s', (_case, typed, emptied) => {
+    expect(cleanUpNote(typed, emptied)).toBe('');
   });
 });
 

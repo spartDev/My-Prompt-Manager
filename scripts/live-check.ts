@@ -158,7 +158,8 @@ export const normalizeFieldText = (text: string): string => text.replace(/[â€‹-â
 
 export interface SlashObservation {
   selectorOpen: boolean;
-  fieldText: string;
+  /** Null when the editor could not be found: never read as an empty field */
+  fieldText: string | null;
   /** The insertion feedback's text, when it shows */
   feedback: string | null;
 }
@@ -177,19 +178,38 @@ export interface Verdict {
 
 /** A // case passes when the Prompt selector is open and the field holds what it held before the //, the // gone */
 export function judgeSlash(observed: SlashObservation, expectedText: string): Verdict {
-  const text = normalizeFieldText(observed.fieldText);
+  const text = observed.fieldText === null ? null : normalizeFieldText(observed.fieldText);
   const feedback = observed.feedback ? `, feedback "${observed.feedback}"` : '';
   return {
     pass: observed.selectorOpen && text === expectedText,
-    detail: `selector ${observed.selectorOpen ? 'open' : 'closed'}, field ${JSON.stringify(text)}${feedback}`
+    detail: `selector ${observed.selectorOpen ? 'open' : 'closed'}, ${text === null ? 'no field found' : `field ${JSON.stringify(text)}`}${feedback}`
   };
 }
 
 const describeIcon = (icon: IconState | null): string =>
   (icon ? `placement ${icon.placement ?? 'none'}, anchor ${icon.anchor ?? 'none'}` : 'no Prompts button');
 
-/** The late-composer case passes when the Prompts button ends on the toolbar */
-export function judgeLateToolbar(icon: IconState | null): Verdict {
+/**
+ * Whether the Anchored overlay is the designed end of the Platform's chain on this page: the chain
+ * finds an anchor by an English ARIA label (ChatGPT, Mistral, Perplexity), and the page says it is in another
+ * language, where src/config/platforms.ts lets the icon fall to the anchor on the editor. Not on a
+ * page that names no language: the overlay there may be a chain that drifted.
+ */
+export function overlayIsFallback(platform: PlatformDefinition, pageLanguage: string): boolean {
+  const readsLabels = platform.iconPlacement?.anchors.some(({ find }) => /\[aria-label\s*[*^$|~]?=/i.test(find)) ?? false;
+  return readsLabels && pageLanguage.trim() !== '' && !/^en(-|$)/i.test(pageLanguage.trim());
+}
+
+/**
+ * The late-composer case passes when the Prompts button ends on the toolbar, or on the Anchored
+ * overlay when that is the chain's designed fallback on this page (overlayIsFallback)
+ *
+ * @param fallbackLanguage - The page's language, given only when the overlay is the fallback there
+ */
+export function judgeLateToolbar(icon: IconState | null, fallbackLanguage?: string): Verdict {
+  if (icon?.placement === 'overlay' && fallbackLanguage !== undefined) {
+    return { pass: true, detail: `${describeIcon(icon)} (the fallback of a chain read by English labels, page language ${fallbackLanguage})` };
+  }
   return { pass: icon?.placement === 'toolbar', detail: describeIcon(icon) };
 }
 
@@ -243,11 +263,11 @@ const readIcon = (page: Page): Promise<IconState | null> =>
     return { placement: icon.getAttribute('data-mpm-placement'), anchor: icon.getAttribute('data-mpm-anchor'), x: box.x, y: box.y };
   }, ICON);
 
-/** The editor's text, found again each time: a Platform may replace its editor */
-async function readField(page: Page, platform: PlatformDefinition): Promise<string> {
+/** The editor's text, found again each time: a Platform may replace its editor. Null when there is none */
+async function readField(page: Page, platform: PlatformDefinition): Promise<string | null> {
   const editor = await findEditor(page, editorSelectorsOf(platform), 1_000);
   if (!editor) {
-    return '';
+    return null;
   }
   const text = await editor.evaluate((element) => (element instanceof HTMLTextAreaElement ? element.value : (element.textContent ?? '')));
   await editor.dispose();
@@ -313,22 +333,54 @@ export async function cleanUp(page: Page, platform: PlatformDefinition): Promise
   await page.keyboard.press('Escape');
   await page.locator(SELECTOR_DIALOG).waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => undefined);
   const editor = await findEditor(page, editorSelectorsOf(platform), 2_000);
-  if (editor) {
-    await editor.click();
-    await editor.dispose();
+  if (!editor) {
+    // Replaced or removed: the keys would go nowhere, and a draft may be kept
+    return false;
   }
+  await editor.click();
+  await editor.dispose();
   await emptyField(page);
-  return normalizeFieldText(await readField(page, platform)) === '';
+  const left = await readField(page, platform);
+  return left !== null && normalizeFieldText(left) === '';
 }
 
-export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number): Promise<Verdict> {
+/**
+ * What a case's line adds about its cleanup: a warning only when the case typed into a field and
+ * that field could not be emptied after, a field gone since included; nothing when no key was
+ * typed (no field, signed out, the late-composer case)
+ */
+export const cleanUpNote = (typed: boolean, emptied: boolean): string =>
+  (typed && !emptied ? '; field NOT emptied after, check for a draft' : '');
+
+/**
+ * What follows a case: the field emptied when the case typed into it, the Prompt selector only
+ * closed when it did not. Returns what the case's line adds (cleanUpNote): said, not hidden, since
+ * the maintainer's account may keep the draft
+ */
+export async function afterCase(page: Page, platform: PlatformDefinition, typed: boolean): Promise<string> {
+  if (!typed) {
+    await page.keyboard.press('Escape').catch(() => undefined);
+    return '';
+  }
+  return cleanUpNote(true, await cleanUp(page, platform).catch(() => false));
+}
+
+/**
+ * Runs one case on its page
+ *
+ * @param progress - Set to typed once the caret is in the field, before the first key: read by the
+ *   cleanup even when the case throws
+ */
+export async function runCase(page: Page, platform: PlatformDefinition, id: CaseId, timeout: number, progress = { typed: false }): Promise<Verdict> {
   if (id === 'late-toolbar') {
     await settlePlacement(page, timeout);
-    return judgeLateToolbar(await readIcon(page));
+    const pageLanguage = await page.evaluate(() => document.documentElement.lang);
+    return judgeLateToolbar(await readIcon(page), overlayIsFallback(platform, pageLanguage) ? pageLanguage : undefined);
   }
   if (!(await focusEmptyField(page, platform, timeout))) {
     return { pass: false, detail: 'no field (signed out?)' };
   }
+  progress.typed = true;
   switch (id) {
     case 'slash-empty':
       await page.keyboard.type('//');
@@ -381,19 +433,16 @@ async function checkPlatform(context: BrowserContext, id: string, options: LiveC
   const results: CaseResult[] = [];
   for (const { id: caseId } of CASES) {
     let page: Page | undefined;
+    const progress = { typed: false };
     try {
       page = await openPage(context, id, platform, options);
-      results.push({ platform: id, case: caseId, ...(await runCase(page, platform, caseId, options.timeout)) });
+      results.push({ platform: id, case: caseId, ...(await runCase(page, platform, caseId, options.timeout, progress)) });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message.split('\n')[0] : String(err);
       results.push({ platform: id, case: caseId, pass: false, detail: `error: ${redactUrls(message, startUrlOf(id, platform))}` });
     } finally {
       if (page) {
-        // Said, not hidden: the maintainer's account may keep the draft
-        if (!(await cleanUp(page, platform).catch(() => false))) {
-          const last = results[results.length - 1];
-          last.detail += '; field NOT emptied after, check for a draft';
-        }
+        results[results.length - 1].detail += await afterCase(page, platform, progress.typed);
         await page.close().catch(() => undefined);
       }
     }
