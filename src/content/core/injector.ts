@@ -1059,7 +1059,8 @@ export class PromptLibraryInjector {
         if (resolution.index > 0 && this.repair.positioning !== null) {
           // At a later anchor while the picked element is not on the page: it may render late, or
           // come back after a re-render. The pick ends only once the grace period is over without
-          // it (or without the chain's first anchor)
+          // it (or without the chain's first anchor). Meanwhile this tab may still need the pick
+          this.repair.report('waiting');
           this.placement.awaitToolbar(
             () => resolveIconPlacement(textarea, iconPlacement)?.index === 0 || this.pickShowsBeside(icon),
             () => { this.repair.report('toolbar', true); }
@@ -1290,6 +1291,8 @@ export class PromptLibraryInjector {
       // icon goes there. While the user has a pick, a later anchor of the chain waits for the end
       // of the grace period: the pick may still render, and comes before it. Once the page has
       // settled without the pick, any anchor of the chain takes the icon
+      // Meanwhile this tab may need the repair: a Toolbar in another tab does not drop it
+      this.repair.report('waiting');
       const toolbarShows = (settled: boolean): boolean => {
         const resolution = resolveIconPlacement(textarea, iconPlacement);
         return resolution !== null && (resolution.index === 0 || settled || this.repair.positioning === null);

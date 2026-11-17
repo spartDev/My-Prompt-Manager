@@ -6,6 +6,7 @@
 import {
   changeIconPlacementRepairs,
   forgetIconPlacementTab,
+  isPlacementReport,
   moveIconPlacementTab,
   overrideFromPick,
   type PlacementReport,
@@ -1029,7 +1030,7 @@ async function handleIconPlacementReported(
     return;
   }
   const hostname = repairablePlatformHostname(sender.tab?.url);
-  if (!hostname || (placement !== "toolbar" && placement !== "overlay" && placement !== "override")) {
+  if (!hostname || !isPlacementReport(placement)) {
     sendResponse({ success: false, error: "Not a placement report of a built-in platform", permanent: true });
     return;
   }

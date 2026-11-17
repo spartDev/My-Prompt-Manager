@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { changeIconPlacementRepairs, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
+import { changeIconPlacementRepairs, forgetIconPlacementTab, type PlacementReport, readIconPlacementRepairs } from '../../../services/iconPlacementRepairs';
 import type { ElementFingerprint } from '../../../types';
 import { getElementFingerprintGenerator } from '../../utils/element-fingerprint';
 import { IconPlacementController } from '../icon-placement';
@@ -317,7 +317,8 @@ describe('icon placement override on a built-in Platform', () => {
     await internals().injectIcon(editor);
     await settle();
     expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
-    expect(reports).toEqual([]);
+    // The tab waits for the picked element: it may still need the pick
+    expect(reports).toEqual(['waiting']);
 
     // The Platform renders the picked element after the rest of its composer
     parent.appendChild(picked);
@@ -358,7 +359,7 @@ describe('icon placement override on a built-in Platform', () => {
     await toolbarLookedFor();
 
     expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
-    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 200 });
+    await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'toolbar']); }, { timeout: 200 });
     expect(await stored()).toBeUndefined();
   });
 
@@ -379,7 +380,7 @@ describe('icon placement override on a built-in Platform', () => {
     const placements = vi.spyOn(internals(), 'injectIcon');
 
     await internals().injectIcon(editor);
-    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 1500 });
+    await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'toolbar']); }, { timeout: 1500 });
 
     expect(placements.mock.calls.length).toBeLessThanOrEqual(2);
     expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
@@ -400,9 +401,9 @@ describe('icon placement override on a built-in Platform', () => {
     reports.length = 0;
     await internals().injectIcon(editor);
     await settle();
-    expect(reports).toEqual([]);
+    expect(reports).toEqual(['waiting']);
 
-    await vi.waitFor(() => { expect(reports).toEqual(['toolbar']); }, { timeout: 1000 });
+    await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'toolbar']); }, { timeout: 1000 });
     expect(icon().getAttribute('data-mpm-anchor')).toBe('1');
     expect(await stored()).toBeUndefined();
   });
@@ -520,7 +521,7 @@ describe('icon placement override on a built-in Platform', () => {
       await internals().repair.load();
       reports.length = 0;
       await internals().injectIcon(editor);
-      await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+      await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'overlay']); }, { timeout: 1000 });
       return { picked, parent };
     };
 
@@ -563,7 +564,7 @@ describe('icon placement override on a built-in Platform', () => {
 
       await vi.waitFor(() => { expect(icon().getAttribute('data-mpm-placement')).toBe('toolbar'); }, { timeout: 1000 });
       expect(icon().getAttribute('data-mpm-anchor')).toBe('0');
-      await vi.waitFor(() => { expect(reports).toEqual(['overlay', 'toolbar']); }, { timeout: 1000 });
+      await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'overlay', 'toolbar']); }, { timeout: 1000 });
     });
 
     it('stays on the overlay when a later anchor of the chain renders, as a send button once the user types, and keeps the pick', async () => {
@@ -574,7 +575,7 @@ describe('icon placement override on a built-in Platform', () => {
       await new Promise((resolve) => setTimeout(resolve, 400));
 
       expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
-      expect(reports).toEqual(['overlay']);
+      expect(reports).toEqual(['waiting', 'overlay']);
       expect((await readIconPlacementRepairs())['claude.ai']?.override).toMatchObject({ selector: PICKED });
     });
   });
@@ -604,7 +605,7 @@ describe('icon placement override on a built-in Platform', () => {
     expect(reports).not.toContain('overlay');
   });
 
-  it('sends no placement for this tab while its icon waits on the overlay, when another tab stores a repair', async () => {
+  it('sends its wait, not its Toolbar of before, while its icon waits on the overlay, when another tab stores a repair', async () => {
     grace(300);
     // The icon was in the toolbar, then the Platform re-rendered the composer without it
     await internals().injectIcon(editor);
@@ -612,13 +613,40 @@ describe('icon placement override on a built-in Platform', () => {
     renameToolbar('', 'renamed-');
     await internals().injectIcon(editor);
     expect(icon().getAttribute('data-mpm-placement')).toBe('overlay');
+    // No repair yet: a wait, like a Toolbar, has nothing to keep
+    expect(reports).toEqual([]);
 
     // Another tab of the Platform reports the overlay: the Toolbar of before is no longer this tab's placement
     await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'overlay', tabId: 2 });
     await settle();
-    expect(reports).toEqual([]);
+    expect(reports).toEqual(['waiting']);
 
-    await vi.waitFor(() => { expect(reports).toEqual(['overlay']); }, { timeout: 1000 });
+    await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'overlay']); }, { timeout: 1000 });
+  });
+
+  it('keeps the pick while its icon waits on the overlay and another tab places the icon in its Toolbar', async () => {
+    grace(300);
+    renameToolbar('', 'renamed-');
+    page.querySelector(PICKED)?.remove();
+    const pick = { mode: 'custom' as const, placement: 'before' as const, selector: PICKED };
+    // Every tab of the Platform closed, the pick stored: on session restore this tab waits
+    await changeIconPlacementRepairs({ type: 'setOverride', hostname: 'claude.ai', positioning: pick });
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'override', tabId: 3 });
+    await forgetIconPlacementTab(3);
+    await settle();
+    await internals().repair.load();
+    reports.length = 0;
+    await internals().injectIcon(editor);
+    await settle();
+    expect(reports).toEqual(['waiting']);
+
+    // Tab 2, on the variant of the UI the chain knows, reports its Toolbar meanwhile
+    await changeIconPlacementRepairs({ type: 'reportPlacement', hostname: 'claude.ai', placement: 'toolbar', tabId: 2 });
+    expect((await stored())?.override).toEqual(pick);
+
+    // The wait ends without the toolbar nor the pick: Settings shows the overlay, the pick kept
+    await vi.waitFor(() => { expect(reports).toEqual(['waiting', 'overlay']); }, { timeout: 1000 });
+    expect(await stored()).toEqual({ status: 'overlay', override: pick });
   });
 
   it('places the icon at an element picked while it waits at a later anchor of the chain', async () => {
