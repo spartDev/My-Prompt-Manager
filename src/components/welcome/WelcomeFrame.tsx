@@ -72,7 +72,8 @@ const BackButton: FC<{ pop: boolean; onClick: () => void }> = ({ pop, onClick })
       type="button"
       onClick={onClick}
       className={cn(
-        'h-12 flex-none rounded-full border-[1.5px] border-strong px-5 text-[14.5px] font-bold text-primary hover:bg-card transition-welcome-press focus-secondary',
+        // Outlined in the field border color, 3:1 on the frame in both themes
+        'h-12 flex-none rounded-full border-[1.5px] border-input px-5 text-[14.5px] font-bold text-primary hover:bg-card transition-welcome-press focus-secondary',
         pops && 'animate-welcome-back-pop'
       )}
     >
@@ -114,7 +115,8 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
  * with no tab bar. A header (the logo in its violet square and the name; Skip and the round close
  * button), the step's content centered in the room left (it scrolls there when it is taller, so the
  * dots and the buttons always stay in view), three progress dots, each a button to its step, then
- * Back from the second step and the primary button in ink over the rest of the width.
+ * Back from the second step and the primary button in ink (the accent in dark) over the rest of the
+ * width.
  *
  * Keyboard: Enter presses the primary button unless the keyboard is on another control, which keeps
  * its own Enter; ArrowLeft and ArrowRight change step (ArrowRight never finishes). A step change is
@@ -205,8 +207,10 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
           </div>
         </header>
 
-        {/* The step slot: centered in the room left, scrolling there when taller; clipped sideways for the slide */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-x-clip overflow-y-auto">
+        {/* The step slot: centered in the room left, scrolling there when taller. Clipped sideways for
+            the slide, at the screen's edge rather than the content's (-mx/px), so a card's shadow fades
+            out in the side margins instead of being cut along the content's edge */}
+        <div className="-mx-[18px] flex min-h-0 flex-1 flex-col overflow-x-clip overflow-y-auto px-[18px]">
           {/* Keyed by the step: each step change mounts it anew, which plays its slide and moves the keyboard */}
           <StepSlot key={step} direction={direction} animated={animated}>
             {children}
@@ -249,8 +253,9 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
             onClick={() => {
               onAction({ type: 'next' });
             }}
-            // relative: painted, and hit, above Back while Back's pop scales it past its box
-            className="relative h-12 min-w-0 flex-1 rounded-full bg-inverse px-4 text-[14.5px] font-bold text-on-inverse-strong shadow-welcome-primary hover:bg-inverse/90 active:scale-97 transition-welcome-press focus-primary"
+            // relative: painted, and hit, above Back while Back's pop scales it past its box. Ink in
+            // light, the accent in dark, where the dark ink hardly stands out from the frame
+            className="relative h-12 min-w-0 flex-1 rounded-full bg-welcome-primary px-4 text-[14.5px] font-bold text-on-welcome-primary shadow-welcome-primary hover:bg-welcome-primary/90 active:scale-97 transition-welcome-press focus-primary"
           >
             {primaryLabel}
           </button>
