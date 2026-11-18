@@ -4,10 +4,9 @@
  * On 2026-11-15 copilot.microsoft.com and m365.cloud.microsoft/chat both redirected a work account
  * to copilot.cloud.microsoft/chat, where the extension did not run (My-Prompt-Manager-axv). These
  * run the real content script, on a page served at that host, so they fail if the manifest leaves
- * the host out. Its composer is a Lexical editor: the stand-in treats a paste, the editing command,
- * an `input` event and a Backspace as Perplexity's Lexical editor does (fixtures/platform-pages.ts,
- * lexicalEditor), so a Prompt written twice shows. That this editor behaves the same was not seen
- * on the live page: the live check of the ticket, signed in, proves it.
+ * the host out. Its composer is a Lexical editor: the stand-in mounts a real one, as Perplexity's
+ * does, so a Prompt written twice shows, with Copilot's own slash menu written by hand
+ * (fixtures/platform-pages.ts, lexicalEditor and COPILOT_SLASH_MENU).
  */
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';
@@ -118,6 +117,50 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await promptRow(page, REVIEW.id).click();
     await expect(promptSelector(page)).toBeHidden();
     await expect.poll(() => page.evaluate(readEditor), { message: 'the Prompt, once' }).toBe(REVIEW.content);
+  });
+
+  test('the stand-in, as Copilot: with its menu open, a slash the editing command deletes comes back, with one pair of hidden marks', async ({ context }) => {
+    // What the AC2 proof of My-Prompt-Manager-hai stands on: the // is put back, and the state set
+    // back does not add a second pair of marks to the paragraph
+    const page = await openPlatform(context, 'm365copilot-editor');
+    const marks = page.locator('[data-lexical-editor] [aria-hidden="true"]');
+    const text = () => page.locator('[data-lexical-editor] [data-lexical-text]:not([aria-hidden])').allTextContents().then((parts) => parts.join(''));
+    await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await page.keyboard.type('Hi there');
+    for (let step = 0; step < 5; step++) {
+      await page.keyboard.press('ArrowLeft');
+    }
+    await page.keyboard.type('/');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
+    await expect(marks).toHaveCount(2);
+
+    // What the field shows once the editing command has deleted, before the stand-in puts it back:
+    // read at the input event, in the capture phase, ahead of the editor's own listeners
+    const deleted = await page.evaluate(() => {
+      let seen: string | null = null;
+      const record = (event: Event): void => {
+        if ((event as InputEvent).inputType.startsWith('delete')) {
+          seen = Array.from(document.querySelectorAll('[data-lexical-editor] [data-lexical-text]:not([aria-hidden])'))
+            .map((span) => span.textContent ?? '').join('');
+        }
+      };
+      document.addEventListener('input', record, true);
+      document.getSelection()?.modify('extend', 'backward', 'character');
+      document.execCommand('delete');
+      document.removeEventListener('input', record, true);
+      return seen;
+    });
+    expect(deleted, 'the editing command deleted the slash').toBe('Hi there');
+
+    await expect.poll(text, { message: 'the slash is back' }).toBe('Hi /there');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
+    await expect(marks).toHaveCount(2);
+
+    // Backspace, which the editor takes itself, removes the slash: the menu closes, its marks go
+    await page.keyboard.press('Backspace');
+    await expect.poll(text).toBe('Hi there');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
+    await expect(marks).toHaveCount(0);
   });
 
   test('a Prompt is inserted once, line for line, without sending, and Undo empties the field again', async ({ context }) => {
