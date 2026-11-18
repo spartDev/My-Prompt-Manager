@@ -134,10 +134,23 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
     await expect(marks).toHaveCount(2);
 
-    await page.evaluate(() => {
+    // What the field shows once the editing command has deleted, before the stand-in puts it back:
+    // read at the input event, in the capture phase, ahead of the editor's own listeners
+    const deleted = await page.evaluate(() => {
+      let seen: string | null = null;
+      const record = (event: Event): void => {
+        if ((event as InputEvent).inputType.startsWith('delete')) {
+          seen = Array.from(document.querySelectorAll('[data-lexical-editor] [data-lexical-text]:not([aria-hidden])'))
+            .map((span) => span.textContent ?? '').join('');
+        }
+      };
+      document.addEventListener('input', record, true);
       document.getSelection()?.modify('extend', 'backward', 'character');
       document.execCommand('delete');
+      document.removeEventListener('input', record, true);
+      return seen;
     });
+    expect(deleted, 'the editing command deleted the slash').toBe('Hi there');
 
     await expect.poll(text, { message: 'the slash is back' }).toBe('Hi /there');
     await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
