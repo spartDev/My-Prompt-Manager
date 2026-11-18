@@ -38,9 +38,9 @@ export type WelcomeAction =
   | { readonly type: 'skip' }
   /** A progress dot: its step */
   | { readonly type: 'goTo'; readonly step: WelcomeStep }
-  /** A Pack in or out of the selection */
+  /** A Pack in or out of the selection; an id that is no Pack changes nothing */
   | { readonly type: 'togglePack'; readonly id: string }
-  /** The step and the Packs a Welcome closed early stored; without Packs, the default selection */
+  /** The step and the Packs a Welcome closed early stored, ids that are no Pack dropped; without Packs, the default selection */
   | { readonly type: 'restore'; readonly step: WelcomeStep; readonly packs?: readonly string[] };
 
 export interface WelcomeTransition {
@@ -53,6 +53,9 @@ export interface WelcomeTransition {
 /** The Packs selected when the user has chosen none yet: those marked defaultSelected, in their order */
 export const defaultPackSelection = (packs: readonly PromptPack[] = PACKS): readonly string[] =>
   packs.filter((pack) => pack.defaultSelected).map((pack) => pack.id);
+
+/** The ids of the Packs the Welcome offers: the only ones a selection holds */
+const PACK_IDS: ReadonlySet<string> = new Set(PACKS.map((pack) => pack.id));
 
 const unchanged = (state: WelcomeState): WelcomeTransition => ({ state, finish: false });
 
@@ -85,6 +88,10 @@ export const transition = (state: WelcomeState, action: WelcomeAction): WelcomeT
     case 'goTo':
       return goTo(state, action.step);
     case 'togglePack': {
+      // An id that is no Pack selects nothing
+      if (!PACK_IDS.has(action.id)) {
+        return unchanged(state);
+      }
       const selectedPacks = state.selectedPacks.includes(action.id)
         ? state.selectedPacks.filter((id) => id !== action.id)
         : [...state.selectedPacks, action.id];
@@ -95,7 +102,8 @@ export const transition = (state: WelcomeState, action: WelcomeAction): WelcomeT
         state: {
           step: action.step,
           direction: 'none',
-          selectedPacks: action.packs === undefined ? defaultPackSelection() : [...new Set(action.packs)]
+          // A stored id that is no Pack (one a later Release removed) is dropped
+          selectedPacks: action.packs === undefined ? defaultPackSelection() : [...new Set(action.packs.filter((id) => PACK_IDS.has(id)))]
         },
         finish: false
       };

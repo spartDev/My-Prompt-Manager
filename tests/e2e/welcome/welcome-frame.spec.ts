@@ -2,9 +2,10 @@
  * E2E: the Welcome's frame and navigation in the real extension (My-Prompt-Manager-ojz.7).
  *
  * - S1: a first install opens the popup on the Welcome at step 1, its primary button usable.
- * - Display: how long after navigation start the primary button is visible and hit-testable, and
- *   the screen fully opaque (the opening fade ended), over several openings. Reported in
- *   test-results/welcome/display-times.json; the formal measure is My-Prompt-Manager-ojz.13's.
+ * - Display: how long after navigation start the primary button is hit-testable (the screen may still
+ *   be transparent then), the screen first visible (opacity above 0) and fully opaque (the opening
+ *   fade ended), over several openings. Reported in test-results/welcome/display-times.json; the
+ *   formal measure is My-Prompt-Manager-ojz.13's.
  * - AC3: a click on the primary button lands during the opening fade and during a step slide. The
  *   page's animations are slowed a hundredfold as they start, so the clicks fall inside them on any
  *   machine; what each click met is read at its pointerdown.
@@ -12,9 +13,10 @@
  *   loops.
  * - AC5 (S6): the popup closed 100ms after the click that brings step 2, sooner than a person closes
  *   a popup, then opened again: the Welcome at step 2. And the window in which a close would lose the
- *   step: the time from the click to the stored record holding it, seen from the service worker, under
- *   50ms at every run (test-results/welcome/step-write-times.json). A popup closed inside that window
- *   loses the step; why it stays and what would remove it is told at the test.
+ *   step: the time from the click to the stored record holding it, seen from the service worker, a
+ *   median under 50ms and every run under the 100ms of the S6 close
+ *   (test-results/welcome/step-write-times.json). A popup closed inside that window loses the step;
+ *   why it stays and what would remove it is told at the test.
  * - AC6: light screenshots of the frame in the popup (400 x 500) and the side panel (360 x 720), in
  *   test-results/welcome/, the dots and the buttons in view there and at 320 x 600.
  *
@@ -26,6 +28,7 @@ import path from 'node:path';
 
 import type { BrowserContext, Locator, Page, Worker } from '@playwright/test';
 
+import { MOTION } from '../../../src/theme/motion';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { createStorageController, type ExtensionStorage, expect, test, waitForBackgroundTarget, waitForFirstInstallRecords } from '../fixtures/extension';
 
@@ -45,8 +48,11 @@ const OPENINGS = 10;
 /** How many clicks the step-write probe times */
 const STEP_WRITES = 10;
 
-/** The longest a step's write may take, from the click on the primary button to the stored record holding the step */
+/** The median time a step's write may take, from the click on the primary button to the stored record holding the step */
 const STEP_WRITE_BUDGET_MS = 50;
+
+/** How long after the click the S6 proof closes the popup: no step write may take longer, at any run */
+const S6_CLOSE_AFTER_MS = 100;
 
 /** What the step-write probe notes: in the service worker, when the stored record first held each step; in the page, when the click landed */
 type StepWriteProbe = typeof globalThis & { welcomeStepStoredAt?: Record<string, number>; welcomeClickedAt?: number };
@@ -119,18 +125,20 @@ test.describe('The Welcome frame in the real extension', () => {
     await page.close();
   });
 
-  test('display: the primary button visible and hit-testable, and the screen opaque, timed from navigation start over several openings', async ({ context, extensionId }) => {
+  test('display: the primary button hit-testable, the screen first visible and fully opaque, timed from navigation start over several openings', async ({ context, extensionId }) => {
     test.slow();
     await installedStorage(context);
-    const runs: Array<{ welcomeAttached: number; primaryUsable: number; opaque: number }> = [];
+    type DisplayTimes = { welcomeAttached: number; primaryHitTestable: number; firstVisible: number; opaque: number };
+    const runs: DisplayTimes[] = [];
 
     for (let opening = 0; opening < OPENINGS; opening += 1) {
       const page = await context.newPage();
       // Watches every frame from the start of the document: when the Welcome is in the page, when
-      // its primary button has a box and is what a click at its center hits, and when the screen is
-      // fully opaque. performance.now() counts from navigation start
+      // its primary button has a box and is what a click at its center hits (the screen may still be
+      // transparent then), the first frame where the screen's opacity is above 0, and the first where
+      // it is 1. performance.now() counts from navigation start
       await page.addInitScript(() => {
-        const times: Record<string, number | null> = { welcomeAttached: null, primaryUsable: null, opaque: null };
+        const times: Record<string, number | null> = { welcomeAttached: null, primaryHitTestable: null, firstVisible: null, opaque: null };
         (window as unknown as { __welcomeDisplay: typeof times }).__welcomeDisplay = times;
         const tick = (): void => {
           const now = performance.now();
@@ -139,17 +147,21 @@ test.describe('The Welcome frame in the real extension', () => {
           if (main && times.welcomeAttached === null) {
             times.welcomeAttached = now;
           }
-          if (button && times.primaryUsable === null) {
+          if (button && times.primaryHitTestable === null) {
             const box = button.getBoundingClientRect();
             const hit = box.width > 0 && box.height > 0 ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null;
             if (hit && button.contains(hit)) {
-              times.primaryUsable = now;
+              times.primaryHitTestable = now;
             }
           }
-          if (main && times.opaque === null && getComputedStyle(main).opacity === '1') {
+          const opacity = main ? Number(getComputedStyle(main).opacity) : 0;
+          if (main && times.firstVisible === null && opacity > 0) {
+            times.firstVisible = now;
+          }
+          if (main && times.opaque === null && opacity === 1) {
             times.opaque = now;
           }
-          if (times.primaryUsable === null || times.opaque === null) {
+          if (times.primaryHitTestable === null || times.firstVisible === null || times.opaque === null) {
             requestAnimationFrame(tick);
           }
         };
@@ -159,34 +171,38 @@ test.describe('The Welcome frame in the real extension', () => {
       await expect(primary(page)).toBeVisible();
       const times = await page.waitForFunction(() => {
         const recorded = (window as unknown as { __welcomeDisplay?: Record<string, number | null> }).__welcomeDisplay;
-        return recorded && recorded.primaryUsable !== null && recorded.opaque !== null ? recorded : null;
+        return recorded && recorded.primaryHitTestable !== null && recorded.firstVisible !== null && recorded.opaque !== null ? recorded : null;
       });
-      runs.push((await times.jsonValue()) as { welcomeAttached: number; primaryUsable: number; opaque: number });
+      runs.push((await times.jsonValue()) as DisplayTimes);
       await page.close();
     }
 
+    const medianOf = (key: keyof DisplayTimes): number => Math.round(median(runs.map((run) => run[key])));
     const summary = {
       openings: runs.length,
-      medianWelcomeAttachedMs: Math.round(median(runs.map((run) => run.welcomeAttached))),
-      medianPrimaryUsableMs: Math.round(median(runs.map((run) => run.primaryUsable))),
-      medianOpaqueMs: Math.round(median(runs.map((run) => run.opaque))),
+      fadeMs: MOTION.welcomeIn,
+      medianWelcomeAttachedMs: medianOf('welcomeAttached'),
+      medianPrimaryHitTestableMs: medianOf('primaryHitTestable'),
+      medianFirstVisibleMs: medianOf('firstVisible'),
+      medianOpaqueMs: medianOf('opaque'),
       runs: runs.map((run) => ({
         welcomeAttached: Math.round(run.welcomeAttached),
-        primaryUsable: Math.round(run.primaryUsable),
+        primaryHitTestable: Math.round(run.primaryHitTestable),
+        firstVisible: Math.round(run.firstVisible),
         opaque: Math.round(run.opaque)
       }))
     };
     await fs.mkdir(OUTPUT_DIR, { recursive: true });
     await fs.writeFile(path.join(OUTPUT_DIR, 'display-times.json'), `${JSON.stringify(summary, null, 2)}\n`);
     await test.info().attach('display-times', { body: JSON.stringify(summary, null, 2), contentType: 'application/json' });
-    test.info().annotations.push({
-      type: 'display',
-      description: `median over ${String(summary.openings)} openings: primary usable ${String(summary.medianPrimaryUsableMs)}ms, opaque ${String(summary.medianOpaqueMs)}ms`
-    });
+    const line = `median over ${String(summary.openings)} openings, fade ${String(summary.fadeMs)}ms: primary hit-testable ${String(summary.medianPrimaryHitTestableMs)}ms, first visible ${String(summary.medianFirstVisibleMs)}ms, opaque ${String(summary.medianOpaqueMs)}ms`;
+    test.info().annotations.push({ type: 'display', description: line });
+    console.log(`[welcome] display, ${line}`);
 
-    // The primary button is usable no later than the screen is opaque: no animation holds it
+    // The primary button is hit-testable no later than the screen is opaque: no animation holds it
     for (const run of runs) {
-      expect(run.primaryUsable).toBeLessThanOrEqual(run.opaque);
+      expect(run.primaryHitTestable).toBeLessThanOrEqual(run.opaque);
+      expect(run.firstVisible).toBeLessThanOrEqual(run.opaque);
     }
   });
 
@@ -296,7 +312,7 @@ test.describe('The Welcome frame in the real extension', () => {
     await expect(welcome(first)).toHaveAttribute('data-welcome-step', '0');
 
     await primary(first).click();
-    await first.waitForTimeout(100);
+    await first.waitForTimeout(S6_CLOSE_AFTER_MS);
     await first.close();
 
     const second = await context.newPage();
@@ -312,12 +328,14 @@ test.describe('The Welcome frame in the real extension', () => {
   // record, then writes it (writeWelcomeRecord of src/welcome/storage.ts, through writeLaunchState),
   // and a popup closed before the write is issued loses it: a page.close() in the instant of the
   // click lost it 5 times out of 5. The lock and the read stay: they keep a done record final when
-  // the popup and the side panel are open together. Measured on a loaded laptop: 3 to 10ms read in the
-  // page itself; seen from the service worker, which adds the change's delivery to it, a median of
-  // 15ms and 25ms at the slowest of 10 runs. Far under a close a person can make, which takes a move
-  // out of the popup, a focus change or a key press. Routing the step writes through the service
+  // the popup and the side panel are open together. The time depends on the machine's load: on a
+  // developer laptop, 3 to 10ms read in the page itself; seen from the service worker, which adds
+  // the change's delivery to it, medians of 15 to 31ms, 44ms at the slowest run seen. Under a close a
+  // person can make, which takes a move out of the popup, a focus change or a key press. The median
+  // is held under 50ms, which a real regression crosses, and every run under the 100ms of the S6
+  // close, so a slow runner does not fail it for nothing. Routing the step writes through the service
   // worker, which outlives the popup, would remove the window.
-  test(`AC5 (S6): the step is stored within ${String(STEP_WRITE_BUDGET_MS)}ms of the click on the primary button, timed from the service worker, so no close at human speed loses it`, async ({ context, storage, extensionId }) => {
+  test(`AC5 (S6): the step is stored a median under ${String(STEP_WRITE_BUDGET_MS)}ms after the click on the primary button and always under ${String(S6_CLOSE_AFTER_MS)}ms, timed from the service worker, so no close at human speed loses it`, async ({ context, storage, extensionId }) => {
     // The same cast as the storage fixture's: the background of a Manifest V3 extension is its service worker
     const worker = (await waitForBackgroundTarget(context)) as Worker;
     // The service worker notes when the stored record first holds each step
@@ -371,8 +389,9 @@ test.describe('The Welcome frame in the real extension', () => {
     });
     console.log(`[welcome] click to stored step, ${String(summary.runs)} runs: median ${String(summary.medianMs)}ms, slowest ${String(summary.slowestMs)}ms ${JSON.stringify(times)}`);
 
+    expect(summary.medianMs, `median click to stored step, in ms (all runs: ${JSON.stringify(times)})`).toBeLessThan(STEP_WRITE_BUDGET_MS);
     for (const time of times) {
-      expect(time, `click to stored step, in ms (all runs: ${JSON.stringify(times)})`).toBeLessThan(STEP_WRITE_BUDGET_MS);
+      expect(time, `click to stored step, in ms (all runs: ${JSON.stringify(times)})`).toBeLessThan(S6_CLOSE_AFTER_MS);
     }
   });
 

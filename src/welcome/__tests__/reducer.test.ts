@@ -160,6 +160,22 @@ describe('Welcome reducer', () => {
     expect(welcomeReducer(at(0), { type: 'restore', step: 2, packs: ['writing', 'writing', 'product'] }).selectedPacks).toEqual(['writing', 'product']);
   });
 
+  it('togglePack with an id that is no Pack changes nothing, at any step', () => {
+    for (const step of [0, 1, 2] as const) {
+      const before = at(step, ['writing']);
+
+      expect(transition(before, { type: 'togglePack', id: 'no-such-pack' })).toEqual({ state: before, finish: false });
+      expect(transition(before, { type: 'togglePack', id: 'no-such-pack' }).state).toBe(before);
+    }
+  });
+
+  it('restore drops the stored ids that are no Pack, and keeps the Packs in their stored order', () => {
+    const restored = welcomeReducer(at(0), { type: 'restore', step: 2, packs: ['retired-pack', 'product', 'writing', ''] });
+
+    expect(restored.selectedPacks).toEqual(['product', 'writing']);
+    expect(initialWelcomeState(1, ['retired-pack']).selectedPacks).toEqual([]);
+  });
+
   describe('the state a Welcome opens in', () => {
     it('a first opening: step 1, no slide, the Packs selected by default', () => {
       expect(initialWelcomeState()).toEqual({ step: 0, direction: 'none', selectedPacks: DEFAULTS });

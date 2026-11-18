@@ -1193,7 +1193,7 @@ No animation of the frame disables, covers or delays that button: a click lands 
 
 | Token | Value | Use |
 |---|---|---|
-| `animate-welcome-in` (`MOTION.welcomeIn`) | `backdrop-in` 150ms, ease | the screen fading in at the opening; the mockup's 500ms is shortened so the screen is whole within the 200ms the Welcome has to show |
+| `animate-welcome-in` (`MOTION.welcomeIn`) | `backdrop-in` 100ms, ease | the screen fading in at the opening; the mockup's 500ms is shortened so the screen is whole within the 200ms the Welcome has to show (150ms was not enough) |
 | `animate-welcome-step-forward` / `-back` (`MOTION.welcomeStep`) | `welcome-from-right` / `welcome-from-left` 500ms, `ease-section` | a step sliding 26px in from the side it comes from as it fades in; the step of the opening shows at once |
 | `animate-welcome-back-pop` (`MOTION.welcomeBackPop`) | `pop` 350ms, ease-spring | Back popping in when a step change brings it |
 | `transition-welcome-dot` (`src/popup.css`, `MOTION.welcomeDot`) | width 450ms ease-spring, background 300ms | the active dot widening from 7 to 22px |

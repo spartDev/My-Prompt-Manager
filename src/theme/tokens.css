@@ -293,9 +293,9 @@
   /* --- end What's new sheet --- */
 
   /* --- Welcome frame (My-Prompt-Manager-ojz.7; Atelier 1C 'Premier lancement') ---
-     The screen fades in at the opening (the mockup's cFade, on the backdrop-in keyframes, in 150ms
-     rather than 500ms so the Welcome is whole within 200ms of opening); a step
-     slides 26px in from the side it comes from while it fades in, on the Section curve (the mockup's
+     The screen fades in at the opening (the mockup's cFade, on the backdrop-in keyframes, in 100ms
+     rather than 500ms so the Welcome is whole within 200ms of opening: 150ms reached 204 to 212ms);
+     a step slides 26px in from the side it comes from while it fades in, on the Section curve (the mockup's
      cL and cR); Back pops in when a step change brings it (cPop). None of them covers or holds the
      primary button. The progress dots and the presses are transitions in popup.css; durations are
      MOTION.welcome* in motion.ts. An inactive dot takes the strong border color (the mockup's
@@ -303,7 +303,7 @@
   --background-color-step-dot: var(--border-color-strong);
   --shadow-tint-ink: rgba(29, 21, 48, 0.9);
   --shadow-welcome-primary: 0 14px 26px -16px var(--shadow-tint-ink);
-  --animate-welcome-in: backdrop-in 150ms ease both;
+  --animate-welcome-in: backdrop-in 100ms ease both;
   --animate-welcome-step-forward: welcome-from-right 500ms var(--ease-section) both;
   --animate-welcome-step-back: welcome-from-left 500ms var(--ease-section) both;
   --animate-welcome-back-pop: pop 350ms var(--ease-spring) both;

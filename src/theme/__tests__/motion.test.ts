@@ -149,8 +149,8 @@ describe('Welcome frame motion', () => {
   /** The Welcome's own block of popup.css, wherever other blocks sit around it */
   const block = popupCss.slice(popupCss.indexOf('/* --- Welcome frame'), popupCss.indexOf('/* --- end Welcome frame --- */'));
 
-  it('fades the screen in at the opening in 150ms, not the mockup\'s 500ms, so it is whole within the 200ms the Welcome has', () => {
-    expect(MOTION.welcomeIn).toBe(150);
+  it('fades the screen in at the opening in 100ms, not the mockup\'s 500ms, so it is whole within the 200ms the Welcome has', () => {
+    expect(MOTION.welcomeIn).toBe(100);
     expect(tokens).toContain(`--animate-welcome-in: backdrop-in ${MOTION.welcomeIn}ms ease both;`);
     expect(tokens).toMatch(/@keyframes backdrop-in \{\s*from \{ opacity: 0; \}\s*to \{ opacity: 1; \}/);
   });

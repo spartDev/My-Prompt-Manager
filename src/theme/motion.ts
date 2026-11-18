@@ -99,11 +99,12 @@ export const MOTION = {
 
   // --- Welcome frame (My-Prompt-Manager-ojz.7) ---
   /**
-   * Welcome: the screen fading in at the opening. The mockup's 500ms left the screen less than
-   * opaque until 534ms after the popup opened (median of 10 openings); 150ms shows it whole within
-   * the 200ms the Welcome has to be on screen (decision Q3 of My-Prompt-Manager-ojz)
+   * Welcome: the screen fading in at the opening, in 100ms rather than the mockup's 500ms, so the
+   * Welcome is whole within the 200ms it has to be on screen (decision Q3 of My-Prompt-Manager-ojz).
+   * Fully opaque, as a median of 10 openings from navigation start: about 534ms with 500ms, 204 to
+   * 212ms with 150ms (over the target), about 140ms with 100ms
    */
-  welcomeIn: 150,
+  welcomeIn: 100,
   /** Welcome: a step sliding 26px in from the side it comes from while it fades in, on the Section curve (EASE.section) */
   welcomeStep: 500,
   /** Welcome: the active progress dot widening from 7 to 22px, on the spring */
