@@ -3,8 +3,9 @@
  *
  * - AC1: axe (@axe-core/playwright, tags wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa) finds no
  *   violation on each of the three steps, light and dark, in the popup (400 x 500) and the side panel
- *   (320 x 600), nor on the Library the Welcome leaves for, with its Notification: 13 combinations, each
- *   count logged ("[axe] …") and written to test-results/welcome/axe-*.json. The same walk measures the
+ *   (320 x 600), nor on the Library the Welcome leaves for, with its Notification, on both surfaces in
+ *   both themes: 16 combinations, each count logged ("[axe] …") and written to
+ *   test-results/welcome/axe-*.json. The same walk measures the
  *   progress dots: each a target of 24 x 24px at least, none overlapping another (WCAG 2.5.8).
  * - AC2: with the keyboard alone (Tab, Shift+Tab, Enter, Space, the arrows; no mouse), from the opening
  *   to the Library with Packs added, then a Prompt copied to the clipboard: the first use is within
@@ -298,23 +299,31 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
     }
   }
 
-  test('AC1: axe finds no violation on the Library the Welcome leaves for, with its Notification (light, popup 400 x 500)', async ({ page, storage, extensionId }) => {
-    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
-    await openSurface(page, extensionId, 'popup');
-    await expect(primary(page)).toHaveText(/^Add \d+ prompts$/);
+  for (const surface of ['popup', 'sidepanel'] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      const { width, height } = SURFACES[surface];
 
-    await primary(page).click();
+      test(`AC1: axe finds no violation on the Library the Welcome leaves for, with its Notification, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await openSurface(page, extensionId, surface);
+        await expectTheme(page, theme);
+        await expect(primary(page)).toHaveText(/^Add \d+ prompts$/);
 
-    await expect(welcome(page)).toHaveCount(0);
-    // The Notification still there when axe reads it: hovered, it keeps its time
-    await page.getByTestId('toast').hover();
-    await animationsDone(page);
-    const count = await audit(page, 'Library at the exit with its Notification, light, popup 400x500');
-    await expect(page.getByTestId('toast')).toBeVisible();
-    await writeReport([count]);
+        await primary(page).click();
 
-    expect(count.rules).toEqual([]);
-  });
+        await expect(welcome(page)).toHaveCount(0);
+        await expect(page.getByTestId('prompt-card').first()).toBeVisible();
+        // The Notification still there when axe reads it: hovered, it keeps its time
+        await page.getByTestId('toast').hover();
+        await animationsDone(page);
+        const count = await audit(page, `Library at the exit with its Notification, ${theme}, ${surface} ${String(width)}x${String(height)}`);
+        await expect(page.getByTestId('toast')).toBeVisible();
+        await writeReport([count]);
+
+        expect(count.rules).toEqual([]);
+      });
+    }
+  }
 
   test('AC2: with the keyboard alone, from the opening to the Library with Packs added, then a Prompt copied', async ({ context, page, storage, extensionId }) => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
