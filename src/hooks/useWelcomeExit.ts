@@ -24,7 +24,7 @@ export interface WelcomeExitOptions {
   readonly showToast: ShowToast;
   /**
    * Hides the Notification on screen, if any. Called as an exit starts: the only one the Welcome can
-   * show is the failure of an earlier add, whose Start empty would do nothing once the user has left
+   * show is the failure of an earlier add, whose Try again would do nothing once the user has left
    */
   readonly hideNotification: () => void;
   /** The Packs the last step offers; tests pass their own */
@@ -48,9 +48,9 @@ export const packsAddedNotice = ({ added, packNames }: AddPacksResult): PacksAdd
     ? { message: 'Your library is ready', sub: 'Every prompt was already in it' }
     : { message: `${String(added)} ${added === 1 ? 'prompt' : 'prompts'} added`, sub: packNames.join(', ') };
 
-/** The Notification of a refused add; its action leaves the Welcome with no Pack */
+/** The Notification of a refused add, which stays until the user acts; its action tries the same add again */
 const ADD_FAILED = "Couldn't add the prompts";
-const START_EMPTY = 'Start empty';
+const TRY_AGAIN = 'Try again';
 
 /**
  * The way out of the Welcome: what the primary button of its last step does with the ids of the Packs
@@ -63,12 +63,15 @@ const START_EMPTY = 'Start empty';
  * with none, the editor's title field takes it as the editor opens.
  *
  * A refused add finishes nothing: the Welcome stays at its last step, nothing is recorded, and a
- * failure Notification offers to start empty; the primary button tries again. Each exit, that Start
- * empty included, hides the Notification on screen as it starts, so a failure Notification never
- * outlives the Welcome with a Start empty that would do nothing any more. A press while an exit
- * is under way (a double click, Enter then a click) does nothing, so the Packs are added once and the
- * Welcome finished once. An add that lands after the unmount (the popup closed) does nothing more:
- * the next opening finds the Welcome pending over a Library with Prompts, which counts as finished.
+ * failure Notification says so until the user acts, with no time of its own. Its action, Try again,
+ * calls this same exit with the same Packs, as the primary button does; the primary button tries
+ * again too, and with every Pack unselected it reads Start empty. Each exit hides the Notification on
+ * screen as it starts, so a failure Notification never stays over an add tried again, nor outlives
+ * the Welcome with a Try again that would do nothing any more (My-Prompt-Manager-ojz.20). A press
+ * while an exit is under way (a double click, Enter then a click) does nothing, so the Packs are
+ * added once and the Welcome finished once. An add that lands after the unmount (the popup closed)
+ * does nothing more: the next opening finds the Welcome pending over a Library with Prompts, which
+ * counts as finished.
  */
 export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly string[]) => void) => {
   // The latest callbacks, for an add that lands and a timer that fires after App rendered again
@@ -106,7 +109,7 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
   /**
    * Starts an exit, unless one is under way: false then. The Notification on screen goes: a failure
    * Notification of an earlier add would otherwise stay over the Library, or over the add tried
-   * again, with a Start empty that does nothing
+   * again, with a Try again that does nothing
    */
   const begin = useCallback((): boolean => {
     if (leaving.current) {
@@ -117,13 +120,10 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     return true;
   }, []);
 
-  const startEmptyAfterFailure = useCallback((): void => {
-    if (begin()) {
-      startEmpty();
-    }
-  }, [begin, startEmpty]);
+  // The exit the primary button calls, for the Try again of a failure Notification to call it the same way
+  const exitRef = useRef<(packIds: readonly string[]) => void>(() => undefined);
 
-  const addThenLeave = useCallback(async (packs: readonly PromptPack[]): Promise<void> => {
+  const addThenLeave = useCallback(async (packIds: readonly string[], packs: readonly PromptPack[]): Promise<void> => {
     let result: AddPacksResult;
     try {
       result = await latest.current.addPacks(packs);
@@ -136,7 +136,17 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
         return;
       }
       leaving.current = false;
-      latest.current.showToast(ADD_FAILED, 'error', { action: { label: START_EMPTY, onClick: startEmptyAfterFailure } });
+      // No time of its own (duration 0): it stays until the user acts, so it is read whole and the
+      // retry stays within reach. Try again is the primary button's exit, with the same Packs
+      latest.current.showToast(ADD_FAILED, 'error', {
+        duration: 0,
+        action: {
+          label: TRY_AGAIN,
+          onClick: () => {
+            exitRef.current(packIds);
+          }
+        }
+      });
       return;
     }
     if (!mounted.current) {
@@ -148,9 +158,9 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     focusFirstPrompt();
     const { message, sub } = packsAddedNotice(result);
     showToast(message, 'success', { sub });
-  }, [startEmptyAfterFailure]);
+  }, []);
 
-  return useCallback((packIds: readonly string[]): void => {
+  const exit = useCallback((packIds: readonly string[]): void => {
     if (!begin()) {
       return;
     }
@@ -160,6 +170,12 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
       startEmpty();
       return;
     }
-    void addThenLeave(packs);
+    void addThenLeave(packIds, packs);
   }, [begin, startEmpty, addThenLeave]);
+
+  useEffect(() => {
+    exitRef.current = exit;
+  }, [exit]);
+
+  return exit;
 };

@@ -924,6 +924,16 @@ The bold message stays whole; the optional sub (the object's name, or the reason
 ellipsis when the pill runs out of room. Write the message short (`Prompt saved`, `Couldn't delete
 Prompt`) and put the name in the sub.
 
+On the Welcome (My-Prompt-Manager-ojz.20), the Notification passes two opt-in props of
+`ToastContainer` that nothing else passes. `wrap`: the message wraps onto a second line instead of
+being cut, in a pill as wide as its text, `min-h-10`, `rounded-[20px]`. `clearRight`: the room on the
+right kept free for the Welcome's close button (`WELCOME_CLOSE_ROOM`, the frame's 18px padding, the
+32px button and 8px), the pill centered in what is left, never under 16px from the left edge. At 320px
+"Couldn't add the prompts" takes two lines, from 16px to 262px, and the close button starts at 270px.
+The failure of the Packs' add has no timer: it stays until the user acts (Try again, the primary
+button, Start empty, Back, a dot, or close), and a step change hides it, so it never covers the
+controls of another step.
+
 ```tsx
 <div role="status" className="
   animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
@@ -1253,9 +1263,9 @@ outline.
 
 | Token | Value | Use |
 |---|---|---|
-| `animate-welcome-float-left` / `-right` / `-center` (`MOTION.welcomeFloat*`) | `float` 5800ms / 6400ms from 900ms / 5200ms from 400ms, ease-in-out, in a loop | step 1's cards, 8px up and back, each at its own pace; still under reduced motion |
-| `MOTION.welcomeTypeLetter`, `MOTION.welcomeTypePause` (timers) | 85ms a letter, the whole name held about 1.2s (14 letters' time, 1190ms) | step 2's name typed into the blank, then typed again; the whole name at once under reduced motion |
-| `animate-welcome-caret` (`MOTION.welcomeCaretBlink`) | `welcome-blink` 1000ms, `steps(1)`, in a loop | the caret after the letters typed; none under reduced motion |
+| `animate-welcome-float-left` / `-right` / `-center` (`MOTION.welcomeFloat*`) | `float` 3400ms / 3800ms from 500ms / 3000ms from 250ms, ease-in-out, once | step 1's cards, 8px up and back once, each at its own pace, all at rest 4.3s after the step shows; still under reduced motion |
+| `MOTION.welcomeTypeLetter`, `MOTION.welcomeTypePause`, `MOTION.welcomeTypings` (timers) | 85ms a letter, the whole name held about 1.2s (14 letters' time, 1190ms), 2 typings | step 2's name typed into the blank, held, typed again, then held for good with a still caret, 4.76s after the step shows; the whole name at once under reduced motion |
+| `animate-welcome-caret` (`MOTION.welcomeCaretBlink`, `MOTION.welcomeCaretBlinks`) | `welcome-blink` 1000ms, `steps(1)`, 4 times | the caret after the letters typed, blinking while it types; still once the name is held, none under reduced motion |
 | `animate-welcome-check` (`MOTION.welcomeCheck`) | `pop` 450ms, ease-spring | the round check of a selected Pack; the Pack itself presses with `active:scale-95` on `transition-chip` |
 | `border-blank` | `bg-accent` (`#6D28D9` / `#844BF2`) | the underline of step 2's blank |
 | `border-inverse-blank` | `bg-inverse-mark` (`#A78BFA`, both modes) | the dashed blank of step 1's ink card |
@@ -1264,6 +1274,15 @@ outline.
 | `shadow-welcome-ink-card` (`--shadow-tint-ink`) | `0 22px 40px -20px` | step 1's ink card |
 
 None of them touches the frame's primary button.
+
+Nothing on the Welcome loops: everything that moves by itself on a step ends within
+`MOTION.welcomeMotionLimit` (5s) of the step's display (WCAG 2.2.2 Pause, Stop, Hide, Level A;
+My-Prompt-Manager-ojz.20), measured on the built extension by `tests/e2e/welcome/welcome-motion.spec.ts`:
+step 1's cards at rest by 4.3s, step 2's caret still by 4.0s and its typing held by 4.76s, step 3's
+check and slide by about 0.5s. The Atelier 1C mockup loops the cards, the typing and the caret; the
+Welcome plays the floats once and the typing twice instead (D28 and D29 of My-Prompt-Manager-ojz.20).
+The Packs grid's edges are drawn by its scroll timeline, which Chromium lists as running animations
+while the grid shows; they move only as the user scrolls, which the criterion leaves out.
 
 #### Welcome exit
 
@@ -1281,6 +1300,11 @@ that scripted focus after a key press, not after a click, so a mouse user sees n
 Copy ignores a repeated Enter: the Enter on "Add N prompts" can still be held when the Copy takes the
 keyboard, and its auto-repeat copies nothing. With Start empty, the editor's title field takes it as
 the editor opens.
+
+A refused add keeps the Welcome at its last step with the failure Notification "Couldn't add the
+prompts" (see Notification, On the Welcome). Its action is Try again, the same add with the same Packs;
+the primary button also tries again, and with every Pack unselected it reads Start empty. The keyboard
+stays on the primary button, so Enter tries again.
 
 #### Modal Fade In
 

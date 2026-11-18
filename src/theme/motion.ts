@@ -116,17 +116,33 @@ export const MOTION = {
   // --- end Welcome frame ---
 
   // --- Welcome steps (My-Prompt-Manager-ojz.8) ---
-  /** Welcome step 1: the three Prompt cards floating 8px up and back, in a loop, each at its own pace (left, right after its delay, center after its delay) */
-  welcomeFloatLeft: 5800,
-  welcomeFloatRight: 6400,
-  welcomeFloatRightDelay: 900,
-  welcomeFloatCenter: 5200,
-  welcomeFloatCenterDelay: 400,
-  /** Welcome step 2: a letter of the name typed into the blank every welcomeTypeLetter; the whole name held welcomeTypePause, then typed again */
+  /**
+   * Welcome: everything that moves on a step by itself ends within this of the step's display, so
+   * nothing moves beside the text with no way to stop it (WCAG 2.2.2 Pause, Stop, Hide, Level A;
+   * My-Prompt-Manager-ojz.20). The mockup loops the cards and the typing; here they play, then rest
+   */
+  welcomeMotionLimit: 5000,
+  /**
+   * Welcome step 1: the three Prompt cards floating 8px up and back once, each at its own pace (left,
+   * right after its delay, center after its delay), the last one at rest 4.3s after the step shows.
+   * The mockup's 5.8s, 6.4s from 0.9s and 5.2s from 0.4s, in a loop, would not end within welcomeMotionLimit
+   */
+  welcomeFloatLeft: 3400,
+  welcomeFloatRight: 3800,
+  welcomeFloatRightDelay: 500,
+  welcomeFloatCenter: 3000,
+  welcomeFloatCenterDelay: 250,
+  /**
+   * Welcome step 2: a letter of the name typed into the blank every welcomeTypeLetter; the whole name
+   * held welcomeTypePause, then typed again, welcomeTypings times in all; the last one stays, whole,
+   * with a still caret: 4.76s after the step shows
+   */
   welcomeTypeLetter: 85,
   welcomeTypePause: 1200,
-  /** Welcome step 2: the caret after the letters typed, blinking once a cycle */
+  welcomeTypings: 2,
+  /** Welcome step 2: the caret after the letters typed, blinking once a cycle, welcomeCaretBlinks cycles, then still */
   welcomeCaretBlink: 1000,
+  welcomeCaretBlinks: 4,
   /** Welcome step 3: the round check of a selected Pack popping in, on the spring */
   welcomeCheck: 450,
   // --- end Welcome steps ---

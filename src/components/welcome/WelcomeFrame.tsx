@@ -29,6 +29,13 @@ export interface WelcomeFrameProps {
 
 const STEPS: readonly WelcomeStep[] = [0, 1, 2];
 
+/**
+ * The pixels at the right of the screen that the round close button and the room around it take: the
+ * frame's side padding (18), the button (32) and a gap of 8. A Notification over the Welcome leaves
+ * them free (ToastContainer's clearRight), so it never covers the close button, at 320px wide too
+ */
+export const WELCOME_CLOSE_ROOM = 18 + 32 + 8;
+
 /** "Step 2 of 3": a dot's name, and what a step change announces */
 const stepName = (step: WelcomeStep): string => `Step ${String(step + 1)} of ${String(STEP_COUNT)}`;
 

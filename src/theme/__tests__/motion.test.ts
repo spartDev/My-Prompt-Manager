@@ -189,19 +189,53 @@ describe('Welcome steps motion', () => {
   /** The Welcome steps' own block of popup.css */
   const block = popupCss.slice(popupCss.indexOf('/* --- Welcome steps'), popupCss.indexOf('/* --- end Welcome steps --- */'));
 
-  it("floats the three cards of step 1 8px up and back, each at its own pace: 5.8s, 6.4s from 0.9s, 5.2s from 0.4s (the mockup's cFloat)", () => {
-    expect([MOTION.welcomeFloatLeft, MOTION.welcomeFloatRight, MOTION.welcomeFloatCenter]).toEqual([5800, 6400, 5200]);
-    expect([MOTION.welcomeFloatRightDelay, MOTION.welcomeFloatCenterDelay]).toEqual([900, 400]);
-    expect(tokens).toContain(`--animate-welcome-float-left: float ${MOTION.welcomeFloatLeft}ms ease-in-out infinite;`);
-    expect(tokens).toContain(`--animate-welcome-float-right: float ${MOTION.welcomeFloatRight}ms ease-in-out ${MOTION.welcomeFloatRightDelay}ms infinite;`);
-    expect(tokens).toContain(`--animate-welcome-float-center: float ${MOTION.welcomeFloatCenter}ms ease-in-out ${MOTION.welcomeFloatCenterDelay}ms infinite;`);
+  /** The Welcome steps' own block of tokens.css */
+  const stepsTokens = tokens.slice(tokens.indexOf('/* --- Welcome steps'), tokens.indexOf('/* --- end Welcome steps --- */'));
+
+  it("floats the three cards of step 1 8px up and back once, each at its own pace: 3.4s, 3.8s from 0.5s, 3s from 0.25s (the mockup's cFloat, which loops)", () => {
+    expect([MOTION.welcomeFloatLeft, MOTION.welcomeFloatRight, MOTION.welcomeFloatCenter]).toEqual([3400, 3800, 3000]);
+    expect([MOTION.welcomeFloatRightDelay, MOTION.welcomeFloatCenterDelay]).toEqual([500, 250]);
+    // One iteration each: no count is written, and none is infinite
+    expect(tokens).toContain(`--animate-welcome-float-left: float ${MOTION.welcomeFloatLeft}ms ease-in-out;`);
+    expect(tokens).toContain(`--animate-welcome-float-right: float ${MOTION.welcomeFloatRight}ms ease-in-out ${MOTION.welcomeFloatRightDelay}ms;`);
+    expect(tokens).toContain(`--animate-welcome-float-center: float ${MOTION.welcomeFloatCenter}ms ease-in-out ${MOTION.welcomeFloatCenterDelay}ms;`);
     expect(tokens).toMatch(/@keyframes float \{\s*0%, 100% \{ transform: translateY\(0\); \}\s*50% \{ transform: translateY\(-8px\); \}/);
   });
 
-  it("types a letter every 85ms, holds the whole name 1.2s, and blinks the caret once a second (the mockup's TYPE and cBlink)", () => {
-    expect([MOTION.welcomeTypeLetter, MOTION.welcomeTypePause, MOTION.welcomeCaretBlink]).toEqual([85, 1200, 1000]);
-    expect(tokens).toContain(`--animate-welcome-caret: welcome-blink ${MOTION.welcomeCaretBlink}ms steps(1) infinite;`);
+  it("types a letter every 85ms, holds the whole name 1.2s, twice, and blinks the caret once a second, four times (the mockup's TYPE and cBlink, which loop)", () => {
+    expect([MOTION.welcomeTypeLetter, MOTION.welcomeTypePause, MOTION.welcomeTypings]).toEqual([85, 1200, 2]);
+    expect([MOTION.welcomeCaretBlink, MOTION.welcomeCaretBlinks]).toEqual([1000, 4]);
+    expect(tokens).toContain(`--animate-welcome-caret: welcome-blink ${MOTION.welcomeCaretBlink}ms steps(1) ${String(MOTION.welcomeCaretBlinks)};`);
     expect(tokens).toMatch(/@keyframes welcome-blink \{\s*0%, 49% \{ opacity: 1; \}\s*50%, 100% \{ opacity: 0; \}/);
+  });
+
+  // WCAG 2.2.2 Pause, Stop, Hide (Level A): motion that starts by itself beside the text ends within 5s
+  it('nothing on a step moves for ever: no animation of the Welcome steps is infinite', () => {
+    expect(stepsTokens).not.toBe('');
+    expect(stepsTokens).not.toMatch(/infinite/);
+  });
+
+  it('everything that moves on a step by itself ends within 5s of the step showing', () => {
+    expect(MOTION.welcomeMotionLimit).toBe(5000);
+    const floats = [
+      MOTION.welcomeFloatLeft,
+      MOTION.welcomeFloatRight + MOTION.welcomeFloatRightDelay,
+      MOTION.welcomeFloatCenter + MOTION.welcomeFloatCenterDelay
+    ];
+    for (const end of floats) {
+      expect(end).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    }
+    expect(MOTION.welcomeCaretBlink * MOTION.welcomeCaretBlinks).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    // The typing of BlankDemo: each typing but the last is followed by its hold (14 letters' time)
+    const name = 'Claire, Head of Sales';
+    const holdTicks = Math.round(MOTION.welcomeTypePause / MOTION.welcomeTypeLetter);
+    const typingEnds = ((name.length + holdTicks) * (MOTION.welcomeTypings - 1) + name.length) * MOTION.welcomeTypeLetter;
+    expect(typingEnds).toBe(4760);
+    expect(typingEnds).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    // The step slide, the dot, Back's pop and a Pack's check are shorter still
+    for (const once of [MOTION.welcomeStep, MOTION.welcomeDot, MOTION.welcomeBackPop, MOTION.welcomeCheck]) {
+      expect(once).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    }
   });
 
   it("pops the check of a selected Pack over 450ms on the spring (the mockup's cPop)", () => {

@@ -2,7 +2,8 @@
  * Leaving the Welcome for a ready Library (My-Prompt-Manager-ojz.9), in App over the store of an
  * opening: the Packs selected added, the Welcome finished, the Library on All with a Notification
  * (scenario 2); or no Pack, the Library, then the editor on a new Prompt (scenario 3); a refused
- * add keeping the Welcome at its last step; never What's new right after the Welcome out of Debug
+ * add keeping the Welcome at its last step, its failure Notification staying with Try again
+ * (My-Prompt-Manager-ojz.20); never What's new right after the Welcome out of Debug
  * mode. StorageManager is the real one over the test storage, so the Prompts listed are the ones
  * stored.
  */
@@ -265,7 +266,9 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent("Couldn't add the prompts");
-      expect(within(alert).getByRole('button', { name: 'Start empty' })).toBeInTheDocument();
+      expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      // The keyboard stays where it was: the failure takes no focus
+      expect(alert).not.toContainElement(document.activeElement as HTMLElement | null);
       expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
       expect(primary()).toHaveTextContent(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
       expect(screen.queryByRole('heading', { name: LIBRARY_HEADING })).not.toBeInTheDocument();
@@ -283,24 +286,94 @@ describe('App: leaving the Welcome for a ready Library', () => {
       await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
     });
 
-    it('Start empty in the failure Notification leaves for the Library, then the editor', async () => {
+    it('the failure Notification stays until the user acts: still there 10s after it shows, with no input', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      // Faked before the failure shows, so any time of its own would be on this clock; still running
+      // with the real one, so the add and the reads it awaits settle
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      fireEvent.click(primary());
+      await screen.findByRole('alert');
+
+      // Past the 6s a failure had, and past 10s
+      act(() => { vi.advanceTimersByTime(10_001); });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent("Couldn't add the prompts");
+      expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      act(() => { vi.advanceTimersByTime(60_000); });
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      vi.useRealTimers();
+    });
+
+    it('Try again in the failure Notification adds the same Packs: the Library with each of them once, the Notification of the add, the Welcome done', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });
       await openWelcome(2);
       refuseOnce();
       fireEvent.click(primary());
       const alert = await screen.findByRole('alert');
 
-      fireEvent.click(within(alert).getByRole('button', { name: 'Start empty' }));
+      fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
 
-      expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
-      expect(screen.getByText('Your library is empty')).toBeInTheDocument();
+      await waitFor(() => { expect(screen.queryByTestId('welcome')).not.toBeInTheDocument(); });
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      expect(addPacks).toHaveBeenCalledTimes(2);
+      expect(addPacks.mock.calls[1]?.[0]).toEqual(addPacks.mock.calls[0]?.[0]);
+      expect(cardTitles().sort()).toEqual(DEFAULT_PROMPTS.map((prompt) => prompt.title).sort());
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
-      expect(getMockStorageManager().addPacks).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
       await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
+      expect(welcomeDoneWrites()).toHaveLength(1);
     });
 
-    it('or the Packs unselected, the primary button, now Start empty, leaves for the Library, then the editor, the failure Notification gone with the Welcome', async () => {
+    it('Try again refused too: the failure Notification again, the Welcome still at its last step, nothing recorded', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      refuseOnce();
+      fireEvent.click(primary());
+      fireEvent.click(within(await screen.findByRole('alert')).getByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => { expect(getMockStorageManager().addPacks).toHaveBeenCalledTimes(2); });
+      const again = await screen.findByRole('alert');
+      expect(again).toHaveTextContent("Couldn't add the prompts");
+      expect(within(again).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+      await settle();
+      expect(await stored(WELCOME_KEY)).toEqual({ status: 'pending', step: 2 });
+      expect(welcomeDoneWrites()).toEqual([]);
+    });
+
+    it.each([
+      ['Back', () => screen.getByRole('button', { name: 'Back' })],
+      ['the first dot', () => screen.getByRole('button', { name: 'Step 1 of 3' })]
+    ])('a step change (%s) hides the failure Notification: it belongs to the last step', async (_how, control) => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      fireEvent.click(primary());
+      await screen.findByRole('alert');
+
+      fireEvent.click(control());
+
+      expect(screen.getByTestId('welcome')).not.toHaveAttribute('data-welcome-step', '2');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('a Pack toggled keeps the failure Notification: the user has not acted on it', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      fireEvent.click(primary());
+      await screen.findByRole('alert');
+
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${DEFAULTS[0]?.name ?? ''} `) }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent("Couldn't add the prompts");
+    });
+
+    it('Start empty stays on the step: the Packs unselected, the primary button, now Start empty, leaves for the Library, then the editor, the failure Notification gone with the Welcome', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });
       await openWelcome(2);
       refuseOnce();
@@ -314,9 +387,9 @@ describe('App: leaving the Welcome for a ready Library', () => {
       fireEvent.click(primary());
 
       expect(screen.getByText('Your library is empty')).toBeInTheDocument();
-      // Its Start empty would do nothing over the Library and the editor: it goes as the exit starts
+      // Its Try again would do nothing over the Library and the editor: it goes as the exit starts
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Start empty' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
       expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(getMockStorageManager().addPacks).toHaveBeenCalledTimes(1);
