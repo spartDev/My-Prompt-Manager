@@ -471,6 +471,34 @@ async function observeSlash(page: Page, platform: PlatformDefinition): Promise<S
   };
 }
 
+/** How many editors clickField finds and clicks before it gives up on a Platform that keeps replacing its editor */
+export const FIELD_CLICK_ATTEMPTS = 3;
+
+/**
+ * Finds the field and clicks it, found again when the Platform replaced it between the lookup and
+ * the click: Gemini mounts its editor, then replaces it with a new one some 200 ms later, which a
+ * lookup in between finds (seen on 2026-11-18). The click then throws as the element is detached,
+ * before any key. Null when no field shows; throws the click's error once FIELD_CLICK_ATTEMPTS
+ * editors were replaced, or on any other error.
+ */
+async function clickField(page: Page, platform: PlatformDefinition, timeout: number): Promise<ElementHandle<HTMLElement> | null> {
+  for (let attempt = 1; ; attempt++) {
+    const editor = await findEditor(page, editorSelectorsOf(platform), timeout);
+    if (!editor) {
+      return null;
+    }
+    try {
+      await editor.click();
+      return editor;
+    } catch (err: unknown) {
+      await editor.dispose();
+      if (attempt >= FIELD_CLICK_ATTEMPTS || !(err instanceof Error && err.message.includes('not attached to the DOM'))) {
+        throw err;
+      }
+    }
+  }
+}
+
 /**
  * Puts the caret in the field, once the Prompts button shows (the content script is ready). The
  * field is never emptied: a Platform may restore a saved draft, which a case would otherwise
@@ -479,12 +507,17 @@ async function observeSlash(page: Page, platform: PlatformDefinition): Promise<S
  * text, left as it was.
  */
 async function focusEmptyField(page: Page, platform: PlatformDefinition, timeout: number): Promise<'ready' | 'no-field' | 'draft'> {
-  const editor = await findEditor(page, editorSelectorsOf(platform), timeout);
+  const shown = await findEditor(page, editorSelectorsOf(platform), timeout);
+  if (!shown) {
+    return 'no-field';
+  }
+  await shown.dispose();
+  await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
+  // Found again after the wait, and again when it was replaced before the click
+  const editor = await clickField(page, platform, timeout);
   if (!editor) {
     return 'no-field';
   }
-  await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
-  await editor.click();
   const text = await editor.evaluate(fieldTextOf);
   await editor.dispose();
   return isEmptyField(text) ? 'ready' : 'draft';
@@ -550,12 +583,11 @@ export type CleanUpResult = 'emptied' | 'not emptied' | 'not ours';
 export async function cleanUp(page: Page, platform: PlatformDefinition, owned: readonly string[]): Promise<CleanUpResult> {
   await page.keyboard.press('Escape');
   await page.locator(SELECTOR_DIALOG).waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => undefined);
-  const editor = await findEditor(page, editorSelectorsOf(platform), 2_000);
+  const editor = await clickField(page, platform, 2_000);
   if (!editor) {
-    // Replaced or removed: the keys would go nowhere, and a draft may be kept
+    // Removed: the keys would go nowhere, and a draft may be kept
     return 'not emptied';
   }
-  await editor.click();
   if (!ownsField(await editor.evaluate(fieldTextOf), owned)) {
     await editor.dispose();
     return 'not ours';
