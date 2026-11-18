@@ -11,6 +11,7 @@ import {
   type CaseResult,
   cleanUp,
   cleanUpNote,
+  FIELD_CLICK_ATTEMPTS,
   fieldTextOf,
   formatReport,
   judgeLateToolbar,
@@ -150,13 +151,15 @@ describe('cleanUp', () => {
  * the Prompts button, during a pause, or while the case types (put before the case's text), or
  * while icon-steady reads where the button is before typing
  */
-function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLeaves = '' }: {
+function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLeaves = '', replacedBeforeClick = 0 }: {
   editor: boolean;
   typeThrows?: boolean;
   text?: string;
   restore?: { draft: string; on: 'icon' | 'pause' | 'type' | 'click' | 'selectAll' | 'baseline' };
   /** What the field still holds after Backspace: an editor may keep spaces or line breaks */
   backspaceLeaves?: string;
+  /** How many clicks find their editor replaced by the Platform, as Gemini replaces its editor once it first shows */
+  replacedBeforeClick?: number;
 }) {
   const keys: string[] = [];
   let field = text;
@@ -166,7 +169,19 @@ function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLea
     }
     return Promise.resolve();
   };
-  const element = { click: () => restoreOn('click'), dispose: () => Promise.resolve(), evaluate: () => Promise.resolve(field) };
+  const clicks = { detached: 0, attached: 0 };
+  const element = {
+    click: () => {
+      if (clicks.detached < replacedBeforeClick) {
+        clicks.detached++;
+        return Promise.reject(new Error('elementHandle.click: Element is not attached to the DOM'));
+      }
+      clicks.attached++;
+      return restoreOn('click');
+    },
+    dispose: () => Promise.resolve(),
+    evaluate: () => Promise.resolve(field)
+  };
   const waitForFunction = vi.fn(() => (editor ? Promise.resolve({ asElement: () => element }) : Promise.reject(new Error('Timeout exceeded'))));
   const page = {
     keyboard: {
@@ -191,7 +206,7 @@ function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLea
     waitForTimeout: vi.fn(() => restoreOn('pause')),
     waitForFunction
   } as unknown as Page;
-  return { page, keys, waitForFunction, field: () => field };
+  return { page, keys, waitForFunction, clicks, field: () => field };
 }
 
 describe('runCase progress', () => {
@@ -282,6 +297,51 @@ describe('runCase progress', () => {
       expect(page.keyboard.type).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('runCase on a field the Platform replaces before the click', () => {
+  it('finds the field again and runs the case when the editor it found was replaced before its click', async () => {
+    const { page, keys, clicks } = fakePage({ editor: true, replacedBeforeClick: 1 });
+    const progress = { typed: false, owned: [] as readonly string[] };
+
+    await runCase(page, SUPPORTED_PLATFORMS.gemini, 'slash-empty', 10, progress);
+
+    expect(clicks).toEqual({ detached: 1, attached: 1 });
+    expect(progress.typed).toBe(true);
+    expect(page.keyboard.type).toHaveBeenCalledWith('//');
+    expect(keys).toEqual([]);
+  });
+
+  it('still leaves a draft as it was in the editor found again', async () => {
+    const { page, keys } = fakePage({ editor: true, replacedBeforeClick: 1, text: 'Mon brouillon' });
+    const progress = { typed: false, owned: [] as readonly string[] };
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.gemini, 'slash-empty', 10, progress);
+
+    expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
+    expect(progress.typed).toBe(false);
+    expect(keys).toEqual([]);
+    expect(page.keyboard.type).not.toHaveBeenCalled();
+  });
+
+  it(`gives up after ${FIELD_CLICK_ATTEMPTS} replaced editors, with nothing typed`, async () => {
+    const { page, clicks } = fakePage({ editor: true, replacedBeforeClick: FIELD_CLICK_ATTEMPTS });
+    const progress = { typed: false, owned: [] as readonly string[] };
+
+    await expect(runCase(page, SUPPORTED_PLATFORMS.gemini, 'slash-empty', 10, progress)).rejects.toThrow('Element is not attached to the DOM');
+    expect(clicks).toEqual({ detached: FIELD_CLICK_ATTEMPTS, attached: 0 });
+    expect(progress.typed).toBe(false);
+    expect(page.keyboard.type).not.toHaveBeenCalled();
+  });
+
+  it('finds the field again in the cleanup when the editor it found was replaced before its click', async () => {
+    const { page, keys, clicks, field } = fakePage({ editor: true, replacedBeforeClick: 1, text: '//' });
+
+    await expect(cleanUp(page, SUPPORTED_PLATFORMS.gemini, ['//'])).resolves.toBe('emptied');
+    expect(clicks).toEqual({ detached: 1, attached: 1 });
+    expect(keys).toEqual(['Escape', 'ControlOrMeta+A', 'Backspace']);
+    expect(field()).toBe('');
+  });
 });
 
 /**
