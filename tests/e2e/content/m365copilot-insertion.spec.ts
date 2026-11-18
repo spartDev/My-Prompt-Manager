@@ -119,6 +119,37 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await expect.poll(() => page.evaluate(readEditor), { message: 'the Prompt, once' }).toBe(REVIEW.content);
   });
 
+  test('the stand-in, as Copilot: with its menu open, a slash the editing command deletes comes back, with one pair of hidden marks', async ({ context }) => {
+    // What the AC2 proof of My-Prompt-Manager-hai stands on: the // is put back, and the state set
+    // back does not add a second pair of marks to the paragraph
+    const page = await openPlatform(context, 'm365copilot-editor');
+    const marks = page.locator('[data-lexical-editor] [aria-hidden="true"]');
+    const text = () => page.locator('[data-lexical-editor] [data-lexical-text]:not([aria-hidden])').allTextContents().then((parts) => parts.join(''));
+    await page.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await page.keyboard.type('Hi there');
+    for (let step = 0; step < 5; step++) {
+      await page.keyboard.press('ArrowLeft');
+    }
+    await page.keyboard.type('/');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
+    await expect(marks).toHaveCount(2);
+
+    await page.evaluate(() => {
+      document.getSelection()?.modify('extend', 'backward', 'character');
+      document.execCommand('delete');
+    });
+
+    await expect.poll(text, { message: 'the slash is back' }).toBe('Hi /there');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(1);
+    await expect(marks).toHaveCount(2);
+
+    // Backspace, which the editor takes itself, removes the slash: the menu closes, its marks go
+    await page.keyboard.press('Backspace');
+    await expect.poll(text).toBe('Hi there');
+    await expect(page.locator('[data-e2e="slash-menu"]')).toHaveCount(0);
+    await expect(marks).toHaveCount(0);
+  });
+
   test('a Prompt is inserted once, line for line, without sending, and Undo empties the field again', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
 

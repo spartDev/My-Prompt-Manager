@@ -413,8 +413,13 @@ const COPILOT_SLASH_MENU = /* js */ `
               menu.setAttribute('data-e2e', 'slash-menu');
               menu.textContent = 'Opened by you';
               document.body.append(menu);
+              // A state set back after a deletion (above) holds its marks already: the menu opens
+              // again, and the paragraph keeps its one pair
               editor.update(() => {
-                $getRoot().getLastChild()?.append(new HiddenMarkNode(''), new HiddenMarkNode('\\u200B\\u200C'));
+                const paragraph = $getRoot().getLastChild();
+                if (paragraph && !paragraph.getChildren().some((node) => node instanceof HiddenMarkNode)) {
+                  paragraph.append(new HiddenMarkNode(''), new HiddenMarkNode('\\u200B\\u200C'));
+                }
               });
             } else if (!slash && menu) {
               menu.remove();
