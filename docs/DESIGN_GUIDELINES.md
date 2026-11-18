@@ -52,7 +52,7 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `border-default` | `#ECE6F5` | `#352C4C` | Cards, unselected pills. Also the color of a bare `border` |
 | `border-divider` | `#F0EBF8` | `#2F2744` | Dividers inside a card |
 | `border-strong` | `#DCD4EA` | `#41375A` | Secondary button; the line under the header, shown only once the list scrolls |
-| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star (3:1 on every surface) |
+| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star, the Welcome's Back and unselected Packs (3:1 on every surface) |
 | `border-focus` | accent | accent | A focused field (`focus-input` applies it) |
 | `border-error` | danger | danger | A field in error |
 | `border-ghost` | `#CFC5E3` | `#4A4066` | Dashed outline of what is not there yet, in an [empty state](#empty-states): ghost cards and tiles on `bg-app` |
@@ -1188,8 +1188,12 @@ for nothing (`motionDuration`).
 
 The Welcome (`src/components/welcome/WelcomeFrame.tsx`, Atelier 1C 'Premier lancement') fills the
 popup or the side panel on `bg-subtle` (the mockups' `#F4F1FA` light, `#2B2340` dark), with no tab bar.
-Its primary button is ink, `bg-inverse text-on-inverse-strong`, 48px high over the rest of the width.
-No animation of the frame disables, covers or delays that button: a click lands while they play.
+Its primary button is `bg-welcome-primary text-on-welcome-primary`, 48px high over the rest of the
+width: ink in light, the accent in dark, as the two mockups draw it (the dark ink, `bg-inverse`, is
+1.5:1 on the frame; the accent 3.0:1, its white label 4.9:1). Back is outlined in `border-input`, 3:1
+on the frame in both modes. The step's area clips sideways at the screen's edge (`-mx-[18px] px-[18px]`),
+so a card's shadow fades out in the side margins. No animation of the frame disables, covers or delays
+the primary button: a click lands while they play.
 
 | Token | Value | Use |
 |---|---|---|
@@ -1197,8 +1201,9 @@ No animation of the frame disables, covers or delays that button: a click lands 
 | `animate-welcome-step-forward` / `-back` (`MOTION.welcomeStep`) | `welcome-from-right` / `welcome-from-left` 500ms, `ease-section` | a step sliding 26px in from the side it comes from as it fades in; the step of the opening shows at once |
 | `animate-welcome-back-pop` (`MOTION.welcomeBackPop`) | `pop` 350ms, ease-spring | Back popping in when a step change brings it |
 | `transition-welcome-dot` (`src/popup.css`, `MOTION.welcomeDot`) | width 450ms ease-spring, background 300ms | the active dot widening from 7 to 22px |
-| `transition-welcome-press` (`src/popup.css`, `MOTION.welcomePress`) | scale 250ms ease-spring, background and color 200ms | the primary button (`active:scale-97`, `hover:bg-inverse/90`), the close button (`active:scale-90`), Skip and Back |
-| `bg-step-dot` | `border-strong` (`#DCD4EA` / `#41375A`) | an inactive progress dot; the active one is `bg-accent` |
+| `transition-welcome-press` (`src/popup.css`, `MOTION.welcomePress`) | scale 250ms ease-spring, background and color 200ms | the primary button (`active:scale-97`, `hover:bg-welcome-primary/90`), the close button (`active:scale-90`), Skip and Back |
+| `bg-welcome-primary` / `text-on-welcome-primary` | `bg-inverse` / `text-on-inverse-strong` (`#1D1530` / `#FFFFFF`) in light, `bg-accent` / `text-on-accent` (`#844BF2` / `#FFFFFF`) in dark | the primary button and its label |
+| `bg-step-dot` | `border-input` (`#8F87A5` / `#766C8E`) | an inactive progress dot, a control with nothing else to show it: 3:1 on the frame (the mockups' `#DCD4EA` / `#41375A` are 1.3:1); the active one is `bg-accent` |
 | `shadow-welcome-primary` (`--shadow-tint-ink`) | `0 14px 26px -16px`, ink at 0.9 in light, near black at 0.92 in dark | the shadow of the primary button |
 
 Under `prefers-reduced-motion` the frame plays none of them (it reads the setting as it opens), and
@@ -1211,9 +1216,14 @@ The content of the three steps (`src/components/welcome/WelcomeCards.tsx`, `Blan
 violet (`bg-inverse-mark/35` for its chip); their lines are `bg-(--border-color-default)`, `bg-muted`,
 `bg-inverse-bar` and `bg-inverse-action`, their chips the empty Categories' tile colors. Step 2's blank
 is `bg-accent-selected text-accent-strong` with `border-blank` under it and a `bg-accent` caret. Step 3's
-Packs are cards (`bg-card border-default`) until selected, then take the Category chip tint of their
-color (`getSoftBadgeColors`, through `--pack-*` variables as `CategoryChips` does), a border and a
-check of their color: a Pack's color is user data. The Platform pills are `bg-card text-secondary`.
+Packs are cards outlined at 3:1 (`bg-card border-input`) until selected, then take the Category chip
+tint of their color, opaque over `bg-card`, the chip's text, and a border and a check round of their
+color (`src/welcome/packColors.ts`, through `--pack-*` variables as `CategoryChips` does): a Pack's
+color is user data. Its color is the mark as is in light, lifted toward white in dark as the chip's
+text is, and the check glyph is `text-on-pack-check`. The Packs' grid takes back its padding with
+`-m-1`, so the Packs line up with the title and the pills while a focused Pack's outline stays whole.
+The Platform pills are `bg-card text-secondary`. Every pair is checked at its threshold, in light and
+dark, by "Welcome in light and dark" in `src/theme/__tests__/tokens.test.ts`.
 
 | Token | Value | Use |
 |---|---|---|
@@ -1223,6 +1233,7 @@ check of their color: a Pack's color is user data. The Platform pills are `bg-ca
 | `animate-welcome-check` (`MOTION.welcomeCheck`) | `pop` 450ms, ease-spring | the round check of a selected Pack; the Pack itself presses with `active:scale-95` on `transition-chip` |
 | `border-blank` | `bg-accent` (`#6D28D9` / `#844BF2`) | the underline of step 2's blank |
 | `border-inverse-blank` | `bg-inverse-mark` (`#A78BFA`, both modes) | the dashed blank of step 1's ink card |
+| `text-on-pack-check` | `text-on-accent` (`#FFFFFF`) in light, `text-on-inverse-mark` (`#1D1530`) in dark | the glyph on a selected Pack's check round: white is under 3:1 on a color lifted for dark |
 | `shadow-welcome-card` / `shadow-welcome-demo` (`--shadow-tint-50`) | `0 14px 30px -18px` / `0 18px 36px -22px`, violet at 0.5 in light, black at 0.8 in dark | step 1's light cards / step 2's card |
 | `shadow-welcome-ink-card` (`--shadow-tint-ink`) | `0 22px 40px -20px` | step 1's ink card |
 

@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MOTION } from '../../../theme/motion';
+import { packColors } from '../../../welcome/packColors';
 import { PACKS } from '../../../welcome/packs';
 import type { WelcomeStep } from '../../../welcome/storage';
 import WelcomeHost, { type WelcomeHostProps } from '../WelcomeHost';
@@ -248,7 +249,11 @@ describe('Welcome steps', () => {
         expect(button).toHaveTextContent(`${String(pack.prompts.length)} prompts`);
         const dot = button.querySelector<HTMLElement>('[data-pack-dot]');
         expect(dot).toHaveAttribute('aria-hidden', 'true');
-        expect(dot).toHaveStyle({ backgroundColor: pack.color });
+        // The Pack's color in light, lifted toward white in dark (My-Prompt-Manager-ojz.11)
+        expect(dot?.className).toContain('bg-[var(--pack-mark)]');
+        expect(dot?.className).toContain('dark:bg-[var(--pack-mark-dark)]');
+        expect(button.style.getPropertyValue('--pack-mark')).toBe(pack.color);
+        expect(button.style.getPropertyValue('--pack-mark-dark')).toBe(packColors(pack.color).dark.mark);
       }
     });
 
@@ -271,20 +276,29 @@ describe('Welcome steps', () => {
       expect(packButton(selected.name)).toHaveAttribute('aria-pressed', 'false');
     });
 
-    it('a selected Pack is tinted, bordered in its color and checked; an unselected one is a plain card', () => {
+    it('a selected Pack is tinted, bordered in its color and checked; an unselected one is a card outlined at 3:1', () => {
       renderWelcome({ step: 2 });
 
       for (const pack of PACKS) {
         const button = packButton(pack.name);
         const check = button.querySelector<HTMLElement>('[data-pack-check]');
+        const colors = packColors(pack.color);
         if (pack.defaultSelected) {
-          expect(button).toHaveStyle({ borderColor: pack.color });
-          expect(button.className).toContain('bg-[var(--pack-bg)]');
+          expect(button.style.getPropertyValue('--pack-tint')).toBe(colors.tint);
+          expect(button.style.getPropertyValue('--pack-text')).toBe(colors.light.text);
+          expect(button.style.getPropertyValue('--pack-text-dark')).toBe(colors.dark.text);
+          expect(button.className).toContain('bg-[var(--pack-tint)]');
+          expect(button.className).toContain('border-[color:var(--pack-mark)]');
+          expect(button.className).toContain('dark:border-[color:var(--pack-mark-dark)]');
+          expect(button.className).toContain('text-[var(--pack-text)]');
+          expect(button.className).toContain('dark:text-[var(--pack-text-dark)]');
           expect(check?.className).toContain('animate-welcome-check');
+          expect(check?.className).toContain('text-on-pack-check');
+          expect(check?.className).toContain('bg-[var(--pack-mark)]');
           expect(check).toHaveAttribute('aria-hidden', 'true');
         } else {
           expect(button.className).toContain('bg-card');
-          expect(button.className).toContain('border-default');
+          expect(button.className).toContain('border-input');
           expect(check).toBeNull();
         }
         expect(button.className).toContain('active:scale-95');

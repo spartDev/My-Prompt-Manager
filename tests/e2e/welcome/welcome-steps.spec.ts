@@ -8,8 +8,13 @@
  *   in view. Packs are compiled in, so the test adds copies of the Pack toggles to the grid's DOM.
  * - Step 2: the blank fills letter by letter in real time, and the card keeps its height while it
  *   does, so the title and the text under it never move.
- * - AC6: light screenshots of the three steps in the popup (400 x 500), the side panel (360 x 720)
- *   and the narrowest side panel (320 x 600), in WELCOME_STEPS_SCREENSHOTS (test-results/welcome-steps
+ * - Step 2's card casts its shadow whole: the step's area clips sideways at the screen's edge, past
+ *   the reach of the shadow. Step 3's Packs line up with the title and the pills, and a focused
+ *   Pack's outline is drawn whole, clipped neither by the grid nor by the step's area
+ *   (My-Prompt-Manager-ojz.11).
+ * - AC6, and AC3 of My-Prompt-Manager-ojz.11: light and dark screenshots of the three steps in the
+ *   popup (400 x 500), the side panel (360 x 720) and the narrowest side panel (320 x 600), and of
+ *   step 3's Packs with the first one focused, in WELCOME_STEPS_SCREENSHOTS (test-results/welcome-steps
  *   when unset).
  *
  * Each test seeds a pending Welcome over an empty Library.
@@ -18,6 +23,7 @@ import fs from 'node:fs/promises';
 
 import type { Locator, Page } from '@playwright/test';
 
+import { DEFAULT_SETTINGS } from '../../../src/types';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
 
@@ -162,6 +168,80 @@ test.describe('The Welcome steps in the real extension', () => {
       await expectInView(page, page.getByRole('group', { name: 'Steps' }), 'the dots');
       await expectInView(page, page.getByRole('heading', { level: 1, name: 'Start with a pack' }), 'the title');
     });
+
+    test(`step 2's card shadow fades out before the step's clip; step 3's Packs line up with the title and the pills, their focus outline whole (${surface})`, async ({ page, storage, extensionId }) => {
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 1 } });
+      await open(page, extensionId, surface);
+      await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
+      await animationsDone(page);
+
+      // A shadow reaches past the card's sides by its blur, plus its spread and its offset (0 18px 36px -22px: 14px)
+      const shadow = await page.evaluate(() => {
+        const card = document.querySelector('[data-testid="welcome-blank"]')?.closest('.shadow-welcome-demo');
+        const clip = document.querySelector('[data-testid="welcome-step"]')?.parentElement;
+        if (!card || !clip) {
+          return null;
+        }
+        const reach = Math.max(
+          ...[...getComputedStyle(card).boxShadow.matchAll(/(-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px (-?[\d.]+)px/g)].map(([, x, , blur, spread]) =>
+            Math.max(0, Number(blur) + Number(spread) + Math.abs(Number(x)))
+          )
+        );
+        const [cardBox, clipBox] = [card.getBoundingClientRect(), clip.getBoundingClientRect()];
+        return { reach, left: cardBox.left - clipBox.left, right: clipBox.right - cardBox.right };
+      });
+      expect(shadow).not.toBeNull();
+      expect(shadow?.reach, 'the card casts a shadow').toBeGreaterThan(0);
+      expect(shadow?.left, 'room for the shadow on the left').toBeGreaterThanOrEqual(shadow?.reach ?? Infinity);
+      expect(shadow?.right, 'room for the shadow on the right').toBeGreaterThanOrEqual(shadow?.reach ?? Infinity);
+
+      await primary(page).click();
+      await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
+      await animationsDone(page);
+
+      const layout = await page.evaluate(() => {
+        const box = (element: Element | null | undefined) => {
+          const rect = element?.getBoundingClientRect();
+          return { left: rect?.left ?? NaN, right: rect?.right ?? NaN, top: rect?.top ?? NaN, bottom: rect?.bottom ?? NaN };
+        };
+        const grid = document.querySelector('[data-testid="welcome-packs"]');
+        const packs = [...(grid?.querySelectorAll('button') ?? [])];
+        // Each Pack focused in turn: its outline drawn past its box by its width and its offset
+        const outlines = packs.map((pack) => {
+          pack.focus();
+          const style = getComputedStyle(pack);
+          const ring = parseFloat(style.outlineWidth) + parseFloat(style.outlineOffset);
+          const rect = box(pack);
+          return { ring, left: rect.left - ring, right: rect.right + ring, top: rect.top - ring, bottom: rect.bottom + ring };
+        });
+        (document.activeElement as HTMLElement | null)?.blur();
+        return {
+          title: box(document.querySelector('[data-welcome-title]')),
+          pills: box(document.querySelector('ul[aria-label="Works on"]')),
+          grid: box(grid),
+          clip: box(document.querySelector('[data-testid="welcome-step"]')?.parentElement),
+          packs: packs.map(box),
+          outlines
+        };
+      });
+
+      expect(layout.packs).toHaveLength(4);
+      expect(Math.min(...layout.packs.map((pack) => pack.left)), 'the Packs start where the title starts').toBeCloseTo(layout.title.left, 0);
+      expect(Math.max(...layout.packs.map((pack) => pack.right)), 'the Packs end where the title ends').toBeCloseTo(layout.title.right, 0);
+      expect(layout.pills.left, 'the pills span the title too').toBeCloseTo(layout.title.left, 0);
+      expect(layout.pills.right).toBeCloseTo(layout.title.right, 0);
+      for (const [index, outline] of layout.outlines.entries()) {
+        const what = `Pack ${String(index + 1)} focused`;
+        expect(outline.ring, `${what}: its outline drawn`).toBeGreaterThan(0);
+        // The grid and the step's area clip what lies past their sides
+        for (const [name, clip] of [['the grid', layout.grid], ["the step's area", layout.clip]] as const) {
+          expect(outline.left, `${what}: left, inside ${name}`).toBeGreaterThanOrEqual(clip.left);
+          expect(outline.right, `${what}: right, inside ${name}`).toBeLessThanOrEqual(clip.right);
+          expect(outline.top, `${what}: top, inside ${name}`).toBeGreaterThanOrEqual(clip.top);
+          expect(outline.bottom, `${what}: bottom, inside ${name}`).toBeLessThanOrEqual(clip.bottom);
+        }
+      }
+    });
   }
 
   for (const surface of ['popup', 'narrowSidepanel'] as const) {
@@ -214,31 +294,49 @@ test.describe('The Welcome steps in the real extension', () => {
     });
   }
 
-  for (const surface of ['popup', 'sidepanel', 'narrowSidepanel'] as const) {
-    test(`AC6: PROOF, light screenshots of the three steps (${surface})`, async ({ page, storage, extensionId }) => {
-      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
-      await open(page, extensionId, surface);
-      await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
-      const { width, height } = SURFACES[surface];
+  // Light (My-Prompt-Manager-ojz.8 AC6) and dark (My-Prompt-Manager-ojz.11 AC3)
+  for (const theme of ['light', 'dark'] as const) {
+    for (const surface of ['popup', 'sidepanel', 'narrowSidepanel'] as const) {
+      test(`PROOF, ${theme} screenshots of the three steps (${surface})`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await open(page, extensionId, surface);
+        if (theme === 'dark') {
+          await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+        } else {
+          await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+        }
+        await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+        const { width, height } = SURFACES[surface];
+        const name = (what: string) => `${SCREENSHOTS_DIR}/steps-${surface}-${String(width)}x${String(height)}-${what}-${theme}.png`;
 
-      for (const step of [0, 1, 2] as const) {
-        await expect(welcome(page)).toHaveAttribute('data-welcome-step', String(step));
-        await animationsDone(page);
-        if (step === 1) {
-          // The blank whole, as the mockup shows it
-          await expect(page.getByTestId('welcome-blank')).toHaveText('Claire, Head of Sales');
+        for (const step of [0, 1, 2] as const) {
+          await expect(welcome(page)).toHaveAttribute('data-welcome-step', String(step));
+          await animationsDone(page);
+          if (step === 1) {
+            // The blank whole, as the mockup shows it
+            await expect(page.getByTestId('welcome-blank')).toHaveText('Claire, Head of Sales');
+          }
+          await expectInView(page, primary(page), `step ${String(step + 1)}: the primary button`);
+          // The pointer off the controls, so none shows its hover
+          await page.mouse.move(width / 2, 4);
+          await page.screenshot({ path: name(`step${String(step + 1)}`), animations: 'disabled' });
+          if (step < 2) {
+            await primary(page).click();
+          }
         }
-        await expectInView(page, primary(page), `step ${String(step + 1)}: the primary button`);
-        // The pointer off the controls, so none shows its hover
-        await page.mouse.move(width / 2, 4);
-        await page.screenshot({
-          path: `${SCREENSHOTS_DIR}/steps-${surface}-${String(width)}x${String(height)}-step${String(step + 1)}-light.png`,
-          animations: 'disabled'
-        });
-        if (step < 2) {
-          await primary(page).click();
+
+        // The Packs, the first one focused from the keyboard: its outline whole, the Packs lined up with the pills
+        const packs = page.getByRole('group', { name: 'Packs' });
+        await packs.getByRole('button').first().focus();
+        const box = await packs.boundingBox();
+        if (box) {
+          await page.screenshot({
+            path: name('step3-packs-focused'),
+            animations: 'disabled',
+            clip: { x: 0, y: Math.max(0, box.y - 12), width, height: Math.min(height - Math.max(0, box.y - 12), box.height + 64) }
+          });
         }
-      }
-    });
+      });
+    }
   }
 });

@@ -10,7 +10,9 @@ import path from 'node:path';
 import { compile } from '@tailwindcss/node';
 import { describe, expect, it } from 'vitest';
 
-import { getContrastRatio } from '../../constants/colors';
+import { getContrastRatio, getSoftBadgeColors } from '../../constants/colors';
+import { packColors } from '../../welcome/packColors';
+import { PACKS } from '../../welcome/packs';
 
 const POPUP_CSS = path.resolve(__dirname, '../../popup.css');
 
@@ -180,7 +182,9 @@ describe('Color tokens', () => {
       'bg-inverse-bar', 'bg-inverse-bar-hover', 'text-on-inverse-muted', 'bg-callout', 'text-callout',
       'border-ghost', 'border-inverse-ghost', 'text-on-inverse-dim', 'text-tile-blue', 'text-tile-pink', 'text-tile-violet',
       // The Welcome's inactive progress dot (My-Prompt-Manager-ojz.7)
-      'bg-step-dot'
+      'bg-step-dot',
+      // The Welcome's primary button and the check of a selected Pack (My-Prompt-Manager-ojz.11)
+      'bg-welcome-primary', 'text-on-welcome-primary', 'text-on-pack-check'
     ];
     const css = await buildCss(classes);
 
@@ -419,12 +423,12 @@ describe('Welcome frame tokens', () => {
     expect(ruleFor(css, 'transition-welcome-press')).toContain('var(--ease-spring)');
   });
 
-  it("an inactive dot takes the strong border color, and the primary button casts the mockups' shadow, in light and dark", async () => {
+  it("an inactive dot takes the field border color, 3:1 on the frame (My-Prompt-Manager-ojz.11), and the primary button casts the mockups' shadow, in light and dark", async () => {
     const declared = await readDeclarations();
     const { light, dark } = await readTokens();
 
-    expect(declared.light['--background-color-step-dot']).toBe('var(--border-color-strong)');
-    expect([light['--background-color-step-dot'], dark['--background-color-step-dot']]).toEqual(['#dcd4ea', '#41375a']);
+    expect(declared.light['--background-color-step-dot']).toBe('var(--border-color-input)');
+    expect([light['--background-color-step-dot'], dark['--background-color-step-dot']]).toEqual(['#8f87a5', '#766c8e']);
     expect(light['--shadow-tint-ink']).toBe('rgba(29, 21, 48, 0.9)');
     expect(dark['--shadow-tint-ink']).toBe('rgba(4, 2, 10, 0.92)');
     expect(light['--shadow-welcome-primary']).toBe('0 14px 26px -16px var(--shadow-tint-ink)');
@@ -494,3 +498,162 @@ describe('Welcome steps tokens', () => {
   });
 });
 // --- end Welcome steps ---
+
+// --- Welcome in light and dark (My-Prompt-Manager-ojz.11) ---
+/** The files that draw the Welcome: the frame, the host, the steps and their contents */
+const WELCOME_FILES = [
+  'components/welcome/WelcomeFrame.tsx',
+  'components/welcome/WelcomeHost.tsx',
+  'components/welcome/WelcomeSteps.tsx',
+  'components/welcome/WelcomeCards.tsx',
+  'components/welcome/BlankDemo.tsx',
+  'components/welcome/PackPicker.tsx'
+].map(file => readFileSync(path.resolve(__dirname, '../..', file), 'utf8'));
+
+/**
+ * Every color token the Welcome reads, with its value in light and in dark: the role-to-token
+ * table of the spec's "Couleurs" (epic My-Prompt-Manager-ojz). The mockups (MPM-C-Atelier and
+ * MPM-C-Atelier-Sombre, block isEmpty) are in the comment where they differ.
+ */
+const WELCOME_COLORS: Array<[token: string, light: string, dark: string]> = [
+  // The screen
+  ['--background-color-subtle', '#f4f1fa', '#2b2340'],
+  // The name, the titles, Back, the demo's sentence (mockup dark #e4def0), an unselected Pack
+  ['--text-color-primary', '#1d1530', '#f1edf9'],
+  // The text of a step, Skip, the close glyph (mockup dark #a39abb), a Pack's count, the Platform pills
+  ['--text-color-secondary', '#5c5370', '#bcb3d0'],
+  // The logo square, the active dot, the caret
+  ['--background-color-accent', '#6d28d9', '#844bf2'],
+  ['--text-color-on-accent', '#ffffff', '#ffffff'],
+  // The close button, the hover of Skip and Back, the cards, the demo, the Packs, the pills
+  ['--background-color-card', '#ffffff', '#231c34'],
+  // The close button's border; the first line of step 1's light cards
+  ['--border-color-default', '#ece6f5', '#352c4c'],
+  // The close button hovered (mockup dark #352c4c)
+  ['--background-color-accent-subtle', '#f1ebfd', '#2f2350'],
+  // The border of Back and of an unselected Pack (mockups #dcd4ea and #ece6f5, dark #41375a and #352c4c: under 3:1)
+  ['--border-color-input', '#8f87a5', '#766c8e'],
+  // An inactive dot (mockups #dcd4ea, dark #41375a: under 3:1)
+  ['--background-color-step-dot', '#8f87a5', '#766c8e'],
+  // The primary button: ink in light, the accent in dark, as the mockups draw it
+  ['--background-color-welcome-primary', '#1d1530', '#844bf2'],
+  ['--text-color-on-welcome-primary', '#ffffff', '#ffffff'],
+  ['--shadow-tint-ink', 'rgba(29, 21, 48, 0.9)', 'rgba(4, 2, 10, 0.92)'],
+  // Every focus outline
+  ['--outline-color-accent', '#6d28d9', '#844bf2'],
+  // Step 1: the chips and the second line of the light cards, the ink card and its marks
+  ['--text-color-tile-pink', '#db2777', '#ec4899'],
+  ['--text-color-tile-blue', '#2563eb', '#3b82f6'],
+  ['--background-color-muted', '#f1edf8', '#2e2645'],
+  ['--background-color-inverse', '#1d1530', '#4a3d6b'],
+  ['--background-color-inverse-mark', '#a78bfa', '#a78bfa'],
+  ['--background-color-inverse-bar', 'rgba(255, 255, 255, 0.22)', 'rgba(255, 255, 255, 0.22)'],
+  ['--background-color-inverse-action', 'rgba(255, 255, 255, 0.14)', 'rgba(255, 255, 255, 0.14)'],
+  ['--border-color-inverse-blank', '#a78bfa', '#a78bfa'],
+  ['--shadow-tint-50', 'rgba(45, 25, 90, 0.5)', 'rgba(0, 0, 0, 0.8)'],
+  // Step 2: the blank and its underline
+  ['--background-color-accent-selected', '#ede5ff', '#38296a'],
+  ['--text-color-accent-strong', '#4c1d95', '#ddd3fe'],
+  ['--border-color-blank', '#6d28d9', '#844bf2'],
+  // Step 3: the glyph on a selected Pack's check, white on its color in light, ink on its lifted color in dark (mockup dark white: under 3:1)
+  ['--text-color-on-pack-check', '#ffffff', '#1d1530']
+];
+
+/** A translucent rgba() color composited over an opaque #RRGGBB one */
+const over = (rgba: string, surface: string): string => {
+  const [r, g, b, alpha] = (/^rgba\((\d+), (\d+), (\d+), ([\d.]+)\)$/.exec(rgba) ?? []).slice(1).map(Number);
+  const base = [1, 3, 5].map(i => parseInt(surface.substring(i, i + 2), 16));
+  return `#${[r, g, b].map((channel, i) => Math.round(base[i] + (channel - base[i]) * alpha).toString(16).padStart(2, '0')).join('')}`;
+};
+
+describe('Welcome in light and dark', () => {
+  it('lists every color class of the Welcome files', async () => {
+    const { light } = await readDeclarations();
+    const prefixes: Record<string, string> = { bg: 'background', text: 'text', border: 'border' };
+    const used = new Set<string>();
+    for (const source of WELCOME_FILES) {
+      for (const [, prefix, name] of source.matchAll(/(?<![\w-])(bg|text|border)-([a-z][a-z-]*[a-z])(?![\w-])/g)) {
+        const token = `--${prefixes[prefix]}-color-${name}`;
+        if (token in light) {used.add(token);}
+      }
+    }
+    // Drawn through a utility rather than a color class: the focus outlines and the shadows
+    used.add('--outline-color-accent').add('--shadow-tint-ink').add('--shadow-tint-50');
+
+    expect(used.size).toBeGreaterThan(20);
+    expect([...used].filter(token => !WELCOME_COLORS.some(([listed]) => listed === token)), 'tokens missing from the list').toEqual([]);
+  });
+
+  it.each(WELCOME_COLORS)('%s is %s in light and %s in dark', async (token, lightValue, darkValue) => {
+    const declared = await readDeclarations();
+    const { light, dark } = await readTokens();
+    const reference = /^var\((--[\w-]+)\)$/.exec(declared.light[token] ?? '')?.[1];
+
+    expect(token in declared.dark || (reference !== undefined && reference in declared.dark), `${token} has a .dark value`).toBe(true);
+    expect(light[token]).toBe(lightValue);
+    expect(dark[token]).toBe(darkValue);
+  });
+
+  it('its text is readable (4.5:1) and every control and its state stand out (3:1), in light and dark', async () => {
+    const tokens = await readTokens();
+    const pairs: Array<[what: string, foreground: string, background: string, minimum: number]> = [
+      ['the name in the header, a title', '--text-color-primary', '--background-color-subtle', 4.5],
+      ['the text of a step, Skip', '--text-color-secondary', '--background-color-subtle', 4.5],
+      ['Skip hovered', '--text-color-secondary', '--background-color-card', 4.5],
+      ['Back', '--text-color-primary', '--background-color-subtle', 4.5],
+      ['Back hovered', '--text-color-primary', '--background-color-card', 4.5],
+      ['the label of the primary button', '--text-color-on-welcome-primary', '--background-color-welcome-primary', 4.5],
+      ['the sentence of the demo', '--text-color-primary', '--background-color-card', 4.5],
+      ['the name typed in the blank', '--text-color-accent-strong', '--background-color-accent-selected', 4.5],
+      ['the name of an unselected Pack', '--text-color-primary', '--background-color-card', 4.5],
+      ['the number of Prompts of an unselected Pack', '--text-color-secondary', '--background-color-card', 4.5],
+      ['a Platform pill', '--text-color-secondary', '--background-color-card', 4.5],
+      ['the close glyph (non-text)', '--text-color-secondary', '--background-color-card', 3],
+      ['the close glyph hovered (non-text)', '--text-color-primary', '--background-color-accent-subtle', 3],
+      ['an inactive dot (non-text)', '--background-color-step-dot', '--background-color-subtle', 3],
+      ['the active dot (non-text)', '--background-color-accent', '--background-color-subtle', 3],
+      ['the border of Back (non-text)', '--border-color-input', '--background-color-subtle', 3],
+      ['the border of an unselected Pack (non-text)', '--border-color-input', '--background-color-subtle', 3],
+      ['the primary button against the frame (non-text)', '--background-color-welcome-primary', '--background-color-subtle', 3],
+      ['a focus outline on the frame (non-text)', '--outline-color-accent', '--background-color-subtle', 3],
+      ['the underline of the blank (non-text)', '--border-color-blank', '--background-color-card', 3]
+    ];
+
+    for (const [mode, values] of Object.entries(tokens)) {
+      for (const [what, foreground, background, minimum] of pairs) {
+        expect(getContrastRatio(values[foreground], values[background]), `${what}, ${mode}`).toBeGreaterThanOrEqual(minimum);
+      }
+    }
+  });
+
+  it.each(PACKS.map(pack => [pack.name, pack.color] as const))(
+    'the %s Pack (%s), selected, reads on its tint (4.5:1); its border, check, check glyph and dot stand out (3:1), in light and dark',
+    async (_name, color) => {
+      const tokens = await readTokens();
+      const colors = packColors(color);
+
+      for (const mode of ['light', 'dark'] as const) {
+        const values = tokens[mode];
+        const { text, mark } = colors[mode];
+        // The tint is the Category chip's over bg-card, so the chip rule's contrast holds
+        const tint = over(getSoftBadgeColors(color, mode).background, values['--background-color-card']);
+
+        expect(getContrastRatio(text, tint), `name and count on the tint, ${mode}`).toBeGreaterThanOrEqual(4.5);
+        expect(getContrastRatio(mark, values['--background-color-subtle']), `border against the frame, ${mode}`).toBeGreaterThanOrEqual(3);
+        expect(getContrastRatio(mark, tint), `check round on the tint, ${mode}`).toBeGreaterThanOrEqual(3);
+        expect(getContrastRatio(values['--text-color-on-pack-check'], mark), `check glyph on its round, ${mode}`).toBeGreaterThanOrEqual(3);
+        expect(getContrastRatio(mark, values['--background-color-card']), `dot of an unselected Pack, ${mode}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  );
+
+  it('a Pack keeps its color in light and lifts it toward white in dark, as the Category chip text does; its tint is the chip\'s, opaque over bg-card', () => {
+    const colors = packColors('#2563EB');
+
+    expect(getSoftBadgeColors('#2563EB', 'light').background).toBe('rgba(37, 99, 235, 0.13)');
+    expect(colors.tint).toBe('color-mix(in srgb, #2563EB 13%, var(--background-color-card))');
+    expect(colors.light).toEqual({ text: '#1B47A9', mark: '#2563EB' });
+    expect(colors.dark).toEqual({ text: '#789EF3', mark: '#789EF3' });
+  });
+});
+// --- end Welcome in light and dark ---

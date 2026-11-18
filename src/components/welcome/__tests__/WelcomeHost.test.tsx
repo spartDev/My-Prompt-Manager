@@ -80,15 +80,16 @@ describe('Welcome frame', () => {
       expect(pill(1).className).toContain('bg-step-dot');
     });
 
-    it('draws the primary button in ink, 48px high, taking the rest of the width', () => {
+    it('draws the primary button in ink (the accent in dark), 48px high, taking the rest of the width; Back outlined at 3:1', () => {
       renderWelcome({ step: 1 });
 
-      expect(primary().className).toContain('bg-inverse');
+      expect(primary().className).toContain('bg-welcome-primary');
+      expect(primary().className).toContain('text-on-welcome-primary');
       expect(primary().className).toContain('h-12');
       expect(primary().className).toContain('flex-1');
       expect(primary().className).toContain('active:scale-97');
       expect(back()?.className).toContain('h-12');
-      expect(back()?.className).toContain('border-strong');
+      expect(back()?.className).toContain('border-input');
     });
   });
 
