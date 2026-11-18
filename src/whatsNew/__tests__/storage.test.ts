@@ -43,24 +43,17 @@ describe('What\'s new record: reading', () => {
 });
 
 describe('What\'s new record: markReleaseSeen', () => {
-  it('writes lastSeenVersion in normal mode', async () => {
-    await markReleaseSeen('2.0.0', { debugMode: false });
+  it('writes lastSeenVersion', async () => {
+    await markReleaseSeen('2.0.0');
 
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
     expect(await stored()).toEqual({ lastSeenVersion: '2.0.0' });
   });
 
-  it('writes nothing in Debug mode', async () => {
-    await markReleaseSeen('2.0.0', { debugMode: true });
-
-    expect(chrome.storage.local.set).not.toHaveBeenCalled();
-    expect(await stored()).toBeUndefined();
-  });
-
   it('keeps installedVersion when it writes lastSeenVersion', async () => {
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0' } });
 
-    await markReleaseSeen('2.0.0', { debugMode: false });
+    await markReleaseSeen('2.0.0');
 
     expect(await stored()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
   });
@@ -68,7 +61,7 @@ describe('What\'s new record: markReleaseSeen', () => {
   it('replaces a malformed value instead of throwing', async () => {
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: 'corrupted' });
 
-    await markReleaseSeen('2.0.0', { debugMode: false });
+    await markReleaseSeen('2.0.0');
 
     expect(await stored()).toEqual({ lastSeenVersion: '2.0.0' });
   });
@@ -77,7 +70,7 @@ describe('What\'s new record: markReleaseSeen', () => {
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: { lastSeenVersion: '1.9.0' } });
     vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('QUOTA_BYTES quota exceeded'));
 
-    await expect(markReleaseSeen('2.0.0', { debugMode: false })).rejects.toThrow('QUOTA_BYTES');
+    await expect(markReleaseSeen('2.0.0')).rejects.toThrow('QUOTA_BYTES');
     expect(await stored()).toEqual({ lastSeenVersion: '1.9.0' });
   });
 });
@@ -98,7 +91,7 @@ describe('What\'s new record: recordInstall', () => {
   });
 
   it('serializes concurrent writes so neither field is lost', async () => {
-    await Promise.all([recordInstall('2.0.0'), markReleaseSeen('2.0.0', { debugMode: false })]);
+    await Promise.all([recordInstall('2.0.0'), markReleaseSeen('2.0.0')]);
 
     expect(await stored()).toEqual({ installedVersion: '2.0.0', lastSeenVersion: '2.0.0' });
   });
@@ -138,7 +131,7 @@ describe("What's new record: recordUpdateFrom", () => {
   });
 
   it('serializes with a concurrent close so neither field is lost', async () => {
-    await Promise.all([recordUpdateFrom('1.9.0'), markReleaseSeen('2.0.0', { debugMode: false })]);
+    await Promise.all([recordUpdateFrom('1.9.0'), markReleaseSeen('2.0.0')]);
 
     expect(await stored()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
   });
@@ -215,7 +208,7 @@ describe("What's new record: kept across Clear All Data and Reset settings", () 
   it('a Release marked seen while Clear all data runs is not lost', async () => {
     await chrome.storage.local.set({ ...OTHER_KEYS, [WHATS_NEW_KEY]: { installedVersion: '1.9.0' } });
 
-    await Promise.all([StorageManager.getInstance().clearAllData(), markReleaseSeen('2.0.0', { debugMode: false })]);
+    await Promise.all([StorageManager.getInstance().clearAllData(), markReleaseSeen('2.0.0')]);
 
     expect(await chrome.storage.local.get(null)).toEqual({
       [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' }

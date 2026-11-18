@@ -25,6 +25,13 @@ export type LaunchStateChange =
    * new at the openings after it
    */
   | { readonly kind: 'welcome-done'; readonly version: string }
+  /**
+   * The Welcome finished, as an opening found it (`isWelcomeFoundDone` of src/launch/decide.ts: a
+   * pending record over a Library with Prompts), so it cannot come back if that Library is emptied
+   * later. The Welcome record alone: the Last seen Release stays What's new's to mark, since What's
+   * new may show at that same opening, and must come back if the extension closes without an action
+   */
+  | { readonly kind: 'welcome-found-done' }
   /** The Release `version` as the Last seen Release: What's new closed */
   | { readonly kind: 'release-seen'; readonly version: string };
 
@@ -37,9 +44,10 @@ const both = async (writes: readonly [Promise<unknown>, Promise<unknown>]): Prom
 };
 
 /**
- * Writes one change of the launch state, or nothing in Debug mode. The writes start before this
- * returns, so a caller that does not wait still has them under way when the popup closes. Rejects
- * when storage cannot be read or written.
+ * Writes one change of the launch state, or nothing in Debug mode: the one Debug check of every
+ * write of the launch state, since the low-level writers it calls have no other caller. The writes
+ * start before this returns, so a caller that does not wait still has them under way when the popup
+ * closes. Rejects when storage cannot be read or written.
  */
 export const writeLaunchState = async (change: LaunchStateChange, { debugMode }: { readonly debugMode: boolean }): Promise<void> => {
   if (debugMode) {
@@ -54,10 +62,13 @@ export const writeLaunchState = async (change: LaunchStateChange, { debugMode }:
       });
       return;
     case 'welcome-done':
-      await both([writeWelcomeRecord({ status: 'done' }), markReleaseSeen(change.version, { debugMode })]);
+      await both([writeWelcomeRecord({ status: 'done' }), markReleaseSeen(change.version)]);
+      return;
+    case 'welcome-found-done':
+      await writeWelcomeRecord({ status: 'done' });
       return;
     case 'release-seen':
-      await markReleaseSeen(change.version, { debugMode });
+      await markReleaseSeen(change.version);
       return;
   }
 };

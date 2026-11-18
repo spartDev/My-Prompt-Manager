@@ -174,7 +174,7 @@ The Release whose What's new the user last closed, or the Release installed when
 _Avoid_: Last version, seen flag
 
 **Debug mode**:
-The Advanced setting, off by default, that turns on detailed logging on Platforms and shows What's new at every opening without changing the Last seen Release.
+The Advanced setting, off by default, that turns on detailed logging on Platforms and, at every opening, shows the Welcome from its first step, then What's new once the Welcome is finished. It records nothing about them, neither the step reached, nor the Welcome finished, nor the Last seen Release, so turning it off gives back what the user saw before; the Packs added at the Welcome's end do go into the Library, without duplicates, as in normal use.
 _Avoid_: Dev mode, test mode
 
 ## Relationships
