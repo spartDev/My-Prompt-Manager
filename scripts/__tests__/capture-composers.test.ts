@@ -10,6 +10,7 @@ import {
   addressAsPrinted,
   type CaptureResult,
   captureExitCode,
+  editorSelectorsOf,
   fixtureHeaderUrl,
   headerUrl,
   parseCaptureArgs,
@@ -643,6 +644,31 @@ describe('strategyEditorSelectors', () => {
 
   it('holds only selectors that name a class', () => {
     expect(strategyEditorSelectors().every((selector) => classNamesOf([selector]).length > 0)).toBe(true);
+  });
+});
+
+describe('editorSelectorsOf', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  // The extension gives the Prompts button only to a textarea or an editable element on a built-in
+  // Platform (PlatformManager.getAllSelectors()): live:check must not find an editor it rejects
+  const platformNaming = (selectors: string[]) => ({ ...SUPPORTED_PLATFORMS.chatgpt, selectors });
+  const found = (selectors: string[]) => selectors.flatMap((selector) => [...document.querySelectorAll(selector)]).map((element) => element.id);
+
+  it('does not find a search box or a row the Platform\'s selectors name, as the extension does not', () => {
+    document.body.innerHTML = '<input id="search" type="text" class="chat-input"><div id="row" class="chat-input"></div>';
+
+    expect(found(editorSelectorsOf(platformNaming(['input[type="text"]', '.chat-input'])))).toEqual([]);
+  });
+
+  it('still finds the textarea and the editable element the Platform\'s selectors name', () => {
+    document.body.innerHTML = '<textarea id="field" class="chat-input"></textarea><div id="editor" class="chat-input" contenteditable="plaintext-only"></div><div id="off" class="chat-input" contenteditable="false"></div>';
+
+    const [ownSelector] = editorSelectorsOf(platformNaming(['.chat-input']));
+
+    expect(found([ownSelector])).toEqual(['field', 'editor']);
   });
 });
 

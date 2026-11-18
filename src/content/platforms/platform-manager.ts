@@ -15,10 +15,8 @@ import { getSettings } from '../utils/storage';
 
 import type { PlatformStrategy } from './base-strategy';
 import { DefaultStrategy } from './default-strategy';
+import { platformFieldSelector } from './platform-field';
 import { STRATEGY_CONSTRUCTORS } from './strategy-constructors';
-
-/** The elements that can be a built-in Platform's composer: a textarea, or an editable element */
-const PLATFORM_FIELD = 'textarea, [contenteditable]:not([contenteditable="false"])';
 
 /**
  * Build strategy registry from platform configuration
@@ -302,7 +300,7 @@ export class PlatformManager {
     // selector (`input[type="text"]`, `[class*="input"]`) matched a search box or a sidebar row on
     // its pages without a composer (seen on 2026-11-18). A custom site keeps every catch-all
     const fieldOfPlatform = getPlatformByHostname(this.hostname)
-      ? (selector: string) => `:is(${selector}):is(${PLATFORM_FIELD})`
+      ? platformFieldSelector
       : (selector: string) => selector;
 
     // Add selectors from strategies

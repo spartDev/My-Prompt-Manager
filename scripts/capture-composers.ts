@@ -29,6 +29,7 @@ import { JSDOM } from 'jsdom';
 import { type BrowserContext, chromium, type ElementHandle, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
+import { platformFieldSelector } from '../src/content/platforms/platform-field';
 import { STRATEGY_CONSTRUCTORS } from '../src/content/platforms/strategy-constructors';
 
 import { CAPTURED_DIR_ENV, CAPTURED_IDS_ENV } from './composers/fixtures';
@@ -308,11 +309,12 @@ const REFIND_TIMEOUT = 5_000;
 const FALLBACK_DEPTH = 5;
 
 /**
- * Where a Platform's editor is looked for: the config's selectors first; the strategies find some
- * editors by other means (ChatGPT's and Perplexity's are contenteditable, their selectors name
- * textareas), so then any editable element
+ * Where a Platform's editor is looked for: the config's selectors first, narrowed as the extension
+ * narrows them (only a textarea or an editable element they name), so live:check never finds an
+ * editor the extension rejects; the strategies find some editors by other means (ChatGPT's and
+ * Perplexity's are contenteditable, their selectors name textareas), so then any editable element
  */
-export const editorSelectorsOf = (platform: PlatformDefinition): string[] => [...platform.selectors, ...GENERIC_EDITORS];
+export const editorSelectorsOf = (platform: PlatformDefinition): string[] => [...platform.selectors.map(platformFieldSelector), ...GENERIC_EDITORS];
 
 /**
  * The first visible editor, by the selectors' order, or null when none shows within the timeout.
