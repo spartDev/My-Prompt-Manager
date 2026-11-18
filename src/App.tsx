@@ -9,6 +9,7 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
+import { WELCOME_CLOSE_ROOM } from './components/welcome/WelcomeFrame';
 import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -446,7 +447,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const [focusFirstPrompt, setFocusFirstPrompt] = useState(false);
   const askFirstPromptFocus = useCallback(() => { setFocusFirstPrompt(true); }, []);
   const handleFirstPromptFocused = useCallback(() => { setFocusFirstPrompt(false); }, []);
-  // The only Notification over the Welcome is a refused add's: it goes as an exit starts
+  // The only Notification over the Welcome is a refused add's: it goes as an exit starts, or the step changes
   const shownToastId = toast?.id;
   const hideShownToast = useCallback(() => {
     if (shownToastId !== undefined) {
@@ -525,7 +526,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }
 
   // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered
-  // behind it. Its Notification shows over it: a refused add of the Packs keeps the Welcome on screen
+  // behind it. Its Notification shows over it: a refused add of the Packs keeps the Welcome on screen.
+  // That one is read whole (wrapped where the room is short) and clear of the close button, at 320px
+  // wide too; it belongs to the last step, so a step change hides it (My-Prompt-Manager-ojz.20)
   if (launch.screen.kind === 'welcome') {
     return (
       <ThemeProvider>
@@ -535,9 +538,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           saveStep={launch.saveStep}
           finishWelcome={launch.finishWelcome}
           onFinish={leaveWelcome}
+          onStepChange={hideShownToast}
           context={context}
         />
-        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
+        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} wrap clearRight={WELCOME_CLOSE_ROOM} />
       </ThemeProvider>
     );
   }

@@ -1,7 +1,8 @@
-import type { FC } from 'react';
+import type { CSSProperties, FC } from 'react';
 import { memo, useEffect, useRef } from 'react';
 
 import type { Toast } from '../types/hooks';
+import { cn } from '../utils';
 
 // Module-scope glyphs: the round under them carries the color
 const CheckGlyph = (
@@ -25,13 +26,35 @@ interface ToastContainerProps {
   onPause?: (id: string) => void;
   /** Neither is on it any longer: its time runs on */
   onResume?: (id: string) => void;
+  /**
+   * Opt-in, for a screen where a Notification must be read whole: the pill takes the width of its
+   * text, up to the room it has, and a message longer than that wraps onto more lines instead of
+   * being cut (the Welcome, My-Prompt-Manager-ojz.20). Left out, the pill is one line high
+   */
+  wrap?: boolean;
+  /**
+   * Opt-in, for a screen with a control at its top right (the Welcome's close button): the pixels
+   * from the right edge the pill leaves free, instead of 16. It sits centered in the room left of
+   * them, so it never covers that control. Left out, the pill is centered on the screen
+   */
+  clearRight?: number;
 }
+
+/** The room the pill leaves on each side of the screen */
+const EDGE_PX = 16;
+
+/** Centered between EDGE_PX on the left and `clearRight` on the right, no wider than that room */
+const placementBeside = (clearRight: number): CSSProperties => ({
+  left: `calc(50% + ${String((EDGE_PX - clearRight) / 2)}px)`,
+  maxWidth: `calc(100% - ${String(EDGE_PX + clearRight)}px)`
+});
 
 /**
  * The Notification pill of the Atelier 1C design: always at the top center, one at a time. A new
  * Notification has a new key, so it mounts again and replays its entrance; it leaves at once.
+ * `wrap` and `clearRight` are opt-ins for one screen (the Welcome); without them nothing changes.
  */
-const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume }) => {
+const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume, wrap = false, clearRight }) => {
   const pillRef = useRef<HTMLDivElement>(null);
   const toastId = toast?.id;
 
@@ -100,12 +123,14 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
       aria-atomic="true"
       data-testid="toast"
       data-type={toast.type}
-      className="
-        animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
-        flex items-center gap-[9px] h-10 max-w-[calc(100%-32px)] pl-3.5 pr-1.5
-        rounded-full bg-inverse text-on-inverse-strong shadow-toast
-        leading-[1.4] antialiased
-      "
+      className={cn(
+        'animate-toast-in fixed top-3 [transform:translateX(-50%)] z-50 flex items-center gap-[9px] pl-3.5 pr-1.5',
+        'bg-inverse text-on-inverse-strong shadow-toast leading-[1.4] antialiased',
+        clearRight === undefined && 'left-1/2 max-w-[calc(100%-32px)]',
+        // Wrapped, the pill grows a line at a time: 40px for one line, as the default one, rounded the same
+        wrap ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full'
+      )}
+      style={clearRight === undefined ? undefined : placementBeside(clearRight)}
     >
       <span
         data-testid="toast-mark"
@@ -114,9 +139,10 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
         {isFailure ? AlertGlyph : CheckGlyph}
       </span>
       {/* The text is the one part that gives way, so the round, the gaps and the action keep their room.
-          Inside it, the message never gives way to the sub: only a message longer than the room left is cut */}
+          Inside it, the message never gives way to the sub: only a message longer than the room left is
+          cut, or, wrapped, goes on to the next line */}
       <span data-testid="toast-text" className="flex min-w-0 items-center gap-[9px]">
-        <span className="shrink-0 max-w-full truncate text-[13px] font-semibold">
+        <span data-testid="toast-message" className={cn('text-[13px] font-semibold', wrap ? 'min-w-0' : 'shrink-0 max-w-full truncate')}>
           {toast.message}
         </span>
         {toast.sub && (
