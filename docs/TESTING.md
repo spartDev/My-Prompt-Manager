@@ -99,7 +99,7 @@ Each line also says what was read: whether the selector was open, the field's te
 
 ## The Welcome by hand
 
-How to check each of the Welcome's twelve acceptance scenarios yourself, in Chrome. Each one also runs as an automated test, named `S1 …` to `S12 …` in `scenarios.spec.ts` of `tests/e2e/welcome/`: `npx playwright test welcome/scenarios -g "S6 "` replays one. What the automated tests cannot do, a person does here: click the toolbar icon, and close the popup by clicking outside it.
+How to check each of the Welcome's twelve acceptance scenarios yourself, in Chrome. Each one also runs as an automated test, named `S1 …` to `S12 …` in `tests/e2e/welcome/scenarios.spec.ts`: `npx playwright test tests/e2e/welcome/scenarios.spec.ts -g "S6 "` replays one. What the automated tests cannot do, a person does here: click the toolbar icon, and close the popup by clicking outside it.
 
 "Open the extension" means click its toolbar icon; "close" means click outside the popup, or close the side panel. "The Welcome" is the full-screen three-step screen; "the Library" is the list of Prompts with the tab bar at the bottom (Library, Categories, Analytics, Settings). A Notification shows at the top for about three seconds; with the pointer on it, it stays.
 
