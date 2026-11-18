@@ -1204,6 +1204,30 @@ No animation of the frame disables, covers or delays that button: a click lands 
 Under `prefers-reduced-motion` the frame plays none of them (it reads the setting as it opens), and
 `src/popup.css` makes them last 1ms besides.
 
+#### Welcome steps
+
+The content of the three steps (`src/components/welcome/WelcomeCards.tsx`, `BlankDemo.tsx`,
+`PackPicker.tsx`). Step 1's cards are `bg-card` and, in the middle, `bg-inverse` with the Notification's
+violet (`bg-inverse-mark/35` for its chip); their lines are `bg-(--border-color-default)`, `bg-muted`,
+`bg-inverse-bar` and `bg-inverse-action`, their chips the empty Categories' tile colors. Step 2's blank
+is `bg-accent-selected text-accent-strong` with `border-blank` under it and a `bg-accent` caret. Step 3's
+Packs are cards (`bg-card border-default`) until selected, then take the Category chip tint of their
+color (`getSoftBadgeColors`, through `--pack-*` variables as `CategoryChips` does), a border and a
+check of their color: a Pack's color is user data. The Platform pills are `bg-card text-secondary`.
+
+| Token | Value | Use |
+|---|---|---|
+| `animate-welcome-float-left` / `-right` / `-center` (`MOTION.welcomeFloat*`) | `float` 5800ms / 6400ms from 900ms / 5200ms from 400ms, ease-in-out, in a loop | step 1's cards, 8px up and back, each at its own pace; still under reduced motion |
+| `MOTION.welcomeTypeLetter`, `MOTION.welcomeTypePause` (timers) | 85ms a letter, the whole name held about 1.2s (14 letters' time, 1190ms) | step 2's name typed into the blank, then typed again; the whole name at once under reduced motion |
+| `animate-welcome-caret` (`MOTION.welcomeCaretBlink`) | `welcome-blink` 1000ms, `steps(1)`, in a loop | the caret after the letters typed; none under reduced motion |
+| `animate-welcome-check` (`MOTION.welcomeCheck`) | `pop` 450ms, ease-spring | the round check of a selected Pack; the Pack itself presses with `active:scale-95` on `transition-chip` |
+| `border-blank` | `bg-accent` (`#6D28D9` / `#844BF2`) | the underline of step 2's blank |
+| `border-inverse-blank` | `bg-inverse-mark` (`#A78BFA`, both modes) | the dashed blank of step 1's ink card |
+| `shadow-welcome-card` / `shadow-welcome-demo` (`--shadow-tint-50`) | `0 14px 30px -18px` / `0 18px 36px -22px`, violet at 0.5 in light, black at 0.8 in dark | step 1's light cards / step 2's card |
+| `shadow-welcome-ink-card` (`--shadow-tint-ink`) | `0 22px 40px -20px` | step 1's ink card |
+
+None of them touches the frame's primary button.
+
 #### Modal Fade In
 
 ```css

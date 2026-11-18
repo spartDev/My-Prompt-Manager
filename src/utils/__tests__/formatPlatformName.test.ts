@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatPlatformName } from '../formatPlatformName';
+import { formatPlatformName, knownPlatformName } from '../formatPlatformName';
+
+describe('knownPlatformName', () => {
+  it('gives the short name of a Platform known by its id, whatever its case', () => {
+    expect(knownPlatformName('m365copilot')).toBe('M365 Copilot');
+    expect(knownPlatformName('GEMINI')).toBe('Gemini');
+  });
+
+  it('gives nothing for an id it does not know, so the caller can fall back on a name of its own', () => {
+    expect(knownPlatformName('deepseek')).toBeUndefined();
+    expect(knownPlatformName('concierge.sanofi.com')).toBeUndefined();
+  });
+});
 
 describe('formatPlatformName', () => {
   describe('known platforms', () => {

@@ -431,3 +431,66 @@ describe('Welcome frame tokens', () => {
   });
 });
 // --- end Welcome frame ---
+
+// --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+describe('Welcome steps tokens', () => {
+  it("compiles the steps' classes from their tokens", async () => {
+    const classes = [
+      'shadow-welcome-card',
+      'shadow-welcome-ink-card',
+      'shadow-welcome-demo',
+      'border-blank',
+      'border-inverse-blank',
+      'animate-welcome-float-left',
+      'animate-welcome-float-right',
+      'animate-welcome-float-center',
+      'animate-welcome-caret',
+      'animate-welcome-check'
+    ];
+    const css = await buildCss(classes);
+
+    expect(ruleFor(css, 'shadow-welcome-card')).toMatch(/var\(--shadow-tint-50\)/);
+    expect(ruleFor(css, 'shadow-welcome-demo')).toMatch(/var\(--shadow-tint-50\)/);
+    expect(ruleFor(css, 'shadow-welcome-ink-card')).toMatch(/var\(--shadow-tint-ink\)/);
+    expect(ruleFor(css, 'border-blank')).toContain('var(--border-color-blank)');
+    expect(ruleFor(css, 'border-inverse-blank')).toContain('var(--border-color-inverse-blank)');
+    for (const name of ['welcome-float-left', 'welcome-float-right', 'welcome-float-center', 'welcome-caret', 'welcome-check']) {
+      expect(ruleFor(css, `animate-${name}`), `animate-${name}`).toContain(`var(--animate-${name})`);
+    }
+  });
+
+  it("draws the blank's underline in the accent and the ink card's blank in the Notification's violet, with the mockups' shadows, in light and dark", async () => {
+    const declared = await readDeclarations();
+    const { light, dark } = await readTokens();
+
+    expect(declared.light['--border-color-blank']).toBe('var(--background-color-accent)');
+    expect([light['--border-color-blank'], dark['--border-color-blank']]).toEqual(['#6d28d9', '#844bf2']);
+    expect(declared.light['--border-color-inverse-blank']).toBe('var(--background-color-inverse-mark)');
+    expect([light['--border-color-inverse-blank'], dark['--border-color-inverse-blank']]).toEqual(['#a78bfa', '#a78bfa']);
+    expect(light['--shadow-tint-50']).toBe('rgba(45, 25, 90, 0.5)');
+    expect(dark['--shadow-tint-50'], 'black at alpha x 1.6 in dark').toBe('rgba(0, 0, 0, 0.8)');
+    expect(light['--shadow-welcome-card']).toBe('0 14px 30px -18px var(--shadow-tint-50)');
+    expect(light['--shadow-welcome-demo']).toBe('0 18px 36px -22px var(--shadow-tint-50)');
+    expect(light['--shadow-welcome-ink-card']).toBe('0 22px 40px -20px var(--shadow-tint-ink)');
+  });
+
+  it('the text of steps 2 and 3 is readable (4.5:1) and the blanks stand out (3:1), in light and dark', async () => {
+    const tokens = await readTokens();
+    const pairs: Array<[what: string, foreground: string, background: string, minimum: number]> = [
+      ['the sentence of the demo', '--text-color-primary', '--background-color-card', 4.5],
+      ['the name typed in the blank', '--text-color-accent-strong', '--background-color-accent-selected', 4.5],
+      ['the underline of the blank (non-text)', '--border-color-blank', '--background-color-card', 3],
+      ['a Platform pill', '--text-color-secondary', '--background-color-card', 4.5],
+      ['an unselected Pack', '--text-color-primary', '--background-color-card', 4.5],
+      ['the number of Prompts of an unselected Pack', '--text-color-secondary', '--background-color-card', 4.5],
+      ['the dashed blank of the ink card (decorative)', '--border-color-inverse-blank', '--background-color-inverse', 3]
+    ];
+
+    for (const [mode, values] of Object.entries(tokens)) {
+      for (const [what, foreground, background, minimum] of pairs) {
+        expect(getContrastRatio(values[foreground], values[background]), `${what}, ${mode}`).toBeGreaterThanOrEqual(minimum);
+      }
+    }
+  });
+});
+// --- end Welcome steps ---
