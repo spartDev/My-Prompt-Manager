@@ -6,7 +6,7 @@ Which component does which job in the popup and the side panel, and the conventi
 
 ## Where things live
 
-`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. Arriving on a Section from the tab bar slides it 26px in from the side of its tab with a fade (`animate-section-forward` or `animate-section-back`, by the order of `SECTION_ORDER`); the first Section shows at once. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, receding a little under a scrim (`animate-recede-in`, `animate-scrim-in`), and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop.
+`src/App.tsx` is the shell: it holds the Prompts and Categories (`usePrompts`, `useCategories`), the Notification (`useToast`) and the current section, and renders one view plus the `TabBar`. Arriving on a Section from the tab bar slides it 26px in from the side of its tab with a fade (`animate-section-forward` or `animate-section-back`, by the order of `SECTION_ORDER`); the first Section shows at once. The editor is a sheet above them: it rises from the bottom (`animate-sheet-in`), the Section and the `TabBar` wait `inert` beneath it, receding a little under a scrim (`animate-recede-in`, `animate-scrim-in`), and on close it leaves to the bottom and unmounts after its animation (`useAnimatedPresence`), when the keyboard returns to what opened it. The same `App` runs in the popup and in the side panel; it receives the context as a prop. While the launch decision shows the Welcome, `App` renders `WelcomeHost` alone, with no Section and no tab bar.
 
 | Folder | What is in it |
 |--------|---------------|
@@ -15,6 +15,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/analytics/` | The Analytics section, its full-page view and that view's two charts (`charts/`) |
 | `src/components/icons/` | Inline SVG icons, one file per area |
 | `src/components/whatsNew/` | What's new: the sheet that lists the Release notes of a Release after an update |
+| `src/components/welcome/` | The Welcome: its frame and the content of its three steps, shown in place of the Library at the first opening after a first install |
 
 ## Which component for which job
 
@@ -66,6 +67,14 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/whatsNew/WhatsNewGrid.tsx` | The two-column grid of a Release's notes (`items`, `onOpen(destination, item)`): the hero (the first Feature, full width), the other Features, then the Critical fixes; no hero without a Feature; with an odd number of tiles under the hero, the last spans both columns. `placeTiles` computes that order. The Feature tiles that open something carry `data-whats-new-tile-index`, from 1 for the hero, in display order, for the number keys of the sheet |
 | `src/components/whatsNew/WhatsNewTile.tsx` | One tile: the hero (example sentence, each `{{word}}` a pill, then title and description), a Feature (icon square, title, description) or a Critical fix (the Fixed pill in place of the icon). A Feature with a destination is a `<button>` named by its title and description, described by the hero's example, with its number key in `aria-keyshortcuts`; a Feature without one and a Critical fix are plain tiles that take no focus, a Critical fix read "Fixed: {title}". Each rises `MOTION.tileStagger` after the one before, all at once under reduced motion |
 | `src/components/icons/WhatsNewIcons.tsx` | `WhatsNewIconGlyph`: one glyph per key of the closed set `WhatsNewIcon` (`src/whatsNew/types.ts`), `search` as its ⌘K key chip, hidden from screen readers |
+
+### Welcome
+
+| Component | Job |
+|-----------|-----|
+| `src/components/welcome/WelcomeHost.tsx` | The Welcome in `App`, alone on the screen while the launch decision of `useLaunchScreen` shows it (nothing of the Library is rendered behind it). Holds the Welcome's state, moved only by the pure reducer of `src/welcome/reducer.ts` (step, direction, Packs selected). Records each step change at once through the hook's `saveStep`, in the handler, so a popup closed right after the click reopens on that step; a Pack toggled records the step with the new selection. The primary button of the last step calls `onFinish` with the Packs selected (`finishWelcome` when left out). Close calls `window.close()` and records nothing |
+| `src/components/welcome/WelcomeFrame.tsx` | The frame of the three steps: header (logo, name, Skip before the last step, the round close button), the step slot centered in the room left and scrolling there when taller, three progress dots (buttons named "Step N of 3", `aria-current` on the active one), Back from the second step and the ink primary button. Enter presses the primary button unless the keyboard is on another control; ArrowLeft and ArrowRight change step (ArrowRight never finishes). A step change is announced in a polite status and moves the keyboard to the step's title. The screen fades in at the opening, a step slides in from the side it comes from, Back pops in; none of it holds the primary button, and none plays under reduced motion. Exports `WelcomeTitle` and `WelcomeText`, the title and text of a step |
+| `src/components/welcome/WelcomeSteps.tsx` | What fills the step slot for each step (`WelcomeStepContent`), and the primary button's label (`primaryLabelOf`) |
 
 ### Settings
 

@@ -58,7 +58,8 @@ const expectLibraryAlone = async (): Promise<void> => {
 const expectWelcomeAlone = async (step: number): Promise<void> => {
   const welcome = await screen.findByTestId('welcome');
   expect(welcome).toHaveAttribute('data-welcome-step', String(step));
-  expect(screen.getByRole('heading', { name: 'Welcome' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: `Step ${String(step + 1)} of 3` })).toHaveAttribute('aria-current', 'step');
+  expect(screen.getByTestId('welcome-primary')).toBeInTheDocument();
   await settle();
   expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
   expect(screen.queryByRole('tab')).not.toBeInTheDocument();
@@ -207,6 +208,40 @@ describe('App: what an opening shows first', () => {
 
     expect(screen.getByTestId('welcome')).toBeInTheDocument();
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+  });
+
+  it('the Welcome\'s frame records each step change through the launch writer, and resumes there at the next opening', async () => {
+    await openingOver({ prompts: [], welcome: { status: 'pending', step: 0 }, installedVersion: '2.0.0' });
+    const { unmount } = render(<App />);
+    await expectWelcomeAlone(0);
+
+    fireEvent.click(screen.getByTestId('welcome-primary'));
+
+    expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '1');
+    await waitFor(async () => {
+      expect((await chrome.storage.local.get(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'pending', step: 1 });
+    });
+
+    // The popup closed and opened again
+    unmount();
+    render(<App />);
+    await expectWelcomeAlone(1);
+  });
+
+  it('Skip, then the primary button of the last step: the Welcome finished and recorded, the Library shown, in two actions', async () => {
+    await openingOver({ prompts: [], welcome: { status: 'pending', step: 0 }, installedVersion: '2.0.0' });
+    render(<App />);
+    await expectWelcomeAlone(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+    fireEvent.click(screen.getByTestId('welcome-primary'));
+
+    expect(await screen.findByRole('heading', { name: LIBRARY_HEADING })).toBeInTheDocument();
+    expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+    await waitFor(async () => {
+      expect((await chrome.storage.local.get(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+    });
   });
 
   it('never in the element picker\'s Settings window, even pending over an empty Library or in Debug mode', async () => {

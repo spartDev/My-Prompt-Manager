@@ -94,8 +94,25 @@ export const MOTION = {
   /** What's new: its backdrop fading in */
   whatsNewBackdropIn: 300,
   /** What's new: its backdrop fading out, with the sheet */
-  whatsNewBackdropOut: 340
+  whatsNewBackdropOut: 340,
   // --- end What's new sheet ---
+
+  // --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+  /**
+   * Welcome: the screen fading in at the opening. The mockup's 500ms left the screen less than
+   * opaque until 534ms after the popup opened (median of 10 openings); 150ms shows it whole within
+   * the 200ms the Welcome has to be on screen (decision Q3 of My-Prompt-Manager-ojz)
+   */
+  welcomeIn: 150,
+  /** Welcome: a step sliding 26px in from the side it comes from while it fades in, on the Section curve (EASE.section) */
+  welcomeStep: 500,
+  /** Welcome: the active progress dot widening from 7 to 22px, on the spring */
+  welcomeDot: 450,
+  /** Welcome: Back popping in when a step change brings it, from the second step */
+  welcomeBackPop: 350,
+  /** Welcome: the primary button shrinking to 97% while pressed, on the spring */
+  welcomePress: 250
+  // --- end Welcome frame ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

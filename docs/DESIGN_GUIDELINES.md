@@ -35,7 +35,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 |---|---|---|---|
 | `bg-app` | `#F4F1FA` | `#120E1B` | Page and header (seamless, no white band) |
 | `bg-card` | `#FFFFFF` | `#231C34` | Cards, form sections, and the search field and pills that sit on `bg-app` |
-| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
+| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light. Also the full screen of the Welcome, which covers `bg-app` |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
 | `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips (the chart tooltip included), the Analytics hero |
@@ -365,6 +365,7 @@ shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 shadow-puck /* 0 2px 6px -2px, tint 25 - the puck of a segmented control */
 shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
 shadow-tile-icon /* 0 4px 10px -6px, tint 40 - the icon square of a What's new Feature tile */
+shadow-welcome-primary /* 0 14px 26px -16px, tint ink - the primary button of the Welcome */
 ```
 
 ### Custom Shadows
@@ -1182,6 +1183,26 @@ checked for contrast in light and dark by "What's new in light and dark" in
 `src/theme/__tests__/tokens.test.ts`. Under
 `prefers-reduced-motion`, `src/popup.css` makes all of them last 1ms, and the caller's timer waits
 for nothing (`motionDuration`).
+
+#### Welcome frame
+
+The Welcome (`src/components/welcome/WelcomeFrame.tsx`, Atelier 1C 'Premier lancement') fills the
+popup or the side panel on `bg-subtle` (the mockups' `#F4F1FA` light, `#2B2340` dark), with no tab bar.
+Its primary button is ink, `bg-inverse text-on-inverse-strong`, 48px high over the rest of the width.
+No animation of the frame disables, covers or delays that button: a click lands while they play.
+
+| Token | Value | Use |
+|---|---|---|
+| `animate-welcome-in` (`MOTION.welcomeIn`) | `backdrop-in` 150ms, ease | the screen fading in at the opening; the mockup's 500ms is shortened so the screen is whole within the 200ms the Welcome has to show |
+| `animate-welcome-step-forward` / `-back` (`MOTION.welcomeStep`) | `welcome-from-right` / `welcome-from-left` 500ms, `ease-section` | a step sliding 26px in from the side it comes from as it fades in; the step of the opening shows at once |
+| `animate-welcome-back-pop` (`MOTION.welcomeBackPop`) | `pop` 350ms, ease-spring | Back popping in when a step change brings it |
+| `transition-welcome-dot` (`src/popup.css`, `MOTION.welcomeDot`) | width 450ms ease-spring, background 300ms | the active dot widening from 7 to 22px |
+| `transition-welcome-press` (`src/popup.css`, `MOTION.welcomePress`) | scale 250ms ease-spring, background and color 200ms | the primary button (`active:scale-97`, `hover:bg-inverse/90`), the close button (`active:scale-90`), Skip and Back |
+| `bg-step-dot` | `border-strong` (`#DCD4EA` / `#41375A`) | an inactive progress dot; the active one is `bg-accent` |
+| `shadow-welcome-primary` (`--shadow-tint-ink`) | `0 14px 26px -16px`, ink at 0.9 in light, near black at 0.92 in dark | the shadow of the primary button |
+
+Under `prefers-reduced-motion` the frame plays none of them (it reads the setting as it opens), and
+`src/popup.css` makes them last 1ms besides.
 
 #### Modal Fade In
 

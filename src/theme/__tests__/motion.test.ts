@@ -142,3 +142,43 @@ describe("What's new tiles motion", () => {
   });
 });
 // --- end What's new tiles ---
+
+// --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+describe('Welcome frame motion', () => {
+  const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+  /** The Welcome's own block of popup.css, wherever other blocks sit around it */
+  const block = popupCss.slice(popupCss.indexOf('/* --- Welcome frame'), popupCss.indexOf('/* --- end Welcome frame --- */'));
+
+  it('fades the screen in at the opening in 150ms, not the mockup\'s 500ms, so it is whole within the 200ms the Welcome has', () => {
+    expect(MOTION.welcomeIn).toBe(150);
+    expect(tokens).toContain(`--animate-welcome-in: backdrop-in ${MOTION.welcomeIn}ms ease both;`);
+    expect(tokens).toMatch(/@keyframes backdrop-in \{\s*from \{ opacity: 0; \}\s*to \{ opacity: 1; \}/);
+  });
+
+  it("slides a step 26px in from the side it comes from with a fade, over 500ms on the Section curve (the mockup's cL and cR)", () => {
+    expect(MOTION.welcomeStep).toBe(500);
+    expect(EASE.section).toBe('cubic-bezier(0.32, 0.72, 0, 1)');
+    expect(tokens).toContain(`--animate-welcome-step-forward: welcome-from-right ${MOTION.welcomeStep}ms var(--ease-section) both;`);
+    expect(tokens).toContain(`--animate-welcome-step-back: welcome-from-left ${MOTION.welcomeStep}ms var(--ease-section) both;`);
+    expect(tokens).toMatch(/@keyframes welcome-from-right \{\s*from \{ opacity: 0; transform: translateX\(26px\); \}\s*to \{ opacity: 1; transform: none; \}/);
+    expect(tokens).toMatch(/@keyframes welcome-from-left \{\s*from \{ opacity: 0; transform: translateX\(-26px\); \}\s*to \{ opacity: 1; transform: none; \}/);
+  });
+
+  it('pops Back in over 350ms and widens the active dot over 450ms, on the spring; the primary button presses over 250ms', () => {
+    expect([MOTION.welcomeBackPop, MOTION.welcomeDot, MOTION.welcomePress]).toEqual([350, 450, 250]);
+    expect(tokens).toContain(`--animate-welcome-back-pop: pop ${MOTION.welcomeBackPop}ms var(--ease-spring) both;`);
+    expect(block).toMatch(new RegExp(`@utility transition-welcome-dot \\{\\s*transition:\\s*width ${MOTION.welcomeDot}ms var\\(--ease-spring\\),`));
+    expect(block).toMatch(new RegExp(`@utility transition-welcome-press \\{\\s*transition:\\s*scale ${MOTION.welcomePress}ms var\\(--ease-spring\\),`));
+  });
+
+  it('makes every animation and transition of the frame near instant, with no delay, under reduced motion', () => {
+    const reduced = block.slice(block.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).not.toBe('');
+    for (const name of ['welcome-in', 'welcome-step-forward', 'welcome-step-back', 'welcome-back-pop']) {
+      expect(reduced).toContain(`.animate-${name}`);
+    }
+    expect(reduced).toMatch(/animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+    expect(reduced).toMatch(/\.transition-welcome-dot,\s*\.transition-welcome-press \{\s*transition-duration: 1ms;/);
+  });
+});
+// --- end Welcome frame ---

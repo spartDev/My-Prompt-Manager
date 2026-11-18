@@ -303,3 +303,37 @@ body {
   }
 }
 /* --- end What's new sheet --- */
+
+/* --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+   The active progress dot widens on the spring as the dots change color; the primary button and the
+   close button press on the spring (scale) and change their fill on hover. Under
+   prefers-reduced-motion the opening fade, the step slide, the pop of Back and these transitions are
+   near instant; the frame leaves its animations off then as well (WelcomeFrame.tsx) */
+@utility transition-welcome-dot {
+  transition:
+    width 450ms var(--ease-spring),
+    background-color 300ms;
+}
+
+@utility transition-welcome-press {
+  transition:
+    scale 250ms var(--ease-spring),
+    background-color 200ms,
+    color 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-welcome-in,
+  .animate-welcome-step-forward,
+  .animate-welcome-step-back,
+  .animate-welcome-back-pop {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+
+  .transition-welcome-dot,
+  .transition-welcome-press {
+    transition-duration: 1ms;
+  }
+}
+/* --- end Welcome frame --- */
