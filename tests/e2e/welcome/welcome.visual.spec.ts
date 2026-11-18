@@ -2,8 +2,8 @@
  * E2E: the Welcome's proof screenshots, to set beside the Atelier 1C mockup (My-Prompt-Manager-ojz.14).
  *
  * Renders the three steps in light and dark, in the popup (400 x 500) and in a side panel as wide and
- * high as the mockup's side format (400 x 860), and in the popup the Library the Welcome leaves for
- * with its Notification, after "Add 9 prompts" (the Packs selected by default, Product and Writing).
+ * high as the mockup's side format (400 x 860), then on both surfaces the Library the Welcome leaves
+ * for with its Notification, after "Add 9 prompts" (the Packs selected by default, Product and Writing).
  * Each test starts from a pending Welcome over an empty Library, the store of a first install, and
  * goes from step to step by pointer clicks on the primary button, as a person does.
  *
@@ -17,7 +17,9 @@
  *   completes it, shoots, and shoots again if the blank changed meanwhile;
  * - the pointer rests where it lights nothing up; on the Library it rests on the Notification's text,
  *   which has no hover look and keeps the Notification on screen until the screenshot is taken;
- * - no keyboard focus is shown: every move is a pointer click, so no control draws its focus ring.
+ * - no focus ring is shown: every move is a pointer click. At the exit the first Prompt's Copy has the
+ *   keyboard (My-Prompt-Manager-ojz.17), but its ring is drawn on :focus-visible only, which Chrome
+ *   does not match after a click; the test checks both before the screenshot.
  *
  * Files: <screen>-<surface>-<theme>.png, screen step1, step2, step3 or exit, surface popup or
  * sidepanel, in WELCOME_VISUAL_DIR (test-results/welcome-visual when unset; Playwright empties
@@ -152,9 +154,8 @@ test.describe('The Welcome beside its mockup: proof screenshots', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const surface of ['popup', 'sidepanel'] as const) {
       const { width, height } = SURFACES[surface];
-      const withExit = surface === 'popup';
 
-      test(`PROOF, ${theme}, ${surface} ${String(width)} x ${String(height)}: the three steps${withExit ? ', then the Library at the exit with its Notification' : ''}`, async ({ page, storage, extensionId }) => {
+      test(`PROOF, ${theme}, ${surface} ${String(width)} x ${String(height)}: the three steps, then the Library at the exit with its Notification`, async ({ page, storage, extensionId }) => {
         await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
         await fs.mkdir(OUTPUT_DIR, { recursive: true });
         await open(page, extensionId, surface, theme);
@@ -175,10 +176,6 @@ test.describe('The Welcome beside its mockup: proof screenshots', () => {
           }
         }
 
-        if (!withExit) {
-          return;
-        }
-
         // The Packs selected by default, as a new user who only reads and goes on
         await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS)} prompts`);
         await primary(page).click();
@@ -188,6 +185,10 @@ test.describe('The Welcome beside its mockup: proof screenshots', () => {
         const notification = page.getByTestId('toast');
         await expect(notification).toContainText(`${String(DEFAULT_PROMPTS)} prompts added`);
         await expect(notification).toContainText('Open your AI chat and type //');
+        // The keyboard on the first Prompt's Copy, reached by a click: no ring drawn
+        const focused = page.getByRole('button', { name: /^Copy content of .+ to clipboard$/ }).first();
+        await expect(focused).toBeFocused();
+        expect(await focused.evaluate((element) => element.matches(':focus-visible')), 'a focus ring after a click').toBe(false);
         // Hovered, the Notification keeps its time; its text has no hover look
         await page.getByTestId('toast-text').hover();
         await animationsDone(page);

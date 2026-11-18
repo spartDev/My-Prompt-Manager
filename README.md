@@ -225,8 +225,8 @@ src/content/
 
 1. **First Time Setup:**
    - Install the extension following the installation guide
-   - Click the extension icon to open the popup
-   - Create your first category (e.g., "Coding", "Writing", "Research")
+   - Click the extension icon: the first opening shows the Welcome, three steps that end with Packs of ready-made Prompts to add, or with Start empty, which opens the editor of a new Prompt
+   - Create your own categories (e.g., "Coding", "Writing", "Research")
    - Add your frequently used prompts
 
 2. **Managing Prompts:**

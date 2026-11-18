@@ -8,6 +8,12 @@
  *
  *   MEASURE=1 CI=1 npx playwright test tests/e2e/welcome/measures.spec.ts --workers=1 --retries=0
  *
+ * A MEASURE run exits 1 by design, so do not take it for a failure: the real action popup with its
+ * action not pinned misses 200 ms from the open request, because Chrome spends about 280 ms before
+ * the popup's navigation starts, before any code of the extension runs. That reading's expect.soft
+ * fails ("the real popup, its action not pinned"), and its test still writes its section. Any other
+ * failed expect is a real one.
+ *
  * - MEASURE_OUT: the JSON report (default test-results/welcome/measures.json). Each test writes its
  *   own section and keeps the others, so one section can be measured again alone (--grep).
  * - MEASURE_BASE_DIST: a build of main at this branch's merge base, for the existing user's "before";

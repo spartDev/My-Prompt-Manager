@@ -1,6 +1,19 @@
 ## [Unreleased]
 
 
+### ✨ Added
+
+-  Welcome: three steps at the first opening after a first install (what the extension is for, blanks to fill in a Prompt, Packs to start with), which leave for a Library holding the chosen Packs' Prompts, or for the editor of a new Prompt. Closed early, it resumes at the same step; once finished it never shows again, not after an update nor after Clear All Data; a user who updates never sees it
+-  Packs: ready-made Prompts in a Category of their own (Product, Engineering, Writing, Hiring; Product and Writing selected), added all together through Admission, with no duplicate
+-  On a first install, the chat tabs already open get the Prompts button and `//`, as after an update
+
+
+### 🔄 Changed
+
+-  Debug mode shows the Welcome from its first step at every opening, then What's new, and records nothing about either; the Packs it adds go into the Library, with no duplicate
+-  What's new never shows during or right after the Welcome
+
+
 ## [1.9.0] - 2026-01-19
 
 

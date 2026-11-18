@@ -12,7 +12,7 @@
  *
  * Screens, as the spec names them, <screen>-<surface>-<theme>.png: step1, step2 and step3 in the popup (format popup,
  * drawn at the real popup's 400 x 500, not the mockup's 400 x 580) and the side panel (format side, 400 x 860); exit,
- * in the popup only, the mockup's Library after its own "Add 9 prompts", with its toast. Each is taken as the spec
+ * in both, the mockup's Library after its own "Add 9 prompts", with its toast. Each is taken as the spec
  * takes ours: animations ended, the endless ones cancelled, the pointer on the header, step 2 while the blank holds
  * the whole name. The mockup's toast hides after 2.7 s with no hover hold, so the script keeps it for the screenshot.
  *
@@ -166,18 +166,16 @@ try {
           await page.getByText(step === 1 ? 'Leave blanks, fill them later' : 'Start with a pack').waitFor();
         }
       }
-      if (surface === 'popup') {
-        await page.evaluate(() => {
-          const setTimeoutOf = window.setTimeout;
-          window.setTimeout = (callback, delay, ...rest) => (delay === 2700 ? 0 : setTimeoutOf(callback, delay, ...rest));
-        });
-        await page.getByText('Add 9 prompts', { exact: true }).click();
-        await page.getByText('9 prompts added').waitFor();
-        await page.waitForTimeout(100);
-        await animationsDone(page);
-        await page.mouse.move(size.width / 2, 4);
-        await shoot(page, file('exit'), size);
-      }
+      await page.evaluate(() => {
+        const setTimeoutOf = window.setTimeout;
+        window.setTimeout = (callback, delay, ...rest) => (delay === 2700 ? 0 : setTimeoutOf(callback, delay, ...rest));
+      });
+      await page.getByText('Add 9 prompts', { exact: true }).click();
+      await page.getByText('9 prompts added').waitFor();
+      await page.waitForTimeout(100);
+      await animationsDone(page);
+      await page.mouse.move(size.width / 2, 4);
+      await shoot(page, file('exit'), size);
       await page.close();
       process.stdout.write(`${theme} ${surface}: done\n`);
     }
