@@ -24,7 +24,7 @@ import type { BrowserContext, Page, Worker } from '@playwright/test';
 
 import { SITE_SETTINGS_KEY } from '../../src/services/siteSettings';
 import { WHATS_NEW_KEY } from '../../src/whatsNew/storage';
-import { createStorageController, type ExtensionStorage, expect, test } from './fixtures/extension';
+import { createStorageController, type ExtensionStorage, expect, test, waitForFirstInstallRecords } from './fixtures/extension';
 import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from './fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from './utils/storage';
 
@@ -61,7 +61,8 @@ const storedRecord = async (storage: ExtensionStorage): Promise<unknown> =>
 
 /**
  * The storage of a build as its first install left it: Chrome installs the copy when it loads it,
- * and the service worker records `installedVersion` = the build's version. Nothing is cleared or seeded
+ * and the service worker records `installedVersion` = the build's version, and the Welcome as
+ * pending. Nothing is cleared or seeded
  */
 const storageOfFirstInstall = async (context: BrowserContext, extensionId: string, version: string): Promise<ExtensionStorage> => {
   const worker = context.serviceWorkers().find((candidate) => candidate.url().startsWith(`chrome-extension://${extensionId}/`));
@@ -70,12 +71,13 @@ const storageOfFirstInstall = async (context: BrowserContext, extensionId: strin
   }
   const storage = createStorageController(worker);
   await expect.poll(async () => storedRecord(storage)).toEqual({ installedVersion: version });
+  await waitForFirstInstallRecords(storage);
   return storage;
 };
 
 /**
  * The storage of a build, emptied once its service worker has recorded the first install.
- * Waiting for that write first means it cannot land over the seed of the test: the seed is the last write
+ * Waiting for those writes first means none can land over the seed of the test: the seed is the last write
  */
 const storageAfterInstall = async (context: BrowserContext, extensionId: string, version: string): Promise<ExtensionStorage> => {
   const storage = await storageOfFirstInstall(context, extensionId, version);

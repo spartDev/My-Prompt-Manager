@@ -6,6 +6,8 @@ import type { BrowserContext, Page, Worker } from '@playwright/test';
 import { test as base, chromium } from '@playwright/test';
 
 import type { Category, Prompt, Settings } from '../../../src/types';
+import { parseWelcomeRecord, WELCOME_KEY } from '../../../src/welcome/storage';
+import { parseWhatsNewRecord, WHATS_NEW_KEY } from '../../../src/whatsNew/storage';
 
 /** The extension Chromium loads: the build in dist/, unless a spec sets another with test.use({ extensionPath }) */
 export const DEFAULT_EXTENSION_PATH = path.resolve(process.cwd(), 'dist');
@@ -35,7 +37,7 @@ export type ExtensionStorage = {
   getSettings: () => Promise<Settings | undefined>;
 };
 
-const waitForBackgroundTarget = async (context: BrowserContext): Promise<BackgroundTarget> => {
+export const waitForBackgroundTarget = async (context: BrowserContext): Promise<BackgroundTarget> => {
   // Extended timeout for CI environments
   const deadline = Date.now() + (process.env.CI ? 120_000 : 30_000);
   const isCI = process.env.CI;
@@ -273,44 +275,81 @@ export const createStorageController = (target: BackgroundTarget): ExtensionStor
   };
 };
 
+/**
+ * Launches Chromium on the profile in `userDataDir` with the extension of `extensionPath` loaded,
+ * its start-up tab closed. The `context` fixture launches it on a fresh profile; a test that
+ * restarts the browser closes its context and launches again on the same profile.
+ *
+ * Chromium installs an extension loaded with --load-extension afresh at every launch: each launch
+ * fires `onInstalled` with reason 'install', never 'update', and keeps `chrome.storage.local`.
+ * A real update is `updateExtensionInPlace` of fixtures/extension-update.ts.
+ */
+export const launchExtensionContext = async (userDataDir: string, extensionPath: string): Promise<BrowserContext> => {
+  const context = await chromium.launchPersistentContext(userDataDir, {
+    headless: process.env.CI ? true : false,
+    args: [
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
+      '--no-first-run',
+      '--no-default-browser-check',
+      // Essential args for CI stability and extension loading
+      ...(process.env.CI ? [
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-features=TranslateUI',
+        '--disable-default-apps',
+        '--disable-extensions-file-access-check',
+        '--disable-dev-shm-usage', // Prevents CI memory issues
+        '--disable-gpu', // Prevents GPU-related crashes in CI
+        '--no-sandbox', // Required for many CI environments
+        '--disable-setuid-sandbox',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-ipc-flooding-protection',
+      ] : []),
+    ],
+    // Increase timeouts for CI environments
+    timeout: process.env.CI ? 120_000 : 30_000,
+  });
+
+  for (const page of context.pages()) {
+    await page.close();
+  }
+  return context;
+};
+
+/** Whether the store holds what the service worker writes at a first install */
+const hasFirstInstallRecords = (stored: Record<string, unknown>): boolean =>
+  parseWhatsNewRecord(stored[WHATS_NEW_KEY]).installedVersion !== undefined &&
+  parseWelcomeRecord(stored[WELCOME_KEY])?.status === 'pending';
+
+/**
+ * Waits until the service worker has written what a first install writes: the Release of install
+ * (`whatsNew`) and the Welcome as pending (`welcome`). Every test starts on a fresh profile, a first
+ * install, and those writes run on their own once the extension loads: a reset made before them
+ * would see one land after it, over the test's seed, and a Welcome record no spec seeded would
+ * cover the popup.
+ */
+export const waitForFirstInstallRecords = async (storage: ExtensionStorage): Promise<void> => {
+  const deadline = Date.now() + (process.env.CI ? 60_000 : 15_000);
+  let stored: Record<string, unknown> = {};
+  while (Date.now() < deadline) {
+    stored = await storage.get([WHATS_NEW_KEY, WELCOME_KEY]);
+    if (hasFirstInstallRecords(stored)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`The service worker did not record the first install; storage holds ${JSON.stringify(stored)}`);
+};
+
 export const test = base.extend<ExtensionOptions & ExtensionFixtures>({
   extensionPath: [DEFAULT_EXTENSION_PATH, { option: true }],
 
   context: async ({ extensionPath }, use) => {
     const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-claude-ext-'));
-
-    const headless = process.env.CI ? true : false;
-    const context = await chromium.launchPersistentContext(userDataDir, {
-      headless,
-      args: [
-        `--disable-extensions-except=${extensionPath}`,
-        `--load-extension=${extensionPath}`,
-        '--no-first-run',
-        '--no-default-browser-check',
-        // Essential args for CI stability and extension loading
-        ...(process.env.CI ? [
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-default-apps',
-          '--disable-extensions-file-access-check',
-          '--disable-dev-shm-usage', // Prevents CI memory issues
-          '--disable-gpu', // Prevents GPU-related crashes in CI
-          '--no-sandbox', // Required for many CI environments
-          '--disable-setuid-sandbox',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
-          '--disable-ipc-flooding-protection',
-        ] : []),
-      ],
-      // Increase timeouts for CI environments
-      timeout: process.env.CI ? 120_000 : 30_000,
-    });
-
-    for (const page of context.pages()) {
-      await page.close();
-    }
+    const context = await launchExtensionContext(userDataDir, extensionPath);
 
     try {
       await use(context);
@@ -324,6 +363,8 @@ export const test = base.extend<ExtensionOptions & ExtensionFixtures>({
     const background = await waitForBackgroundTarget(context);
     const controller = createStorageController(background);
 
+    // Every test starts on a first install: reset only once its records are written, or one lands after the reset
+    await waitForFirstInstallRecords(controller);
     await controller.reset();
 
     try {
