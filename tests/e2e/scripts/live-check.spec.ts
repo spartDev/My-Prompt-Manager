@@ -29,24 +29,27 @@ for (const { id, fixture } of LEXICAL_STAND_INS) {
       test(`empties the field after ${caseId} typed ${JSON.stringify(text)}`, async ({ page }) => {
         const field = page.locator(PLATFORM_FIELD[fixture]);
         await page.keyboard.type(text);
-        await expect(field).toHaveText(text);
+        await expect.poll(() => field.textContent()).toBe(text);
 
         const note = await afterCase(page, SUPPORTED_PLATFORMS[id], { typed: true, owned: CASE_FIELDS[caseId].typed });
 
         expect(note).toBe('');
-        await expect(field).toHaveText('');
+        expect(await field.textContent()).toBe('');
       });
     }
 
     test('leaves a field holding a draft as it was, and says so', async ({ page }) => {
       const field = page.locator(PLATFORM_FIELD[fixture]);
       await page.keyboard.type('Mon brouillon Hi there');
-      await expect(field).toHaveText('Mon brouillon Hi there');
+      await expect.poll(() => field.textContent()).toBe('Mon brouillon Hi there');
+      const draft = await field.innerHTML();
 
       const note = await afterCase(page, SUPPORTED_PLATFORMS[id], { typed: true, owned: CASE_FIELDS['slash-inside'].typed });
 
       expect(note).toBe(NOT_OURS);
-      await expect(field).toHaveText('Mon brouillon Hi there');
+      // Exact, not toHaveText: a string there normalizes whitespace, so a doubled space would pass
+      expect(await field.textContent()).toBe('Mon brouillon Hi there');
+      expect(await field.innerHTML()).toBe(draft);
     });
   });
 }
