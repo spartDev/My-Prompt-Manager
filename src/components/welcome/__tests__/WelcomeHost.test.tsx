@@ -80,6 +80,16 @@ describe('Welcome frame', () => {
       expect(pill(1).className).toContain('bg-step-dot');
     });
 
+    // WCAG 2.5.8: the 7px pills sat in 13px-wide buttons, too close for the spacing exception. The
+    // boxes are measured in the real extension by tests/e2e/welcome/welcome-a11y.spec.ts
+    it('makes each dot a target of 24 x 24px at least, its pill centered in it', () => {
+      renderWelcome({ step: 1 });
+
+      for (const step of [1, 2, 3]) {
+        expect(dot(step)).toHaveClass('h-6', 'min-w-6', 'justify-center');
+      }
+    });
+
     it('draws the primary button in ink (the accent in dark), 48px high, taking the rest of the width; Back outlined at 3:1', () => {
       renderWelcome({ step: 1 });
 

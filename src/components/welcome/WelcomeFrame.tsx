@@ -227,8 +227,10 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
               onClick={() => {
                 onAction({ type: 'goTo', step: dot });
               }}
-              // 24px high for the pointer and the finger; the 7px pill inside is what shows
-              className="flex h-6 items-center rounded-full px-[3px] focus-interactive"
+              // A target of 24 x 24px at least for the pointer and the finger (WCAG 2.5.8), the pill
+              // centered in it: the pills stand 24px apart or more, center to center. The mockup's 6px
+              // gap left 13px-wide targets too close together
+              className="flex h-6 min-w-6 items-center justify-center rounded-full px-[3px] focus-interactive"
             >
               <span
                 aria-hidden="true"

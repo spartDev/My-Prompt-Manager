@@ -304,8 +304,10 @@ const LibraryView: FC<LibraryViewProps> = ({
                 aria-label={`${String(resultCount)} prompt${resultCount !== 1 ? 's' : ''} found`}
               >
                 {finalFilteredPrompts.map((prompt: Prompt, index) => (
+                  // An item of the list: a screen reader counts the Prompts as it enters it
                   <div
                     key={prompt.id}
+                    role="listitem"
                     className={cn('min-w-0', riseClass)}
                     style={{ animationDelay: `${String(Math.min(index, MOTION.listStaggerSteps) * MOTION.listStagger)}ms` }}
                   >

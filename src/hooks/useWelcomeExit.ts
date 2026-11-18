@@ -17,6 +17,11 @@ export interface WelcomeExitOptions {
   /** Opens the editor on a new Prompt */
   readonly openNewPrompt: () => void;
   readonly showToast: ShowToast;
+  /**
+   * Hides the Notification on screen, if any. Called as an exit starts: the only one the Welcome can
+   * show is the failure of an earlier add, whose Start empty would do nothing once the user has left
+   */
+  readonly hideNotification: () => void;
   /** The Packs the last step offers; tests pass their own */
   readonly packs?: readonly PromptPack[];
 }
@@ -51,7 +56,9 @@ const START_EMPTY = 'Start empty';
  * `MOTION.welcomeEditorDelay` later, a timer cleared on unmount.
  *
  * A refused add finishes nothing: the Welcome stays at its last step, nothing is recorded, and a
- * failure Notification offers to start empty; the primary button tries again. A press while an exit
+ * failure Notification offers to start empty; the primary button tries again. Each exit, that Start
+ * empty included, hides the Notification on screen as it starts, so a failure Notification never
+ * outlives the Welcome with a Start empty that would do nothing any more. A press while an exit
  * is under way (a double click, Enter then a click) does nothing, so the Packs are added once and the
  * Welcome finished once. An add that lands after the unmount (the popup closed) does nothing more:
  * the next opening finds the Welcome pending over a Library with Prompts, which counts as finished.
@@ -89,13 +96,25 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     }, MOTION.welcomeEditorDelay);
   }, []);
 
-  const startEmptyAfterFailure = useCallback((): void => {
+  /**
+   * Starts an exit, unless one is under way: false then. The Notification on screen goes: a failure
+   * Notification of an earlier add would otherwise stay over the Library, or over the add tried
+   * again, with a Start empty that does nothing
+   */
+  const begin = useCallback((): boolean => {
     if (leaving.current) {
-      return;
+      return false;
     }
     leaving.current = true;
-    startEmpty();
-  }, [startEmpty]);
+    latest.current.hideNotification();
+    return true;
+  }, []);
+
+  const startEmptyAfterFailure = useCallback((): void => {
+    if (begin()) {
+      startEmpty();
+    }
+  }, [begin, startEmpty]);
 
   const addThenLeave = useCallback(async (packs: readonly PromptPack[]): Promise<void> => {
     let result: AddPacksResult;
@@ -124,10 +143,9 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
   }, [startEmptyAfterFailure]);
 
   return useCallback((packIds: readonly string[]): void => {
-    if (leaving.current) {
+    if (!begin()) {
       return;
     }
-    leaving.current = true;
     // In the order the last step offers them; an id that is no Pack, or a Pack with no Prompt, adds nothing
     const packs = (latest.current.packs ?? PACKS).filter((pack) => packIds.includes(pack.id) && pack.prompts.length > 0);
     if (packs.length === 0) {
@@ -135,5 +153,5 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
       return;
     }
     void addThenLeave(packs);
-  }, [startEmpty, addThenLeave]);
+  }, [begin, startEmpty, addThenLeave]);
 };

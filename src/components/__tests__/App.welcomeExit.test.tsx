@@ -300,7 +300,7 @@ describe('App: leaving the Welcome for a ready Library', () => {
       await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
     });
 
-    it('or the Packs unselected, the primary button, now Start empty, leaves for the Library, then the editor', async () => {
+    it('or the Packs unselected, the primary button, now Start empty, leaves for the Library, then the editor, the failure Notification gone with the Welcome', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });
       await openWelcome(2);
       refuseOnce();
@@ -314,8 +314,37 @@ describe('App: leaving the Welcome for a ready Library', () => {
       fireEvent.click(primary());
 
       expect(screen.getByText('Your library is empty')).toBeInTheDocument();
+      // Its Start empty would do nothing over the Library and the editor: it goes as the exit starts
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start empty' })).not.toBeInTheDocument();
       expect(await screen.findByTestId('editor-sheet')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(getMockStorageManager().addPacks).toHaveBeenCalledTimes(1);
+    });
+
+    it("a second press with the Packs hides the failure Notification while that add runs, then shows the add's", async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      fireEvent.click(primary());
+      await screen.findByRole('alert');
+      // The add tried again takes a while
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      const add = addPacks.getMockImplementation() as typeof addPacks;
+      let release = (): void => undefined;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      addPacks.mockImplementationOnce(async (packs) => {
+        await held;
+        return add(packs);
+      });
+
+      fireEvent.click(primary());
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByTestId('welcome')).toBeInTheDocument();
+      act(() => { release(); });
+      await waitFor(() => { expect(screen.queryByTestId('welcome')).not.toBeInTheDocument(); });
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
     });
   });
 

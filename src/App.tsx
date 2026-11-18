@@ -434,16 +434,27 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // The way out of the Welcome's last step: the Packs selected added, then the Welcome finished, then
   // the Library on All with the Notification of the add; with none, the Library, then the editor
   const addPacks = useAddPacks({ refreshPrompts, refreshCategories });
+  // Defensive: the Welcome replaced the Library in this opening, so its filter is still All and its
+  // search empty. This puts them back if something set them while the Welcome was up (a review the
+  // side panel takes), so no Prompt the Packs added is filtered out of sight
   const showWholeLibrary = useCallback(() => {
     clearSearch();
     setLibraryFilter(ALL_PROMPTS);
   }, [clearSearch]);
+  // The only Notification over the Welcome is a refused add's: it goes as an exit starts
+  const shownToastId = toast?.id;
+  const hideShownToast = useCallback(() => {
+    if (shownToastId !== undefined) {
+      hideToast(shownToastId);
+    }
+  }, [shownToastId, hideToast]);
   const leaveWelcome = useWelcomeExit({
     addPacks,
     finishWelcome: launch.finishWelcome,
     showLibrary: showWholeLibrary,
     openNewPrompt,
-    showToast
+    showToast,
+    hideNotification: hideShownToast
   });
 
   // A review asked from the full-page Analytics view opens the side panel and waits in session

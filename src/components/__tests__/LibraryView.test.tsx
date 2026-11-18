@@ -311,6 +311,18 @@ describe('LibraryView', () => {
       render(<LibraryView {...defaultProps} />);
       expect(screen.getByText('Test Prompt')).toBeInTheDocument();
     });
+
+    // axe's aria-required-children, on the Library the Welcome leaves for (My-Prompt-Manager-ojz.10)
+    it('gives each Prompt card as an item of the list, so a screen reader counts the Prompts', () => {
+      render(<LibraryView {...defaultProps} />);
+
+      const list = screen.getByRole('list', { name: /prompts? found$/ });
+      const items = within(list).getAllByRole('listitem');
+      expect(items).toHaveLength(defaultPrompts.length);
+      for (const [index, item] of items.entries()) {
+        expect(within(item).getByRole('article')).toHaveAccessibleName(defaultPrompts[index]?.title ?? '');
+      }
+    });
   });
 
   describe('Library filter', () => {

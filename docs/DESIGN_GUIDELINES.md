@@ -1195,6 +1195,13 @@ on the frame in both modes. The step's area clips sideways at the screen's edge 
 so a card's shadow fades out in the side margins. No animation of the frame disables, covers or delays
 the primary button: a click lands while they play.
 
+Each progress dot is a button of 24 x 24px at least (`h-6 min-w-6`), its pill centered in it, so the
+dots meet WCAG 2.5.8 (Target Size): the pills stand 24px apart, center to center, where the mockups'
+6px gap left 13px-wide targets too close together. The state is the pill's shape: in dark the active
+pill (`bg-accent`, 3.0:1 on the frame) and an inactive dot (`bg-step-dot`, 3.0:1) are 1.01:1 to each
+other, and the 22px pill against the 7px dot carries it, each 3:1 on the frame (WCAG 1.4.1 and 1.4.11);
+`aria-current="step"` and the "Step N of 3" announcement carry it for assistive technology.
+
 | Token | Value | Use |
 |---|---|---|
 | `animate-welcome-in` (`MOTION.welcomeIn`) | `backdrop-in` 100ms, ease | the screen fading in at the opening; the mockup's 500ms is shortened so the screen is whole within the 200ms the Welcome has to show (150ms was not enough) |
@@ -1224,6 +1231,15 @@ text is, and the check glyph is `text-on-pack-check`. The Packs' grid takes back
 `-m-1`, so the Packs line up with the title and the pills while a focused Pack's outline stays whole.
 The Platform pills are `bg-card text-secondary`. Every pair is checked at its threshold, in light and
 dark, by "Welcome in light and dark" in `src/theme/__tests__/tokens.test.ts`.
+
+Where the Packs do not fit (a side panel under about 600px high), their grid scrolls within itself,
+and while Packs remain beyond its top or bottom, that edge fades out over 16px and a line in
+`border-input` (3:1 on the frame) shows along it (`welcome-packs-edges` around the grid,
+`welcome-packs-scroll` on it, in `src/popup.css`), so a selected Pack, counted in "Add N prompts", is
+never out of view unseen. Like the Sections' scroll lines, the grid's own scroll timeline draws it, with
+no scroll state in React; where the Packs fit, the timeline is inactive and neither shows. It is the
+scroll's state, not motion, so it stays under reduced motion. A Pack the keyboard reaches scrolls into
+view clear of the fades (`scroll-py-4`).
 
 | Token | Value | Use |
 |---|---|---|
