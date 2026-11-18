@@ -15,6 +15,7 @@ import type { BrowserContext, Worker } from '@playwright/test';
 
 import { copyDistWithManifest } from './dist-copy';
 import { DEFAULT_EXTENSION_PATH } from './extension';
+import { addOnInstalledProbe } from './oninstalled-probe';
 
 /** The part of chrome.developerPrivate the update uses: chrome://extensions has it, @types/chrome does not */
 interface DeveloperPrivate {
@@ -22,9 +23,18 @@ interface DeveloperPrivate {
   reload: (extensionId: string, options: { failQuietly: boolean }) => Promise<void>;
 }
 
+/** What a copy of the build carries besides itself */
+export interface BuildCopyOptions {
+  /** The observer of onInstalled of fixtures/oninstalled-probe.ts, which records each event the copy fires */
+  readonly onInstalledProbe?: boolean;
+}
+
 /** Copies the build in dist/ to `target`, replacing what was there, at manifest version `version` */
-export function copyBuildAt(target: string, version: string): void {
+export function copyBuildAt(target: string, version: string, { onInstalledProbe = false }: BuildCopyOptions = {}): void {
   copyDistWithManifest(path.resolve(DEFAULT_EXTENSION_PATH), target, (manifest) => ({ ...manifest, version }));
+  if (onInstalledProbe) {
+    addOnInstalledProbe(target);
+  }
 }
 
 /** The running service worker of the extension, once it runs at `version` */
@@ -55,9 +65,10 @@ export const updateExtensionInPlace = async (
   context: BrowserContext,
   extensionId: string,
   extensionPath: string,
-  version: string
+  version: string,
+  options: BuildCopyOptions = {}
 ): Promise<Worker> => {
-  copyBuildAt(extensionPath, version);
+  copyBuildAt(extensionPath, version, options);
 
   const extensions = await context.newPage();
   try {

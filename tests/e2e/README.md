@@ -14,6 +14,7 @@ tests/e2e/
 ├── sidepanel/          # Component-specific tests
 ├── content/            # Content script tests
 ├── whats-new/          # What's new sheet tests and proof screenshots
+├── welcome/           # The Welcome; scenarios.spec.ts runs its twelve acceptance scenarios
 └── user-journeys/      # End-to-end user workflow tests
 ```
 
