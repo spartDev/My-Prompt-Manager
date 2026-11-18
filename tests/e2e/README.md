@@ -14,7 +14,7 @@ tests/e2e/
 ├── sidepanel/          # Component-specific tests
 ├── content/            # Content script tests
 ├── whats-new/          # What's new sheet tests and proof screenshots
-├── welcome/           # The Welcome; scenarios.spec.ts runs its twelve acceptance scenarios
+├── welcome/           # The Welcome; scenarios.spec.ts runs its twelve acceptance scenarios; measures.spec.ts measures its numeric targets, on demand only (MEASURE=1, see its header)
 └── user-journeys/      # End-to-end user workflow tests
 ```
 
