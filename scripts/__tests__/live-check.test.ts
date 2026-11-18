@@ -299,7 +299,7 @@ function domPage(html: string, lang: string, onType?: () => void) {
     dispose: () => Promise.resolve(),
     evaluate: (fn: (element: HTMLElement, arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(editor as HTMLElement, arg))
   };
-  const handles = new Map<object, unknown>();
+  const handles = new Map<object, unknown>([[handle, editor]]);
   const unwrap = (arg: unknown): unknown =>
     (arg && typeof arg === 'object' && !Array.isArray(arg)
       ? Object.fromEntries(Object.entries(arg).map(([key, value]) => [key, typeof value === 'object' && value !== null && handles.has(value) ? handles.get(value) : value]))
@@ -484,6 +484,36 @@ describe('runCase icon-steady holds the anchor across the typing', () => {
 
     expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px, anchor not found, measured on the page' });
   });
+
+  // The extension places the button against the first match and leaves it there while it stays on
+  // the page: a match that shows earlier in the form afterwards is not the button's anchor
+  it('holds the element the button stands against, not an earlier one the anchor selector also finds', async () => {
+    const page = domPage('<form><textarea></textarea><div><button aria-label="Dictate">early</button></div>'
+      + `<div>${toolbarIcon}<button aria-label="Dictate">m</button></div></form>`, 'en');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor (0.0px on the page)' });
+  });
+
+  it('fails, and says so, when the button stands against no element the anchor selector finds before typing', async () => {
+    const page = domPage(`<form><textarea></textarea>${toolbarIcon}<span></span><button aria-label="Dictate">m</button></form>`, 'en');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, not beside its anchor before typing (0.0px on the page)' });
+  });
+
+  it('fails when the button moves to another composer than the field typed in', async () => {
+    const page = domPage(`<form><textarea></textarea>${toolbarIcon}<button aria-label="Dictate">m</button></form>`
+      + '<form id="other"><textarea></textarea><button aria-label="Dictate">m</button></form>', 'en', () => {
+      document.querySelector('#other button')?.before(icon());
+    });
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, outside the composer of the field typed in (0.0px on the page)' });
+  });
 });
 
 describe('runCase late-toolbar reads the chain in the page', () => {
@@ -662,10 +692,10 @@ describe('cleanUpNote', () => {
 describe('judgeSteady', () => {
   /** At (x, y) on the page, no anchor found: on the toolbar by default */
   const at = (x: number, y: number, placement = 'toolbar', anchor = '0') =>
-    ({ placement, anchor, x, y, fromAnchor: null, anchorElement: null, beside: null });
+    ({ placement, anchor, x, y, fromAnchor: null, anchorElement: null, beside: null, inComposer: placement === 'toolbar' ? true : null });
   /** On the toolbar, at (x, y) on the page, (dx, dy) from the element it was placed against */
   const beside = (x: number, y: number, dx: number, dy: number, anchorElement: 'held' | 'new' = 'held', next = true) =>
-    ({ placement: 'toolbar', anchor: '0', x, y, fromAnchor: { x: dx, y: dy }, anchorElement, beside: next });
+    ({ placement: 'toolbar', anchor: '0', x, y, fromAnchor: { x: dx, y: dy }, anchorElement, beside: next, inComposer: true });
 
   it('passes when the Prompts button keeps its place on the overlay, a subpixel re-layout aside', () => {
     expect(judgeSteady(at(10, 20, 'overlay', 'none'), at(10.5, 20, 'overlay', 'none'))).toEqual({ pass: true, detail: 'placement overlay, anchor none, moved 0.5px' });
@@ -703,7 +733,8 @@ describe('judgeSteady', () => {
 
   it.each([
     ['on either side', at(1022, 434), at(1022.5, 434), true, 'placement toolbar, anchor 0, moved 0.5px, anchor not found, measured on the page'],
-    ['after typing', beside(1022, 434, -36, 0), at(980, 434), false, 'placement toolbar, anchor 0, moved 42.0px, anchor not found after typing, measured on the page']
+    ['after typing', beside(1022, 434, -36, 0), at(980, 434), false, 'placement toolbar, anchor 0, moved 42.0px, anchor not found after typing, measured on the page'],
+    ['before typing', at(1022, 434), beside(1022, 434, -36, 0), true, 'placement toolbar, anchor 0, moved 0.0px, anchor not found before typing, measured on the page']
   ])('measures on the page when the anchor is not found %s, and says so', (_case, before, after, pass, detail) => {
     expect(judgeSteady(before, after)).toEqual({ pass, detail });
   });
