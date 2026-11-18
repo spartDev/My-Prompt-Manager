@@ -1,10 +1,12 @@
 /**
  * E2E: What's new over the Library, in the real extension (My-Prompt-Manager-d1g.11)
  *
- * The manifest is still 1.9.0, which has no Release notes: Debug mode is what shows the newest ones,
- * those of 2.0.0. In the popup (400 x 500) and the side panel (360 x 720), light and dark: the sheet
- * rises over a seeded Library with the pill "New in 2.0.0", and after Got it and its exit, the Library
- * is back. Debug mode leaves the Last seen Release as it was.
+ * The manifest is still 1.9.0, which has no Release notes, so the spec runs on the copy of the build
+ * at 2.0.0 (fixtures/whats-new-build.ts), as after the update of an existing user from 1.9.0. (Debug
+ * mode no longer shows What's new at once: the Welcome comes first, My-Prompt-Manager-ojz.2.) In the
+ * popup (400 x 500) and the side panel (360 x 720), light and dark: the sheet rises over a seeded
+ * Library with the pill "New in 2.0.0", and after Got it and its exit, the Library is back, the
+ * Release marked seen.
  *
  * Proof screenshots, after the entry animation has ended (motion left on, as the other proof specs):
  * whats-new-{popup,sidepanel}-{light,dark}.png and library-after-close-{popup,sidepanel}-{light,dark}.png.
@@ -19,13 +21,16 @@
 import type { Page } from '@playwright/test';
 
 import type { Category } from '../../../src/types';
+import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { RELEASE_NOTES } from '../../../src/whatsNew/releaseNotes';
+import { WHATS_NEW_KEY } from '../../../src/whatsNew/storage';
 import { type ExtensionStorage, expect, test } from '../fixtures/extension';
+import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from '../fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 
 const SCREENSHOT_DIR = 'test-results/whats-new';
 
-/** The notes Debug mode shows on 1.9.0: the newest Release that has some */
+/** The notes of the Release the build is updated to */
 const notes200 = RELEASE_NOTES.find((notes) => notes.version === '2.0.0') ?? { items: [] };
 
 /** The popup is 400 x 500; the side panel is as wide as the user makes it, 360 here */
@@ -61,7 +66,8 @@ const animationsDone = (page: Page): Promise<void> =>
         .map((animation) => animation.finished.catch(() => undefined)));
   });
 
-const openWithDebugMode = async (
+/** The opening after the update of an existing user from 1.9.0: a Library, the Welcome done */
+const openAfterUpdate = async (
   page: Page,
   storage: ExtensionStorage,
   extensionId: string,
@@ -69,7 +75,7 @@ const openWithDebugMode = async (
   surface: keyof typeof SURFACES
 ): Promise<void> => {
   await seedLibrary(storage, { categories, prompts, settings: { theme } });
-  await storage.seed({ promptLibrarySettings: { enabledSites: [], customSites: [], debugMode: true } });
+  await storage.seed({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0' }, [WELCOME_KEY]: { status: 'done' } });
   // The motion is part of the result: whatever the machine's own setting
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize(SURFACES[surface]);
@@ -78,10 +84,12 @@ const openWithDebugMode = async (
 };
 
 test.describe("What's new", () => {
+  test.use({ extensionPath: WHATS_NEW_UPDATE_EXTENSION_PATH });
+
   for (const theme of ['light', 'dark'] as const) {
     for (const surface of ['popup', 'sidepanel'] as const) {
-      test(`PROOF: Debug mode shows the 2.0.0 notes over the Library, then Got it gives the Library back (${surface}, ${theme})`, async ({ page, storage, extensionId }) => {
-        await openWithDebugMode(page, storage, extensionId, theme, surface);
+      test(`PROOF: after the update to ${WHATS_NEW_UPDATE_VERSION}, its notes over the Library, then Got it gives the Library back (${surface}, ${theme})`, async ({ page, storage, extensionId }) => {
+        await openAfterUpdate(page, storage, extensionId, theme, surface);
 
         const sheet = page.getByRole('dialog', { name: 'What’s new' });
         await expect(sheet).toBeVisible();
@@ -103,9 +111,10 @@ test.describe("What's new", () => {
         await page.mouse.move(SURFACES[surface].width - 4, 4);
         await page.screenshot({ path: `${SCREENSHOT_DIR}/library-after-close-${surface}-${theme}.png`, animations: 'disabled' });
 
-        // Debug mode writes no Last seen Release
-        const stored = await storage.get<{ whatsNew?: { lastSeenVersion?: string } }>('whatsNew');
-        expect(stored.whatsNew?.lastSeenVersion).toBeUndefined();
+        // Got it marks the Release seen
+        await expect
+          .poll(async () => (await storage.get<{ whatsNew?: { lastSeenVersion?: string } }>(WHATS_NEW_KEY)).whatsNew?.lastSeenVersion)
+          .toBe(WHATS_NEW_UPDATE_VERSION);
       });
     }
   }

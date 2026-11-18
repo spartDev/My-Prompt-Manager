@@ -3,7 +3,9 @@
  *
  * useTheme applies the `dark` class after settings load. Controls with `transition-all`
  * used to animate their background light → dark for 200ms. An init script snapshots the
- * running transitions at the exact moment `dark` lands on <html>.
+ * running transitions at the exact moment `dark` lands on <html>. The Library mounts once the
+ * launch decision is known (src/hooks/useLaunchScreen.ts), which may land after the `dark` class:
+ * a control not mounted yet then mounts dark, and the check after the switch requires it there.
  */
 
 import { expect, test } from '../fixtures/extension';
@@ -44,7 +46,8 @@ test.describe('Dark theme on open', () => {
                       return frames.length > 1 && values(frames[0]) !== values(frames[frames.length - 1]);
                     })
                     .map(a => (a as CSSTransition).transitionProperty)
-                : ['<missing>'];
+                // Not mounted yet: it mounts dark, so it has nothing to animate
+                : [];
             }
             snapshot.runningTransitions = runningTransitions;
           } catch (err) {

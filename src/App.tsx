@@ -14,6 +14,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
 import { useCategories } from './hooks/useCategories';
 import { useClipboard } from './hooks/useClipboard';
+import { useLaunchScreen } from './hooks/useLaunchScreen';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
@@ -51,6 +52,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const isPickerMode = urlParams.get('picker') === 'true';
   
   const [currentView, setCurrentView] = useState<Section>(isPickerMode ? 'settings' : 'library');
+  // What this opening shows first: the Welcome, What's new over the Library, or the Library alone.
+  // Neither in the element picker's Settings window, where nothing of it is even read
+  const launch = useLaunchScreen({ enabled: !isPickerMode });
+  const welcomeShown = launch.screen.kind === 'welcome';
   // Arriving on a Section slides it in from the side of its tab; the first Section shows at once
   const [sectionMotion, setSectionMotion] = useState<'forward' | 'back' | null>(null);
   // The editor rises as a sheet over the Section and leaves to the bottom: it stays in the
@@ -362,7 +367,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [currentView, refreshPrompts, refreshCategories]);
 
   // Cmd/Ctrl+K, from any Section: back to the Library if need be, and the keyboard goes into its search
-  // field. Not while the editor or a dialog is open over the Section, nor in the element picker's Settings
+  // field. Not while the editor or a dialog is open over the Section, nor in the element picker's
+  // Settings, nor while the Welcome covers the Library
   const [focusSearch, setFocusSearch] = useState(false);
   const handleSearchFocused = useCallback(() => { setFocusSearch(false); }, []);
   // Back to the Library if need be, with the keyboard in its search field: Cmd/Ctrl+K, and the
@@ -373,7 +379,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [handleSelectSection]);
   const editorOpen = editor !== null;
   useEffect(() => {
-    if (isPickerMode) { return; }
+    if (isPickerMode || welcomeShown) { return; }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') { return; }
       if (editorOpen || document.querySelector('[aria-modal="true"]')) { return; }
@@ -382,7 +388,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isPickerMode, editorOpen, goToLibrarySearch]);
+  }, [isPickerMode, welcomeShown, editorOpen, goToLibrarySearch]);
 
   // A Feature tile of What's new, once the sheet has started to leave: where the Feature lives
   const handleWhatsNewOpen = (destination: WhatsNewDestination) => {
@@ -468,6 +474,27 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, []);
 
   const loading = promptsLoading || categoriesLoading;
+
+  // Until the opening knows what it shows, only the background: the Library never flashes before the Welcome
+  if (launch.loading) {
+    return (
+      <ThemeProvider>
+        <div data-testid="launch-deciding" className="h-full w-full bg-app" />
+      </ThemeProvider>
+    );
+  }
+
+  // The Welcome fills the popup or side panel, without the tab bar. A placeholder: the Welcome's
+  // screens replace it (My-Prompt-Manager-ojz.7)
+  if (launch.screen.kind === 'welcome') {
+    return (
+      <ThemeProvider>
+        <main data-testid="welcome" data-welcome-step={launch.screen.step} className="h-full w-full bg-app flex items-center justify-center">
+          <h1 className="text-xl font-semibold text-primary">Welcome</h1>
+        </main>
+      </ThemeProvider>
+    );
+  }
 
   if (promptsError) {
     return (
@@ -607,9 +634,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
-      {/* What's new, over the Library at the opening that follows an update; never over the
-          element picker's Settings */}
-      {!isPickerMode && <WhatsNewHost onOpen={handleWhatsNewOpen} />}
+      {/* What's new, over the Library at the opening that follows an update, as the launch decided;
+          never over the element picker's Settings, where the launch decides nothing */}
+      <WhatsNewHost
+        notes={launch.screen.kind === 'whats-new' ? launch.screen.notes : null}
+        onClose={launch.closeWhatsNew}
+        onOpen={handleWhatsNewOpen}
+      />
 
       <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>
