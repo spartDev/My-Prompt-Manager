@@ -248,14 +248,15 @@ const M365COPILOT_FLUENT_HTML = plainPage(
  * The composer of Microsoft 365 Copilot where m365.cloud.microsoft and copilot.microsoft.com send a
  * work account, copilot.cloud.microsoft, as read on the live page on 2026-11-15 (ticket
  * My-Prompt-Manager-axv): the editor, a span in a span, in the composer div, which also holds the
- * plus menu in a div beside an svg, and the dictation button in a span. No send button while the
- * field is empty. The plus menu's div is the bar a test finds the Prompts button in.
+ * plus menu in a div beside an svg, and the dictation button in a span, Fluent's actions
+ * (.fai-BebopLiteChatInput__actions, read on 2026-11-18, ticket My-Prompt-Manager-14v). No send
+ * button while the field is empty. The actions are the bar a test finds the Prompts button in.
  */
 const M365COPILOT_FIELD =
   '<span><span class="field" data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"></span><span></span></span>';
 const M365COPILOT_BAR =
-  '<div class="bar" data-e2e="toolbar"><svg width="0" height="0"></svg><div><button type="button" data-testid="PlusMenuButton" aria-label="Add and manage sources">+</button></div></div>' +
-  '<span><button type="button" aria-label="Start dictation">Mic</button></span>';
+  '<div><svg width="0" height="0"></svg><div><button type="button" data-testid="PlusMenuButton" aria-label="Add and manage sources">+</button></div></div>' +
+  '<span class="bar fai-BebopLiteChatInput__actions" data-e2e="toolbar"><button type="button" aria-label="Start dictation">Mic</button></span>';
 
 /** Its editor without the editor library, its toolbar on the page from the start */
 const M365COPILOT_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div');

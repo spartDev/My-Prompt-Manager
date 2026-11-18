@@ -13,6 +13,12 @@
  * - Mistral (My-Prompt-Manager-spc, read on 2026-11-17, signed in with an empty draft, signed out
  *   with an empty draft and with text): each button of the action row sits alone in a block <div>. A button put before the voice button, in its <div>,
  *   stacked above it and pushed it below the row.
+ * - Microsoft 365 Copilot at copilot.cloud.microsoft (My-Prompt-Manager-14v, read on 2026-11-18,
+ *   signed in with a work account and an empty draft): the composer is a grid of three columns,
+ *   the "+" (in a block <div> of its own), the field and the actions with the dictation button. A
+ *   button put after the "+", in its <div>, went to a second line under it and widened the first
+ *   column, which pushed the field right. The case also checks that the field starts where it does
+ *   without the button.
  */
 
 import type { BrowserContext, Page } from '@playwright/test';
@@ -39,6 +45,8 @@ interface ComposerCase {
   composer: string;
   /** The Platform's button the Prompts button must sit next to, on its row */
   neighbour: string;
+  /** The field, when the button must leave its start where it is without the button */
+  field?: string;
 }
 
 const GEMINI_COLORS = {
@@ -141,6 +149,55 @@ const mistralComposer = (theme: Theme): string => {
 </html>`;
 };
 
+const M365COPILOT_COLORS = {
+  light: { page: '#fafafa', composer: '#ffffff', text: '#242424', border: '#d1d1d1' },
+  dark: { page: '#1f1f1f', composer: '#292929', text: '#ffffff', border: '#525252' },
+};
+
+/** Microsoft 365 Copilot's composer at copilot.cloud.microsoft, as it was laid out on the live site on 2026-11-18 with an empty draft */
+const m365copilotComposer = (theme: Theme): string => {
+  const colors = M365COPILOT_COLORS[theme];
+  return /* html */ `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Microsoft 365 Copilot</title>
+    <style>
+      body { margin: 0; padding: 48px 32px; background: ${colors.page}; color: ${colors.text}; font-family: sans-serif; }
+      .fai-BebopLiteChatInput { display: flex; flex-direction: column; width: 768px; }
+      .fai-BebopLiteChatInput__inputWrapper {
+        display: grid; position: relative; padding: 6px 10px; border-radius: 30px; background: ${colors.composer}; border: 1px solid ${colors.border};
+        grid-template-areas: "attachments attachments attachments" "contentBefore input actions";
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+      }
+      .fai-BebopLiteChatInput__attachments { grid-area: attachments; }
+      .fai-EditorInput { grid-area: input; display: grid; padding: 0 8px; }
+      [data-lexical-editor] { display: block; min-height: 27px; line-height: 27px; outline: none; white-space: pre-wrap; }
+      .fai-BebopLiteChatInput__capabilities { position: absolute; }
+      .fai-BebopLiteChatInput__contentBefore { grid-area: contentBefore; display: flex; padding: 6px; }
+      .fai-BebopLiteChatInput__actions { grid-area: actions; display: flex; align-items: center; padding: 6px 4px; }
+      button.platform { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; }
+    </style>
+  </head>
+  <body>
+    <div class="fai-BebopLiteChatInput">
+      <div class="fai-BebopLiteChatInput__inputWrapper">
+        <div class="fai-BebopLiteChatInput__attachments"></div>
+        <span class="fai-EditorInput"><span data-lexical-editor="true" contenteditable="true" role="textbox" aria-label="Message Copilot"><p><br></p></span></span>
+        <div class="fai-BebopLiteChatInput__capabilities"><div></div></div>
+        <div class="fai-BebopLiteChatInput__contentBefore">
+          <svg width="0" height="0" style="display: none"></svg>
+          <div><button type="button" class="platform" data-testid="PlusMenuButton" aria-label="Add and manage sources">+</button></div>
+        </div>
+        <span class="fai-BebopLiteChatInput__actions"><button type="button" class="platform" aria-label="Start dictation">Mic</button></span>
+      </div>
+    </div>
+  </body>
+</html>`;
+};
+
 const CASES: ComposerCase[] = [
   {
     platform: 'gemini',
@@ -155,6 +212,14 @@ const CASES: ComposerCase[] = [
     html: mistralComposer,
     composer: '.card',
     neighbour: 'button[aria-label="Voice Mode"]',
+  },
+  {
+    platform: 'm365copilot',
+    url: 'https://copilot.cloud.microsoft/chat',
+    html: m365copilotComposer,
+    composer: '.fai-BebopLiteChatInput__inputWrapper',
+    neighbour: 'button[aria-label="Start dictation"]',
+    field: '[data-lexical-editor]',
   },
 ];
 
@@ -186,7 +251,7 @@ const openComposer = async (context: BrowserContext, url: string, html: string):
 };
 
 test.describe('The Prompts button fits in the composer', () => {
-  for (const { platform, url, html, composer, neighbour } of CASES) {
+  for (const { platform, url, html, composer, neighbour, field } of CASES) {
     for (const theme of ['light', 'dark'] as const) {
       test(`PROOF: on ${platform}, the button sits inside the composer next to its own buttons (${theme})`, async ({
         context,
@@ -220,6 +285,19 @@ test.describe('The Prompts button fits in the composer', () => {
         // Before its neighbour, on the same row
         expect(buttonBox.x + buttonBox.width).toBeLessThanOrEqual(neighbourBox.x + TOLERANCE);
         expect(Math.abs(buttonBox.y + buttonBox.height / 2 - (neighbourBox.y + neighbourBox.height / 2))).toBeLessThanOrEqual(2);
+        if (field) {
+          // The field starts where it does without the button: the button does not push it
+          const fieldStarts = await page.evaluate(([fieldSelector, iconSelector]) => {
+            const fieldElement = document.querySelector(fieldSelector) as HTMLElement;
+            const iconElement = document.querySelector(iconSelector) as HTMLElement;
+            const withButton = fieldElement.getBoundingClientRect().left;
+            iconElement.style.display = 'none';
+            const withoutButton = fieldElement.getBoundingClientRect().left;
+            iconElement.style.display = '';
+            return { withButton, withoutButton };
+          }, [field, ICON_ROOT] as const);
+          expect(Math.abs(fieldStarts.withButton - fieldStarts.withoutButton)).toBeLessThanOrEqual(TOLERANCE);
+        }
 
         await page.screenshot({
           path: `${SCREENSHOT_DIR}/${platform}-${theme}.png`,

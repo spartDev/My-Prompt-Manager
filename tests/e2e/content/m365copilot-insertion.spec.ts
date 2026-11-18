@@ -42,7 +42,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     });
   });
 
-  test('the Prompts button goes into the toolbar rendered after the editor, right after the plus menu', async ({ context }) => {
+  test('the Prompts button goes into the toolbar rendered after the editor, first in the actions, before the dictation button', async ({ context }) => {
     const page = await openPlatform(context, 'm365copilot-editor');
 
     // The stand-in renders its toolbar after its editor, as the live page does, once the button
@@ -51,7 +51,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await expect(button).toHaveAttribute('data-mpm-placement', 'toolbar');
     expect(await page.evaluate(() => (window as Window & { __placementBeforeToolbar?: string | null }).__placementBeforeToolbar)).toBe('overlay');
     await expect(button).toHaveAttribute('data-mpm-anchor', '0');
-    expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
+    expect(await button.evaluate((element) => element.nextElementSibling?.getAttribute('aria-label'))).toBe('Start dictation');
   });
 
   test('the Prompts button still goes into the toolbar when Copilot renders it long after the grace period', async ({ context }) => {
@@ -65,7 +65,7 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
     await expect(button).toHaveAttribute('data-mpm-placement', 'toolbar', { timeout: 20_000 });
     expect(await page.evaluate(() => (window as Window & { __placementBeforeToolbar?: string | null }).__placementBeforeToolbar)).toBe('overlay');
     await expect(button).toHaveAttribute('data-mpm-anchor', '0');
-    expect(await button.evaluate((element) => element.previousElementSibling?.getAttribute('data-testid'))).toBe('PlusMenuButton');
+    expect(await button.evaluate((element) => element.nextElementSibling?.getAttribute('aria-label'))).toBe('Start dictation');
   });
 
   test('typing // in one go opens the Prompt selector next to Copilot\'s own slash menu, which closes with the //', async ({ context }) => {
