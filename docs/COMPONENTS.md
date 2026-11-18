@@ -75,7 +75,7 @@ Which component does which job in the popup and the side panel, and the conventi
 | `src/components/settings/SettingsRow.tsx` | One setting in a group: label (and grey detail) at the left, control at the right, an optional status or confirmation under it |
 | `src/components/settings/SegmentedControl.tsx` | A choice among two or three options (theme, popup or side panel): a radio group with a sliding puck |
 | `src/components/settings/Switch.tsx` | The switch for every boolean setting, named by its row's label |
-| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `HelpSection.tsx`, `AdvancedSection.tsx` | One Settings group each (Advanced holds Debug mode, whose hint says What's new shows at every opening, and the reset) |
+| `src/components/settings/AppearanceSection.tsx`, `LibrarySection.tsx`, `NotificationSection.tsx`, `HelpSection.tsx`, `AdvancedSection.tsx` | One Settings group each (Advanced holds Debug mode, whose hint says the Welcome then What's new show at every opening, recording no progress, while Packs added stay in the Library, and the reset) |
 | `src/components/settings/DataStorageSection.tsx` | The Your data group: storage use, Backup export (`handleExport` builds and writes the file; off while the Library cannot be read, so no empty Backup is saved), the restore file picker, Clear All Data |
 | `src/components/settings/SiteIntegrationSection.tsx` | Platforms and custom sites: lists, add flow, element picker, import and export of a site configuration |
 | `src/components/settings/SiteRow.tsx` | One Platform or custom site: logo, name, domain and switch; a custom site's Export and Remove in its ⋯ menu |

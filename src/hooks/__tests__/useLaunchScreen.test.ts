@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { decideLaunch } from '../../launch/decide';
 import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
+import { STORAGE_KEYS } from '../../services/storage';
 import { buildPrompt } from '../../test/builders';
 import { getMockStorageManager } from '../../test/mocks';
 import * as Logger from '../../utils/logger';
@@ -38,7 +39,7 @@ const REGISTRY: readonly ReleaseNotes[] = [V1_9, V2_0];
 const LAUNCH_KEYS = [SITE_SETTINGS_KEY, WELCOME_KEY, WHATS_NEW_KEY].sort();
 
 /** The key the Library is stored under */
-const LIBRARY_KEY = 'prompts';
+const LIBRARY_KEY = STORAGE_KEYS.PROMPTS;
 
 const setManifestVersion = (version: string): void => {
   vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version } as chrome.runtime.Manifest);
@@ -78,6 +79,10 @@ const libraryReads = (): string[][] => reads().filter((keys) => keys.includes(LI
 /** The writes of chrome.storage.local.set that touched the Welcome record */
 const welcomeWrites = (): unknown[] =>
   vi.mocked(chrome.storage.local.set).mock.calls.filter(([items]) => WELCOME_KEY in (items as Record<string, unknown>));
+
+/** The writes of chrome.storage.local.set that touched the What's new record */
+const whatsNewWrites = (): unknown[] =>
+  vi.mocked(chrome.storage.local.set).mock.calls.filter(([items]) => WHATS_NEW_KEY in (items as Record<string, unknown>));
 
 /** The writes, removals and clears storage was asked for */
 const storageChanges = (): unknown[] => [
@@ -180,7 +185,7 @@ describe('useLaunchScreen', () => {
     });
 
     it('a pending record: the same one get, then the Library, once', async () => {
-      await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
+      await newUserAt(0);
       vi.mocked(chrome.storage.local.get).mockClear();
 
       await openExtension();
@@ -440,6 +445,9 @@ describe('useLaunchScreen', () => {
       await settle();
 
       expect(welcomeWrites()).toEqual([[{ [WELCOME_KEY]: { status: 'done' } }]]);
+      // Storage refuses a second done over the first, but not a second Last seen Release: the guard
+      // of finishWelcome is what keeps it to one
+      expect(whatsNewWrites()).toEqual([[{ [WHATS_NEW_KEY]: { installedVersion: '2.0.0', lastSeenVersion: '2.0.0' } }]]);
       expect(await storedWelcome()).toEqual({ status: 'done' });
     });
 
@@ -480,10 +488,105 @@ describe('useLaunchScreen', () => {
     });
   });
 
+  describe('a Welcome found done: a pending record over a Library with Prompts', () => {
+    /** The store a relaunch of the command-line extension leaves over a Library: a first install of 2.0.0, pending at step 0 */
+    const relaunchOverALibrary = async (): Promise<void> => {
+      await chrome.storage.local.clear();
+      await seedLibrary(2);
+      await chrome.storage.local.set({
+        [WHATS_NEW_KEY]: { installedVersion: '2.0.0' },
+        [WELCOME_KEY]: { status: 'pending', step: 0 }
+      });
+    };
+
+    it('the opening records the Welcome done, so it never comes back once that Library is emptied', async () => {
+      await relaunchOverALibrary();
+      const first = await openExtension();
+      expect(first.result.current.screen).toEqual({ kind: 'none' });
+      await waitFor(async () => {
+        expect(await storedWelcome()).toEqual({ status: 'done' });
+      });
+      first.unmount();
+
+      // The user deletes every Prompt
+      await chrome.storage.local.set({ [LIBRARY_KEY]: [] });
+      const second = await openExtension();
+
+      expect(second.result.current.screen).toEqual({ kind: 'none' });
+    });
+
+    it('leaves the Last seen Release to What\'s new: What\'s new shows, and comes back if the extension closes without an action', async () => {
+      // An update to 2.0.0, a Release with notes, over pending and a Library
+      await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      const first = await openExtension();
+      expect(first.result.current.screen).toEqual({ kind: 'whats-new', notes: V2_0 });
+      await waitFor(async () => {
+        expect(await storedWelcome()).toEqual({ status: 'done' });
+      });
+      first.unmount();
+      await settle();
+
+      expect(whatsNewWrites()).toEqual([]);
+      expect(await storedWhatsNew()).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
+      const second = await openExtension();
+      expect(second.result.current.screen).toEqual({ kind: 'whats-new', notes: V2_0 });
+    });
+
+    it('writes once, through the writer, at the opening', async () => {
+      await relaunchOverALibrary();
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      const { result } = await openExtension();
+      act(() => {
+        result.current.saveStep(1);
+        result.current.finishWelcome();
+      });
+      await settle();
+
+      expect(welcomeWrites()).toEqual([[{ [WELCOME_KEY]: { status: 'done' } }]]);
+      expect(whatsNewWrites()).toEqual([]);
+    });
+
+    it.each<[string, () => Promise<void>]>([
+      ['a Welcome that shows (pending over an empty Library)', () => newUserAt(1)],
+      ['a doubt (pending over a Library storage cannot read)', () => chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 0 }, [LIBRARY_KEY]: 'corrupted' })],
+      ['a done record over a Library', () => Promise.resolve()]
+    ])('writes nothing for %s', async (_label, seed) => {
+      await seed();
+      const before = await snapshot();
+      vi.mocked(chrome.storage.local.set).mockClear();
+
+      await openExtension();
+      await settle();
+
+      expect(storageChanges()).toEqual([]);
+      expect(await snapshot()).toBe(before);
+    });
+
+    it('logs a failed write without throwing, and the screen stays as decided', async () => {
+      await relaunchOverALibrary();
+      vi.mocked(chrome.storage.local.set).mockRejectedValue(new Error('QUOTA_BYTES quota exceeded'));
+
+      const { result } = await openExtension();
+
+      expect(result.current.screen).toEqual({ kind: 'none' });
+      await waitFor(() => {
+        expect(Logger.error).toHaveBeenCalledWith(
+          expect.stringContaining('Welcome'),
+          expect.any(Error),
+          expect.objectContaining({ component: 'useLaunchScreen' })
+        );
+      });
+    });
+  });
+
   describe('Debug mode', () => {
     it.each([
       ['a done record and a Library with Prompts', { status: 'done' }, 2],
       ['a pending record at step 2', { status: 'pending', step: 2, packs: ['writing'] }, 0],
+      ['a pending record at step 2 over a Library with Prompts (found done in normal mode)', { status: 'pending', step: 2 }, 2],
       ['no record', undefined, 0]
     ])('%s: the Welcome from step 0 at each of three openings, and nothing written', async (_name, record, prompts) => {
       await chrome.storage.local.clear();

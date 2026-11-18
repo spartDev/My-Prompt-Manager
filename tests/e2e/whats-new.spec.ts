@@ -5,8 +5,10 @@
  * (`welcome`) and Debug mode (`promptLibrarySettings.debugMode`) seeded in storage. Each opening of
  * the popup is a new page, as when the user closes the popup and opens it again. The launch decision
  * (src/launch/decide.ts, My-Prompt-Manager-ojz.2) puts the Welcome before What's new: a first install
- * opens on the Welcome, never What's new, and Debug mode shows the Welcome at every opening (What's
- * new follows it once it is finished, My-Prompt-Manager-ojz.4).
+ * opens on the Welcome, never What's new, and Debug mode shows the Welcome at every opening, from
+ * its first step, and writes nothing (My-Prompt-Manager-ojz.4). What's new follows the Welcome in
+ * Debug mode once it is finished in that opening: proven by the hook and App tests until the
+ * Welcome has the controls that finish it (My-Prompt-Manager-ojz.7, .9; e2e My-Prompt-Manager-ojz.12).
  *
  * Two builds. dist/ is at the repository's manifest version (1.9.0), which has no Release notes:
  * there an update to it shows nothing. The registry has Release notes for 2.0.0 only, so the update
@@ -68,6 +70,15 @@ const expectLibraryWithoutWhatsNew = async (page: Page): Promise<void> => {
   await expect(page.getByTestId('prompt-card').filter({ hasText: 'Draft email' })).toBeVisible();
   await page.waitForTimeout(DECISION_SETTLE_MS);
   await expect(page.getByRole('dialog', { name: WHATS_NEW })).toHaveCount(0);
+};
+
+/** Every key of storage but the Library's (the Prompts and the Categories), each as bytes, in key order */
+const storageButTheLibrary = async (storage: ExtensionStorage): Promise<ReadonlyArray<readonly [string, string]>> => {
+  const all = await storage.get<Record<string, unknown>>();
+  return Object.keys(all)
+    .filter((key) => key !== 'prompts' && key !== 'categories')
+    .sort()
+    .map((key) => [key, JSON.stringify(all[key])] as const);
 };
 
 const storedRecord = async (storage: ExtensionStorage): Promise<unknown> =>
@@ -238,6 +249,57 @@ test.describe(`What's new after the update to ${WHATS_NEW_UPDATE_VERSION}, a Rel
     await expect(second.getByRole('dialog', { name: WHATS_NEW })).toBeVisible();
     await second.close();
   });
+
+  /** Site settings as the Settings switch stores them, Debug mode off then on */
+  const SITE_SETTINGS = { enabledSites: [], customSites: [], debugMode: false };
+
+  const DEBUG_SESSIONS = [
+    {
+      name: "an existing user whose What's new is still to show",
+      seed: (storage: ExtensionStorage) => seedPopup(storage, { [WHATS_NEW_KEY]: UPDATED_FROM_1_9, [SITE_SETTINGS_KEY]: SITE_SETTINGS }),
+      before: "What's new",
+      expectBefore: async (page: Page) => {
+        await expect(page.getByRole('dialog', { name: WHATS_NEW })).toBeVisible();
+        await expect(page.getByTestId('welcome')).toHaveCount(0);
+      }
+    },
+    {
+      name: 'a new user who closed the Welcome at its last step, a Pack selected',
+      seed: (storage: ExtensionStorage) =>
+        storage.seed({
+          [WELCOME_KEY]: { status: 'pending', step: 2, packs: ['writing'] },
+          [WHATS_NEW_KEY]: { installedVersion: WHATS_NEW_UPDATE_VERSION },
+          [SITE_SETTINGS_KEY]: SITE_SETTINGS
+        }),
+      before: 'the Welcome at its last step',
+      expectBefore: async (page: Page) => {
+        await expectWelcomeWithoutWhatsNew(page);
+        await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+      }
+    }
+  ] as const;
+
+  for (const session of DEBUG_SESSIONS) {
+    test(`Debug mode, ${session.name}: the Welcome from its first step at each of three openings, never What's new over it, every key but the Library's as it was; Debug mode off: ${session.before} again`, async ({ context, extensionId }) => {
+      const storage = await storageAfterInstall(context, extensionId, WHATS_NEW_UPDATE_VERSION);
+      await session.seed(storage);
+      const before = await storageButTheLibrary(storage);
+
+      await storage.seed({ [SITE_SETTINGS_KEY]: { ...SITE_SETTINGS, debugMode: true } });
+      for (let opening = 0; opening < 3; opening++) {
+        const popup = await openPopup(context, extensionId);
+        await expectWelcomeWithoutWhatsNew(popup);
+        await expect(popup.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '0');
+        await popup.close();
+      }
+      await storage.seed({ [SITE_SETTINGS_KEY]: SITE_SETTINGS });
+
+      expect(await storageButTheLibrary(storage)).toEqual(before);
+      const popup = await openPopup(context, extensionId);
+      await session.expectBefore(popup);
+      await popup.close();
+    });
+  }
 
   for (const close of ['Escape', 'the backdrop'] as const) {
     test(`update case: a close by ${close} writes the Last seen Release too, and the next opening shows nothing`, async ({ context, extensionId }) => {

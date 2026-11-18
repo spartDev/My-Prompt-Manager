@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { decideLaunch, type LaunchInputs, type LaunchScreen } from '../launch/decide';
+import { decideLaunch, isWelcomeFoundDone, type LaunchInputs, type LaunchScreen } from '../launch/decide';
 import { type LaunchStateChange, writeLaunchState } from '../launch/write';
 import { readPrompts } from '../services/promptAdmission';
 import { parseSiteSettings, SITE_SETTINGS_KEY } from '../services/siteSettings';
+import { STORAGE_KEYS } from '../services/storage';
 import { Logger, toError } from '../utils';
 import { parseWelcomeRecord, WELCOME_KEY, type WelcomeStep } from '../welcome/storage';
 import { isFirstInstall } from '../whatsNew/decide';
@@ -45,8 +46,8 @@ const NOTHING: LaunchScreen = { kind: 'none' };
 /** The keys the decision reads, in one get */
 const LAUNCH_KEYS = [WELCOME_KEY, WHATS_NEW_KEY, SITE_SETTINGS_KEY];
 
-/** The key the Library's Prompts are stored under (StorageManager's) */
-const LIBRARY_KEY = 'prompts';
+/** The key the Library's Prompts are stored under */
+const LIBRARY_KEY = STORAGE_KEYS.PROMPTS;
 
 /** The Welcome record as the decision takes it: none stored, a value that is no record, or the record */
 const welcomeOf = (stored: unknown): LaunchInputs['welcome'] =>
@@ -90,7 +91,9 @@ const readLibraryHasPrompts = async (): Promise<boolean | undefined> => {
  * What this opening of the popup or side panel shows first, decided once on mount by `decideLaunch`.
  * Reads the Welcome record, the What's new record and the Site settings (Debug mode) in one
  * `chrome.storage.local.get`, and the Library only when the Welcome is pending. A failed read shows
- * nothing and is logged, never the Welcome. Every write goes through `writeLaunchState`, bound to the
+ * nothing and is logged, never the Welcome. A pending record over a Library with Prompts, which the
+ * decision reads as a Welcome finished, is recorded done at the opening, so the Welcome cannot come
+ * back if that Library is emptied later. Every write goes through `writeLaunchState`, bound to the
  * Debug mode of this opening, which writes nothing in Debug mode. Debug mode stays in here: nothing
  * returned names it.
  */
@@ -103,6 +106,17 @@ export const useLaunchScreen = ({ enabled = true, releaseNotes = RELEASE_NOTES }
   const welcomeShown = useRef(false);
   // The Release whose What's new shows, until it is closed
   const whatsNewShown = useRef<string | null>(null);
+
+  /** Starts a write of the launch state for this opening and logs its failure; never throws */
+  const write = useCallback((change: LaunchStateChange, failure: string, context: Readonly<Record<string, unknown>>): void => {
+    const current = opening.current;
+    if (current === null) {
+      return;
+    }
+    writeLaunchState(change, { debugMode: current.debugMode }).catch((error: unknown) => {
+      Logger.error(failure, toError(error), { component: 'useLaunchScreen', ...context });
+    });
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
@@ -139,6 +153,9 @@ export const useLaunchScreen = ({ enabled = true, releaseNotes = RELEASE_NOTES }
         welcomeShown.current = decided.kind === 'welcome';
         whatsNewShown.current = decided.kind === 'whats-new' ? decided.notes.version : null;
         setScreen(decided);
+        if (isWelcomeFoundDone(inputs)) {
+          write({ kind: 'welcome-found-done' }, 'Could not record the Welcome as finished over a Library with Prompts', {});
+        }
       } catch (error) {
         Logger.error('Could not decide what the opening shows', toError(error), { component: 'useLaunchScreen' });
       } finally {
@@ -151,18 +168,7 @@ export const useLaunchScreen = ({ enabled = true, releaseNotes = RELEASE_NOTES }
     return () => {
       cancelled = true;
     };
-  }, [enabled, releaseNotes]);
-
-  /** Starts a write of the launch state for this opening and logs its failure; never throws */
-  const write = useCallback((change: LaunchStateChange, failure: string, context: Readonly<Record<string, unknown>>): void => {
-    const current = opening.current;
-    if (current === null) {
-      return;
-    }
-    writeLaunchState(change, { debugMode: current.debugMode }).catch((error: unknown) => {
-      Logger.error(failure, toError(error), { component: 'useLaunchScreen', ...context });
-    });
-  }, []);
+  }, [enabled, releaseNotes, write]);
 
   const saveStep = useCallback(
     (step: WelcomeStep, packs?: readonly string[]) => {

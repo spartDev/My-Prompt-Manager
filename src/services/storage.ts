@@ -59,7 +59,8 @@ class StorageError extends Error implements AppError {
   }
 }
 
-const STORAGE_KEYS = {
+/** The `chrome.storage.local` keys of the Library and the settings; the Library's Prompts are under PROMPTS */
+export const STORAGE_KEYS = {
   PROMPTS: 'prompts',
   CATEGORIES: 'categories',
   SETTINGS: 'settings'

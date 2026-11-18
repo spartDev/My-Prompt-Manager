@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { WelcomeRecord } from '../../welcome/storage';
 import { decideWhatsNew } from '../../whatsNew/decide';
 import type { ReleaseNotes } from '../../whatsNew/types';
-import { decideLaunch, type LaunchInputs, type LaunchScreen } from '../decide';
+import { decideLaunch, isWelcomeFoundDone, type LaunchInputs, type LaunchScreen } from '../decide';
 
 const notes = (version: string): ReleaseNotes => ({
   version,
@@ -271,5 +271,40 @@ describe('decideLaunch', () => {
     const snapshot = JSON.stringify(inputs);
     expect(decideLaunch(inputs)).toEqual(decideLaunch(inputs));
     expect(JSON.stringify(inputs)).toBe(snapshot);
+  });
+});
+
+describe('isWelcomeFoundDone', () => {
+  const ROWS = RECORDS.flatMap((record) =>
+    LIBRARIES.map((library) => ({
+      name: `${record.name} · ${library.name}`,
+      welcome: record.welcome,
+      libraryHasPrompts: library.libraryHasPrompts,
+      expected: isPending(record.welcome) && library.libraryHasPrompts === true
+    }))
+  );
+
+  it.each(ROWS)('$name → $expected', ({ welcome, libraryHasPrompts, expected }) => {
+    expect(isWelcomeFoundDone({ welcome, libraryHasPrompts })).toBe(expected);
+  });
+
+  it('only for a pending record over a Library with Prompts: 3 of the 18 combinations', () => {
+    expect(ROWS.filter((row) => row.expected)).toHaveLength(3);
+  });
+
+  it('marks done only Welcomes the decision already reads as finished: in normal mode it never shows them', () => {
+    const found = TABLE.filter(({ inputs }) => !inputs.debugMode && isWelcomeFoundDone(inputs));
+    expect(found.length).toBeGreaterThan(0);
+    for (const { inputs } of found) {
+      expect(decideLaunch(inputs).kind).not.toBe('welcome');
+    }
+  });
+
+  it('never a Welcome the decision shows, nor one it is in doubt about', () => {
+    const shownOrDoubt = TABLE.filter(({ inputs }) => !inputs.debugMode && !inputs.welcomeFinishedThisOpening && isPending(inputs.welcome) && inputs.libraryHasPrompts !== true);
+    expect(shownOrDoubt.length).toBeGreaterThan(0);
+    for (const { inputs } of shownOrDoubt) {
+      expect(isWelcomeFoundDone(inputs)).toBe(false);
+    }
   });
 });
