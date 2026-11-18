@@ -1,0 +1,326 @@
+/**
+ * The way out of the Welcome (My-Prompt-Manager-ojz.9, architecture A8 of My-Prompt-Manager-ojz):
+ * with Packs, the Packs are added, then the Welcome is finished, then the Library shows on All with
+ * a Notification of what was added; with none, the Welcome is finished, the Library shows, and the
+ * editor opens on a new Prompt 250ms later. A failed add finishes nothing. A second press while the
+ * first is under way does nothing.
+ */
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { AddPacksResult } from '../../services/storage';
+import { MOTION } from '../../theme/motion';
+import type { ShowToast } from '../../types/hooks';
+import { PACKS } from '../../welcome/packs';
+import type { PromptPack } from '../../welcome/types';
+import { packsAddedNotice, useWelcomeExit, type WelcomeExitOptions } from '../useWelcomeExit';
+
+const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
+const DEFAULT_IDS = DEFAULTS.map((pack) => pack.id);
+const DEFAULT_COUNT = DEFAULTS.reduce((count, pack) => count + pack.prompts.length, 0);
+
+/** An add the test settles itself */
+const deferred = <T,>() => {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (reason: unknown) => void = () => undefined;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+/** The hook over spies that write, in `log`, the order of what it does */
+const renderExit = (overrides: Partial<WelcomeExitOptions> = {}) => {
+  const log: string[] = [];
+  const addPacks = vi.fn<WelcomeExitOptions['addPacks']>(async (packs: readonly PromptPack[]) => {
+    log.push(`addPacks ${packs.map((pack) => pack.id).join(',')}`);
+    return { added: packs.reduce((count, pack) => count + pack.prompts.length, 0), skipped: 0, packNames: packs.map((pack) => pack.name) };
+  });
+  const finishWelcome = vi.fn(() => { log.push('finishWelcome'); });
+  const showLibrary = vi.fn(() => { log.push('showLibrary'); });
+  const openNewPrompt = vi.fn(() => { log.push('openNewPrompt'); });
+  const showToast = vi.fn<ShowToast>((message) => { log.push(`toast ${message}`); });
+  const options: WelcomeExitOptions = { addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, ...overrides };
+  const view = renderHook((props: WelcomeExitOptions) => useWelcomeExit(props), { initialProps: options });
+  return { ...view, log, addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, options };
+};
+
+/** Lets the promise callbacks of an add that has settled run */
+const flush = (): Promise<void> => act(async () => { await Promise.resolve(); });
+
+describe('useWelcomeExit', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe('with Packs: the Packs added, then the Welcome finished, then the Library and the Notification', () => {
+    it('adds the Packs selected, finishes the Welcome only once they are in, then shows the Library on All and the Notification', async () => {
+      const { result, log, showToast } = renderExit();
+
+      act(() => { result.current(DEFAULT_IDS); });
+      expect(log).toEqual([`addPacks ${DEFAULT_IDS.join(',')}`]);
+
+      await flush();
+
+      expect(log).toEqual([`addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', `toast ${String(DEFAULT_COUNT)} prompts added`]);
+      expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+    });
+
+    it('finishes nothing while the add is under way', async () => {
+      const add = deferred<AddPacksResult>();
+      const { result, finishWelcome, showLibrary, showToast } = renderExit({ addPacks: vi.fn(() => add.promise) });
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      expect(finishWelcome).not.toHaveBeenCalled();
+      expect(showLibrary).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+
+      add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      await flush();
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+    });
+
+    it('adds the Packs in the order the last step offers them, whatever the order they were selected in, and no id that is no Pack', async () => {
+      const { result, addPacks } = renderExit();
+
+      act(() => { result.current(['hiring', 'not-a-pack', 'product']); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(1);
+      expect(addPacks.mock.calls[0]?.[0].map((pack) => pack.id)).toEqual(['product', 'hiring']);
+    });
+
+    it('opens no editor: the Library has its Prompts to copy', async () => {
+      const { result, openNewPrompt } = renderExit();
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      act(() => { vi.advanceTimersByTime(5_000); });
+
+      expect(openNewPrompt).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('the Notification once the Packs are in', () => {
+    it('says how many Prompts were really added, the Packs that added some as its sub', () => {
+      expect(packsAddedNotice({ added: 9, skipped: 0, packNames: ['Product', 'Writing'] })).toEqual({ message: '9 prompts added', sub: 'Product, Writing' });
+      // Some were already there: only those added are counted, only the Packs that added some named
+      expect(packsAddedNotice({ added: 4, skipped: 5, packNames: ['Writing'] })).toEqual({ message: '4 prompts added', sub: 'Writing' });
+      expect(packsAddedNotice({ added: 1, skipped: 3, packNames: ['Hiring'] })).toEqual({ message: '1 prompt added', sub: 'Hiring' });
+    });
+
+    it('says the Library is ready when every Prompt was already there (added 0, no Pack named)', () => {
+      expect(packsAddedNotice({ added: 0, skipped: 9, packNames: [] })).toEqual({ message: 'Your library is ready', sub: 'Every prompt was already in it' });
+    });
+
+    it('shows that one when the add adds nothing, and still finishes the Welcome', async () => {
+      const { result, finishWelcome, showToast } = renderExit({
+        addPacks: vi.fn(async () => ({ added: 0, skipped: DEFAULT_COUNT, packNames: [] }))
+      });
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith('Your library is ready', 'success', { sub: 'Every prompt was already in it' });
+    });
+  });
+
+  describe('the add refused: the Welcome stays, nothing is finished, and the user can try again or start empty', () => {
+    const refused = () => vi.fn<WelcomeExitOptions['addPacks']>().mockRejectedValueOnce(new Error('Storage quota exceeded'));
+
+    it('finishes nothing and shows a failure Notification that offers to start empty', async () => {
+      const addPacks = refused();
+      const { result, finishWelcome, showLibrary, openNewPrompt, showToast } = renderExit({ addPacks });
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      expect(finishWelcome).not.toHaveBeenCalled();
+      expect(showLibrary).not.toHaveBeenCalled();
+      expect(openNewPrompt).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { action: { label: 'Start empty', onClick: expect.any(Function) } });
+    });
+
+    it('a second press tries again, and finishes once the Packs are in', async () => {
+      const addPacks = refused().mockResolvedValueOnce({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      const { result, finishWelcome, showToast } = renderExit({ addPacks });
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(2);
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+    });
+
+    it('Start empty in the Notification finishes the Welcome with no Pack and opens the editor 250ms later', async () => {
+      const { result, finishWelcome, showLibrary, openNewPrompt, showToast } = renderExit({ addPacks: refused() });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      const options = showToast.mock.calls[0]?.[2];
+
+      act(() => { options?.action?.onClick(); });
+
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showLibrary).toHaveBeenCalledTimes(1);
+      act(() => { vi.advanceTimersByTime(MOTION.welcomeEditorDelay); });
+      expect(openNewPrompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('Start empty in the Notification does nothing once another exit is under way', async () => {
+      const add = deferred<AddPacksResult>();
+      const addPacks = refused().mockImplementationOnce(() => add.promise);
+      const { result, finishWelcome, showToast } = renderExit({ addPacks });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      const options = showToast.mock.calls[0]?.[2];
+      // Tried again: that add is under way when the old Notification's Start empty is pressed
+      act(() => { result.current(DEFAULT_IDS); });
+
+      act(() => { options?.action?.onClick(); });
+      add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      await flush();
+      act(() => { vi.advanceTimersByTime(1_000); });
+
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+    });
+  });
+
+  describe('Start empty: the Welcome finished, the Library, then the editor on a new Prompt', () => {
+    it('finishes the Welcome and shows the Library at once, and opens the editor 250ms later, not before', () => {
+      const { result, log, addPacks, openNewPrompt, showToast } = renderExit();
+
+      act(() => { result.current([]); });
+
+      expect(log).toEqual(['finishWelcome', 'showLibrary']);
+      expect(addPacks).not.toHaveBeenCalled();
+      expect(showToast).not.toHaveBeenCalled();
+
+      act(() => { vi.advanceTimersByTime(MOTION.welcomeEditorDelay - 1); });
+      expect(openNewPrompt).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(1); });
+      expect(openNewPrompt).toHaveBeenCalledTimes(1);
+      expect(log).toEqual(['finishWelcome', 'showLibrary', 'openNewPrompt']);
+    });
+
+    it('waits 250ms, within the 50ms the ticket allows, under reduced motion too: it is a pause to see the Library, no animation', () => {
+      vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn()
+      }));
+      expect(MOTION.welcomeEditorDelay).toBe(250);
+      const { result, openNewPrompt } = renderExit();
+
+      act(() => { result.current([]); });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(openNewPrompt).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(100); });
+      expect(openNewPrompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('treats Packs that hold no Prompt, or ids that are no Pack, as no Pack', () => {
+      const empty: PromptPack = { id: 'empty', name: 'Empty', color: '#2563EB', defaultSelected: false, prompts: [] };
+      const { result, addPacks, finishWelcome } = renderExit({ packs: [empty] });
+
+      act(() => { result.current(['empty', 'not-a-pack']); });
+
+      expect(addPacks).not.toHaveBeenCalled();
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+    });
+
+    it('unmounted before the 250ms, opens no editor and leaves no timer', () => {
+      const { result, unmount, openNewPrompt } = renderExit();
+
+      act(() => { result.current([]); });
+      expect(vi.getTimerCount()).toBe(1);
+      unmount();
+
+      expect(vi.getTimerCount()).toBe(0);
+      act(() => { vi.advanceTimersByTime(1_000); });
+      expect(openNewPrompt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a second press while the first is under way (a double click, Enter then a click) does nothing', () => {
+    it('with Packs: one add, one finish, one Notification', async () => {
+      const add = deferred<AddPacksResult>();
+      const addPacks = vi.fn(() => add.promise);
+      const { result, finishWelcome, showToast } = renderExit({ addPacks });
+
+      act(() => {
+        result.current(DEFAULT_IDS);
+        result.current(DEFAULT_IDS);
+      });
+      act(() => { result.current(DEFAULT_IDS); });
+      add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      await flush();
+      // And after it: the Welcome has been left
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(1);
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenCalledTimes(1);
+    });
+
+    it('Start empty: one finish, one editor', () => {
+      const { result, finishWelcome, openNewPrompt } = renderExit();
+
+      act(() => {
+        result.current([]);
+        result.current([]);
+      });
+      act(() => { vi.advanceTimersByTime(1_000); });
+
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(openNewPrompt).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('unmounted while the add is under way (the popup closed), finishes nothing and shows nothing once it lands', async () => {
+    const add = deferred<AddPacksResult>();
+    const { result, unmount, finishWelcome, showToast, showLibrary } = renderExit({ addPacks: vi.fn(() => add.promise) });
+
+    act(() => { result.current(DEFAULT_IDS); });
+    unmount();
+    add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+    await flush();
+
+    expect(finishWelcome).not.toHaveBeenCalled();
+    expect(showLibrary).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('uses the latest callbacks it was given when the editor opens', () => {
+    const { result, rerender, options, openNewPrompt } = renderExit();
+    const later = vi.fn();
+
+    act(() => { result.current([]); });
+    // App renders again, with new handlers, before the 250ms are up
+    rerender({ ...options, openNewPrompt: later });
+    act(() => { vi.advanceTimersByTime(MOTION.welcomeEditorDelay); });
+
+    expect(later).toHaveBeenCalledTimes(1);
+    expect(openNewPrompt).not.toHaveBeenCalled();
+  });
+});

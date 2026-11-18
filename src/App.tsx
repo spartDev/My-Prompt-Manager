@@ -12,6 +12,7 @@ import ToastContainer from './components/ToastContainer';
 import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useAddPacks } from './hooks/useAddPacks';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
 import { useCategories } from './hooks/useCategories';
 import { useClipboard } from './hooks/useClipboard';
@@ -19,6 +20,7 @@ import { useLaunchScreen } from './hooks/useLaunchScreen';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
+import { useWelcomeExit } from './hooks/useWelcomeExit';
 import { ALL_PROMPTS } from './services/libraryFilter';
 import { onLibraryReviewRequested, takePendingLibraryReview } from './services/libraryReview';
 import { MOTION } from './theme/motion';
@@ -133,6 +135,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const handleCreateFromSearch = (title: string, category?: string) => { openEditor({ mode: 'add', title, category }); };
 
   const handleEditPrompt = (prompt: Prompt) => { openEditor({ mode: 'edit', prompt }); };
+
+  // The editor on a new Prompt, from What's new or after the Welcome: an editor already open keeps
+  // its draft, as a new one would remount it (editorKey)
+  const openNewPrompt = () => {
+    if (editor === null) {
+      openEditor({ mode: 'add' });
+    }
+  };
 
   const editorShown = editorSheet.shown !== null;
   useEffect(() => {
@@ -398,10 +408,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         goToLibrarySearch();
         return;
       case 'prompt-editor-new':
-        // An editor already open keeps its draft: a new one would remount it (editorKey)
-        if (editor === null) {
-          openEditor({ mode: 'add' });
-        }
+        openNewPrompt();
         return;
       case 'library':
       case 'categories':
@@ -423,6 +430,21 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setFocusLibraryFilter(true);
     handleSelectSection('library');
   }, [clearSearch, refreshPrompts, handleSelectSection]);
+
+  // The way out of the Welcome's last step: the Packs selected added, then the Welcome finished, then
+  // the Library on All with the Notification of the add; with none, the Library, then the editor
+  const addPacks = useAddPacks({ refreshPrompts, refreshCategories });
+  const showWholeLibrary = useCallback(() => {
+    clearSearch();
+    setLibraryFilter(ALL_PROMPTS);
+  }, [clearSearch]);
+  const leaveWelcome = useWelcomeExit({
+    addPacks,
+    finishWelcome: launch.finishWelcome,
+    showLibrary: showWholeLibrary,
+    openNewPrompt,
+    showToast
+  });
 
   // A review asked from the full-page Analytics view opens the side panel and waits in session
   // storage: the side panel takes it, on opening or while it is already open
@@ -485,7 +507,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
-  // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered behind it
+  // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered
+  // behind it. Its Notification shows over it: a refused add of the Packs keeps the Welcome on screen
   if (launch.screen.kind === 'welcome') {
     return (
       <ThemeProvider>
@@ -494,8 +517,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           packs={launch.screen.packs}
           saveStep={launch.saveStep}
           finishWelcome={launch.finishWelcome}
+          onFinish={leaveWelcome}
           context={context}
         />
+        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </ThemeProvider>
     );
   }

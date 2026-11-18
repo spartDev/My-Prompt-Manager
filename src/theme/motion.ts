@@ -128,8 +128,16 @@ export const MOTION = {
   /** Welcome step 2: the caret after the letters typed, blinking once a cycle */
   welcomeCaretBlink: 1000,
   /** Welcome step 3: the round check of a selected Pack popping in, on the spring */
-  welcomeCheck: 450
+  welcomeCheck: 450,
   // --- end Welcome steps ---
+
+  // --- Welcome exit (My-Prompt-Manager-ojz.9) ---
+  /**
+   * Welcome, "Start empty": the Library shows, then the editor opens on a new Prompt this long after.
+   * A pause to see where the Welcome leads, not an animation: it stays under reduced motion
+   */
+  welcomeEditorDelay: 250
+  // --- end Welcome exit ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
