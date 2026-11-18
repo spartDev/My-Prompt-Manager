@@ -84,17 +84,28 @@ export interface PackPickerProps {
 
 /**
  * The Packs of the Welcome's last step in two columns, then the Platforms the extension works on as
- * a row of pills. The grid scrolls within itself when more Packs than fit are offered, so the
- * Platforms, the dots and the primary button stay in view.
+ * a row of pills. The grid scrolls within itself when the Packs do not fit (a short side panel, more
+ * Packs), so the Platforms, the dots and the primary button stay in view. While Packs remain beyond
+ * its top or bottom, that edge fades out and a line shows along it (welcome-packs-* in src/popup.css,
+ * driven by the grid's scroll), so a Pack, a selected one counted in the primary button included, is
+ * never out of view unseen; a Pack the keyboard reaches scrolls into view clear of the fade.
  */
 const PackPicker: FC<PackPickerProps> = ({ selectedPacks, onTogglePack }) => (
   <>
-    {/* The padding leaves room for a toggle's focus outline inside the grid's scroll box; the negative
-        margins take it back, so the Packs line up with the title and the pills */}
-    <div role="group" aria-label="Packs" data-testid="welcome-packs" className="-m-1 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto p-1">
-      {PACKS.map((pack) => (
-        <PackToggle key={pack.id} pack={pack} selected={selectedPacks.includes(pack.id)} onToggle={onTogglePack} />
-      ))}
+    {/* The edges: they draw the lines of the cue, outside the grid's scroll box and its fade */}
+    <div className="welcome-packs-edges relative flex min-h-0 flex-col">
+      {/* The padding leaves room for a toggle's focus outline inside the grid's scroll box; the negative
+          margins take it back, so the Packs line up with the title and the pills */}
+      <div
+        role="group"
+        aria-label="Packs"
+        data-testid="welcome-packs"
+        className="welcome-packs-scroll -m-1 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto scroll-py-4 p-1"
+      >
+        {PACKS.map((pack) => (
+          <PackToggle key={pack.id} pack={pack} selected={selectedPacks.includes(pack.id)} onToggle={onTogglePack} />
+        ))}
+      </div>
     </div>
     <ul aria-label="Works on" className="flex flex-none flex-wrap justify-center gap-[5px]">
       {PLATFORM_NAMES.map((name) => (

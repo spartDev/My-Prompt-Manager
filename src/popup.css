@@ -355,4 +355,121 @@ body {
     animation-delay: 0ms !important;
   }
 }
+
+/* The Packs' grid in a short side panel (My-Prompt-Manager-ojz.10). While Packs remain beyond its
+   top or its bottom, that edge fades out over 16px and a line in the field border color (3:1 on the
+   frame) shows along it, so a Pack, a selected one counted in "Add N prompts" included, is never out
+   of view unseen. Driven by the grid's own scroll timeline, as the Sections' scroll lines are: no
+   scroll state in React. Where the Packs fit, the timeline is inactive and neither shows. It is no
+   motion, only the scroll's state: it stays under prefers-reduced-motion. The lines sit at the grid's
+   edges, 0.25rem outside the edges' box (the grid's -m-1), drawn above the Packs */
+@property --welcome-packs-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --welcome-packs-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --welcome-packs-line-top {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --welcome-packs-line-bottom {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+.welcome-packs-edges {
+  timeline-scope: --welcome-packs;
+  animation:
+    welcome-packs-line-top linear both,
+    welcome-packs-line-bottom linear both;
+  animation-timeline: --welcome-packs, --welcome-packs;
+  animation-range:
+    0 8px,
+    calc(100% - 8px) 100%;
+}
+
+.welcome-packs-edges::before,
+.welcome-packs-edges::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  pointer-events: none;
+}
+
+.welcome-packs-edges::before {
+  top: -0.25rem;
+  background-color: var(--welcome-packs-line-top);
+}
+
+.welcome-packs-edges::after {
+  bottom: -0.25rem;
+  background-color: var(--welcome-packs-line-bottom);
+}
+
+.welcome-packs-scroll {
+  scroll-timeline: --welcome-packs block;
+  /* Only the mask's alpha counts, so any opaque token serves: the Packs fade to the frame behind them,
+     in either theme */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--background-color-app) var(--welcome-packs-fade-top),
+    var(--background-color-app) calc(100% - var(--welcome-packs-fade-bottom)),
+    transparent
+  );
+  animation:
+    welcome-packs-fade-top linear both,
+    welcome-packs-fade-bottom linear both;
+  animation-timeline: --welcome-packs, --welcome-packs;
+  animation-range:
+    0 8px,
+    calc(100% - 8px) 100%;
+}
+
+@keyframes welcome-packs-line-top {
+  from {
+    --welcome-packs-line-top: transparent;
+  }
+  to {
+    --welcome-packs-line-top: var(--border-color-input);
+  }
+}
+
+@keyframes welcome-packs-line-bottom {
+  from {
+    --welcome-packs-line-bottom: var(--border-color-input);
+  }
+  to {
+    --welcome-packs-line-bottom: transparent;
+  }
+}
+
+@keyframes welcome-packs-fade-top {
+  from {
+    --welcome-packs-fade-top: 0px;
+  }
+  to {
+    --welcome-packs-fade-top: 16px;
+  }
+}
+
+@keyframes welcome-packs-fade-bottom {
+  from {
+    --welcome-packs-fade-bottom: 16px;
+  }
+  to {
+    --welcome-packs-fade-bottom: 0px;
+  }
+}
 /* --- end Welcome steps --- */

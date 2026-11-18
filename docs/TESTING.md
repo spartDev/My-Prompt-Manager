@@ -72,6 +72,8 @@ The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.
 - A hover a test asserts on goes through `readWhileHovering` or `holdHover` (`tests/e2e/utils/hover.ts`), not a bare `locator.hover()`. A headed run opens one window per test, over one another; when one opens over the window under the real pointer, Chrome gives that page a real mouse event at the pointer's position and the hover Playwright set ends, which a bare `hover()` never takes back. CI, headless, has no real pointer.
 - `tests/e2e/` has its own `tsconfig.json`, which `npm run typecheck` checks.
 - Linux CI renders wider fonts than the Mac (DejaVu Sans): a layout assertion that passes locally can fail there. `npm run test:e2e:linux -- <spec>` runs a spec the way CI renders it, in Docker; `tests/e2e/README.md` says how.
+- Accessibility: `tests/e2e/welcome/welcome-a11y.spec.ts` audits the Welcome and the Library it leaves for with `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), walks the Welcome with the keyboard alone, and reads names and states from Chrome's own accessibility tree over CDP (`Accessibility.getFullAXTree`). axe reads colors as drawn: let the page's finite animations end before it runs.
+- `page.screenshot({ animations: 'disabled' })` cancels scroll-driven animations too, such as the scroll cue of the Welcome's Packs: leave the option out of a screenshot that must show one.
 - A locator assertion (`toHaveAttribute`, `toHaveText`, `toHaveClass`…) takes a string or a RegExp. An asymmetric matcher such as `expect.stringContaining(...)` makes it pass whatever the value, and `npm run lint` rejects it in `tests/e2e/` (the GritQL plugin in `biome-plugins/`).
 
 ## On the live Platforms: `npm run live:check`

@@ -41,9 +41,10 @@ const renderExit = (overrides: Partial<WelcomeExitOptions> = {}) => {
   const showLibrary = vi.fn(() => { log.push('showLibrary'); });
   const openNewPrompt = vi.fn(() => { log.push('openNewPrompt'); });
   const showToast = vi.fn<ShowToast>((message) => { log.push(`toast ${message}`); });
-  const options: WelcomeExitOptions = { addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, ...overrides };
+  const hideNotification = vi.fn(() => { log.push('hideNotification'); });
+  const options: WelcomeExitOptions = { addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, hideNotification, ...overrides };
   const view = renderHook((props: WelcomeExitOptions) => useWelcomeExit(props), { initialProps: options });
-  return { ...view, log, addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, options };
+  return { ...view, log, addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, hideNotification, options };
 };
 
 /** Lets the promise callbacks of an add that has settled run */
@@ -64,11 +65,11 @@ describe('useWelcomeExit', () => {
       const { result, log, showToast } = renderExit();
 
       act(() => { result.current(DEFAULT_IDS); });
-      expect(log).toEqual([`addPacks ${DEFAULT_IDS.join(',')}`]);
+      expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`]);
 
       await flush();
 
-      expect(log).toEqual([`addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', `toast ${String(DEFAULT_COUNT)} prompts added`]);
+      expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', `toast ${String(DEFAULT_COUNT)} prompts added`]);
       expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
     });
 
@@ -180,6 +181,48 @@ describe('useWelcomeExit', () => {
       expect(openNewPrompt).toHaveBeenCalledTimes(1);
     });
 
+    // A stale failure Notification left over the Library or the editor would offer a Start empty that does nothing
+    it('the primary button pressed again, now Start empty (the Packs unselected), hides the failure Notification as it leaves', async () => {
+      const { result, log, hideNotification } = renderExit({ addPacks: refused() });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      hideNotification.mockClear();
+
+      act(() => { result.current([]); });
+
+      expect(hideNotification).toHaveBeenCalledTimes(1);
+      expect(log.slice(log.indexOf("toast Couldn't add the prompts") + 1)).toEqual(['hideNotification', 'finishWelcome', 'showLibrary']);
+    });
+
+    it('the primary button pressed again with Packs hides the failure Notification while that add runs, so its Start empty is never on screen doing nothing', async () => {
+      const add = deferred<AddPacksResult>();
+      const addPacks = refused().mockImplementationOnce(() => add.promise);
+      const { result, hideNotification, showToast } = renderExit({ addPacks });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      hideNotification.mockClear();
+
+      act(() => { result.current(DEFAULT_IDS); });
+
+      expect(hideNotification).toHaveBeenCalledTimes(1);
+      add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      await flush();
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+    });
+
+    it('Start empty in the Notification hides it as it leaves', async () => {
+      const { result, log, hideNotification, showToast } = renderExit({ addPacks: refused() });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      const options = showToast.mock.calls[0]?.[2];
+      hideNotification.mockClear();
+
+      act(() => { options?.action?.onClick(); });
+
+      expect(hideNotification).toHaveBeenCalledTimes(1);
+      expect(log.slice(-3)).toEqual(['hideNotification', 'finishWelcome', 'showLibrary']);
+    });
+
     it('Start empty in the Notification does nothing once another exit is under way', async () => {
       const add = deferred<AddPacksResult>();
       const addPacks = refused().mockImplementationOnce(() => add.promise);
@@ -206,7 +249,7 @@ describe('useWelcomeExit', () => {
 
       act(() => { result.current([]); });
 
-      expect(log).toEqual(['finishWelcome', 'showLibrary']);
+      expect(log).toEqual(['hideNotification', 'finishWelcome', 'showLibrary']);
       expect(addPacks).not.toHaveBeenCalled();
       expect(showToast).not.toHaveBeenCalled();
 
@@ -214,7 +257,7 @@ describe('useWelcomeExit', () => {
       expect(openNewPrompt).not.toHaveBeenCalled();
       act(() => { vi.advanceTimersByTime(1); });
       expect(openNewPrompt).toHaveBeenCalledTimes(1);
-      expect(log).toEqual(['finishWelcome', 'showLibrary', 'openNewPrompt']);
+      expect(log).toEqual(['hideNotification', 'finishWelcome', 'showLibrary', 'openNewPrompt']);
     });
 
     it('waits 250ms, within the 50ms the ticket allows, under reduced motion too: it is a pause to see the Library, no animation', () => {
