@@ -22,7 +22,7 @@ import {
   storedSize
 } from '../utils/storageQuota';
 import type { PromptPack } from '../welcome/types';
-import { clearStorageKeepingWhatsNew, withWhatsNewLock } from '../whatsNew/storage';
+import { clearStorageKeepingRecords, withKeptRecordLocks } from './clearStorage';
 import { withIconPlacementRepairsLock } from './iconPlacementRepairs';
 import {
   AdmissionRefusedError,
@@ -846,22 +846,24 @@ export class StorageManager {
 
   /**
    * Clear All Data: empties chrome.storage but for the What's new record (the Release of the first
-   * install and the Last seen Release, kept so What's new does not come back), under every lock,
-   * in the documented order, so a locked write from another context lands either before the clear
-   * (and is cleared) or after it (on an emptied store), never in the middle of it.
+   * install and the Last seen Release, kept so What's new does not come back) and the Welcome
+   * record (kept so the Welcome never comes back), under every lock, in the documented order, so a
+   * locked write from another context lands either before the clear (and is cleared) or after it
+   * (on an emptied store), never in the middle of it.
    */
   clearAllData(): Promise<void> {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
         this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, () =>
           // Last, after SETTINGS: a change of the Site settings, an icon placement repair, or a
-          // write of the What's new record, waiting in another context is applied to the cleared
-          // store and cannot write the old ones back
+          // write of the What's new record or of the Welcome record (those two locks innermost, in
+          // that order), waiting in another context, is applied to the cleared store and cannot
+          // write the old ones back
           withSiteSettingsLock(() =>
             withIconPlacementRepairsLock(() =>
-              withWhatsNewLock(async () => {
+              withKeptRecordLocks(async () => {
                 try {
-                  await clearStorageKeepingWhatsNew();
+                  await clearStorageKeepingRecords();
                 } catch (error) {
                   throw this.handleStorageError(error);
                 }

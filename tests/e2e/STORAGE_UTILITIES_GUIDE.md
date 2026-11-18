@@ -72,7 +72,7 @@ The storage functionality is split across two files with distinct responsibiliti
    - Provides extended timeouts for CI environments
 
 3. **Raw Storage Operations**
-   - `reset()`: Clears all storage (chrome.storage.local.clear)
+   - `reset()`: Clears all storage (chrome.storage.local.clear). The `storage` fixture first waits for the first install's records (`waitForFirstInstallRecords`), then resets before and after each test
    - `seed(data)`: Writes arbitrary key-value data to storage
    - `get(keys)`: Reads arbitrary keys from storage
 

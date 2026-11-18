@@ -165,6 +165,10 @@ _Avoid_: Bug fix, hotfix
 The sheet that rises over the Library at the first opening after an update to a Release that has Release notes, and lists them. Never shown on a first install. Closing it, by any means, marks the Release as seen.
 _Avoid_: Changelog, release popup, splash
 
+**Welcome**:
+The three screens shown full-screen at the first opening after a first install, until the user finishes them. Closed before the end, it resumes at the same step at the next opening. Once finished it never shows again, not after an update nor after Clear All Data. An update never starts it: a user who updates from a Release before the Welcome is marked as having finished it.
+_Avoid_: Onboarding, tour, tutorial
+
 **Last seen Release**:
 The Release whose What's new the user last closed. What's new shows again only for a Release that has Release notes and is not the Last seen Release.
 _Avoid_: Last version, seen flag

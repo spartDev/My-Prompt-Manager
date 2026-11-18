@@ -71,7 +71,7 @@ My Prompt Manager is a Chrome extension built with a modular, extensible archite
 |---------|-----------|---------|-----------|
 | **Extension UI** | React 18 + TypeScript | Prompt management interface | On-demand (popup/side panel) |
 | **Content Script** | TypeScript modules | Platform integration | Per-tab, per-site |
-| **Background** | Service Worker | Side panel API, tab management | Event-driven |
+| **Background** | Service Worker | Side panel API, tab management, the What's new and Welcome records at install and update | Event-driven |
 
 ---
 
@@ -516,6 +516,8 @@ React Hooks (usePrompts, useCategories, useSettings)
     │
     └─► React Components (PromptList, SettingsView, etc.)
 ```
+
+Beside the Library, `chrome.storage.local` holds keys that `StorageManager` does not own, each with one owner module (table in [SERVICES_AND_HOOKS.md](./SERVICES_AND_HOOKS.md)). Two of them are what a launch shows: `whatsNew` (`src/whatsNew/storage.ts`: the Release of install and the Last seen Release) and `welcome` (`src/welcome/storage.ts`: the Welcome pending at a step, or done). The service worker writes both from `chrome.runtime.onInstalled`: on 'install' the Release of install, and the Welcome as pending where there is no Welcome record; on 'update' the Release the update came from where the What's new record has no Release of install, and the Welcome as done where there is no Welcome record. Clear All Data and the error screen's Reset Data keep both (`src/services/clearStorage.ts`).
 
 ---
 

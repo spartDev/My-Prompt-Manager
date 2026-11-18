@@ -1,8 +1,8 @@
 import type { ErrorInfo, ReactNode } from 'react';
 import { Component } from 'react';
 
+import { clearStorageKeepingRecords, withKeptRecordLocks } from '../services/clearStorage';
 import { Logger, toError } from '../utils';
-import { clearStorageKeepingWhatsNew, withWhatsNewLock } from '../whatsNew/storage';
 
 const WarningIcon = (
   <svg
@@ -91,12 +91,12 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReset = () => {
-    // Clear extension storage, but for the What's new record, and reload
+    // Clear extension storage, but for the What's new and Welcome records, and reload
     if (chrome?.storage?.local) {
-      void withWhatsNewLock(clearStorageKeepingWhatsNew)
+      void withKeptRecordLocks(clearStorageKeepingRecords)
         .catch(async (error: unknown) => {
-          // The record could not be kept: still reset the data, which is what this button is for
-          Logger.error('Could not keep the What\'s new record while resetting data', toError(error), {
+          // The records could not be kept: still reset the data, which is what this button is for
+          Logger.error('Could not keep the What\'s new and Welcome records while resetting data', toError(error), {
             component: 'ErrorBoundary'
           });
           await chrome.storage.local.clear();

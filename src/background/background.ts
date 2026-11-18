@@ -25,6 +25,7 @@ import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
+import { markExistingUserDone, recordWelcomePending } from "../welcome/storage";
 import { recordInstall, recordUpdateFrom } from "../whatsNew/storage";
 
 /** An Element picker open in a tab, from START_ELEMENT_PICKER until the pick or its cancel */
@@ -1875,6 +1876,52 @@ async function recordUpdateOrigin(previousVersion: string | undefined): Promise<
   }
 }
 
+/**
+ * Records the Welcome as pending at a first install, so the first opening shows it from its first
+ * step (CONTEXT.md, Welcome). A record already stored is kept.
+ */
+async function recordWelcomeOfFirstInstall(): Promise<void> {
+  try {
+    const recorded = await recordWelcomePending();
+    Logger.info(
+      recorded
+        ? "Recorded the Welcome as pending"
+        : "Kept the Welcome record already stored",
+      { component: "Background" },
+    );
+  } catch (error) {
+    Logger.error(
+      "Could not record the Welcome of the first install",
+      toError(error),
+      { component: "Background" },
+    );
+  }
+}
+
+/**
+ * Marks the Welcome as done at an update when there is no Welcome record: the user installed a
+ * Release from before the Welcome and never sees it (CONTEXT.md, Welcome). A record is kept.
+ */
+async function markWelcomeDoneForExistingUser(
+  previousVersion: string | undefined,
+): Promise<void> {
+  try {
+    const marked = await markExistingUserDone();
+    if (marked) {
+      Logger.info("Marked the Welcome as done for an existing user", {
+        component: "Background",
+        previousVersion,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Could not mark the Welcome as done for an existing user",
+      toError(error),
+      { component: "Background", previousVersion },
+    );
+  }
+}
+
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
@@ -1884,12 +1931,16 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 
   // A first install records its Release; an update records where it came from, only when the
-  // What's new record has no Release of install yet
+  // What's new record has no Release of install yet. A first install records the Welcome as
+  // pending; an update marks it done when there is no Welcome record (an existing user). Other
+  // reasons (chrome_update, shared_module_update) write neither record
   if (details.reason === "install") {
     void recordFirstInstall();
+    void recordWelcomeOfFirstInstall();
   }
   if (details.reason === "update") {
     void recordUpdateOrigin(details.previousVersion);
+    void markWelcomeDoneForExistingUser(details.previousVersion);
   }
 
   void (async () => {
