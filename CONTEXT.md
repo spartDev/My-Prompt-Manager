@@ -18,6 +18,10 @@ _Avoid_: Collection, tag, folder
 The Category named Uncategorized, which every Library has. It is never renamed, recolored or deleted, and it takes the Prompts of a Category that is deleted. A Library whose only Category is the Default Category has no Categories of the user's own.
 _Avoid_: No category, none, unsorted
 
+**Pack**:
+A ready-made set of Prompts in one Category, offered by the Welcome's last step. Adding a Pack puts its Prompts in the Library's Category with the Pack's name, ignoring case, or else in a new Category with the Pack's color, and skips every Prompt whose content the Library already has (it would make a Duplicate pair), so adding the same Pack again adds nothing. The Packs the user chose are added all together or not at all.
+_Avoid_: Template, starter kit
+
 **Pinned Prompt**:
 A Prompt the user has marked to always appear before unpinned Prompts in the Library, whatever the chosen sort; within the pinned and unpinned groups the chosen sort still applies. Most Used is the one exception: it ranks by use alone.
 _Avoid_: Favorite, starred prompt
@@ -47,7 +51,7 @@ A saved Prompt's content is exactly what the user wrote, including any spaces an
 _Avoid_: "sanitized prompt", "cleaned prompt"
 
 **Admission**:
-The moment Prompt text or a Category name enters the Library, by any route: creating or editing a Prompt, opening a Share code, restoring a Backup, or creating, renaming or restoring a Category. Every route is admitted the same way, even when the user typed or pasted the text themselves, because a pasted Hidden character is invisible to the person pasting it. Text is checked once, at Admission, and from then on it is Verbatim. Text that is too long is refused, never shortened; when a Backup is restored, a Prompt that is refused is skipped and reported while the rest are restored. Prompts and Category names already in the Library when this rule began are cleaned of Hidden characters once (Categories whose names become the same are merged into the first), but Prompts are never refused or shortened retroactively. Title and Category names also have surrounding spaces removed; content does not.
+The moment Prompt text or a Category name enters the Library, by any route: creating or editing a Prompt, opening a Share code, restoring a Backup, adding a Pack, or creating, renaming or restoring a Category. Every route is admitted the same way, even when the user typed or pasted the text themselves, because a pasted Hidden character is invisible to the person pasting it. Text is checked once, at Admission, and from then on it is Verbatim. Text that is too long is refused, never shortened; when a Backup is restored, a Prompt that is refused is skipped and reported while the rest are restored. Prompts and Category names already in the Library when this rule began are cleaned of Hidden characters once (Categories whose names become the same are merged into the first), but Prompts are never refused or shortened retroactively. Title and Category names also have surrounding spaces removed; content does not.
 _Avoid_: "import" (covers only some of the routes), "sanitizing"
 
 **Hidden character**:
