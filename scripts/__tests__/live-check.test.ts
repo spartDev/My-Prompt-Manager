@@ -147,19 +147,20 @@ describe('cleanUp', () => {
  * A page for the case runner with no browser: an editor found or not, each key recorded, and
  * typing that throws when asked. The field keeps what is typed and Backspace empties it. It holds
  * text from the start, or gets a draft restored by the Platform later: while the script waits for
- * the Prompts button, during a pause, or while the case types (put before the case's text)
+ * the Prompts button, during a pause, or while the case types (put before the case's text), or
+ * while icon-steady reads where the button is before typing
  */
 function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLeaves = '' }: {
   editor: boolean;
   typeThrows?: boolean;
   text?: string;
-  restore?: { draft: string; on: 'icon' | 'pause' | 'type' | 'click' | 'selectAll' };
+  restore?: { draft: string; on: 'icon' | 'pause' | 'type' | 'click' | 'selectAll' | 'baseline' };
   /** What the field still holds after Backspace: an editor may keep spaces or line breaks */
   backspaceLeaves?: string;
 }) {
   const keys: string[] = [];
   let field = text;
-  const restoreOn = (when: 'icon' | 'pause' | 'click' | 'selectAll') => {
+  const restoreOn = (when: 'icon' | 'pause' | 'click' | 'selectAll' | 'baseline') => {
     if (restore?.on === when) {
       field = restore.draft;
     }
@@ -186,7 +187,7 @@ function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLea
     },
     locator: () => ({ waitFor: () => Promise.resolve(), isVisible: () => Promise.resolve(false), first: () => ({ waitFor: () => restoreOn('icon') }) }),
     evaluate: () => Promise.resolve(null),
-    evaluateHandle: () => Promise.resolve({ dispose: () => Promise.resolve() }),
+    evaluateHandle: () => restoreOn('baseline').then(() => ({ dispose: () => Promise.resolve() })),
     waitForTimeout: vi.fn(() => restoreOn('pause')),
     waitForFunction
   } as unknown as Page;
@@ -287,19 +288,27 @@ describe('runCase progress', () => {
  * A page for the case runner backed by the test's own DOM: the page evaluates against `document`,
  * the editor handle against the editor element, so the chain is read as the browser would read it.
  * A handle the page returns stands for its value when sent back to the page, as Playwright's does.
+ * The editor is the first one in the page, found again at each lookup.
  *
  * @param onType - What the Platform does to its DOM while the case types
  */
 function domPage(html: string, lang: string, onType?: () => void) {
   document.documentElement.lang = lang;
   document.body.innerHTML = html;
-  const editor = document.querySelector<HTMLElement>('textarea, [contenteditable="true"]');
-  const handle = {
-    click: () => Promise.resolve(),
-    dispose: () => Promise.resolve(),
-    evaluate: (fn: (element: HTMLElement, arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(editor as HTMLElement, arg))
+  const handles = new Map<object, unknown>();
+  const editorHandle = (editor: HTMLElement) => {
+    const handle = {
+      click: () => Promise.resolve(),
+      dispose: () => Promise.resolve(),
+      evaluate: (fn: (element: HTMLElement, arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(editor, arg))
+    };
+    handles.set(handle, editor);
+    return handle;
   };
-  const handles = new Map<object, unknown>([[handle, editor]]);
+  const findEditorNow = () => {
+    const editor = document.querySelector<HTMLElement>('textarea, [contenteditable="true"]');
+    return editor ? Promise.resolve({ asElement: () => editorHandle(editor) }) : Promise.reject(new Error('Timeout exceeded'));
+  };
   const unwrap = (arg: unknown): unknown =>
     (arg && typeof arg === 'object' && !Array.isArray(arg)
       ? Object.fromEntries(Object.entries(arg).map(([key, value]) => [key, typeof value === 'object' && value !== null && handles.has(value) ? handles.get(value) : value]))
@@ -311,7 +320,7 @@ function domPage(html: string, lang: string, onType?: () => void) {
       handles.set(jsHandle, fn(unwrap(arg)));
       return Promise.resolve(jsHandle);
     },
-    waitForFunction: () => (editor ? Promise.resolve({ asElement: () => handle }) : Promise.reject(new Error('Timeout exceeded'))),
+    waitForFunction: findEditorNow,
     keyboard: { press: () => Promise.resolve(), type: () => { onType?.(); return Promise.resolve(); } },
     locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => Promise.resolve() }) }),
     waitForTimeout: () => Promise.resolve()
@@ -514,6 +523,16 @@ describe('runCase icon-steady holds the anchor across the typing', () => {
 
     expect(verdict).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, outside the composer of the field typed in (0.0px on the page)' });
   });
+
+  it('keeps the field typed in while it is on the page, though another editor shows earlier in it', async () => {
+    const page = domPage(`<form><textarea></textarea>${toolbarIcon}<button aria-label="Dictate">m</button></form>`, 'en', () => {
+      document.body.insertAdjacentHTML('afterbegin', '<form><textarea></textarea></form>');
+    });
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor (0.0px on the page)' });
+  });
 });
 
 describe('runCase late-toolbar reads the chain in the page', () => {
@@ -607,6 +626,18 @@ describe('afterCase', () => {
     await expect(afterCase(page, SUPPORTED_PLATFORMS.chatgpt, progress)).resolves.toBe(NOT_OURS);
     expect(keys).toEqual(['Escape']);
     expect(field()).toBe('Mon brouillon Hello world');
+  });
+
+  it('types nothing in a draft the Platform restores while icon-steady reads where the button is before typing', async () => {
+    const { page, field } = fakePage({ editor: true, restore: { draft: 'Mon brouillon', on: 'baseline' } });
+    const progress = { typed: false, owned: [] as readonly string[] };
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10, progress);
+
+    expect(verdict).toEqual({ pass: false, detail: 'the field holds a draft: case not run, field left as it was' });
+    expect(page.keyboard.type).not.toHaveBeenCalled();
+    expect(progress.typed).toBe(false);
+    expect(field()).toBe('Mon brouillon');
   });
 
   it('reads the field again after Select All: a draft restored then is kept, nothing deleted', async () => {
@@ -728,6 +759,13 @@ describe('judgeSteady', () => {
     expect(judgeSteady(beside(1022, 434, -36, 0), beside(980, 434, -36, 0, 'held', false))).toEqual({
       pass: false,
       detail: 'placement toolbar, anchor 0, no longer beside its anchor (42.0px on the page)'
+    });
+  });
+
+  it('fails when the button stood against no anchor before typing, though none is found after', () => {
+    expect(judgeSteady(beside(1022, 434, -36, 0, 'held', false), at(1022, 434))).toEqual({
+      pass: false,
+      detail: 'placement toolbar, anchor 0, not beside its anchor before typing (0.0px on the page)'
     });
   });
 

@@ -341,11 +341,12 @@ export function judgeSteady(before: IconState | null, after: IconState | null): 
   if (after.inComposer === false) {
     return { pass: false, detail: `${describeIcon(after)}, outside the composer of the field typed in (${onPage.toFixed(1)}px on the page)` };
   }
+  // Whatever is found after typing: the baseline itself is off
+  if (before.fromAnchor && before.beside === false) {
+    return { pass: false, detail: `${describeIcon(after)}, not beside its anchor before typing (${onPage.toFixed(1)}px on the page)` };
+  }
   if (before.fromAnchor && after.fromAnchor) {
     const reRendered = after.anchorElement === 'new' ? ', its anchor re-rendered' : '';
-    if (!before.beside) {
-      return { pass: false, detail: `${describeIcon(after)}, not beside its anchor before typing (${onPage.toFixed(1)}px on the page)` };
-    }
     if (!after.beside) {
       return { pass: false, detail: `${describeIcon(after)}, no longer beside its anchor${reRendered} (${onPage.toFixed(1)}px on the page)` };
     }
@@ -622,6 +623,9 @@ export const CASE_FIELDS: Record<Exclude<CaseId, 'late-toolbar'>, { typed: reado
   'icon-steady': { typed: ['Hello world'], typing: startsOf('Hello world') }
 };
 
+/** A case not run: the field holds a draft, never typed into */
+const DRAFT_NOT_RUN: Verdict = { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
+
 /**
  * Runs one case on its page
  *
@@ -647,7 +651,10 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
     return { pass: false, detail: 'no field (signed out?)' };
   }
   if (field === 'draft') {
-    return { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
+    return DRAFT_NOT_RUN;
+  }
+  if (id === 'icon-steady') {
+    return runSteady(page, platform, progress);
   }
   const fields = CASE_FIELDS[id];
   progress.owned = [...fields.typed, ...fields.typing];
@@ -677,28 +684,42 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
       await page.keyboard.type('//');
       allTyped();
       return judgeSlash(await settleSlash(page, platform, 'Hi there', timeout), 'Hi there');
-    case 'icon-steady': {
-      // The element the button stands against, held across the typing: a button then beside
-      // another element the anchor selector also finds has moved. The composer is the field's,
-      // found again after typing: a Platform may replace its editor
-      const editor = await findEditor(page, editorSelectorsOf(platform), 1_000);
-      const held = await holdAnchor(page, platform, editor);
-      try {
-        const before = await readIcon(page, platform, held, editor);
-        await page.keyboard.type('Hello world', { delay: 50 });
-        allTyped();
-        await page.waitForTimeout(500);
-        const editorAfter = await findEditor(page, editorSelectorsOf(platform), 1_000);
-        try {
-          return judgeSteady(before, await readIcon(page, platform, held, editorAfter));
-        } finally {
-          await editorAfter?.dispose();
-        }
-      } finally {
-        await held.dispose();
-        await editor?.dispose();
-      }
+  }
+}
+
+/**
+ * icon-steady, once the caret is in the empty field. The element the button stands against is
+ * held across the typing: a button then beside another element the anchor selector also finds has
+ * moved. The composer is the field's: the one typed in while it is on the page (another editor may
+ * show earlier meanwhile), else the one found again (a Platform may replace its editor)
+ */
+async function runSteady(page: Page, platform: PlatformDefinition, progress: CaseProgress): Promise<Verdict> {
+  const editor = await findEditor(page, editorSelectorsOf(platform), 1_000);
+  if (!editor) {
+    return { pass: false, detail: 'no field (signed out?)' };
+  }
+  const held = await holdAnchor(page, platform, editor);
+  let found: ElementHandle<HTMLElement> | null = null;
+  try {
+    const before = await readIcon(page, platform, held, editor);
+    // The reads above come after the field was found empty: a draft restored meanwhile is not typed into
+    if (!isEmptyField(await editor.evaluate(fieldTextOf))) {
+      return DRAFT_NOT_RUN;
     }
+    const { typed, typing } = CASE_FIELDS['icon-steady'];
+    progress.owned = [...typed, ...typing];
+    progress.typed = true;
+    await page.keyboard.type('Hello world', { delay: 50 });
+    // Once every key is typed, a field cut short is not the case's any more
+    progress.owned = typed;
+    await page.waitForTimeout(500);
+    const kept = await editor.evaluate((element) => element.isConnected);
+    found = kept ? null : await findEditor(page, editorSelectorsOf(platform), 1_000);
+    return judgeSteady(before, await readIcon(page, platform, held, kept ? editor : found));
+  } finally {
+    await held.dispose();
+    await editor.dispose();
+    await found?.dispose();
   }
 }
 
