@@ -92,14 +92,10 @@ export const recordUpdateFrom = (previousVersion: string | undefined): Promise<b
 };
 
 /**
- * Marks a Release as the Last seen Release: the only writer of `lastSeenVersion`. In Debug mode
- * it writes nothing, so a Debug session leaves the Last seen Release as it was. Only the launch
+ * Marks a Release as the Last seen Release: the only writer of `lastSeenVersion`. Only the launch
  * writer calls it (`writeLaunchState`, src/launch/write.ts), when What's new closes and when the
- * Welcome is finished.
+ * Welcome is finished, and that writer writes nothing in Debug mode, so a Debug session leaves the
+ * Last seen Release as it was (src/test/guardrails/launch-state-guardrails.test.ts keeps every
+ * other module of src/, the service worker included, from calling it).
  */
-export const markReleaseSeen = async (version: string, { debugMode }: { debugMode: boolean }): Promise<void> => {
-  if (debugMode) {
-    return;
-  }
-  await writeField('lastSeenVersion', version);
-};
+export const markReleaseSeen = (version: string): Promise<void> => writeField('lastSeenVersion', version);

@@ -43,6 +43,15 @@ const openingOver = async ({
   }
 };
 
+/** Every key of chrome.storage.local but the Library's (the Prompts and the Categories), each as bytes, in key order */
+const storageButTheLibrary = async (): Promise<ReadonlyArray<readonly [string, string]>> => {
+  const all = await chrome.storage.local.get(null);
+  return Object.keys(all)
+    .filter((key) => key !== 'prompts' && key !== 'categories')
+    .sort()
+    .map((key) => [key, JSON.stringify(all[key])] as const);
+};
+
 /** Lets a screen that should not come show up */
 const settle = (): Promise<void> => act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20); }); });
 
@@ -174,11 +183,14 @@ describe('App: what an opening shows first', () => {
     await expectWelcomeAlone(1);
   });
 
-  it('pending with Prompts in the Library (the Welcome finished, its done write lost): the Library', async () => {
+  it('pending with Prompts in the Library (the Welcome finished, its done write lost): the Library, and the Welcome recorded done', async () => {
     await openingOver({ prompts: library, welcome: { status: 'pending', step: 0 }, installedVersion: '2.0.0' });
     render(<App />);
 
     await expectLibraryAlone();
+    await waitFor(async () => {
+      expect((await chrome.storage.local.get(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+    });
   });
 
   it('no record over an empty Library (opened before the install write): the Library, not the Welcome', async () => {
@@ -195,6 +207,24 @@ describe('App: what an opening shows first', () => {
     render(<App />);
 
     await expectWelcomeAlone(0);
+  });
+
+  it.each<[string, Prompt[], WelcomeRecord]>([
+    ['a done record and a full Library', library, { status: 'done' }],
+    ['a pending record at step 2 over an empty Library', [], { status: 'pending', step: 2, packs: ['writing'] }],
+    ['a pending record at step 2 over a Library with Prompts', library, { status: 'pending', step: 2 }]
+  ])('Debug mode, %s: the Welcome from step 0 at each of three openings, every key but the Library\'s left as it was', async (_label, prompts, welcome) => {
+    await openingOver({ prompts, welcome, lastSeenVersion: '1.9.0', debugMode: true });
+    const before = await storageButTheLibrary();
+
+    for (let opening = 0; opening < 3; opening++) {
+      const { unmount } = render(<App />);
+      await expectWelcomeAlone(0);
+      unmount();
+    }
+    await settle();
+
+    expect(await storageButTheLibrary()).toEqual(before);
   });
 
   it('Cmd/Ctrl+K does nothing while the Welcome shows', async () => {

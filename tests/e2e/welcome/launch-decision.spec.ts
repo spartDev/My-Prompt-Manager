@@ -77,7 +77,7 @@ const openPopup = async (context: BrowserContext, extensionId: string): Promise<
 };
 
 test.describe('The launch decision in the real extension', () => {
-  test('a relaunch over a Library with no Welcome record: the service worker writes pending, and the popup opens on the Library, not the Welcome', async () => {
+  test('a relaunch over a Library with no Welcome record: the service worker writes pending, the popup opens on the Library, not the Welcome, and records it done, so an emptied Library never brings it back', async () => {
     test.slow();
     const install = await ownInstall('1.9.0');
     try {
@@ -97,7 +97,17 @@ test.describe('The launch decision in the real extension', () => {
       await popup.waitForTimeout(DECISION_SETTLE_MS);
       await expect(popup.getByTestId('welcome')).toHaveCount(0);
       await expect(popup.getByRole('dialog', { name: WHATS_NEW })).toHaveCount(0);
+      // Pending over a Library with Prompts is a Welcome finished: the opening records it done
+      await expect.poll(async () => recordOf(relaunched.storage, WELCOME_KEY)).toEqual({ status: 'done' });
       await popup.close();
+
+      // The user deletes every Prompt: the next opening shows the empty Library, never the Welcome
+      await relaunched.storage.seed({ prompts: [] });
+      const emptied = await openPopup(install.context, relaunched.extensionId);
+      await expect(emptied.getByRole('heading', { name: /my prompt manager/i })).toBeVisible();
+      await emptied.waitForTimeout(DECISION_SETTLE_MS);
+      await expect(emptied.getByTestId('welcome')).toHaveCount(0);
+      await emptied.close();
     } finally {
       await install.dispose();
     }

@@ -30,6 +30,9 @@ const WHOLE_JOURNEY: readonly LaunchStateChange[] = [
   { kind: 'release-seen', version: '2.0.0' }
 ];
 
+/** Every change the writer takes: the journey, and a Welcome an opening found done */
+const EVERY_CHANGE: readonly LaunchStateChange[] = [...WHOLE_JOURNEY, { kind: 'welcome-found-done' }];
+
 describe('writeLaunchState', () => {
   beforeEach(async () => {
     // A user part-way through the Welcome after an update to 2.0.0, with a Library and Debug mode on
@@ -45,10 +48,10 @@ describe('writeLaunchState', () => {
   });
 
   describe('in Debug mode, writes nothing', () => {
-    it('the steps 0, 1, 2, the end and the Release seen leave the whole of chrome.storage.local byte-identical', async () => {
+    it('the steps 0, 1, 2, the end, the Release seen and a Welcome found done leave the whole of chrome.storage.local byte-identical', async () => {
       const before = await snapshot();
 
-      for (const change of WHOLE_JOURNEY) {
+      for (const change of EVERY_CHANGE) {
         await writeLaunchState(change, DEBUG);
       }
 
@@ -67,7 +70,7 @@ describe('writeLaunchState', () => {
       vi.mocked(chrome.storage.local.remove).mockClear();
       const before = await snapshot();
 
-      for (const change of WHOLE_JOURNEY) {
+      for (const change of EVERY_CHANGE) {
         await writeLaunchState(change, DEBUG);
       }
 
@@ -79,7 +82,7 @@ describe('writeLaunchState', () => {
       vi.mocked(chrome.storage.local.get).mockClear();
       vi.mocked(chrome.storage.local.get).mockRejectedValue(new Error('storage unavailable'));
 
-      for (const change of WHOLE_JOURNEY) {
+      for (const change of EVERY_CHANGE) {
         await expect(writeLaunchState(change, DEBUG)).resolves.toBeUndefined();
       }
       expect(chrome.storage.local.get).not.toHaveBeenCalled();
@@ -116,6 +119,14 @@ describe('writeLaunchState', () => {
       expect(await stored(WHATS_NEW_KEY)).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '2.0.0' });
     });
 
+    it('welcome-found-done: the Welcome finished, the Last seen Release left as it was for What\'s new to mark', async () => {
+      await writeLaunchState({ kind: 'welcome-found-done' }, NORMAL);
+
+      expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' });
+      expect(await stored(WHATS_NEW_KEY)).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
+      expect(vi.mocked(chrome.storage.local.set).mock.calls.filter(([items]) => WHATS_NEW_KEY in items)).toEqual([]);
+    });
+
     it('release-seen: the Last seen Release, the Release of install kept, the Welcome record untouched', async () => {
       await writeLaunchState({ kind: 'release-seen', version: '2.0.0' }, NORMAL);
 
@@ -142,7 +153,8 @@ describe('writeLaunchState', () => {
     it.each<[string, LaunchStateChange]>([
       ['the first step', { kind: 'welcome-step', step: 0 }],
       ['a step with Packs', { kind: 'welcome-step', step: 2, packs: ['product'] }],
-      ['the end again', { kind: 'welcome-done', version: '2.0.0' }]
+      ['the end again', { kind: 'welcome-done', version: '2.0.0' }],
+      ['a Welcome found done', { kind: 'welcome-found-done' }]
     ])('a later write of %s does not reopen a finished Welcome', async (_label, change) => {
       await writeLaunchState({ kind: 'welcome-done', version: '2.0.0' }, NORMAL);
 
