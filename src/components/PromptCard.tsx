@@ -1,4 +1,4 @@
-import type { FC, MouseEvent, ReactNode } from 'react';
+import type { FC, MouseEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { memo, useState } from 'react';
 
 import { encode } from '../services/promptEncoder';
@@ -67,6 +67,14 @@ const PromptCard: FC<PromptCardProps> = ({
   const handleCopyClick = (e?: MouseEvent | KeyboardEvent) => {
     e?.stopPropagation();
     onCopy(prompt);
+  };
+
+  // A held Enter copies once: after the Welcome the Library gives the Copy the keyboard while the
+  // Enter that added the Packs can still be down, and its auto-repeat would copy a Prompt unasked
+  const handleCopyKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === 'Enter' && e.repeat) {
+      e.preventDefault();
+    }
   };
 
   const isPinned = prompt.pinned === true;
@@ -178,6 +186,7 @@ const PromptCard: FC<PromptCardProps> = ({
         <button
           ref={copyButtonRef}
           onClick={handleCopyClick}
+          onKeyDown={handleCopyKeyDown}
           className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-accent-subtle text-accent hover:bg-accent-selected transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           aria-label={`Copy content of ${prompt.title} to clipboard`}
           title="Copy to clipboard"

@@ -11,6 +11,9 @@
  * - S2 with the mouse: a click on "Add 9 prompts" puts the keyboard on the same Copy, but Chrome
  *   does not match :focus-visible after a click, so no ring is drawn there (none in the pixels). Enter
  *   still copies.
+ * - S2 with Enter held: the Enter that adds the Packs stays down once the Copy has the keyboard, and
+ *   its repeats copy nothing: the clipboard keeps what the user had, no use is recorded, and the
+ *   Notification still says the Prompts were added. A fresh Enter then copies.
  * - S3, AC2, by keyboard: Enter on "Start empty": the empty Library, then the editor, with the
  *   keyboard in its title field.
  */
@@ -19,6 +22,7 @@ import path from 'node:path';
 
 import type { Page } from '@playwright/test';
 
+import { USAGE_STORAGE_KEY } from '../../../src/constants';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { PACKS } from '../../../src/welcome/packs';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
@@ -39,6 +43,9 @@ const COPY_RING = { width: 2, offset: 1 };
 
 /** The most Tab presses the ticket allows from the exit to the first Copy */
 const MAX_TABS_TO_COPY = 1;
+
+/** How long a copy nobody asked for gets to land before its absence is read */
+const SETTLE_MS = 750;
 
 const DEFAULT_COUNT = PACKS.filter((pack) => pack.defaultSelected).reduce((count, pack) => count + pack.prompts.length, 0);
 
@@ -171,6 +178,44 @@ test.describe('Where the keyboard lands as the Welcome hands over', () => {
 
     await page.keyboard.press('Enter');
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(content);
+  });
+
+  test('S2 with Enter held: the repeats that reach the first Prompt\'s Copy copy nothing; a fresh Enter copies', async ({ context, page, storage, extensionId }) => {
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await open(page, extensionId, 'popup');
+    await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+    // What the user had on the clipboard before the Welcome
+    const mine = 'MINE: what the user copied before the Welcome';
+    await page.evaluate((text) => navigator.clipboard.writeText(text), mine);
+
+    // Enter down on the primary, and held: the Packs are added and the Copy takes the keyboard
+    await primary(page).focus();
+    await page.keyboard.down('Enter');
+    await expect(page.getByTestId('welcome')).toHaveCount(0);
+    const { title, content } = await firstPrompt(page);
+    const copy = firstCard(page).getByRole('button', { name: `Copy content of ${title} to clipboard` });
+    await expect(copy).toBeFocused();
+    // The key's auto-repeat, on the Copy now, then the key let go
+    await page.keyboard.down('Enter');
+    await page.keyboard.down('Enter');
+    await page.keyboard.up('Enter');
+    await page.waitForTimeout(SETTLE_MS);
+
+    expect(await page.evaluate(() => navigator.clipboard.readText()), 'the clipboard keeps what the user had').toBe(mine);
+    const toast = page.getByTestId('toast');
+    await expect(toast).toContainText(`${String(DEFAULT_COUNT)} prompts added`);
+    await expect(toast).not.toContainText('Prompt copied');
+    const prompts = await storage.getPrompts();
+    expect(prompts).toHaveLength(DEFAULT_COUNT);
+    expect(prompts.map((prompt) => prompt.usageCount ?? 0), 'no use recorded').toEqual(prompts.map(() => 0));
+    expect((await storage.get([USAGE_STORAGE_KEY]))[USAGE_STORAGE_KEY] ?? [], 'no usage event').toEqual([]);
+    await expect(copy).toBeFocused();
+
+    // A fresh Enter still copies
+    await page.keyboard.press('Enter');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(content);
+    await expect(toast).toContainText('Prompt copied');
   });
 
   test('S3, AC2, by keyboard: Start empty leaves the keyboard in the editor\'s title field', async ({ page, storage, extensionId }) => {

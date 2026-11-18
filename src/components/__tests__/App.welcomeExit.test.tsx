@@ -442,13 +442,15 @@ describe('App: leaving the Welcome for a ready Library', () => {
       fireEvent.click(primary());
       await waitFor(() => { expect(document.activeElement).toBe(firstCard().copy); });
 
+      // The keyboard on nothing, and kept there: fireEvent.click moves no focus, so the round trip
+      // to Categories and back leaves it on body unless the Library takes it again
       act(() => { (document.activeElement as HTMLElement).blur(); });
       fireEvent.click(screen.getByRole('tab', { name: /categories/i }));
       fireEvent.click(await screen.findByRole('tab', { name: /library/i }));
       await screen.findAllByTestId('prompt-card');
-      act(() => { (document.activeElement as HTMLElement).blur(); });
       await settle();
 
+      expect(document.activeElement).not.toBe(firstCard().copy);
       expect(document.activeElement).toBe(document.body);
     });
 

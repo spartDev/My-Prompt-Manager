@@ -1277,8 +1277,10 @@ The keyboard goes where the Welcome leads. With Packs, it lands on the first car
 show (`focusFirstPrompt` of `LibraryView`), so one Enter copies that Prompt, whose name the button
 carries; only when it is on no element, so a user who has already reached one keeps it. Its ring is
 `focus-interactive`'s drawn on `:focus-visible` (see Small Action Button (Copy)): Chrome matches it for
-that scripted focus after a key press, not after a click, so a mouse user sees no ring appear. With
-Start empty, the editor's title field takes it as the editor opens.
+that scripted focus after a key press, not after a click, so a mouse user sees no ring appear. The
+Copy ignores a repeated Enter: the Enter on "Add N prompts" can still be held when the Copy takes the
+keyboard, and its auto-repeat copies nothing. With Start empty, the editor's title field takes it as
+the editor opens.
 
 #### Modal Fade In
 
