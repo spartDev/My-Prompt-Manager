@@ -122,6 +122,11 @@ export interface ToastOptions {
   /** Milliseconds on screen; by default 2.7 s for success and info, 6 s for error and warning */
   duration?: number;
   action?: ToastAction;
+  /**
+   * For a Notification that must be read whole wherever it shows (the exit of the Welcome): its sub
+   * takes a line of its own under the message, and neither is cut. Left out, the sub is cut as above
+   */
+  whole?: boolean;
 }
 
 export interface Toast {
@@ -131,6 +136,8 @@ export interface Toast {
   type: ToastType;
   duration: number;
   action?: ToastAction;
+  /** Read whole: the sub on a line of its own, nothing cut (ToastOptions.whole) */
+  whole?: boolean;
 }
 
 export interface ToastSettings {

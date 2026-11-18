@@ -164,7 +164,8 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     showLibrary();
     focusFirstPrompt();
     const { message, sub } = packsAddedNotice(result);
-    showToast(message, 'success', { sub });
+    // Read whole on the Library, the "//" of its second line included, even in a 320px side panel
+    showToast(message, 'success', { sub, whole: true });
   }, []);
 
   const exit = useCallback((packIds: readonly string[]): void => {

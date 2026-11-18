@@ -146,7 +146,10 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(notification).toHaveAttribute('role', 'status');
       expect(notification).toHaveAttribute('data-type', 'success');
       expect(within(notification).getByText(ADDED)).toBeInTheDocument();
-      expect(within(notification).getByText(IN_THE_CHAT)).toBeInTheDocument();
+      // Read whole on the Library: its second line on a line of its own, never cut (My-Prompt-Manager-ojz.19)
+      expect(within(notification).getByText(IN_THE_CHAT)).not.toHaveClass('truncate');
+      expect(within(notification).getByTestId('toast-text')).toHaveClass('flex-col');
+      expect(notification).toHaveClass('w-max', 'min-h-10');
 
       // Stored: the Prompts, each in its Pack's Category, and the Welcome finished
       const prompts = await stored<Prompt[]>('prompts');

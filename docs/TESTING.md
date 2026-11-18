@@ -151,9 +151,9 @@ Automated: `S1 I install the extension and open it: I see the Welcome, step 1`.
 
 Do: on a first install, open the extension. Click Next, then Next. On step 3, under the Packs, read the row "Type // in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot", the Platforms as pills. Product and Writing are selected; click Engineering to select it too. The button reads Add 15 prompts: click it.
 
-You must see: the Library with 15 Prompts, those of Product, Engineering and Writing, the filter All selected; at the top, the Notification "15 prompts added · Open your AI chat and type //". No What's new. The Categories tab shows Product, Engineering and Writing.
+You must see: the Library with 15 Prompts, those of Product, Engineering and Writing, the filter All selected; at the top, the Notification "15 prompts added" with, on a line of its own under it, "Open your AI chat and type //", whole with its `//`. No What's new. The Categories tab shows Product, Engineering and Writing. Do it again in the side panel made 320px wide (a new profile): the same two lines, neither cut, the Notification above the search field.
 
-Automated: `S2 I go to the end choosing Packs: …`.
+Automated: `S2 I go to the end choosing Packs: …`, and `the exit Notification shows whole, …` in `tests/e2e/welcome/welcome-exit.spec.ts` (popup 400 x 500, side panel 360 x 600 and 320 x 500, light and dark).
 
 #### S3 I go to the end choosing no Pack
 

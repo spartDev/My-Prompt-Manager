@@ -22,6 +22,8 @@ const DEFAULT_IDS = DEFAULTS.map((pack) => pack.id);
 const DEFAULT_COUNT = DEFAULTS.reduce((count, pack) => count + pack.prompts.length, 0);
 /** The second line of every Notification of an exit with Packs: what to do next, in the AI chat (My-Prompt-Manager-ojz.19, decision D1) */
 const IN_THE_CHAT = 'Open your AI chat and type //';
+/** That second line, read whole on the Library: on its own line, never cut, even 320px wide */
+const EXIT_OPTIONS = { sub: IN_THE_CHAT, whole: true };
 
 /** An add the test settles itself */
 const deferred = <T,>() => {
@@ -75,7 +77,7 @@ describe('useWelcomeExit', () => {
       await flush();
 
       expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(DEFAULT_COUNT)} prompts added`]);
-      expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('finishes nothing while the add is under way', async () => {
@@ -143,7 +145,7 @@ describe('useWelcomeExit', () => {
       await flush();
 
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenCalledWith('Your library is ready', 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenCalledWith('Your library is ready', 'success', EXIT_OPTIONS);
     });
   });
 
@@ -192,7 +194,7 @@ describe('useWelcomeExit', () => {
       expect(log).toEqual(['hideNotification', 'addPacks product,hiring', 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(count)} prompts added`]);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
       expect(focusFirstPrompt).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(count)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(count)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again refused too: the failure Notification again, with its Try again, and nothing finished; a third try adds the Packs', async () => {
@@ -217,7 +219,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(3);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('a second press of the primary button tries again too, and finishes once the Packs are in', async () => {
@@ -231,7 +233,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     // Start empty stays on the step: every Pack unselected, the primary button reads it
@@ -263,7 +265,7 @@ describe('useWelcomeExit', () => {
       expect(hideNotification).toHaveBeenCalledTimes(1);
       add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
       await flush();
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again does nothing once another exit is under way', async () => {
@@ -283,7 +285,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again that lands after the unmount (the popup closed) finishes nothing and shows nothing', async () => {

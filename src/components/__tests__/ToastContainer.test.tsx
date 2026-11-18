@@ -165,6 +165,35 @@ describe('ToastContainer', () => {
       expect(pill.style.maxWidth).toBe('calc(100% - 74px)');
     });
 
+    // My-Prompt-Manager-ojz.19: the exit of the Welcome, shown on the Library, which passes neither opt-in
+    it('a Notification read whole, on a screen with no opt-in: the pill grows, its sub a line of its own under the message, never cut', () => {
+      const exit = createToast({ message: '9 prompts added', sub: 'Open your AI chat and type //', whole: true });
+      render(<ToastContainer toast={exit} onDismiss={onDismiss} />);
+
+      const pill = screen.getByTestId('toast');
+      expect(pill).toHaveClass('w-max', 'min-h-10', 'py-1.5', 'rounded-[20px]', 'left-1/2', 'max-w-[calc(100%-32px)]');
+      expect(pill).not.toHaveClass('h-10');
+      expect(pill).toHaveAttribute('role', 'status');
+      const text = screen.getByTestId('toast-text');
+      expect(text).toHaveClass('flex-col', 'items-start');
+      expect(text).not.toHaveClass('items-center');
+      expect(screen.getByTestId('toast-message')).toHaveClass('min-w-0');
+      expect(screen.getByTestId('toast-message')).not.toHaveClass('truncate');
+      const sub = screen.getByTestId('toast-sub');
+      expect(sub).toHaveTextContent('Open your AI chat and type //');
+      expect(sub).not.toHaveClass('truncate');
+      expect(sub).toHaveClass('min-w-0', 'text-on-inverse');
+    });
+
+    it('the next Notification, not read whole, is one line again with its sub cut', () => {
+      const { rerender } = render(<ToastContainer toast={createToast({ id: 'exit', sub: 'Open your AI chat and type //', whole: true })} onDismiss={onDismiss} />);
+      rerender(<ToastContainer toast={createToast({ id: 'saved', sub: 'Weekly status update' })} onDismiss={onDismiss} />);
+
+      expect(screen.getByTestId('toast')).toHaveClass('h-10', 'rounded-full');
+      expect(screen.getByTestId('toast-text')).toHaveClass('items-center');
+      expect(screen.getByTestId('toast-sub')).toHaveClass('truncate');
+    });
+
     it('keeps a failure an alert, announced at once, its action a button that runs then leaves', () => {
       const onClick = vi.fn();
       render(<ToastContainer toast={{ ...failure, action: { label: 'Try again', onClick } }} onDismiss={onDismiss} wrap clearRight={58} />);

@@ -53,6 +53,8 @@ const placementBeside = (clearRight: number): CSSProperties => ({
  * The Notification pill of the Atelier 1C design: always at the top center, one at a time. A new
  * Notification has a new key, so it mounts again and replays its entrance; it leaves at once.
  * `wrap` and `clearRight` are opt-ins for one screen (the Welcome); without them nothing changes.
+ * One Notification can ask to be read whole wherever it shows (`Toast.whole`, the exit of the Welcome
+ * on the Library): the pill grows as with `wrap`, and the sub takes a line of its own, never cut.
  */
 const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume, wrap = false, clearRight }) => {
   const pillRef = useRef<HTMLDivElement>(null);
@@ -113,6 +115,10 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
 
   // A failure is announced at once; a confirmation waits for the screen reader to be idle
   const isFailure = toast.type === 'error' || toast.type === 'warning';
+  // A Notification to read whole (the exit of the Welcome, My-Prompt-Manager-ojz.19) grows as `wrap`
+  // makes it, on whichever screen it shows, its sub on a line of its own under the message
+  const whole = toast.whole === true;
+  const grows = wrap || whole;
 
   return (
     <div
@@ -128,7 +134,7 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
         'bg-inverse text-on-inverse-strong shadow-toast leading-[1.4] antialiased',
         clearRight === undefined && 'left-1/2 max-w-[calc(100%-32px)]',
         // Wrapped, the pill grows a line at a time: 40px for one line, as the default one, rounded the same
-        wrap ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full'
+        grows ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full'
       )}
       style={clearRight === undefined ? undefined : placementBeside(clearRight)}
     >
@@ -140,13 +146,13 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
       </span>
       {/* The text is the one part that gives way, so the round, the gaps and the action keep their room.
           Inside it, the message never gives way to the sub: only a message longer than the room left is
-          cut, or, wrapped, goes on to the next line */}
-      <span data-testid="toast-text" className="flex min-w-0 items-center gap-[9px]">
-        <span data-testid="toast-message" className={cn('text-[13px] font-semibold', wrap ? 'min-w-0' : 'shrink-0 max-w-full truncate')}>
+          cut, or, wrapped, goes on to the next line. Read whole, the sub is the second line, never cut */}
+      <span data-testid="toast-text" className={cn('flex min-w-0', whole ? 'flex-col items-start' : 'items-center gap-[9px]')}>
+        <span data-testid="toast-message" className={cn('text-[13px] font-semibold', grows ? 'min-w-0' : 'shrink-0 max-w-full truncate')}>
           {toast.message}
         </span>
         {toast.sub && (
-          <span className="min-w-0 truncate text-[12.5px] text-on-inverse">
+          <span data-testid="toast-sub" className={cn('min-w-0 text-[12.5px] text-on-inverse', !whole && 'truncate')}>
             {toast.sub}
           </span>
         )}
