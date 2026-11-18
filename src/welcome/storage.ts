@@ -4,9 +4,11 @@
  * settings leaves it; Clear All Data and the Reset Data of the error screen keep it too
  * (`src/services/clearStorage.ts`), so the Welcome never comes back after a clear.
  *
- * This module is its only reader and its low-level writer. The service worker records the facts of
- * the install with `recordWelcomePending` ('install') and `markExistingUserDone` ('update'); the
- * launch writer of the popup and side panel writes the steps and the end with `writeWelcomeRecord`.
+ * This module is its only reader and its low-level writer; the launch decision reads the key in its
+ * one get with the What's new record and the Site settings (src/hooks/useLaunchScreen.ts) and parses
+ * it with `parseWelcomeRecord`. The service worker records the facts of the install with
+ * `recordWelcomePending` ('install') and `markExistingUserDone` ('update'); the launch writer of the
+ * popup and side panel writes the steps and the end with `writeWelcomeRecord`.
  * Nothing else writes it. A done record is final: no write of this module replaces it.
  * Terms: CONTEXT.md, "Welcome".
  */

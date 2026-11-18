@@ -2,7 +2,9 @@
  * The What's new record: the Release of install (that of a first install, or the one an update
  * from an install older than What's new came from), and the Last seen Release. One `chrome.storage.local` key, apart from the Site settings, so Reset settings leaves
  * it; Clear All Data and the Reset Data of the error screen keep it too
- * (`src/services/clearStorage.ts`). This module is its only reader and writer.
+ * (`src/services/clearStorage.ts`). This module is its only reader and writer; the launch decision
+ * reads the key in its one get with the Welcome record and the Site settings
+ * (src/hooks/useLaunchScreen.ts) and parses it with `parseWhatsNewRecord`.
  * Terms: CONTEXT.md, section "Releases".
  */
 
