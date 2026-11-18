@@ -291,6 +291,32 @@
   --animate-whats-new-backdrop-in: backdrop-in 300ms ease both;
   --animate-whats-new-backdrop-out: backdrop-out 340ms ease both;
   /* --- end What's new sheet --- */
+
+  /* --- Welcome frame (My-Prompt-Manager-ojz.7; Atelier 1C 'Premier lancement') ---
+     The screen fades in at the opening (the mockup's cFade, on the backdrop-in keyframes, in 100ms
+     rather than 500ms so the Welcome is whole within 200ms of opening: 150ms reached 204 to 212ms);
+     a step slides 26px in from the side it comes from while it fades in, on the Section curve (the mockup's
+     cL and cR); Back pops in when a step change brings it (cPop). None of them covers or holds the
+     primary button. The progress dots and the presses are transitions in popup.css; durations are
+     MOTION.welcome* in motion.ts. An inactive dot takes the strong border color (the mockup's
+     #DCD4EA light, #41375A dark); the primary button casts the mockup's ink shadow */
+  --background-color-step-dot: var(--border-color-strong);
+  --shadow-tint-ink: rgba(29, 21, 48, 0.9);
+  --shadow-welcome-primary: 0 14px 26px -16px var(--shadow-tint-ink);
+  --animate-welcome-in: backdrop-in 100ms ease both;
+  --animate-welcome-step-forward: welcome-from-right 500ms var(--ease-section) both;
+  --animate-welcome-step-back: welcome-from-left 500ms var(--ease-section) both;
+  --animate-welcome-back-pop: pop 350ms var(--ease-spring) both;
+
+  @keyframes welcome-from-right {
+    from { opacity: 0; transform: translateX(26px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes welcome-from-left {
+    from { opacity: 0; transform: translateX(-26px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* --- end Welcome frame --- */
 }
 
 /* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
@@ -405,5 +431,9 @@
     /* --- What's new sheet (My-Prompt-Manager-d1g.5): its upward shadow, black at 0.45 x 1.6 --- */
     --shadow-tint-sheet: rgba(0, 0, 0, 0.72);
     /* --- end What's new sheet --- */
+
+    /* --- Welcome frame (My-Prompt-Manager-ojz.7): the primary button's shadow, the dark mockup's --- */
+    --shadow-tint-ink: rgba(4, 2, 10, 0.92);
+    /* --- end Welcome frame --- */
   }
 }

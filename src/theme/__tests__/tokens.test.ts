@@ -178,7 +178,9 @@ describe('Color tokens', () => {
       'border-focus', 'border-error', 'outline-danger',
       'text-pin', 'text-on-inverse-strong', 'text-on-inverse-mark', 'bg-inverse-mark', 'bg-inverse-alert', 'bg-inverse-action',
       'bg-inverse-bar', 'bg-inverse-bar-hover', 'text-on-inverse-muted', 'bg-callout', 'text-callout',
-      'border-ghost', 'border-inverse-ghost', 'text-on-inverse-dim', 'text-tile-blue', 'text-tile-pink', 'text-tile-violet'
+      'border-ghost', 'border-inverse-ghost', 'text-on-inverse-dim', 'text-tile-blue', 'text-tile-pink', 'text-tile-violet',
+      // The Welcome's inactive progress dot (My-Prompt-Manager-ojz.7)
+      'bg-step-dot'
     ];
     const css = await buildCss(classes);
 
@@ -393,3 +395,39 @@ describe("What's new in light and dark", () => {
   });
 });
 // --- end What's new in light and dark ---
+
+// --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+describe('Welcome frame tokens', () => {
+  it("compiles the frame's classes from their tokens", async () => {
+    const css = await buildCss([
+      'bg-step-dot',
+      'shadow-welcome-primary',
+      'animate-welcome-in',
+      'animate-welcome-step-forward',
+      'animate-welcome-step-back',
+      'animate-welcome-back-pop',
+      'transition-welcome-dot',
+      'transition-welcome-press'
+    ]);
+
+    expect(ruleFor(css, 'bg-step-dot')).toContain('var(--background-color-step-dot)');
+    expect(ruleFor(css, 'shadow-welcome-primary')).toMatch(/var\(--shadow-tint-ink\)/);
+    for (const name of ['welcome-in', 'welcome-step-forward', 'welcome-step-back', 'welcome-back-pop']) {
+      expect(ruleFor(css, `animate-${name}`), `animate-${name}`).toContain(`var(--animate-${name})`);
+    }
+    expect(ruleFor(css, 'transition-welcome-dot')).toContain('var(--ease-spring)');
+    expect(ruleFor(css, 'transition-welcome-press')).toContain('var(--ease-spring)');
+  });
+
+  it("an inactive dot takes the strong border color, and the primary button casts the mockups' shadow, in light and dark", async () => {
+    const declared = await readDeclarations();
+    const { light, dark } = await readTokens();
+
+    expect(declared.light['--background-color-step-dot']).toBe('var(--border-color-strong)');
+    expect([light['--background-color-step-dot'], dark['--background-color-step-dot']]).toEqual(['#dcd4ea', '#41375a']);
+    expect(light['--shadow-tint-ink']).toBe('rgba(29, 21, 48, 0.9)');
+    expect(dark['--shadow-tint-ink']).toBe('rgba(4, 2, 10, 0.92)');
+    expect(light['--shadow-welcome-primary']).toBe('0 14px 26px -16px var(--shadow-tint-ink)');
+  });
+});
+// --- end Welcome frame ---

@@ -9,6 +9,7 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
+import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
@@ -484,14 +485,17 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
-  // The Welcome fills the popup or side panel, without the tab bar. A placeholder: the Welcome's
-  // screens replace it (My-Prompt-Manager-ojz.7)
+  // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered behind it
   if (launch.screen.kind === 'welcome') {
     return (
       <ThemeProvider>
-        <main data-testid="welcome" data-welcome-step={launch.screen.step} className="h-full w-full bg-app flex items-center justify-center">
-          <h1 className="text-xl font-semibold text-primary">Welcome</h1>
-        </main>
+        <WelcomeHost
+          step={launch.screen.step}
+          packs={launch.screen.packs}
+          saveStep={launch.saveStep}
+          finishWelcome={launch.finishWelcome}
+          context={context}
+        />
       </ThemeProvider>
     );
   }
