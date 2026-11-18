@@ -8,12 +8,15 @@
  * appends each event to `chrome.storage.session`. Nothing of the build is changed: the manifest
  * names a new entry that imports the probe, then the build's own service worker loader, so both
  * listeners are registered in the same first run of the worker. The probe writes nothing to
- * `chrome.storage.local`, so every record a spec reads there is the extension's own.
+ * `chrome.storage.local`, so every record a spec reads there is the extension's own. It refuses
+ * dist/, the build `npm run package` zips, and any folder inside it, so it can only reach a copy.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
 import type { Worker } from '@playwright/test';
+
+import { DEFAULT_EXTENSION_PATH } from './extension';
 
 /** The `chrome.storage.session` key the probe appends the events to */
 export const ON_INSTALLED_PROBE_KEY = 'e2eOnInstalledProbe';
@@ -42,11 +45,32 @@ interface ManifestWithWorker {
   background: { service_worker: string; type?: string };
 }
 
+/** The path `target` stands for once every symbolic link is followed, also when its last folders do not exist yet */
+const realPath = (target: string): string => {
+  const resolved = path.resolve(target);
+  try {
+    return fs.realpathSync(resolved);
+  } catch {
+    const parent = path.dirname(resolved);
+    return parent === resolved ? resolved : path.join(realPath(parent), path.basename(resolved));
+  }
+};
+
+/** Whether `target` is dist/, the build `npm run package` zips, or a folder inside it, links followed */
+export const resolvesInsideDist = (target: string): boolean => {
+  const relative = path.relative(realPath(DEFAULT_EXTENSION_PATH), realPath(target));
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+};
+
 /**
  * Adds the probe to the build copied at `extensionPath`: the probe module, and an entry that
- * imports it before the build's own service worker, named by the manifest. Run on a fresh copy.
+ * imports it before the build's own service worker, named by the manifest. Run on a fresh copy;
+ * throws, writing nothing, when `extensionPath` resolves to dist/ or inside it.
  */
 export function addOnInstalledProbe(extensionPath: string): void {
+  if (resolvesInsideDist(extensionPath)) {
+    throw new Error(`The probe goes on a copy of the build, never in dist/: ${extensionPath} resolves to ${realPath(extensionPath)}`);
+  }
   const manifestPath = path.join(extensionPath, 'manifest.json');
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as ManifestWithWorker;
   const worker = manifest.background.service_worker;

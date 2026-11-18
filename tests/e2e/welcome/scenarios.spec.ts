@@ -12,8 +12,8 @@
  * - an update is a build at a higher version copied over the loaded folder, then the Reload of
  *   chrome://extensions, which fires onInstalled 'update' with the previous version
  *   (fixtures/extension-update.ts). A relaunch fires 'install' again, store kept (docs/TESTING.md);
- *   S5 and S7 read which event fired from an observer of onInstalled added to their copies of the
- *   build (fixtures/oninstalled-probe.ts), besides the records the extension writes;
+ *   the tests of updates read which event fired from an observer of onInstalled added to their
+ *   copies of the build (fixtures/oninstalled-probe.ts), besides the records the extension writes;
  * - Debug mode is switched on and off through the Settings switch, never seeded;
  * - a click is a Playwright click on the control, a close is the page closed (a click outside the
  *   popup) or the Welcome's own close button, a copy is read back from the clipboard.
@@ -27,7 +27,9 @@
  * so What's new could show there and must not (dist-e2e-whats-new, fixtures/whats-new-build.ts). The
  * Debug scenarios run on dist/ at 1.9.0, a Release without notes, for an existing user updated from
  * 1.8.0 who never closed a What's new: a Debug session that wrote the Last seen Release would show
- * there. S5 and S7 run on copies of the build of their own (`ownInstall`).
+ * there. The tests of updates, S5, S7 and the two beside them (S7 with no Prompt, and a Welcome left
+ * pending through an update, My-Prompt-Manager-ojz.18), run on copies of the build of their own
+ * (`ownInstall`).
  *
  * S11 and S12 time the journey with the reading model of the epic's measurement plan, the words on
  * each screen read at 238 words a minute (Brysbaert 2019) plus 1.1 s of pointing and 0.2 s of click
@@ -47,7 +49,9 @@ import type { BrowserContext, Locator, Page, Worker } from '@playwright/test';
 import { parseSiteSettings, SITE_SETTINGS_KEY } from '../../../src/services/siteSettings';
 import { PACKS } from '../../../src/welcome/packs';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
-import { WHATS_NEW_KEY } from '../../../src/whatsNew/storage';
+import { decideWhatsNew, isFirstInstall } from '../../../src/whatsNew/decide';
+import { RELEASE_NOTES } from '../../../src/whatsNew/releaseNotes';
+import { parseWhatsNewRecord, WHATS_NEW_KEY } from '../../../src/whatsNew/storage';
 import {
   createStorageController,
   type ExtensionStorage,
@@ -683,6 +687,130 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
       await install.dispose();
     }
   });
+
+  // S7 again, from a Library with no Prompt: no Prompt stands for a finished Welcome there, so a
+  // pending record written by the update would show the Welcome at the first opening
+  test('S7 I start from an earlier Release with no Prompt, and update: I see my empty Library, never the Welcome', async () => {
+    test.slow();
+    const install = await ownInstall(BUILT_RELEASE);
+    try {
+      const before = await storageOf(install.context);
+      await waitForFirstInstallRecords(before.storage);
+      // The exact store of a 1.9.0 user who has no Prompt: an empty Library, no Welcome record, no What's new record
+      await before.storage.reset();
+      await seedLibrary(before.storage, { prompts: [] });
+      expect(Object.keys(await before.storage.get()).sort()).toEqual(['categories', 'interfaceMode', 'prompts', 'settings']);
+      expect(await before.storage.getPrompts()).toEqual([]);
+
+      const worker = await install.update(before.extensionId, NEW_RELEASE);
+      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}, no Prompt`)).toEqual({ reason: 'update', previousVersion: BUILT_RELEASE, version: NEW_RELEASE });
+      const storage = createStorageController(worker);
+      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: BUILT_RELEASE });
+      await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+
+      // The first opening: What's new of the Release, as for every user who updates to it (S5), over
+      // the empty Library; never the Welcome
+      const popup = await openExtension(install.context, before.extensionId);
+      const sheet = whatsNew(popup);
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByText(`New in ${NEW_RELEASE}`, { exact: true })).toBeVisible();
+      await expect(welcome(popup)).toHaveCount(0);
+      await sheet.getByRole('button', { name: 'Got it' }).click();
+      await expect(sheet).toHaveCount(0);
+      await expectLibraryAlone(popup, 0);
+      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: BUILT_RELEASE, lastSeenVersion: NEW_RELEASE });
+      await popup.close();
+
+      for (const surface of ['sidepanel', 'popup'] as const) {
+        const again = await openExtension(install.context, before.extensionId, surface);
+        await expectLibraryAlone(again, 0);
+        await again.close();
+      }
+      expect(await recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+      expect(await storage.getPrompts()).toEqual([]);
+    } finally {
+      await install.dispose();
+    }
+  });
+
+  /** The Release the user of the pending case installs: lower than the Release with notes, and without notes of its own */
+  const PENDING_INSTALLED = '1.9.1';
+
+  // Decision Q2: a Welcome left unfinished stays pending through an update. The one case where What's
+  // new's own rule says yes to a new user: an update, to a Release with notes, never seen
+  test("Pending through an update: the Welcome resumes, What's new never follows", async () => {
+    test.slow();
+    const install = await ownInstall(PENDING_INSTALLED);
+    try {
+      const installed = await storageOf(install.context);
+      expect(await lastOnInstalled(installed.worker, 'first install')).toEqual({ reason: 'install', previousVersion: null, version: PENDING_INSTALLED });
+      await waitForFirstInstallRecords(installed.storage);
+
+      // A new user opens the extension, goes on to step 2 and closes it there
+      const first = await openExtension(install.context, installed.extensionId);
+      await expectWelcomeAt(first, 0);
+      await expectWelcomeAlone(first);
+      await primary(first).click();
+      await expectWelcomeAt(first, 1);
+      const pending = { [WELCOME_KEY]: { status: 'pending', step: 1 }, [WHATS_NEW_KEY]: { installedVersion: PENDING_INSTALLED } };
+      // Closed once the step is stored: a close in the milliseconds of its write is S6's matter
+      await expect.poll(async () => installed.storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(pending);
+      await first.close();
+
+      // A real update to the Release with notes: 'update' from the Release installed, the Welcome still pending
+      const worker = await install.update(installed.extensionId, NEW_RELEASE);
+      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}, the Welcome pending`)).toEqual({
+        reason: 'update',
+        previousVersion: PENDING_INSTALLED,
+        version: NEW_RELEASE
+      });
+      const storage = createStorageController(worker);
+      expect(await storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(pending);
+      expect(await storage.getPrompts()).toEqual([]);
+      // What's new's own rule would show the Release's notes at this opening: so the Welcome alone keeps them away
+      const record = parseWhatsNewRecord(await recordOf(storage, WHATS_NEW_KEY));
+      const notes = decideWhatsNew({
+        currentVersion: NEW_RELEASE,
+        lastSeenVersion: record.lastSeenVersion,
+        releaseNotes: RELEASE_NOTES,
+        isFirstInstall: isFirstInstall(record.installedVersion, NEW_RELEASE),
+        debugMode: false
+      });
+      expect(notes?.version, "What's new by its own rule").toBe(NEW_RELEASE);
+
+      // Reopened: the Welcome at step 2, and no What's new at step 2 nor at step 3
+      const resumed = await openExtension(install.context, installed.extensionId);
+      await expectWelcomeAt(resumed, 1);
+      await expectWelcomeAlone(resumed);
+      await primary(resumed).click();
+      await expectWelcomeAt(resumed, 2);
+      await expectWelcomeAlone(resumed);
+      await expect(primary(resumed)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+
+      // Finished: the Library with the Packs' Prompts, and no What's new in this opening
+      await primary(resumed).click();
+      await expect(welcome(resumed)).toHaveCount(0);
+      await expect(notification(resumed).getByText(`${String(DEFAULT_COUNT)} prompts added`, { exact: true })).toBeVisible();
+      await expectLibraryAlone(resumed, DEFAULT_COUNT);
+      // Closed once the end of the Welcome is stored, as a person closes it
+      await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+      await resumed.close();
+
+      // The next openings: the Library alone, in the popup and in the side panel
+      for (const surface of ['popup', 'sidepanel'] as const) {
+        const again = await openExtension(install.context, installed.extensionId, surface);
+        await expectLibraryAlone(again, DEFAULT_COUNT);
+        await again.close();
+      }
+      // The finish marked the installed Release seen: that, not the Welcome, keeps What's new away from now on
+      expect(await storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual({
+        [WELCOME_KEY]: { status: 'done' },
+        [WHATS_NEW_KEY]: { installedVersion: PENDING_INSTALLED, lastSeenVersion: NEW_RELEASE }
+      });
+    } finally {
+      await install.dispose();
+    }
+  });
 });
 
 // =====================================================================================================
@@ -728,7 +856,10 @@ test.describe('Debug mode, switched in Settings', () => {
     }
     await third.close();
 
-    // Nothing recorded by the three openings
+    // The records as the finish left them: the Welcome still done, the Last seen Release unchanged,
+    // the Library as it was. This cannot show that a Debug opening writes no step: storage refuses a
+    // step over a done record. S10 shows a What's new closed in Debug mode leaves the Last seen
+    // Release; src/launch/__tests__/write.test.ts, that the launch writer writes nothing in Debug mode
     expect(await storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(records);
     expect(await storage.getPrompts()).toHaveLength(DEFAULT_COUNT);
   });
