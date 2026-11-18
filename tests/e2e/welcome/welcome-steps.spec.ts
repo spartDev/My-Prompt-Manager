@@ -4,6 +4,10 @@
  * - AC5: step 3, with its four Packs in two columns and the Platform pills, fits the 400 x 500 popup
  *   and the narrowest side panel, 320 x 600: the primary button wholly in the viewport, and nothing of
  *   the step to scroll to (every Pack and every pill in view). Steps 1 and 2 fit there too.
+ * - AC2 of My-Prompt-Manager-ojz.19: step 3's caption "Type // in the chat on" and the pills after it
+ *   whole and in view, the primary button in view, in the popup (400 x 500) and a side panel of
+ *   360 x 600, light and dark, with a screenshot of each in WELCOME_STEPS_SCREENSHOTS (the short side
+ *   panels, with the Packs' scroll cue, are in welcome-a11y.spec.ts).
  * - More Packs than fit scroll inside the Packs' grid: the pills, the dots and the primary button stay
  *   in view. Packs are compiled in, so the test adds copies of the Pack toggles to the grid's DOM.
  * - Step 2: the blank fills letter by letter in real time, and the card keeps its height while it
@@ -26,6 +30,7 @@ import type { Locator, Page } from '@playwright/test';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
+import { PLATFORMS_CAPTION as CAPTION, expectPlatformsRowWhole } from '../utils/welcomePlatforms';
 
 const SCREENSHOTS_DIR = process.env.WELCOME_STEPS_SCREENSHOTS ?? 'test-results/welcome-steps';
 
@@ -100,11 +105,13 @@ test.describe('The Welcome steps in the real extension', () => {
       for (const pack of await packs.all()) {
         await expectInView(page, pack, `the Pack ${(await pack.textContent()) ?? ''}`);
       }
-      const pills = page.getByRole('list', { name: 'Works on' }).getByRole('listitem');
+      const pills = page.getByRole('list', { name: CAPTION }).getByRole('listitem');
       await expect(pills).toHaveCount(6);
       for (const pill of await pills.all()) {
         await expectInView(page, pill, `the pill ${(await pill.textContent()) ?? ''}`);
       }
+      // The caption before them, whole (My-Prompt-Manager-ojz.19)
+      await expectPlatformsRowWhole(page, surface);
       await expectInView(page, page.getByRole('heading', { level: 1, name: 'Start with a pack' }), 'the title');
       expect(await scrollRoom(page)).toEqual({ page: 0, step: 0, packs: 0 });
 
@@ -164,7 +171,8 @@ test.describe('The Welcome steps in the real extension', () => {
       expect(room.step, 'the step itself does not').toBe(0);
       expect(room.page, 'nor the page').toBe(0);
       await expectInView(page, primary(page), 'the primary button');
-      await expectInView(page, page.getByRole('list', { name: 'Works on' }), 'the pills');
+      // The list takes no box of its own: its row, with the caption, is what shows
+      await expectInView(page, page.getByTestId('welcome-platforms'), 'the caption and the pills');
       await expectInView(page, page.getByRole('group', { name: 'Steps' }), 'the dots');
       await expectInView(page, page.getByRole('heading', { level: 1, name: 'Start with a pack' }), 'the title');
     });
@@ -217,7 +225,7 @@ test.describe('The Welcome steps in the real extension', () => {
         (document.activeElement as HTMLElement | null)?.blur();
         return {
           title: box(document.querySelector('[data-welcome-title]')),
-          pills: box(document.querySelector('ul[aria-label="Works on"]')),
+          pills: box(document.querySelector('[data-testid="welcome-platforms"]')),
           grid: box(grid),
           clip: box(document.querySelector('[data-testid="welcome-step"]')?.parentElement),
           packs: packs.map(box),
@@ -242,6 +250,39 @@ test.describe('The Welcome steps in the real extension', () => {
         }
       }
     });
+  }
+
+  // AC2 of My-Prompt-Manager-ojz.19: the caption "Type // in the chat on" before the pills fits. The
+  // short side panels (320 x 500, 320 x 420), where the Packs' grid scrolls with its cue, are measured
+  // with that cue in tests/e2e/welcome/welcome-a11y.spec.ts
+  for (const { file, width, height } of [
+    { file: 'popup', width: 400, height: 500 },
+    { file: 'sidepanel', width: 360, height: 600 }
+  ] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      test(`step 3's caption and pills whole, the primary button in view, ${file} ${String(width)} x ${String(height)}, ${theme}`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
+        if (theme === 'dark') {
+          await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+        } else {
+          await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+        }
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
+        await animationsDone(page);
+
+        const layout = await expectPlatformsRowWhole(page, `${file} ${String(width)} x ${String(height)} ${theme}`);
+        test.info().annotations.push({ type: 'platforms row', description: JSON.stringify({ lines: layout.lines, row: layout.row, caption: layout.caption, primary: layout.primary }) });
+        // Where the Packs fit, nothing to scroll: every Pack in view with the row
+        expect(await scrollRoom(page)).toEqual({ page: 0, step: 0, packs: 0 });
+
+        await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+        await page.mouse.move(width / 2, 4);
+        await page.screenshot({ path: `${SCREENSHOTS_DIR}/${file}-${String(width)}x${String(height)}-step3-caption-${theme}.png`, animations: 'disabled' });
+      });
+    }
   }
 
   for (const surface of ['popup', 'narrowSidepanel'] as const) {

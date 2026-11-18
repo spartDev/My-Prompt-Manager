@@ -38,15 +38,22 @@ export interface PacksAddedNotice {
 }
 
 /**
- * The Notification of an add: how many Prompts were really added, the Packs that added some as its
- * sub ("9 prompts added", "Product, Writing"). When every Prompt was already in the Library (the
- * owner finishing the Welcome again in Debug mode), nothing was added and no Pack is named: it says
- * the Library is ready instead.
+ * The Notification's second line after the Packs: the next step, in the AI chat, where `//` opens the
+ * Prompt selector (SELECTOR_TRIGGER of src/content/selector/inputText.ts). The Library on screen
+ * already shows the Packs; what the Welcome has not said yet is how a Prompt gets into the chat
+ * (decision D1, My-Prompt-Manager-ojz.19)
  */
-export const packsAddedNotice = ({ added, packNames }: AddPacksResult): PacksAddedNotice =>
-  added === 0
-    ? { message: 'Your library is ready', sub: 'Every prompt was already in it' }
-    : { message: `${String(added)} ${added === 1 ? 'prompt' : 'prompts'} added`, sub: packNames.join(', ') };
+const IN_THE_CHAT = 'Open your AI chat and type //';
+
+/**
+ * The Notification of an add: how many Prompts were really added ("9 prompts added"), and where to
+ * use them as its sub. When every Prompt was already in the Library (the owner finishing the Welcome
+ * again in Debug mode), nothing was added: it says the Library is ready instead, with the same sub.
+ */
+export const packsAddedNotice = ({ added }: AddPacksResult): PacksAddedNotice => ({
+  message: added === 0 ? 'Your library is ready' : `${String(added)} ${added === 1 ? 'prompt' : 'prompts'} added`,
+  sub: IN_THE_CHAT
+});
 
 /** The Notification of a refused add; its action leaves the Welcome with no Pack */
 const ADD_FAILED = "Couldn't add the prompts";

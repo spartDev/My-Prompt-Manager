@@ -181,7 +181,7 @@ test.describe('The Welcome beside its mockup: proof screenshots', () => {
         await expect(page.getByTestId('prompt-card')).toHaveCount(DEFAULT_PROMPTS);
         const notification = page.getByTestId('toast');
         await expect(notification).toContainText(`${String(DEFAULT_PROMPTS)} prompts added`);
-        await expect(notification).toContainText(DEFAULT_PACKS.map((pack) => pack.name).join(', '));
+        await expect(notification).toContainText('Open your AI chat and type //');
         // Hovered, the Notification keeps its time; its text has no hover look
         await page.getByTestId('toast-text').hover();
         await animationsDone(page);

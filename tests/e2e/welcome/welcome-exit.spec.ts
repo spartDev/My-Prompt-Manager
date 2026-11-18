@@ -2,9 +2,9 @@
  * E2E: leaving the Welcome for a ready Library, in the real extension (My-Prompt-Manager-ojz.9).
  *
  * - S2, AC1: Skip, then "Add 9 prompts": the Library lists the Prompts of the Packs selected on All,
- *   with the Notification "9 prompts added" and the Packs as its sub; neither the Library's loading
- *   state nor its empty state ever shows on the way; the Prompts stored in their Packs' Categories
- *   and the Welcome recorded finished.
+ *   with the Notification "9 prompts added" and "Open your AI chat and type //" as its sub
+ *   (My-Prompt-Manager-ojz.19); neither the Library's loading state nor its empty state ever shows
+ *   on the way; the Prompts stored in their Packs' Categories and the Welcome recorded finished.
  * - S3, AC2: no Pack, "Start empty": the empty Library, then the editor on a new Prompt about 250ms
  *   later, both times read in the page as they are first seen. The exact 250ms is proven with fake
  *   timers in src/hooks/__tests__/useWelcomeExit.test.ts.
@@ -39,7 +39,8 @@ const CLIPBOARD_BEFORE = '-';
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_PROMPTS = DEFAULTS.flatMap((pack) => pack.prompts);
 const ADDED = `${String(DEFAULT_PROMPTS.length)} prompts added`;
-const DEFAULT_NAMES = DEFAULTS.map((pack) => pack.name).join(', ');
+/** The Notification's second line after the Packs: the next step, in the AI chat (My-Prompt-Manager-ojz.19) */
+const IN_THE_CHAT = 'Open your AI chat and type //';
 
 /** What the page notes, from its first script on: when each part of the way out was first in the document */
 interface ExitProbe {
@@ -108,7 +109,7 @@ const median = (values: readonly number[]): number => {
 };
 
 test.describe('Leaving the Welcome in the real extension', () => {
-  test('S2, AC1: Skip, then Add 9 prompts: the Library lists them on All with "9 prompts added" and the Packs named, no loading or empty state on the way, the Welcome recorded finished', async ({ page, storage, extensionId }) => {
+  test('S2, AC1: Skip, then Add 9 prompts: the Library lists them on All with "9 prompts added" and "Open your AI chat and type //", no loading or empty state on the way, the Welcome recorded finished', async ({ page, storage, extensionId }) => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
     await probeTheExit(page);
     await openPopup(page, extensionId);
@@ -125,7 +126,7 @@ test.describe('Leaving the Welcome in the real extension', () => {
     const notification = page.getByTestId('toast');
     await expect(notification).toHaveAttribute('data-type', 'success');
     await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
-    await expect(notification.getByText(DEFAULT_NAMES, { exact: true })).toBeVisible();
+    await expect(notification.getByText(IN_THE_CHAT, { exact: true })).toBeVisible();
     await expect(page.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
     expect(await probeOf(page)).toMatchObject({ loadingSeen: false, emptySeen: false });
 
@@ -140,6 +141,33 @@ test.describe('Leaving the Welcome in the real extension', () => {
     await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
     await expect(page.getByRole('dialog', { name: /what.s new/i })).toHaveCount(0);
   });
+
+  // My-Prompt-Manager-ojz.19: the second line says what to do in the chat, so its "//" must show. The
+  // Notification cuts its sub with an ellipsis when the pill runs out of room (ToastContainer, ticket
+  // .20): the two texts need 106 + 173px beside 75px of pill, so on a surface under ~386px wide the
+  // "//" is cut. Marked as failing there until the exit Notification may wrap (.20's opt-in, or the
+  // coordinator's call); the test then passes and the mark must go
+  for (const { file, width, height } of [
+    { file: 'popup', width: 400, height: 500 },
+    { file: 'sidepanel', width: 360, height: 600 },
+    { file: 'sidepanel', width: 320, height: 500 }
+  ] as const) {
+    test(`the exit Notification's second line "${IN_THE_CHAT}" shows whole, its "//" included (${file} ${String(width)} x ${String(height)})`, async ({ page, storage, extensionId }) => {
+      test.fail(width < 386, `cut today at ${String(width)}px: "${IN_THE_CHAT}" needs 173px, the pill leaves it ${String(width - 32 - 75 - 106)}px`);
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+      await page.setViewportSize({ width, height });
+      await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
+      await primary(page).click();
+
+      const notification = page.getByTestId('toast');
+      await expect(notification.getByText(IN_THE_CHAT, { exact: true })).toBeVisible();
+      // Hovered, the Notification keeps its time while it is read
+      await page.getByTestId('toast-text').hover();
+      const sub = await notification.getByText(IN_THE_CHAT, { exact: true }).evaluate((element) => ({ scrollWidth: element.scrollWidth, clientWidth: element.clientWidth }));
+      test.info().annotations.push({ type: 'second line (px)', description: JSON.stringify(sub) });
+      expect(sub.scrollWidth, 'the second line, not cut').toBeLessThanOrEqual(sub.clientWidth);
+    });
+  }
 
   test('S3, AC2: no Pack, Start empty: the empty Library, then the editor on a new Prompt about 250ms later', async ({ page, storage, extensionId }) => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: [] } });

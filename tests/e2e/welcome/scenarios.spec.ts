@@ -65,6 +65,7 @@ import { copyBuildAt, updateExtensionInPlace } from '../fixtures/extension-updat
 import { type OnInstalledEvent, onInstalledEvents } from '../fixtures/oninstalled-probe';
 import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from '../fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
+import { PLATFORMS_CAPTION } from '../utils/welcomePlatforms';
 import { promptWorkflows } from '../utils/workflows';
 
 const OUTPUT_DIR = 'test-results/welcome';
@@ -90,12 +91,16 @@ type Surface = keyof typeof SURFACES;
 
 /** The title of each step, as the user reads it */
 const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+/** Step 1's text: "here", on the popup and the side panel alike (My-Prompt-Manager-ojz.19) */
+const STEP_1_TEXT = 'Save the prompts you reuse and find them in a second, here or right inside your AI chat.';
 
 const DEFAULT_PACKS = PACKS.filter((pack) => pack.defaultSelected);
 const promptsOf = (packs: typeof PACKS): number => packs.reduce((count, pack) => count + pack.prompts.length, 0);
 const DEFAULT_COUNT = promptsOf(DEFAULT_PACKS);
 const PACK_CONTENTS = new Set(PACKS.flatMap((pack) => pack.prompts.map((prompt) => prompt.content)));
 const PACK_NAMES = new Set(PACKS.map((pack) => pack.name.toLowerCase()));
+/** The second line of the Notification after an exit with Packs: the next step, in the AI chat (My-Prompt-Manager-ojz.19) */
+const IN_THE_CHAT = 'Open your AI chat and type //';
 
 // --- The reading model of the measurement plan (My-Prompt-Manager-ojz, description) ---
 
@@ -419,14 +424,17 @@ test.describe('A new user, from the first install of the Release that brings the
 
     const popup = await openExtension(context, extensionId);
     await expectWelcomeAt(popup, 0);
+    await expect(welcome(popup).getByText(STEP_1_TEXT, { exact: true })).toBeVisible();
     await expect(primary(popup)).toHaveText('Next');
     await expectWelcomeAlone(popup);
     await expect(cards(popup)).toHaveCount(0);
     await popup.close();
 
-    // The side panel, where the toolbar icon opens the extension by default: the same Welcome
+    // The side panel, where the toolbar icon opens the extension by default: the same Welcome, whose
+    // "here" fits it as well as the popup (My-Prompt-Manager-ojz.19)
     const sidePanel = await openExtension(context, extensionId, 'sidepanel');
     await expectWelcomeAt(sidePanel, 0);
+    await expect(welcome(sidePanel).getByText(STEP_1_TEXT, { exact: true })).toBeVisible();
     await expectWelcomeAlone(sidePanel);
     await sidePanel.close();
 
@@ -450,16 +458,20 @@ test.describe('A new user, from the first install of the Release that brings the
     await expect(packToggle(popup, 'Engineering')).toHaveAttribute('aria-pressed', 'true');
     const chosen = PACKS.filter((pack) => pack.defaultSelected || pack.id === 'engineering');
     const count = promptsOf(chosen);
+    // Under the Packs, what to do in the chat, before the Platforms (My-Prompt-Manager-ojz.19)
+    // The caption holds no character a RegExp reads as a pattern
+    await expect(popup.getByTestId('welcome-platforms')).toHaveText(new RegExp(`^${PLATFORMS_CAPTION}`));
+    await expect(popup.getByRole('list', { name: PLATFORMS_CAPTION })).toBeVisible();
     await expect(primary(popup)).toHaveText(`Add ${String(count)} prompts`);
     await primary(popup).click();
 
-    // The Library with exactly those Prompts, and the Notification naming them
+    // The Library with exactly those Prompts, and the Notification of how many, with the next step in the chat
     await expect(welcome(popup)).toHaveCount(0);
     await expect(cards(popup)).toHaveCount(count);
     expect((await cards(popup).getByRole('heading').allTextContents()).sort()).toEqual(chosen.flatMap((pack) => pack.prompts.map((prompt) => prompt.title)).sort());
     await expect(notification(popup)).toHaveAttribute('data-type', 'success');
     await expect(notification(popup).getByText(`${String(count)} prompts added`, { exact: true })).toBeVisible();
-    await expect(notification(popup).getByText(chosen.map((pack) => pack.name).join(', '), { exact: true })).toBeVisible();
+    await expect(notification(popup).getByText(IN_THE_CHAT, { exact: true })).toBeVisible();
     await expect(popup.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
     await popup.waitForTimeout(SETTLE_MS);
     await expect(whatsNew(popup)).toHaveCount(0);
@@ -872,8 +884,8 @@ test.describe('Debug mode, switched in Settings', () => {
     await library.close();
 
     const expected = [
-      { message: `${String(DEFAULT_COUNT)} prompts added`, sub: DEFAULT_PACKS.map((pack) => pack.name).join(', ') },
-      { message: 'Your library is ready', sub: 'Every prompt was already in it' }
+      { message: `${String(DEFAULT_COUNT)} prompts added`, sub: IN_THE_CHAT },
+      { message: 'Your library is ready', sub: IN_THE_CHAT }
     ];
     for (const [round, notice] of expected.entries()) {
       const popup = await openExtension(context, extensionId);

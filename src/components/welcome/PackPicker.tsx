@@ -1,4 +1,4 @@
-import type { CSSProperties, FC } from 'react';
+import { type CSSProperties, type FC, useId } from 'react';
 
 import { cn } from '../../utils';
 import { packColors } from '../../welcome/packColors';
@@ -84,40 +84,53 @@ export interface PackPickerProps {
 
 /**
  * The Packs of the Welcome's last step in two columns, then the Platforms the extension works on as
- * a row of pills. The grid scrolls within itself when the Packs do not fit (a short side panel, more
- * Packs), so the Platforms, the dots and the primary button stay in view. While Packs remain beyond
- * its top or bottom, that edge fades out and a line shows along it (welcome-packs-* in src/popup.css,
- * driven by the grid's scroll), so a Pack, a selected one counted in the primary button included, is
- * never out of view unseen. A Pack the keyboard reaches scrolls into view with its focus outline, and
- * while a Pack has the focus the fades step aside, the lines staying, so its outline is whole.
+ * a row of pills after the caption "Type // in the chat on": the row reads as one sentence ending in
+ * the Platform names and says what to do in the chat (decision D1, My-Prompt-Manager-ojz.19; `//` is
+ * SELECTOR_TRIGGER of src/content/selector/inputText.ts). The caption is also the pills' list's name.
+ * The grid scrolls within itself when the Packs do not fit (a short side panel, more Packs), so the
+ * Platforms, the dots and the primary button stay in view. While Packs remain beyond its top or
+ * bottom, that edge fades out and a line shows along it (welcome-packs-* in src/popup.css, driven by
+ * the grid's scroll), so a Pack, a selected one counted in the primary button included, is never out
+ * of view unseen. A Pack the keyboard reaches scrolls into view with its focus outline, and while a
+ * Pack has the focus the fades step aside, the lines staying, so its outline is whole.
  */
-const PackPicker: FC<PackPickerProps> = ({ selectedPacks, onTogglePack }) => (
-  <>
-    {/* The edges: they draw the lines of the cue, outside the grid's scroll box and its fade */}
-    <div className="welcome-packs-edges relative flex min-h-0 flex-col">
-      {/* The padding leaves room for a toggle's focus outline (3px past its border) inside the grid's
-          scroll box, with some to spare, so a 320 x 420 side panel holds a whole Pack with its outline
-          whole; the negative margins take it back, so the Packs line up with the title and the pills.
-          The scroll padding brings a Pack the keyboard reaches into view with its outline */}
-      <div
-        role="group"
-        aria-label="Packs"
-        data-testid="welcome-packs"
-        className="welcome-packs-scroll -m-1.5 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto scroll-py-1 p-1.5"
-      >
-        {PACKS.map((pack) => (
-          <PackToggle key={pack.id} pack={pack} selected={selectedPacks.includes(pack.id)} onToggle={onTogglePack} />
-        ))}
+const PackPicker: FC<PackPickerProps> = ({ selectedPacks, onTogglePack }) => {
+  const captionId = useId();
+  return (
+    <>
+      {/* The edges: they draw the lines of the cue, outside the grid's scroll box and its fade */}
+      <div className="welcome-packs-edges relative flex min-h-0 flex-col">
+        {/* The padding leaves room for a toggle's focus outline (3px past its border) inside the grid's
+            scroll box, with some to spare, so a 320 x 420 side panel holds a whole Pack with its outline
+            whole; the negative margins take it back, so the Packs line up with the title and the pills.
+            The scroll padding brings a Pack the keyboard reaches into view with its outline */}
+        <div
+          role="group"
+          aria-label="Packs"
+          data-testid="welcome-packs"
+          className="welcome-packs-scroll -m-1.5 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto scroll-py-1 p-1.5"
+        >
+          {PACKS.map((pack) => (
+            <PackToggle key={pack.id} pack={pack} selected={selectedPacks.includes(pack.id)} onToggle={onTogglePack} />
+          ))}
+        </div>
       </div>
-    </div>
-    <ul aria-label="Works on" className="flex flex-none flex-wrap justify-center gap-[5px]">
-      {PLATFORM_NAMES.map((name) => (
-        <li key={name} className="inline-flex h-6 items-center rounded-full bg-card px-2.5 text-[11.5px] font-semibold text-secondary">
-          {name}
-        </li>
-      ))}
-    </ul>
-  </>
-);
+      {/* One wrapping row, the caption then the pills. The list takes no box of its own (contents, as
+          CategoryChips' radiogroup), so its pills wrap with the caption as the words of one sentence */}
+      <div data-testid="welcome-platforms" className="flex flex-none flex-wrap items-center justify-center gap-[5px]">
+        <span id={captionId} className="px-0.5 text-xs font-medium whitespace-nowrap text-secondary">
+          Type <span className="font-extrabold">{'//'}</span> in the chat on
+        </span>
+        <ul aria-labelledby={captionId} className="contents">
+          {PLATFORM_NAMES.map((name) => (
+            <li key={name} className="inline-flex h-6 items-center rounded-full bg-card px-2.5 text-[11.5px] font-semibold text-secondary">
+              {name}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
+  );
+};
 
 export default PackPicker;
