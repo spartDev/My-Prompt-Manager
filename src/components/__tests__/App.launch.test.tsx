@@ -274,6 +274,22 @@ describe('App: what an opening shows first', () => {
     });
   });
 
+  it('Debug mode, What\'s new still to show: the Welcome finished by its own buttons, then What\'s new over the Library in the same opening, and nothing recorded', async () => {
+    await openingOver({ prompts: library, welcome: { status: 'done' }, lastSeenVersion: '1.9.0', debugMode: true });
+    const before = await storageButTheLibrary();
+    render(<App />);
+    await expectWelcomeAlone(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+    fireEvent.click(screen.getByTestId('welcome-primary'));
+
+    expect(await screen.findByRole('dialog', { name: WHATS_NEW })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: LIBRARY_HEADING })).toBeInTheDocument();
+    expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+    await settle();
+    expect(await storageButTheLibrary()).toEqual(before);
+  });
+
   it('never in the element picker\'s Settings window, even pending over an empty Library or in Debug mode', async () => {
     window.location.search = '?picker=true';
     await openingOver({ prompts: [], welcome: { status: 'pending', step: 0 }, installedVersion: '2.0.0', debugMode: true });
