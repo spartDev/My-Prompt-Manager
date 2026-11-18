@@ -1320,7 +1320,7 @@ The terms (Prompt, Admission, Verbatim, Hidden character) are defined in [`CONTE
 
 ```
 Text enters the Library
-(create, edit, Share code, Backup restore; Category create, rename, restore)
+(create, edit, Share code, Backup restore, Pack; Category create, rename, restore)
     ↓
 ┌─────────────────────────────────────┐
 │ Layer 1: Admission (once, on write) │
@@ -1352,7 +1352,7 @@ Prompt selector / chat input (text stays text)
 
 ### Admission (the write path)
 
-`src/services/promptAdmission.ts` is a pure module (no `chrome.*`) shared by the popup, the service worker and the content script. Every route that puts text into the Library is admitted the same way, including text the user typed or pasted: creating or editing a Prompt, opening a Share code, restoring a Backup, and creating, renaming or restoring a Category. The check runs inside the text-writing methods of `StorageManager` (`savePrompt`, `updatePrompt`, `importPrompt`, `saveCategory`, `updateCategory`, `importCategory`), so no route can skip it. Callers handle a refusal (`AdmissionRefusedError`); a form can ask the same module whether text would be admitted, without saving, by calling the pure `admit()`.
+`src/services/promptAdmission.ts` is a pure module (no `chrome.*`) shared by the popup, the service worker and the content script. Every route that puts text into the Library is admitted the same way, including text the user typed or pasted: creating or editing a Prompt, opening a Share code, restoring a Backup, adding a Pack, and creating, renaming or restoring a Category. The check runs inside the text-writing methods of `StorageManager` (`savePrompt`, `updatePrompt`, `importPrompt`, `addPacks`, `saveCategory`, `updateCategory`, `importCategory`), so no route can skip it. Callers handle a refusal (`AdmissionRefusedError`); a form can ask the same module whether text would be admitted, without saving, by calling the pure `admit()`.
 
 | Rule | Behaviour |
 |------|-----------|

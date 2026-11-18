@@ -14,16 +14,19 @@ import {
 } from '../types';
 import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';
+import * as Logger from '../utils/logger';
 import {
   checkQuotaAvailability,
   type StorageWarningLevel,
   storageWarningLevel,
   storedSize
 } from '../utils/storageQuota';
+import type { PromptPack } from '../welcome/types';
 import { clearStorageKeepingWhatsNew, withWhatsNewLock } from '../whatsNew/storage';
 import { withIconPlacementRepairsLock } from './iconPlacementRepairs';
 import {
   AdmissionRefusedError,
+  type AdmittedPrompt,
   admit,
   admitEdit,
   admitNew,
@@ -64,6 +67,33 @@ const STORAGE_KEYS = {
 
 /** Every key except the prompts key, which can only be written through writePrompts. */
 type NonPromptStorageKey = Exclude<(typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS], typeof STORAGE_KEYS.PROMPTS>;
+
+/** What adding Packs did: the Prompts added and skipped, and the names of the Packs that added at least one. */
+export interface AddPacksResult {
+  added: number;
+  skipped: number;
+  packNames: string[];
+}
+
+/** Adding Packs, decided before anything is written. */
+interface PackPlan {
+  /** The Library's stored Categories, as they are, then the ones to create. */
+  readonly categories: readonly unknown[];
+  /** The Categories to create: the default Category when it is missing, and the Packs' new ones. */
+  readonly created: readonly Category[];
+  /** The Prompts to add, admitted. */
+  readonly prompts: readonly AdmittedPrompt[];
+  /** The content of every Prompt of the Library and of the plan, surrounding spaces aside. */
+  readonly contents: ReadonlySet<string>;
+  readonly skipped: number;
+  readonly packNames: readonly string[];
+}
+
+/** Two Prompts have the same content when they differ only by surrounding spaces, as a Duplicate pair compares them. */
+const contentKey = (prompt: { readonly content: string }): string => prompt.content.trim();
+
+const isNamed = (entry: unknown): entry is { name: string } =>
+  typeof entry === 'object' && entry !== null && 'name' in entry && typeof entry.name === 'string';
 
 export class StorageManager {
   private static instance: StorageManager | undefined;
@@ -612,6 +642,120 @@ export class StorageManager {
         throw this.handleStorageError(error);
       }
     }));
+  }
+
+  /**
+   * Adds the Packs the Welcome's last step chose (CONTEXT.md, Pack), a route of Admission: each Prompt
+   * is admitted as a new Prompt and each Pack's name as a Category name. A Prompt whose content the
+   * Library or an earlier Prompt of the Packs already has is skipped, so the same Packs added again
+   * add nothing. A Pack's Prompts go into the Category with its name ignoring case, as the Library
+   * spells it, else into one created with the Pack's color, when at least one of them is added.
+   *
+   * All or nothing: a refused Prompt or Pack name, the Prompt limit, the Library cap or the quota
+   * refuses the whole add before anything is written. Otherwise the Categories and the Prompts are
+   * written in one set, the default Category among them when it is missing; nothing is written when
+   * every Prompt is skipped. CATEGORIES then PROMPTS.
+   */
+  addPacks(packs: readonly PromptPack[]): Promise<AddPacksResult> {
+    return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
+      try {
+        // Raw, as importPrompt reads them: an entry that is not a Category is written back as it is
+        const storedCategories = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
+        const existingPrompts = await this.getPrompts();
+        const plan = this.planPacks(packs, Array.isArray(storedCategories) ? storedCategories : [], existingPrompts);
+        const result: AddPacksResult = {
+          added: plan.prompts.length,
+          skipped: plan.skipped,
+          packNames: [...plan.packNames]
+        };
+
+        if (plan.prompts.length > 0) {
+          const updatedPrompts = [...existingPrompts, ...plan.prompts];
+
+          // HARD LIMITS, as savePrompt checks them, for every Prompt added at once
+          if (updatedPrompts.length > this.STORAGE_LIMITS.MAX_PROMPTS) {
+            throw new StorageError({
+              message: `Maximum prompt limit reached (${String(this.STORAGE_LIMITS.MAX_PROMPTS)}). Please delete old prompts.`,
+              type: 'STORAGE_QUOTA_EXCEEDED',
+              details: {
+                current: existingPrompts.length,
+                adding: plan.prompts.length,
+                max: this.STORAGE_LIMITS.MAX_PROMPTS
+              }
+            });
+          }
+          this.checkLibraryCap(updatedPrompts);
+          await this.checkQuotaBeforeWrite(storedSize([...plan.prompts, ...plan.created]));
+
+          await this.writeCategoriesAndPrompts(plan.categories, updatedPrompts);
+        }
+
+        Logger.info('Packs added to the Library', { component: 'StorageManager', ...result });
+        return result;
+      } catch (error) {
+        throw this.handleStorageError(error);
+      }
+    }));
+  }
+
+  /**
+   * Plans addPacks, Pack after Pack, without writing. `categories` are the stored ones, raw; when the
+   * default Category is not among them it is planned first, as readCategoriesWithDefault writes it.
+   */
+  private planPacks(
+    packs: readonly PromptPack[],
+    categories: readonly unknown[],
+    prompts: readonly StoredPrompt[]
+  ): PackPlan {
+    const now = Date.now();
+    const defaultCategory: Category[] = categories.some(entry => isNamed(entry) && entry.name === DEFAULT_CATEGORY)
+      ? []
+      : [{ id: uuidv4(), name: DEFAULT_CATEGORY }];
+
+    const planPack = (plan: PackPlan, pack: PromptPack): PackPlan => {
+      const packName = this.admitCategoryName(pack.name);
+      // The Library's spelling of the name, ignoring case, else the Pack's (Category names are unique ignoring case)
+      const category = matchStoredCategory(packName, plan.categories);
+
+      const admitted = pack.prompts.map(({ title, content }) => {
+        const admission = admitNew({ title, content, category }, { id: uuidv4(), now });
+        if (!admission.ok) {
+          throw new AdmissionRefusedError(admission.errors);
+        }
+        return admission.prompt;
+      });
+      const added = admitted.filter((prompt, index) =>
+        !plan.contents.has(contentKey(prompt)) &&
+        admitted.findIndex(other => contentKey(other) === contentKey(prompt)) === index
+      );
+      const skipped = plan.skipped + admitted.length - added.length;
+
+      if (added.length === 0) {
+        return { ...plan, skipped };
+      }
+
+      const created: Category[] = plan.categories.some(entry => isNamed(entry) && entry.name === category)
+        ? []
+        : [{ id: uuidv4(), name: category, ...(isValidHexColor(pack.color) && { color: pack.color }) }];
+
+      return {
+        categories: [...plan.categories, ...created],
+        created: [...plan.created, ...created],
+        prompts: [...plan.prompts, ...added],
+        contents: new Set([...plan.contents, ...added.map(contentKey)]),
+        skipped,
+        packNames: [...plan.packNames, packName]
+      };
+    };
+
+    return packs.reduce(planPack, {
+      categories: [...defaultCategory, ...categories],
+      created: defaultCategory,
+      prompts: [],
+      contents: new Set(prompts.map(contentKey)),
+      skipped: 0,
+      packNames: []
+    });
   }
 
   /**
