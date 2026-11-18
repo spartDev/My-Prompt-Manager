@@ -66,7 +66,7 @@ Some tests check the source rather than behavior, and fail the build when a rule
 The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.ts`) runs `npm run build`, and the fixture of `tests/e2e/fixtures/extension.ts` loads `dist/` into Chromium, so an end-to-end run always tests the current code.
 
 - Every test starts on a fresh profile, that is a first install: the service worker writes the What's new record and the Welcome record (pending) as the extension loads. The `storage` fixture waits for both (`waitForFirstInstallRecords`) before its reset, so no install write lands over a test's seed and a spec sees a Welcome record only if it seeds one. A spec that opens the popup or side panel without the `storage` fixture runs on the first install's store, a pending Welcome over an empty Library, so it opens on the Welcome, not the Library.
-- A relaunch of the persistent context on the same profile (`launchExtensionContext` of `tests/e2e/fixtures/extension.ts`, as a restart of Chrome) fires `onInstalled` with reason 'install' again, store kept: Chromium installs an extension loaded with `--load-extension` afresh at every launch, even after a build at a higher version was copied over its folder. A real 'update', with the previous version, is `updateExtensionInPlace` of `tests/e2e/fixtures/extension-update.ts`: it copies the build at a higher version over the loaded folder and reloads the extension from chrome://extensions with developer mode on (off, that reload disables it). `tests/e2e/welcome/welcome-record.spec.ts` uses both. The extension's own logs of those events are Logger.info, silent in a production build: to read which event fired and from which version, copy the build with `copyBuildAt(path, version, { onInstalledProbe: true })` (and pass the same option to `updateExtensionInPlace`), which adds the observer of `tests/e2e/fixtures/oninstalled-probe.ts`; it records each `onInstalled` event in `chrome.storage.session` and writes nothing to `chrome.storage.local`. `tests/e2e/welcome/scenarios.spec.ts`, the Welcome's twelve acceptance scenarios, reads it.
+- A relaunch of the persistent context on the same profile (`launchExtensionContext` of `tests/e2e/fixtures/extension.ts`, as a restart of Chrome) fires `onInstalled` with reason 'install' again, store kept: Chromium installs an extension loaded with `--load-extension` afresh at every launch, even after a build at a higher version was copied over its folder. A real 'update', with the previous version, is `updateExtensionInPlace` of `tests/e2e/fixtures/extension-update.ts`: it copies the build at a higher version over the loaded folder and reloads the extension from chrome://extensions with developer mode on (off, that reload disables it). `tests/e2e/welcome/welcome-record.spec.ts` uses both. The extension's own logs of those events are Logger.info, silent in a production build: to read which event fired and from which version, copy the build with `copyBuildAt(path, version, { onInstalledProbe: true })` (and pass the same option to `updateExtensionInPlace`), which adds the observer of `tests/e2e/fixtures/oninstalled-probe.ts`; it records each `onInstalled` event in `chrome.storage.session` and writes nothing to `chrome.storage.local`. The probe refuses `dist/` and any folder inside it, links followed, so it only ever changes a copy (`tests/e2e/welcome/oninstalled-probe.spec.ts`). `tests/e2e/welcome/scenarios.spec.ts` reads it: it holds the Welcome's twelve acceptance scenarios S1 to S12, three tests of the ways out of the Welcome (Skip then no Pack, a refused add then the retry, a refused add then Start empty), and two update cases ("Pending through an update…" and S7 with no Prompt).
 - Page objects are in `tests/e2e/pages/`, workflows and assertions in `tests/e2e/utils/`, seeded data in `tests/e2e/fixtures/`. `tests/e2e/README.md` describes them.
 - Locally the browser is headed; CI runs headless with one retry.
 - A hover a test asserts on goes through `readWhileHovering` or `holdHover` (`tests/e2e/utils/hover.ts`), not a bare `locator.hover()`. A headed run opens one window per test, over one another; when one opens over the window under the real pointer, Chrome gives that page a real mouse event at the pointer's position and the hover Playwright set ends, which a bare `hover()` never takes back. CI, headless, has no real pointer.
@@ -74,7 +74,7 @@ The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.
 - Linux CI renders wider fonts than the Mac (DejaVu Sans): a layout assertion that passes locally can fail there. `npm run test:e2e:linux -- <spec>` runs a spec the way CI renders it, in Docker; `tests/e2e/README.md` says how.
 - Accessibility: `tests/e2e/welcome/welcome-a11y.spec.ts` audits the Welcome and the Library it leaves for with `@axe-core/playwright` (tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa`), walks the Welcome with the keyboard alone, and reads names and states from Chrome's own accessibility tree over CDP (`Accessibility.getFullAXTree`). axe reads colors as drawn: let the page's finite animations end before it runs.
 - `page.screenshot({ animations: 'disabled' })` cancels scroll-driven animations too, such as the scroll cue of the Welcome's Packs: leave the option out of a screenshot that must show one.
-- The Welcome beside its mockup: `tests/e2e/welcome/welcome.visual.spec.ts` shoots the three steps in light and dark, in the popup (400 x 500) and a side panel of the mockup's side format (400 x 860), and the Library at the exit with its Notification in the popup, each at a fixed moment (animations ended, step 2's blank holding the whole name, no hover, no keyboard focus). Set `WELCOME_VISUAL_DIR` to a folder outside `test-results/`, which Playwright empties at each run. The mockup (Atelier 1C, `MPM-C-Atelier` and `MPM-C-Atelier-Sombre`, screen `empty`) is not in the repository: the `design-system` skill says how to serve it and shoot the same screens at the same sizes. `scripts/pr-assets.sh <topic> <files>` publishes side-by-side images named `<screen>-<surface>-light.png` and `-dark.png` as Light | Dark tables.
+- The Welcome beside its mockup: `tests/e2e/welcome/welcome.visual.spec.ts` shoots the three steps in light and dark, in the popup (400 x 500) and a side panel of the mockup's side format (400 x 860), and the Library at the exit with its Notification in the popup, each at a fixed moment (animations ended, step 2's blank holding the whole name, no hover, no keyboard focus). Set `WELCOME_VISUAL_DIR` to a folder outside `test-results/`, which Playwright empties at each run. The mockup (Atelier 1C, `MPM-C-Atelier` and `MPM-C-Atelier-Sombre`, screen `empty`) is not in the repository: read its files as the `design-system` skill says, then `node scripts/welcome-mockup-shots.mjs <its project folder> <out>` shoots the same screens at the same sizes, and `node scripts/welcome-side-by-side.mjs <ours> <mockup> <out>` sets each pair side by side with a caption. The mockup's Library is the Atelier 1C redesign, not shipped, so the exit pair compares the Notification only; the script also writes `notification-popup-<theme>.png`, the top 90 px of both halves. `scripts/pr-assets.sh <topic> <files>` publishes them, named `<screen>-<surface>-light.png` and `-dark.png`, as Light | Dark tables.
 - A locator assertion (`toHaveAttribute`, `toHaveText`, `toHaveClass`…) takes a string or a RegExp. An asymmetric matcher such as `expect.stringContaining(...)` makes it pass whatever the value, and `npm run lint` rejects it in `tests/e2e/` (the GritQL plugin in `biome-plugins/`).
 
 ## On the live Platforms: `npm run live:check`
@@ -106,8 +106,8 @@ How to check each of the Welcome's twelve acceptance scenarios yourself, in Chro
 ### A test install
 
 1. In this repository, run `npm run build`. Then copy the build to a folder of its own, the test folder: `rsync -a --delete dist/ ~/mpm-test/`. You load this copy, not `dist/`, so you can change its version, and the next build does not change the installed extension under you.
-2. Set the version of the test folder: in `~/mpm-test/manifest.json`, `"version": "2.0.0"`, the Release that brings the Welcome. It has Release notes, so a What's new that must not show could show.
-3. Use a Chrome profile of its own (Chrome menu, Profiles, Add), so your own Library is never touched. In it, open `chrome://extensions`, turn on Developer mode (top right), click Load unpacked and choose `~/mpm-test`. This is a first install. Pin the extension (puzzle icon in the toolbar, pin).
+2. Set the version of the test folder: in `~/mpm-test/manifest.json`, `"version": "2.0.0"`. It is the Release that brings the Welcome, and the only one with Release notes in `src/whatsNew/releaseNotes.ts`, so a What's new that must not show could show; `package.json` and `manifest.json` still say 1.9.0. The procedures below rely on that registry: notes for 2.0.0 and none for 1.9.1 or 1.9.2. If the Welcome ships under another number, three things change together: the Release notes registry, the version in `package.json` and `manifest.json`, and the versions written in these procedures (here, S5, S7 and the two update cases).
+3. Use a Chrome profile of its own (Chrome menu, Profiles, Add), so your own Library is never touched. In it, open `chrome://extensions`, turn on Developer mode (top right), click Load unpacked and choose `~/mpm-test`. This is a first install. Pin the extension (puzzle icon in the toolbar, pin). Leave Developer mode on for as long as you test: turning it off disables an extension loaded unpacked.
 4. The toolbar icon opens the side panel: Settings, Appearance, Open in is Side panel by default. To see the popup while the Welcome is not finished, open `chrome-extension://<ID>/src/popup.html` in a tab: it is the popup's page, and `<ID>` is on the extension's card in `chrome://extensions`. Once the Welcome is finished, Settings, Appearance, Open in, Popup makes the icon open the popup.
 5. To start again from a first install: on the extension's card, click Remove, then Load unpacked the test folder again. Removing the extension deletes all it stored. Clear All Data does not do that for the Welcome: a Welcome once finished stays finished after it.
 
@@ -186,13 +186,13 @@ Do: on a first install, open the extension and click Next: step 2 ("Leave blanks
 
 You must see, each time you open it: the Welcome at step 2, the second dot long, with a Back button. The other surface (popup's page or side panel) opens at step 2 too.
 
-Close at any speed a person can: a close within about 50 ms of the click on Next could lose that one step and resume at step 1, never lose the Welcome (a decision of the epic My-Prompt-Manager-ojz).
+Close at any speed a person can. In the page, the step is written 3 to 10 ms after the click; seen from the service worker, it is stored at a median of 15 to 31 ms, 44 ms at the slowest. `tests/e2e/welcome/welcome-frame.spec.ts` asserts a median under 50 ms and every run under 100 ms, and that a popup closed 100 ms after the click opens again at step 2. Only a close in the few milliseconds before the step is stored could lose that one step and resume at step 1, never the Welcome (a decision of the epic My-Prompt-Manager-ojz).
 
 Automated: `S6 I close the popup at step 2, then reopen it: …`.
 
 #### S7 I start from an earlier Release with Prompts, and update
 
-Do: build Release 1.9.0, which has no Welcome, in a checkout of its own: `git worktree add ../mpm-1.9.0 v1.9.0`, then `npm ci && npm run build` in `../mpm-1.9.0`, and `rsync -a --delete ../mpm-1.9.0/dist/ ~/mpm-test/`. Load it unpacked in a new test profile. Add two Prompts of your own. Then copy the current build over the test folder, set its version to `2.0.0` and click Reload (an update by hand). Open the extension; click Got it. Open again. Delete both Prompts, close, open again.
+Do: build Release 1.9.0, which has no Welcome, in a checkout of its own: `git worktree add ../mpm-1.9.0 v1.9.0`, then `npm ci && npm run build` in `../mpm-1.9.0`, and `rsync -a --delete ../mpm-1.9.0/dist/ ~/mpm-test/`. Load it unpacked in a new test profile, not the profile of the earlier scenarios, whose store already holds this Release's records. Add two Prompts of your own. Then copy the current build over the test folder, set its version to `2.0.0` and click Reload (an update by hand). Open the extension; click Got it. Open again. Delete both Prompts, close, open again. When you are done with Release 1.9.0, remove its checkout: `git worktree remove ../mpm-1.9.0`.
 
 You must see: after the update, What's new over your Library with your two Prompts, never the Welcome; after Got it and at the next opening, your Library alone; with both Prompts deleted, the empty Library, still no Welcome.
 
@@ -218,7 +218,7 @@ Automated: `S9 In Debug mode, I finish the Welcome with the same Packs twice: �
 
 Do: before turning Debug mode on, open the extension and note what you see: the Library, its Prompts, its Categories, the Settings. Then run "Replay the Welcome" to the end (step 8).
 
-You must see: the same opening as before, the Library with no Welcome and no What's new, the same Settings. The only change is the Pack Prompts you added in Debug mode (the epic's decision Q1: Packs added in Debug mode stay).
+You must see: the same opening as before, the Library with no Welcome and no What's new, the same Settings. The only change is the Pack Prompts you added in Debug mode (the epic's decision Q1: Packs added in Debug mode stay). In storage, which nothing on screen shows, the Debug mode switch leaves its Site settings key, `promptLibrarySettings`, written with its defaults where it had none: the epic counts that as the state from before.
 
 Automated: `S10 I turn Debug mode off: …`.
 
@@ -237,6 +237,24 @@ Do: on a first install, start a stopwatch as you click the toolbar icon. Click S
 You must see: two clicks from the opening to a Library with Prompts (Skip, Add 9 prompts), one click from there to the copy; the pasted text is that Prompt's whole text, as shown in the card; under 60 seconds.
 
 Automated: `S12 I leave the Welcome with a Pack and copy a Prompt: …`.
+
+### Two update cases beyond the twelve
+
+#### A Welcome left pending through an update
+
+Do: make a test install at version `1.9.1` (step 2 of "A test install"). Open the extension; click Next (step 2, "Leave blanks, fill them later"); close. Update by hand to `2.0.0` (copy the build over the test folder again, set the version, Reload). Open the extension; click Next. Click Add 9 prompts. Close; open the side panel, then the popup's page.
+
+You must see: at the first opening, the Welcome at step 1 and no What's new; after the update, the Welcome at step 2, alone, no What's new, though 2.0.0 has Release notes; step 3 with no What's new; after Add 9 prompts, the Library of 9 with "9 prompts added", and no What's new in that opening; at the next openings, the Library alone.
+
+Automated: `Pending through an update: the Welcome resumes, What's new never follows`.
+
+#### S7 with no Prompt
+
+Do: as in S7, build Release 1.9.0 and load it unpacked in a new test profile. Open it once and add no Prompt. Copy the current build over the test folder, set its version to `2.0.0` and click Reload. Open the extension; click Got it. Open the side panel, then the popup's page.
+
+You must see: after the update, What's new of 2.0.0 over the empty Library, never the Welcome; after Got it, "Your library is empty"; at the next openings, the empty Library alone.
+
+Automated: `S7 I start from an earlier Release with no Prompt, and update: I see my empty Library, never the Welcome`.
 
 ### Known case: Debug mode set by hand
 
