@@ -40,7 +40,7 @@ document.querySelectorAll('[role="textbox"]')
 **What to find:**
 - CSS selector for the text input element
 - The composer around the input element, and the elements of its Toolbar the icon can sit next to, by what they are for: a `data-testid`, a custom element, an ARIA label, a button `type`
-- Input element type (textarea, contenteditable, or custom)
+- Input element type: a `textarea` or a `contenteditable` element. The composer of a built-in Platform must be one of the two: `PlatformManager.getAllSelectors()` narrows every selector with `platformFieldSelector()` (`src/content/platforms/platform-field.ts`) to the textareas and editable elements it names, so a selector that only finds an `<input>`, a `[role="textbox"]` div without `contenteditable`, or an editor inside a shadow root or an iframe matches nothing, and the extension silently shows no Prompts button. `npm run live:check` and `npm run composers:capture` look for the editor through the same helper. A composer of another kind needs a change to that rule first, not a selector
 
 **Common patterns:**
 - ChatGPT: `textarea[data-testid="chat-input"]`
@@ -63,7 +63,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
     displayName: 'Your AI Platform',             // Human-readable name
     priority: 70,                                 // 60-79 for new platforms
     defaultEnabled: true,                         // On for every user who never switched it, existing users included
-    selectors: [                                  // CSS selectors (most specific first)
+    selectors: [                                  // CSS selectors (most specific first); only a textarea or an editable element they name is taken (Step 1)
       'textarea[data-testid="chat-input"]',
       'div[contenteditable="true"][role="textbox"]',
       '[role="textbox"]'                         // Generic fallback
