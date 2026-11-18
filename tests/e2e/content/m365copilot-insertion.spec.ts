@@ -4,10 +4,9 @@
  * On 2026-11-15 copilot.microsoft.com and m365.cloud.microsoft/chat both redirected a work account
  * to copilot.cloud.microsoft/chat, where the extension did not run (My-Prompt-Manager-axv). These
  * run the real content script, on a page served at that host, so they fail if the manifest leaves
- * the host out. Its composer is a Lexical editor: the stand-in treats a paste, the editing command,
- * an `input` event and a Backspace as Perplexity's Lexical editor does (fixtures/platform-pages.ts,
- * lexicalEditor), so a Prompt written twice shows. That this editor behaves the same was not seen
- * on the live page: the live check of the ticket, signed in, proves it.
+ * the host out. Its composer is a Lexical editor: the stand-in mounts a real one, as Perplexity's
+ * does, so a Prompt written twice shows, with Copilot's own slash menu written by hand
+ * (fixtures/platform-pages.ts, lexicalEditor and COPILOT_SLASH_MENU).
  */
 import { DEFAULT_CATEGORY } from '../../../src/types';
 import { expect, test } from '../fixtures/extension';

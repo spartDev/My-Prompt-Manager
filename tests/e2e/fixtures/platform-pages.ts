@@ -29,11 +29,10 @@ import { expect } from './extension';
  * (seen on 2026-11-11): a ProseMirror editor, which holds one <p> per line and reads a line
  * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
  *
- * One more stands in for Perplexity's live composer, a Lexical editor that takes text as a paste
- * and inserts a second time the text an `input` event carries (seen on 2026-11-11). See
- * lexicalEditor. Another runs the same stand-in at copilot.cloud.microsoft, whose composer is a
- * Lexical editor too: that it behaves as Perplexity's does was not seen on the live page, only its
- * attributes were read (2026-11-15), so the live check of ticket My-Prompt-Manager-axv proves it.
+ * One more stands in for Perplexity's live composer, a Lexical editor: a real one, from the lexical
+ * package at the version perplexity.ai serves. See lexicalEditor. Another runs the same editor at
+ * copilot.cloud.microsoft, whose composer is a Lexical editor too, with Copilot's own slash menu
+ * written by hand (COPILOT_SLASH_MENU).
  *
  * And one keeps the Fluent composer m365.cloud.microsoft served before it redirected a work account
  * to copilot.cloud.microsoft, so the content script is proven to run on that host still.
@@ -59,8 +58,11 @@ export const ENTER_COUNTER = /* html */ `
       });
     </script>`;
 
-/** React 19 ships CommonJS only; the page loads these through a minimal require(). */
-const REACT_SCRIPTS: Record<string, { module: string; file: string }> = {
+/** A CommonJS module of node_modules a stand-in page loads, served at its path on the Platform's host. */
+type ModuleScript = { module: string; file: string };
+
+/** React 19 ships CommonJS only; the page loads these through a minimal require() (moduleScripts). */
+const REACT_SCRIPTS: Record<string, ModuleScript> = {
   '/__e2e__/react.js': { module: 'react', file: 'react/cjs/react.production.js' },
   '/__e2e__/scheduler.js': { module: 'scheduler', file: 'scheduler/cjs/scheduler.production.js' },
   '/__e2e__/react-dom.js': { module: 'react-dom', file: 'react-dom/cjs/react-dom.production.js' },
@@ -69,6 +71,44 @@ const REACT_SCRIPTS: Record<string, { module: string; file: string }> = {
     file: 'react-dom/cjs/react-dom-client.production.js',
   },
 };
+
+/**
+ * The lexical package and the @lexical/plain-text editor, with what they require, in the production
+ * build, at the version pinned in package.json (0.41.0, what perplexity.ai serves).
+ */
+const LEXICAL_SCRIPTS: Record<string, ModuleScript> = {
+  '/__e2e__/lexical.js': { module: 'lexical', file: 'lexical/Lexical.prod.js' },
+  '/__e2e__/lexical-plain-text.js': { module: '@lexical/plain-text', file: '@lexical/plain-text/LexicalPlainText.prod.js' },
+  '/__e2e__/lexical-clipboard.js': { module: '@lexical/clipboard', file: '@lexical/clipboard/LexicalClipboard.prod.js' },
+  '/__e2e__/lexical-dragon.js': { module: '@lexical/dragon', file: '@lexical/dragon/LexicalDragon.prod.js' },
+  '/__e2e__/lexical-extension.js': { module: '@lexical/extension', file: '@lexical/extension/LexicalExtension.prod.js' },
+  '/__e2e__/lexical-html.js': { module: '@lexical/html', file: '@lexical/html/LexicalHtml.prod.js' },
+  '/__e2e__/lexical-list.js': { module: '@lexical/list', file: '@lexical/list/LexicalList.prod.js' },
+  '/__e2e__/lexical-selection.js': { module: '@lexical/selection', file: '@lexical/selection/LexicalSelection.prod.js' },
+  '/__e2e__/lexical-utils.js': { module: '@lexical/utils', file: '@lexical/utils/LexicalUtils.prod.js' },
+  '/__e2e__/preact-signals-core.js': { module: '@preact/signals-core', file: '@preact/signals-core/dist/signals-core.js' },
+};
+
+const MODULE_SCRIPTS: Record<string, ModuleScript> = { ...REACT_SCRIPTS, ...LEXICAL_SCRIPTS };
+
+/**
+ * The minimal require() a page loads CommonJS modules through, and the script tags of `scripts`:
+ * each defines its module, required by the page's own script after them.
+ */
+const moduleScripts = (scripts: Record<string, ModuleScript>): string => /* html */ `
+    <script>
+      const factories = {};
+      const cache = {};
+      window.__define = (name, factory) => { factories[name] = factory; };
+      window.__require = (name) => {
+        if (!cache[name]) {
+          cache[name] = { exports: {} };
+          factories[name](cache[name], cache[name].exports, window.__require);
+        }
+        return cache[name].exports;
+      };
+    </script>
+    ${Object.keys(scripts).map((src) => `<script src="${src}"></script>`).join('\n    ')}`;
 
 const CHATGPT_REACT_HTML = /* html */ `
 <!DOCTYPE html>
@@ -85,20 +125,7 @@ const CHATGPT_REACT_HTML = /* html */ `
     <form>
       <main id="root"></main>
       <div data-e2e="toolbar" style="display: flex; gap: 6px; margin-top: 8px;"><button type="button" aria-label="Dictate">Mic</button><button type="button" aria-label="Start Voice">Voice</button></div>
-    </form>${ENTER_COUNTER}
-    <script>
-      const factories = {};
-      const cache = {};
-      window.__define = (name, factory) => { factories[name] = factory; };
-      window.__require = (name) => {
-        if (!cache[name]) {
-          cache[name] = { exports: {} };
-          factories[name](cache[name], cache[name].exports, window.__require);
-        }
-        return cache[name].exports;
-      };
-    </script>
-    ${Object.keys(REACT_SCRIPTS).map((src) => `<script src="${src}"></script>`).join('\n    ')}
+    </form>${ENTER_COUNTER}${moduleScripts(REACT_SCRIPTS)}
     <script>
       const React = window.__require('react');
       const { createRoot } = window.__require('react-dom/client');
@@ -299,258 +326,105 @@ const MISTRAL_EDITOR_HTML = paragraphEditorPage(
 );
 
 /**
- * What Perplexity's Lexical composer does with what an Insertion can send it (seen on the live
- * site on 2026-11-11). The editor keeps its own text and draws it: one <span> per line that has
- * text, one <br> between two lines, and a last <br> that keeps an empty last line open.
- * - A paste goes where the selection the editor knows of is, in place of what is selected, and
- *   leaves the caret after the pasted text. The editor learns of a selection from the
- *   `selectionchange` event; one over the editor itself, not from the start of its paragraph to
- *   its end, leaves out the line breaks that end the field.
- * - Typed text, and a deletion, go where the beforeinput event says: Lexical reads the selection
- *   then. Text from the editing command arrives with its line breaks dropped.
- * - An `input` event that carries text inserts that text again, after what the field holds. One
- *   that carries none follows a change the browser made to the DOM itself (the editing command
- *   deleting text): the editor takes its text from what its paragraph then shows.
- * - A `beforeinput` that deletes, typed or sent by a script, is cancelled: the editor takes what the
- *   event or the selection says out of its text at once, and draws the field again in a
- *   microtask, as Lexical does.
- * - Around an `input` event that carries none, as Lexical 0.41 does (the version perplexity.ai
- *   serves, My-Prompt-Manager-9o0):
- *   - an element the editor drew that the browser removed (the editing command emptying a
- *     <span>) is drawn again from the editor's text: what was deleted is back;
- *   - a text of the editor's found emptied, the caret in it, stays in the field 20 ms, then an
- *     update of the editor's own takes it out and puts the caret back in the paragraph with
- *     setBaseAndExtent: in Chrome, that takes the focus back to the field from where it was. A
- *     character typed in those 20 ms goes in that emptied text, and is taken out with it.
- * - A Backspace key removes the last character.
+ * The Lexical composer of Perplexity and of Microsoft 365 Copilot: a real Lexical editor, from the
+ * lexical package at the version perplexity.ai serves (0.41, My-Prompt-Manager-9o0), with
+ * @lexical/plain-text, mounted on the page's field. Plain text, as the live editors lay pasted text
+ * out: one paragraph, its lines one <span> each with a <br> between two (seen on 2026-11-11), where
+ * the rich text editor makes a paragraph per line. Everything the editor does with a paste, the
+ * editing command, an `input` or `beforeinput` event, a Backspace or a DOM change made behind its
+ * back is Lexical's own (My-Prompt-Manager-hai).
+ *
+ * `platform` is the script of what the Platform adds to the editor, run before the editor is made:
+ * it may push node classes onto `nodes` and set `registerPlatform(editor)`.
  */
-const lexicalEditor = (field: string, slashMenu = false): string => /* html */ `
+const lexicalEditor = (field: string, platform = ''): string => /* html */ `${moduleScripts(LEXICAL_SCRIPTS)}
     <script>
-      const editor = document.querySelector(${JSON.stringify(field)});
-      const slashMenu = ${String(slashMenu)};
-      // The slash menu while it is open (slashMenu)
-      let menu = null;
-      let text = '';
-      // The selection the editor knows of, as offsets in its text
-      let known = { start: 0, end: 0 };
-      // A deletion is drawn in a microtask, as Lexical commits its updates: until then the editor
-      // goes by the selection it knows, not by the page's, which still shows the old text
-      let pending = false;
-      // The spans the slash menu adds while it is open: not text of the editor
-      const hidden = (node) => node.nodeType === Node.ELEMENT_NODE && node.getAttribute('aria-hidden') === 'true';
-      const lengthOf = (node) => (node.nodeName === 'BR' ? 1 : hidden(node) ? 0 : node.textContent.length);
-      // The elements the editor drew for its text, last time it drew
-      let drawn = [];
-      // The emptied text the editor takes out 20 ms after it found it, until it does
-      let emptied = null;
-      const menuSpans = () => ['', '\u200B\u200C'].map((marks) => {
-        const span = document.createElement('span');
-        span.setAttribute('aria-hidden', 'true');
-        span.setAttribute('data-lexical-text', 'true');
-        span.textContent = marks;
-        return span;
-      });
-      const draw = () => {
-        const paragraph = document.createElement('p');
-        if (text === '') {
-          paragraph.append(document.createElement('br'));
-        } else {
-          const lines = text.split('\\n');
-          lines.forEach((line, index) => {
-            if (line !== '') {
-              const span = document.createElement('span');
-              span.setAttribute('data-lexical-text', 'true');
-              span.textContent = line;
-              paragraph.append(span);
-            }
-            if (index < lines.length - 1) { paragraph.append(document.createElement('br')); }
-          });
-          if (lines.length > 1 && lines[lines.length - 1] === '') { paragraph.append(document.createElement('br')); }
-        }
-        if (menu) {
-          paragraph.append(...menuSpans());
-        }
-        editor.replaceChildren(paragraph);
-        drawn = Array.from(paragraph.querySelectorAll('span')).filter((span) => !hidden(span));
-      };
-      /** The offset in the text of a point of the editor's DOM. */
-      const offsetOf = (container, offset) => {
-        const paragraph = editor.querySelector('p');
-        const nodes = Array.from(paragraph.childNodes);
-        if (container === editor) { return offset === 0 ? 0 : text.replace(/\\n+$/, '').length; }
-        let position = 0;
-        if (container === paragraph) {
-          for (let index = 0; index < offset && index < nodes.length; index++) { position += lengthOf(nodes[index]); }
-          return Math.min(position, text.length);
-        }
-        const span = container.nodeType === Node.TEXT_NODE ? container.parentNode : container;
-        for (const node of nodes) {
-          if (node === span) {
-            return position + (hidden(node) ? 0 : container.nodeType === Node.TEXT_NODE ? offset : offset === 0 ? 0 : lengthOf(node));
-          }
-          position += lengthOf(node);
-        }
-        return text.length;
-      };
-      /** Puts the caret after the first characters of the text, in the DOM just drawn. */
-      const caretTo = (position, place = (node, offset) => document.getSelection().collapse(node, offset)) => {
-        const paragraph = editor.querySelector('p');
-        const nodes = Array.from(paragraph.childNodes);
-        let remaining = position;
-        let index = 0;
-        for (const node of nodes) {
-          if (node.nodeName !== 'BR' && remaining <= lengthOf(node)) {
-            place(node.firstChild, remaining);
-            known = { start: position, end: position };
-            return;
-          }
-          if (remaining === 0) { break; }
-          remaining -= lengthOf(node);
-          index += 1;
-        }
-        place(paragraph, Math.min(index, nodes.length));
-        known = { start: position, end: position };
-      };
-      /** Text arrives where the known selection is, in place of what is selected. */
-      const write = (written, later = false) => {
-        text = text.slice(0, known.start) + written + text.slice(known.end);
-        let caret = known.start + written.length;
-        if (slashMenu && written === '/' && !menu) {
-          // A slash opens the menu, which adds its hidden spans to the paragraph
-          menu = document.createElement('div');
-          menu.setAttribute('role', 'listbox');
-          menu.setAttribute('data-e2e', 'slash-menu');
-          menu.textContent = 'Opened by you';
-          document.body.append(menu);
-        } else if (menu && !text.includes('/')) {
-          // The slash is gone: so is the menu, and its spans
-          menu.remove();
-          menu = null;
-        }
-        if (later) {
-          known = { start: caret, end: caret };
-          if (!pending) {
-            pending = true;
-            queueMicrotask(() => {
-              pending = false;
-              draw();
-              caretTo(known.end);
-            });
-          }
-          return;
-        }
-        draw();
-        caretTo(caret);
-      };
-      // While the menu is open, the keys and the text typed are its own: they stop at the editor
-      for (const type of ['keydown', 'beforeinput', 'input']) {
-        editor.addEventListener(type, (event) => { if (menu) { event.stopPropagation(); } });
-      }
-      document.addEventListener('selectionchange', () => {
-        const selection = document.getSelection();
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
-          known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
-        }
-      });
-      editor.addEventListener('paste', (event) => {
-        event.preventDefault();
-        write(event.clipboardData.getData('text/plain'));
-      });
-      editor.addEventListener('beforeinput', (event) => {
-        event.preventDefault();
-        // What is typed or deleted goes where the event says, as Lexical reads the selection on a
-        // beforeinput: the selectionchange of a caret moved a moment ago (an arrow key) may not
-        // have come yet, the browser sends it later
-        const selection = document.getSelection();
-        const range = event.getTargetRanges()[0] ?? (selection.rangeCount > 0 ? selection.getRangeAt(0) : null);
-        if (!pending && range && editor.contains(range.startContainer) && editor.contains(range.endContainer)) {
-          known = { start: offsetOf(range.startContainer, range.startOffset), end: offsetOf(range.endContainer, range.endOffset) };
-        }
-        if (event.inputType === 'insertText' && event.data && emptied) {
-          // Typed in the emptied text: it goes with it
-          emptied.appendData(event.data);
-          document.getSelection().collapse(emptied, emptied.length);
-        } else if (event.inputType === 'insertText' && event.data) {
-          write(event.data.replace(/\\n/g, ''));
-        } else if (event.inputType.startsWith('delete')) {
-          // A caret, not a selection: Backspace takes the character before it
-          if (known.start === known.end && event.inputType === 'deleteContentBackward') {
-            known = { start: Math.max(0, known.start - 1), end: known.end };
-          }
-          write('', true);
-        }
-      });
-      editor.addEventListener('input', (event) => {
-        if (typeof event.data === 'string' && event.data !== '') {
-          text += event.data;
-          draw();
-          caretTo(text.length);
-          return;
-        }
-        if (menu) {
-          // While its slash menu is open, Copilot's editor does not take a change the browser made
-          // behind its back: it draws its own text again, the caret where it was (read live on
-          // 2026-11-16)
-          const at = known.end;
-          draw();
-          caretTo(at);
-          return;
-        }
-        // The browser removed an element the editor drew: the editor draws it again from its text
-        if (drawn.some((span) => !span.isConnected)) {
-          draw();
-          caretTo(Math.min(known.end, text.length));
-          return;
-        }
-        // The browser changed the DOM itself (the editing command deleted text): the editor takes
-        // its text from what its paragraph now shows, as Lexical does
-        const paragraph = editor.querySelector('p');
-        const nodes = paragraph ? Array.from(paragraph.childNodes) : [];
-        const lines = [''];
-        nodes.forEach((node, index) => {
-          if (node.nodeName === 'BR') {
-            if (index < nodes.length - 1) { lines.push(''); }
-          } else if (!hidden(node)) {
-            lines[lines.length - 1] += node.textContent;
-          }
+      {
+        const { $createParagraphNode, $getRoot, createEditor } = window.__require('lexical');
+        const { registerPlainText } = window.__require('@lexical/plain-text');
+        const root = document.querySelector(${JSON.stringify(field)});
+        const nodes = [];
+        let registerPlatform = () => {};
+        ${platform}
+        const editor = createEditor({ namespace: 'stand-in', nodes, onError: (error) => { throw error; } });
+        editor.setRootElement(root);
+        registerPlainText(editor);
+        registerPlatform(editor);
+        editor.update(() => {
+          if ($getRoot().isEmpty()) { $getRoot().append($createParagraphNode()); }
         });
-        const selection = document.getSelection();
-        const caret = paragraph && selection.rangeCount > 0 && editor.contains(selection.focusNode)
-          ? offsetOf(selection.focusNode, selection.focusOffset)
-          : null;
-        text = lines.join('\\n');
-        if (menu && !text.includes('/')) {
-          menu.remove();
-          menu = null;
-        }
-        const at = caret === null ? text.length : Math.min(caret, text.length);
-        const focus = selection.focusNode;
-        if (focus && focus.nodeType === Node.TEXT_NODE && focus.nodeValue === '' && drawn.includes(focus.parentNode)) {
-          // A text of the editor's found emptied: taken out by an update of the editor's own, 20 ms
-          // later, whose commit puts the caret back with setBaseAndExtent
-          known = { start: at, end: at };
-          emptied = focus;
-          window.setTimeout(() => {
-            emptied = null;
-            draw();
-            caretTo(at, (node, offset) => document.getSelection().setBaseAndExtent(node, offset, node, offset));
-          }, 20);
-          return;
-        }
-        draw();
-        caretTo(at);
-      });
-      editor.addEventListener('keydown', (event) => {
-        if (event.key === 'Backspace') {
-          event.preventDefault();
-          text = text.slice(0, -1);
-          draw();
-          caretTo(text.length);
-        }
-      });
-      draw();
+      }
     </script>`;
+
+/**
+ * Copilot's own slash menu, seen on the live page on 2026-11-15: a slash opens a list of recent
+ * files. While it is open the editor's paragraph ends with two text spans hidden from assistive
+ * technology, an empty one and one holding a zero-width space and a zero-width non-joiner, the
+ * caret staying at the end of the slashes' text (read on the live page on 2026-11-16):
+ * `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span aria-hidden
+ * data-lexical-text>U+200B U+200C</span>`. Here they are text nodes of the editor's, of a type of
+ * their own, as Copilot's are. The menu closes once the slash is gone. The stand-in also takes the
+ * worst a menu may do: while it is open, the keys and the text typed stop at the editor. And while
+ * it is open the editor puts back a // the browser's editing command deletes (read live on
+ * 2026-11-16): Copilot's own doing, which Lexical 0.41 alone does not do with a deletion inside a
+ * text. A deleteContentBackward beforeinput, Lexical handles itself, as Backspace.
+ */
+const COPILOT_SLASH_MENU = /* js */ `
+        const { TextNode } = window.__require('lexical');
+        class HiddenMarkNode extends TextNode {
+          static getType() { return 'copilot-hidden-mark'; }
+          static clone(node) { return new HiddenMarkNode(node.__text, node.__key); }
+          static importJSON(json) { return new HiddenMarkNode(json.text); }
+          createDOM(config, editor) {
+            const span = super.createDOM(config, editor);
+            span.setAttribute('aria-hidden', 'true');
+            return span;
+          }
+        }
+        nodes.push(HiddenMarkNode);
+        let menu = null;
+        for (const type of ['keydown', 'beforeinput', 'input']) {
+          root.addEventListener(type, (event) => { if (menu) { event.stopPropagation(); } });
+        }
+        // While the menu is open, the editor does not take a deletion the browser made behind its
+        // back (the editing command): it draws its own text again, the caret where it was (read live
+        // on 2026-11-16). Its state is kept here, before Lexical hears of the change, and set back
+        // once Lexical has taken it
+        let copilotEditor = null;
+        let beforeDeletion = null;
+        root.addEventListener('input', (event) => {
+          if (menu && copilotEditor && event.inputType.startsWith('delete')) { beforeDeletion = copilotEditor.getEditorState(); }
+        });
+        registerPlatform = (editor) => {
+          copilotEditor = editor;
+          root.addEventListener('input', () => {
+            if (beforeDeletion) {
+              const state = beforeDeletion;
+              beforeDeletion = null;
+              editor.setEditorState(state);
+            }
+          });
+          editor.registerUpdateListener(({ editorState }) => {
+            const slash = editorState.read(() => $getRoot().getAllTextNodes()
+              .some((node) => !(node instanceof HiddenMarkNode) && node.getTextContent().includes('/')));
+            if (slash && !menu) {
+              menu = document.createElement('div');
+              menu.setAttribute('role', 'listbox');
+              menu.setAttribute('data-e2e', 'slash-menu');
+              menu.textContent = 'Opened by you';
+              document.body.append(menu);
+              editor.update(() => {
+                $getRoot().getLastChild()?.append(new HiddenMarkNode(''), new HiddenMarkNode('\\u200B\\u200C'));
+              });
+            } else if (!slash && menu) {
+              menu.remove();
+              menu = null;
+              editor.update(() => {
+                for (const node of $getRoot().getAllTextNodes()) { if (node instanceof HiddenMarkNode) { node.remove(); } }
+              });
+            }
+          });
+        };`;
 
 const PERPLEXITY_EDITOR_HTML = plainPage(
   'Perplexity',
@@ -562,19 +436,11 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
 /**
  * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft: its composer
  * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button
- * (LATE_TOOLBAR), and an editor that behaves as Perplexity's Lexical editor does (lexicalEditor),
- * assumed, not seen there. And its own slash menu, seen on the live page on 2026-11-15: a slash
- * opens a list of recent files. While it is open the editor's paragraph ends with two text spans
- * hidden from assistive technology, an empty one and one holding a zero-width space and a
- * zero-width non-joiner, the caret staying at the end of the slashes' text (read on the live page
- * on 2026-11-16): `<span data-lexical-text>//</span><span aria-hidden data-lexical-text></span><span
- * aria-hidden data-lexical-text>U+200B U+200C</span>`. The editor puts the // back when the browser's
- * editing command deletes it; a deleteContentBackward beforeinput it handles itself, as Backspace,
- * and the menu closes once the slash is gone. The stand-in also takes the worst a menu may do:
- * while it is open, the keys and the text typed stop at the editor.
+ * (LATE_TOOLBAR), the same Lexical editor as Perplexity's (lexicalEditor), and Copilot's own slash
+ * menu (COPILOT_SLASH_MENU).
  */
 const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
-  .replace('</body>', `${lexicalEditor('[data-lexical-editor]', true)}${LATE_TOOLBAR}\n  </body>`);
+  .replace('</body>', `${lexicalEditor('[data-lexical-editor]', COPILOT_SLASH_MENU)}${LATE_TOOLBAR}\n  </body>`);
 
 /**
  * The stand-ins for the live composers that are rich text editors: ProseMirror on ChatGPT and
@@ -618,7 +484,7 @@ const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: str
   m365copilot: { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_HTML },
 };
 
-const readReactScript = ({ module, file }: { module: string; file: string }): string => {
+const readModuleScript = ({ module, file }: ModuleScript): string => {
   const source = fs.readFileSync(path.resolve(process.cwd(), 'node_modules', file), 'utf8');
   return `window.__define(${JSON.stringify(module)}, function (module, exports, require) {\n${source}\n});`;
 };
@@ -641,9 +507,9 @@ export async function routePlatform(
       return;
     }
 
-    const script = REACT_SCRIPTS[new URL(request.url()).pathname];
+    const script = MODULE_SCRIPTS[new URL(request.url()).pathname];
     if (script) {
-      await route.fulfill({ status: 200, contentType: 'text/javascript', body: readReactScript(script) });
+      await route.fulfill({ status: 200, contentType: 'text/javascript', body: readModuleScript(script) });
       return;
     }
 
