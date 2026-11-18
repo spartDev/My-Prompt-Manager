@@ -32,7 +32,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
     "@crxjs/vite-plugin": "3.0.0",
-    "@lexical/rich-text": "0.41.0",
+    "@lexical/plain-text": "0.41.0",
     "@playwright/test": "1.65.0",
     "@tailwindcss/node": "4.3.5",
     "@tailwindcss/postcss": "4.3.5",
