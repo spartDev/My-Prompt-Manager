@@ -280,14 +280,20 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     // that holds one element), then the plus menu and the dictation button (nesting read on the live
     // page signed in, 2026-11-15, ticket My-Prompt-Manager-axv). The plus menu is found by its
     // test id, which does not follow the user's language; its toolbar renders after the editor,
-    // so the icon waits for it (IconPlacementController.awaitToolbar). Then Fluent's component
-    // class names of m365.cloud.microsoft, not its hashed ones, on the composer that holds its
-    // actions or its send button (an inner .fai-ChatInput holding neither is not the composer). Neither is captured, since both need sign-in: see
-    // tests/fixtures/composers/m365copilot.html.
+    // so the icon waits for it (IconPlacementController.awaitToolbar). The icon goes first in the
+    // actions, Fluent's span that holds the dictation button and, once the draft has text, the send
+    // button: on the field's row, with the field's start where it was. Not after the plus menu, which
+    // sits alone in a block div: there the icon went to a second line under the "+" and widened the
+    // column, which pushed the field (seen live on 2026-11-18, ticket My-Prompt-Manager-14v). Should
+    // the actions lose their class name, beside the plus menu's div, still on the row. Then Fluent's
+    // component class names of m365.cloud.microsoft, not its hashed ones, on the composer that holds
+    // its actions or its send button (an inner .fai-ChatInput holding neither is not the composer).
+    // Neither is captured, since both need sign-in: see tests/fixtures/composers/m365copilot.html.
     iconPlacement: {
       composer: 'div:has(> span > [data-lexical-editor]):has([data-testid="PlusMenuButton"]), div:has(> [data-lexical-editor]):has([data-testid="PlusMenuButton"]), .fai-ChatInput:has(.fai-ChatInput__actions, button[type="submit"])',
       anchors: [
-        { find: '[data-testid="PlusMenuButton"]', relation: "after" },
+        { find: ".fai-BebopLiteChatInput__actions", relation: "inside-start" },
+        { find: 'div:has(> [data-testid="PlusMenuButton"])', relation: "after" },
         { find: ".fai-ChatInput__actions", relation: "inside-start" },
         { find: 'button[type="submit"]', relation: "before" },
       ],
