@@ -230,8 +230,15 @@ export interface SlashObservation {
 export interface IconState {
   placement: string | null;
   anchor: string | null;
+  /** Where the button is on the page */
   x: number;
   y: number;
+  /**
+   * Where the button is from the element of the chain it was placed against (data-mpm-anchor), as
+   * the extension resolves it in the button's composer. Null when the button is not on the toolbar
+   * or that element is not found
+   */
+  fromAnchor: { x: number; y: number } | null;
 }
 
 export interface Verdict {
@@ -290,19 +297,33 @@ export function judgeLateToolbar(icon: IconState | null, fallbackLanguage?: stri
 /** How far the Prompts button may shift while the user types, in px: a subpixel re-layout is not a move */
 const STEADY_TOLERANCE = 1;
 
-/** The typing case passes when the Prompts button keeps its placement, its anchor and its position */
+const distance = (from: { x: number; y: number }, to: { x: number; y: number }): number =>
+  Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+
+/**
+ * The typing case passes when the Prompts button keeps its placement, its anchor and its position:
+ * its position from that anchor when the anchor is found before and after, else on the page. A
+ * Platform may move its own controls as the field gets text, and the button with them: Gemini and
+ * Mistral show a send button that pushes their right-aligned group, the button included, 42 and
+ * 40 px left (live, 2026-11-18). The button stays beside its anchor; only a move away from it is the
+ * extension's doing
+ */
 export function judgeSteady(before: IconState | null, after: IconState | null): Verdict {
   if (!before || !after) {
     return { pass: false, detail: `${before ? 'Prompts button gone while typing' : 'no Prompts button before typing'}` };
   }
-  const moved = Math.max(Math.abs(after.x - before.x), Math.abs(after.y - before.y));
-  const same = before.placement === after.placement && before.anchor === after.anchor;
-  return {
-    pass: same && moved <= STEADY_TOLERANCE,
-    detail: same
-      ? `${describeIcon(after)}, moved ${moved.toFixed(1)}px`
-      : `${describeIcon(before)} became ${describeIcon(after)}`
-  };
+  if (before.placement !== after.placement || before.anchor !== after.anchor) {
+    return { pass: false, detail: `${describeIcon(before)} became ${describeIcon(after)}` };
+  }
+  const onPage = distance(before, after);
+  if (before.fromAnchor && after.fromAnchor) {
+    const moved = distance(before.fromAnchor, after.fromAnchor);
+    return {
+      pass: moved <= STEADY_TOLERANCE,
+      detail: `${describeIcon(after)}, moved ${moved.toFixed(1)}px from its anchor (${onPage.toFixed(1)}px on the page)`
+    };
+  }
+  return { pass: onPage <= STEADY_TOLERANCE, detail: `${describeIcon(after)}, moved ${onPage.toFixed(1)}px` };
 }
 
 export interface CaseResult extends Verdict {
@@ -327,15 +348,34 @@ export const liveCheckExitCode = (results: readonly CaseResult[]): number =>
 
 // ---- In the browser ----
 
-const readIcon = (page: Page): Promise<IconState | null> =>
-  page.evaluate((selector) => {
+/**
+ * The Prompts button, and where it is from the anchor it was placed against, found in its composer
+ * as resolveIconPlacement finds it. Sent to the page as it is: no inner function
+ */
+const readIcon = (page: Page, platform: PlatformDefinition): Promise<IconState | null> =>
+  page.evaluate(({ selector, chain }) => {
     const icon = document.querySelector(selector);
     if (!icon) {
       return null;
     }
     const box = icon.getBoundingClientRect();
-    return { placement: icon.getAttribute('data-mpm-placement'), anchor: icon.getAttribute('data-mpm-anchor'), x: box.x, y: box.y };
-  }, ICON);
+    const placement = icon.getAttribute('data-mpm-placement');
+    const anchor = icon.getAttribute('data-mpm-anchor');
+    const find = chain && placement === 'toolbar' && anchor !== null ? chain.anchors[Number(anchor)] : undefined;
+    const anchorBox = chain && find ? icon.closest(chain.composer)?.querySelector(find)?.getBoundingClientRect() : undefined;
+    return {
+      placement,
+      anchor,
+      x: box.x,
+      y: box.y,
+      fromAnchor: anchorBox ? { x: box.x - anchorBox.x, y: box.y - anchorBox.y } : null
+    };
+  }, {
+    selector: ICON,
+    chain: platform.iconPlacement
+      ? { composer: platform.iconPlacement.composer, anchors: platform.iconPlacement.anchors.map(({ find }) => find) }
+      : null
+  });
 
 /** The editor's text, found again each time: a Platform may replace its editor. Null when there is none */
 async function readField(page: Page, platform: PlatformDefinition): Promise<string | null> {
@@ -520,7 +560,7 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
     await settlePlacement(page, timeout);
     const pageLanguage = await page.evaluate(() => document.documentElement.lang);
     const fallback = overlayIsFallback(platform, pageLanguage, await probeChain(page, platform));
-    return judgeLateToolbar(await readIcon(page), fallback ? pageLanguage : undefined);
+    return judgeLateToolbar(await readIcon(page, platform), fallback ? pageLanguage : undefined);
   }
   if (id === 'icon-steady') {
     // Settled first, as the late-composer case waits for it: the case is about typing, not about
@@ -565,11 +605,11 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
       allTyped();
       return judgeSlash(await settleSlash(page, platform, 'Hi there', timeout), 'Hi there');
     case 'icon-steady': {
-      const before = await readIcon(page);
+      const before = await readIcon(page, platform);
       await page.keyboard.type('Hello world', { delay: 50 });
       allTyped();
       await page.waitForTimeout(500);
-      return judgeSteady(before, await readIcon(page));
+      return judgeSteady(before, await readIcon(page, platform));
     }
   }
 }

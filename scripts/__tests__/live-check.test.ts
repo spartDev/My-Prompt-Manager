@@ -572,10 +572,32 @@ describe('cleanUpNote', () => {
 });
 
 describe('judgeSteady', () => {
-  const at = (x: number, y: number, placement = 'toolbar', anchor = '0') => ({ placement, anchor, x, y });
+  const at = (x: number, y: number, placement = 'toolbar', anchor = '0') => ({ placement, anchor, x, y, fromAnchor: null });
+  /** On the toolbar, at (x, y) on the page, (dx, dy) from the element it was placed against */
+  const beside = (x: number, y: number, dx: number, dy: number) => ({ placement: 'toolbar', anchor: '0', x, y, fromAnchor: { x: dx, y: dy } });
 
   it('passes when the Prompts button keeps its place, a subpixel re-layout aside', () => {
     expect(judgeSteady(at(10, 20), at(10.5, 20))).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.5px' });
+  });
+
+  // Gemini and Mistral, live 2026-11-18: the send button the Platform shows once the field has text
+  // pushes its whole right-aligned group, the Prompts button and the Platform's own controls, 42 and 40 px left
+  it('passes when the button moves on the page with its anchor, the same distance from it', () => {
+    expect(judgeSteady(beside(1022, 434, -36, 0), beside(980, 434, -36, 0))).toEqual({
+      pass: true,
+      detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor (42.0px on the page)'
+    });
+  });
+
+  it('fails when the button moves away from its anchor', () => {
+    expect(judgeSteady(beside(1022, 434, -36, 0), beside(980, 434, -78, 0))).toEqual({
+      pass: false,
+      detail: 'placement toolbar, anchor 0, moved 42.0px from its anchor (42.0px on the page)'
+    });
+  });
+
+  it('measures on the page when the anchor is not found on either side', () => {
+    expect(judgeSteady(beside(1022, 434, -36, 0), at(980, 434))).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, moved 42.0px' });
   });
 
   it.each([
