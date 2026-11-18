@@ -362,7 +362,9 @@ body {
    of view unseen. Driven by the grid's own scroll timeline, as the Sections' scroll lines are: no
    scroll state in React. Where the Packs fit, the timeline is inactive and neither shows. It is no
    motion, only the scroll's state: it stays under prefers-reduced-motion. The lines sit at the grid's
-   edges, 0.25rem outside the edges' box (the grid's -m-1), drawn above the Packs */
+   edges, 0.375rem outside the edges' box (the grid's -m-1.5), drawn above the Packs. While a Pack has
+   the focus, the fades step aside and the lines stay (My-Prompt-Manager-ojz.17): in a 320 x 420 side
+   panel the view is barely one Pack high, and a fade there would hide an edge of its focus outline */
 @property --welcome-packs-fade-top {
   syntax: '<length>';
   inherits: false;
@@ -405,15 +407,17 @@ body {
   inset-inline: 0;
   height: 1px;
   pointer-events: none;
+  /* Over a Pack that crosses the edge, which nothing fades out while a Pack has the focus */
+  z-index: 1;
 }
 
 .welcome-packs-edges::before {
-  top: -0.25rem;
+  top: -0.375rem;
   background-color: var(--welcome-packs-line-top);
 }
 
 .welcome-packs-edges::after {
-  bottom: -0.25rem;
+  bottom: -0.375rem;
   background-color: var(--welcome-packs-line-bottom);
 }
 
@@ -435,6 +439,11 @@ body {
   animation-range:
     0 8px,
     calc(100% - 8px) 100%;
+}
+
+/* A Pack has the focus: no fade, so its outline is drawn whole wherever the scroll left it */
+.welcome-packs-scroll:focus-within {
+  animation: none;
 }
 
 @keyframes welcome-packs-line-top {

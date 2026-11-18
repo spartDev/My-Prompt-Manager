@@ -58,7 +58,8 @@ const PromptCard: FC<PromptCardProps> = ({
   onCopy,
   onTogglePin,
   showToast,
-  searchQuery = ''
+  searchQuery = '',
+  copyButtonRef
 }) => {
   const [isSharing, setIsSharing] = useState(false);
   const usageCount = typeof prompt.usageCount === 'number' && Number.isFinite(prompt.usageCount) ? prompt.usageCount : 0;
@@ -171,10 +172,13 @@ const PromptCard: FC<PromptCardProps> = ({
           {formatUsage(usageCount)}
         </span>
 
-        {/* Copy Button */}
+        {/* Copy Button. Its ring is focus-interactive's, drawn on :focus-visible only: after the Welcome
+            the Library gives it the keyboard by script, and Chrome shows that ring after a key press,
+            not after a click, so a mouse user sees no ring appear */}
         <button
+          ref={copyButtonRef}
           onClick={handleCopyClick}
-          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-accent-subtle text-accent hover:bg-accent-selected transition-colors focus-interactive"
+          className="relative z-10 shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-full bg-accent-subtle text-accent hover:bg-accent-selected transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           aria-label={`Copy content of ${prompt.title} to clipboard`}
           title="Copy to clipboard"
         >
@@ -229,6 +233,9 @@ const arePropsEqual = (prevProps: PromptCardProps, nextProps: PromptCardProps): 
   
   // Check isSelected prop if it exists
   if (prevProps.isSelected !== nextProps.isSelected) {return false;}
+
+  // The card the Library gives the keyboard to: the ref moves with the first card
+  if (prevProps.copyButtonRef !== nextProps.copyButtonRef) {return false;}
   
   // Check categories array length and relevant category data
   // We only need to check if the current prompt's category changed in the categories array
