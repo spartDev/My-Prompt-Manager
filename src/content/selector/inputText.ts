@@ -256,9 +256,9 @@ export type RemovalByEditor = 'removed' | 'unchanged' | 'changed';
 /**
  * Asks the editor of a contenteditable field to delete the `//` before the caret itself, as two
  * presses of Backspace do: one beforeinput event of `deleteContentBackward` per slash. An editor
- * that writes its own DOM (Lexical) handles such an event and cancels it, and it may put back what
- * the browser's editing command deletes behind its back, as Microsoft 365 Copilot's does while its
- * slash menu is open (read live on 2026-11-16).
+ * that writes its own DOM (Lexical) handles such an event and cancels it. What the browser's editing
+ * command deletes behind its back may come back: Microsoft 365 Copilot's slash menu, while open,
+ * puts the // back (read live on 2026-11-16; Lexical 0.41 alone does not).
  *
  * The events go to the field, where such an editor listens: the browser sends them at the caret,
  * from where they reach it, but the editor may have drawn the caret's node anew after the first.
@@ -333,7 +333,8 @@ function nextFrame(): Promise<void> {
  * Removes the `//` just typed before the caret, as two presses of Backspace would: the rest of the
  * field is not rewritten, and the Platform's editor hears of it through its usual input events.
  * The editor of a contenteditable is asked first to delete them itself (deleteTypedTriggerByEditor):
- * Lexical (Perplexity, Microsoft 365 Copilot) puts back a // deleted behind its back. An editor that
+ * Microsoft 365 Copilot's slash menu puts back a // deleted behind the editor's back, and Lexical
+ * (Perplexity) drops an emptied text node together with the key typed into it. An editor that
  * does not take that, or takes it and leaves the field as it was, gets the editing command. When
  * that command is missing or refused, or the `//` is the whole text of an inline element, the two
  * characters are taken out of their text node (only a // with no character the user does not see
