@@ -755,6 +755,20 @@ async function runSteady(page: Page, platform: PlatformDefinition, progress: Cas
   }
 }
 
+/**
+ * Sends the page's requests to the network, past any service worker the profile holds for the
+ * Platform: a worker answers a navigation before the context's routes see it, so the stand-in
+ * would never load. chat.mistral.ai registers one for a signed-in user (its sw.js answers fetches),
+ * and a live-check profile signed in there got Mistral's own page instead of the stand-in: no
+ * field, no Prompts button (My-Prompt-Manager-h6o). Playwright's `serviceWorkers: 'block'` only
+ * stops new registrations, not a worker already installed in the profile. Chromium only, as the script.
+ */
+export async function bypassServiceWorkers(context: BrowserContext, page: Page): Promise<void> {
+  const session = await context.newCDPSession(page);
+  await session.send('Network.enable');
+  await session.send('Network.setBypassServiceWorker', { bypass: true });
+}
+
 /** Opens the Platform in a new tab: the live page, or its stand-in served on the Platform's own hostname */
 async function openPage(context: BrowserContext, id: string, platform: PlatformDefinition, options: LiveCheckOptions): Promise<Page> {
   let url = startUrlOf(id, platform);
@@ -764,6 +778,9 @@ async function openPage(context: BrowserContext, id: string, platform: PlatformD
     url = await routePlatform(context, STAND_INS[id]);
   }
   const page = await context.newPage();
+  if (options.standIn) {
+    await bypassServiceWorkers(context, page);
+  }
   // A Platform may ask before leaving a page with a draft
   page.on('dialog', (dialog) => { void dialog.accept(); });
   await page.goto(url, { waitUntil: 'domcontentloaded' });

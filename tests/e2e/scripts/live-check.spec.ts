@@ -7,7 +7,7 @@
 
 import { expect, test } from '@playwright/test';
 
-import { afterCase, CASE_FIELDS } from '../../../scripts/live-check';
+import { afterCase, bypassServiceWorkers, CASE_FIELDS } from '../../../scripts/live-check';
 import { SUPPORTED_PLATFORMS } from '../../../src/config/platforms';
 import { type EditorFixture, PLATFORM_FIELD, routePlatform } from '../fixtures/platform-pages';
 
@@ -53,3 +53,41 @@ for (const { id, fixture } of LEXICAL_STAND_INS) {
     });
   });
 }
+
+/**
+ * A profile signed in to chat.mistral.ai holds Mistral's service worker, which answers a navigation
+ * before the context's routes see it: --stand-in then got Mistral's own page, with no field
+ * (My-Prompt-Manager-h6o). The worker here answers every navigation, as that one may.
+ */
+const MISTRAL_WORKER = /* js */ `
+  self.addEventListener('install', () => { self.skipWaiting(); });
+  self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
+  self.addEventListener('fetch', (event) => {
+    if (event.request.mode === 'navigate') {
+      event.respondWith(new Response('<!DOCTYPE html><title>Le Chat</title><p>From the worker</p>', { headers: { 'content-type': 'text/html' } }));
+    }
+  });`;
+
+test.describe('live:check --stand-in past a service worker the profile holds', () => {
+  test('opens the Mistral stand-in, not the page the worker serves', async ({ context }) => {
+    const url = await routePlatform(context, 'mistral-editor');
+    // Registered last, so it takes the worker's script before the stand-in's route aborts it
+    await context.route('https://chat.mistral.ai/sw.js', (route) => route.fulfill({ contentType: 'text/javascript', body: MISTRAL_WORKER }));
+    const install = await context.newPage();
+    await install.goto(url, { waitUntil: 'domcontentloaded' });
+    await install.evaluate(async () => {
+      await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+    });
+    // The worker answers a navigation now
+    await install.goto(url, { waitUntil: 'domcontentloaded' });
+    await expect(install.getByText('From the worker')).toBeVisible();
+    await install.close();
+
+    const page = await context.newPage();
+    await bypassServiceWorkers(context, page);
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator(PLATFORM_FIELD['mistral-editor'])).toBeVisible();
+  });
+});
