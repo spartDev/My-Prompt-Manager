@@ -17,8 +17,8 @@ const library: Prompt[] = [
 ];
 
 /**
- * The store of an opening: the Library StorageManager gives, the Welcome record, the What's new
- * record of an install at `installedVersion` (the Last seen Release `lastSeenVersion`), and Debug mode
+ * The store of an opening: the Library, the Welcome record, the What's new record of an install at
+ * `installedVersion` (the Last seen Release `lastSeenVersion`), and Debug mode
  */
 const openingOver = async ({
   prompts,
@@ -33,8 +33,8 @@ const openingOver = async ({
   lastSeenVersion?: string;
   debugMode?: boolean;
 }): Promise<void> => {
-  getMockStorageManager().getPrompts.mockResolvedValue([...prompts]);
   await chrome.storage.local.set({
+    prompts: [...prompts],
     [WHATS_NEW_KEY]: { installedVersion, ...(lastSeenVersion === undefined ? {} : { lastSeenVersion }) },
     [SITE_SETTINGS_KEY]: { debugMode }
   });

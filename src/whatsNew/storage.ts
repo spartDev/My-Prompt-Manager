@@ -93,7 +93,9 @@ export const recordUpdateFrom = (previousVersion: string | undefined): Promise<b
 
 /**
  * Marks a Release as the Last seen Release: the only writer of `lastSeenVersion`. In Debug mode
- * it writes nothing, so a Debug session leaves the Last seen Release as it was.
+ * it writes nothing, so a Debug session leaves the Last seen Release as it was. Only the launch
+ * writer calls it (`writeLaunchState`, src/launch/write.ts), when What's new closes and when the
+ * Welcome is finished.
  */
 export const markReleaseSeen = async (version: string, { debugMode }: { debugMode: boolean }): Promise<void> => {
   if (debugMode) {

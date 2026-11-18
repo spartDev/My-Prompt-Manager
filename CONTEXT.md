@@ -170,7 +170,7 @@ The three screens shown full-screen at the first opening after a first install, 
 _Avoid_: Onboarding, tour, tutorial
 
 **Last seen Release**:
-The Release whose What's new the user last closed. What's new shows again only for a Release that has Release notes and is not the Last seen Release.
+The Release whose What's new the user last closed, or the Release installed when the user finished the Welcome, so What's new never follows the Welcome. What's new shows again only for a Release that has Release notes and is not the Last seen Release.
 _Avoid_: Last version, seen flag
 
 **Debug mode**:

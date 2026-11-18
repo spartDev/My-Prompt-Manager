@@ -8,8 +8,9 @@
  * one get with the What's new record and the Site settings (src/hooks/useLaunchScreen.ts) and parses
  * it with `parseWelcomeRecord`. The service worker records the facts of the install with
  * `recordWelcomePending` ('install') and `markExistingUserDone` ('update'); the launch writer of the
- * popup and side panel writes the steps and the end with `writeWelcomeRecord`.
- * Nothing else writes it. A done record is final: no write of this module replaces it.
+ * popup and side panel (`writeLaunchState`, src/launch/write.ts) writes the steps and the end with
+ * `writeWelcomeRecord`. Nothing else writes it (src/test/guardrails/launch-state-guardrails.test.ts).
+ * A done record is final: no write of this module replaces it.
  * Terms: CONTEXT.md, "Welcome".
  */
 
@@ -87,10 +88,14 @@ export function withWelcomeLock<T>(operation: () => Promise<T>): Promise<T> {
   return welcomeLock.withLock(WELCOME_KEY, operation);
 }
 
-/** Writes `record` when what storage holds passes `may`; under the lock, so nothing writes in between */
-const writeIf = (may: (stored: WelcomeRecord | undefined) => boolean, record: WelcomeRecord): Promise<boolean> =>
+/**
+ * Writes the record `next` makes of what storage holds, or nothing when it makes none; under the
+ * lock, so nothing writes in between
+ */
+const writeOver = (next: (stored: WelcomeRecord | undefined) => WelcomeRecord | undefined): Promise<boolean> =>
   withWelcomeLock(async () => {
-    if (!may(await readWelcomeRecord())) {
+    const record = next(await readWelcomeRecord());
+    if (record === undefined) {
       return false;
     }
     await chrome.storage.local.set({ [WELCOME_KEY]: ownFields(record) });
@@ -99,15 +104,33 @@ const writeIf = (may: (stored: WelcomeRecord | undefined) => boolean, record: We
 
 /**
  * Writes the Welcome record: the step reached, its Packs, or the end. The low-level writer of the
- * launch writer (src/launch/write.ts) and of the service worker, nothing else. A done record is
- * never replaced, so a step written late, by a second popup or side panel still on the Welcome,
- * cannot bring a finished Welcome back. Rejects, with storage untouched, when storage cannot be
- * read or written.
+ * launch writer (src/launch/write.ts), nothing else.
+ *
+ * - A step is written only over a pending record, so the popup and the side panel never make a
+ *   record the service worker did not: no record, or one storage cannot read, stays as it is. A step
+ *   without Packs keeps the Packs stored; with Packs, an empty selection included, it replaces them.
+ * - The end is written over anything but the end: a Welcome the user finished is final, whatever
+ *   storage held.
+ * - A done record is never replaced, so a step written late, by a second popup or side panel still
+ *   on the Welcome, cannot bring a finished Welcome back.
+ *
+ * Rejects, with storage untouched, when storage cannot be read or written.
  *
  * @returns Whether it wrote
  */
 export const writeWelcomeRecord = (record: WelcomeRecord): Promise<boolean> =>
-  writeIf((stored) => stored?.status !== 'done', record);
+  writeOver((stored) => {
+    if (stored?.status === 'done') {
+      return undefined;
+    }
+    if (record.status === 'done') {
+      return record;
+    }
+    if (stored?.status !== 'pending') {
+      return undefined;
+    }
+    return record.packs === undefined && stored.packs !== undefined ? { ...record, packs: stored.packs } : record;
+  });
 
 /**
  * Records the Welcome as pending, from its first step. The service worker calls it on
@@ -119,7 +142,7 @@ export const writeWelcomeRecord = (record: WelcomeRecord): Promise<boolean> =>
  * @returns Whether it wrote
  */
 export const recordWelcomePending = (): Promise<boolean> =>
-  writeIf((stored) => stored === undefined, { status: 'pending', step: 0 });
+  writeOver((stored) => (stored === undefined ? { status: 'pending', step: 0 } : undefined));
 
 /**
  * Marks the Welcome as done for an existing user. The service worker calls it on `onInstalled`
@@ -131,4 +154,4 @@ export const recordWelcomePending = (): Promise<boolean> =>
  * @returns Whether it wrote
  */
 export const markExistingUserDone = (): Promise<boolean> =>
-  writeIf((stored) => stored === undefined, { status: 'done' });
+  writeOver((stored) => (stored === undefined ? { status: 'done' } : undefined));
