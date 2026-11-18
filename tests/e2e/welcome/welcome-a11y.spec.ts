@@ -15,7 +15,8 @@
  * - AC3: after each step change the live region holds "Step N of 3" and the step's title has the
  *   keyboard; the dots, the Packs, Skip and close have the names and states of the spec, read from
  *   Chrome's own accessibility tree (what a screen reader is given), as is the typing demo, hidden with
- *   its whole sentence given instead.
+ *   its whole sentence given instead, and the Platforms' list, named by its visible caption "Type //
+ *   in the chat on" (My-Prompt-Manager-ojz.19).
  * - The Library behind is inert: while the Welcome shows, nothing of the Library is in the document,
  *   even over a Library that holds Prompts (Debug mode), and the keyboard never leaves the Welcome.
  * - In a short side panel (320 x 500, 320 x 420) the Packs' grid scrolls: while Packs remain below
@@ -24,7 +25,9 @@
  *   Each Pack reached, forward and back, has its 2px focus ring whole: inside the grid's view, under
  *   no fade (the fades step aside while a Pack has the focus, the lines stay) and drawn on its four
  *   sides, read from the pixels (My-Prompt-Manager-ojz.17); the fade comes back as the keyboard leaves
- *   the Packs. Where the Packs fit, no cue. Light and dark screenshots in WELCOME_A11Y_SCREENSHOTS
+ *   the Packs. Under the grid, the caption "Type // in the chat on" and the Platform pills are whole
+ *   and the primary button in view (My-Prompt-Manager-ojz.19, AC2). Where the Packs fit, no cue.
+ *   Light and dark screenshots in WELCOME_A11Y_SCREENSHOTS
  *   (test-results/welcome-a11y when unset).
  */
 import fs from 'node:fs/promises';
@@ -36,10 +39,12 @@ import type { Locator, Page } from '@playwright/test';
 import { SITE_SETTINGS_KEY } from '../../../src/services/siteSettings';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { PACKS } from '../../../src/welcome/packs';
+import { welcomePlatformNames } from '../../../src/welcome/platforms';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
 import { focusRingOf, pixelsOf, RING_TOLERANCE, ringSides } from '../utils/focusRing';
 import { createPromptSeed } from '../utils/storage';
+import { expectPlatformsRowWhole, PLATFORMS_CAPTION } from '../utils/welcomePlatforms';
 
 const OUTPUT_DIR = 'test-results/welcome';
 const SCREENSHOTS_DIR = process.env.WELCOME_A11Y_SCREENSHOTS ?? 'test-results/welcome-a11y';
@@ -494,6 +499,11 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
           expect(packs.map(({ name, properties }) => ({ name, pressed: properties.pressed }))).toEqual(
             PACKS.map((pack) => ({ name: `${pack.name} ${String(pack.prompts.length)} prompts`, pressed: pack.defaultSelected ? 'true' : 'false' }))
           );
+          // The Platforms: a list named by the visible caption before it, its items the Platforms
+          // (My-Prompt-Manager-ojz.19), though the list draws no box of its own
+          const lists = tree.filter((node) => node.role === 'list');
+          expect(lists.map((node) => node.name)).toEqual([PLATFORMS_CAPTION]);
+          expect(tree.filter((node) => node.role === 'listitem')).toHaveLength(welcomePlatformNames().length);
         }
         if (step < 2) {
           await primary(page).click();
@@ -570,6 +580,10 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
         const atTop = await packsCue(page);
         test.info().annotations.push({ type: 'cue at the top', description: JSON.stringify(atTop) });
         expect(atTop).toEqual({ overflows: true, scrollTop: 0, fadeTop: 0, fadeBottom: FADE_PX, lineTop: 0, lineBottom: 1 });
+        // Under the grid and its cue, the caption "Type // in the chat on" and the pills whole, the
+        // primary button in view (My-Prompt-Manager-ojz.19, AC2)
+        const row = await expectPlatformsRowWhole(page, `320 x ${String(height)} ${theme}`);
+        test.info().annotations.push({ type: 'platforms row', description: JSON.stringify({ lines: row.lines, row: row.row, grid: row.grid, primary: row.primary }) });
         // Not animations: 'disabled', which cancels the scroll-driven animations that draw the cue
         await page.screenshot({ path: name('cue') });
 

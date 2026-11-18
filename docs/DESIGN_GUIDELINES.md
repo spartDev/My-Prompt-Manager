@@ -934,6 +934,15 @@ The failure of the Packs' add has no timer: it stays until the user acts (Try ag
 button, Start empty, Back, a dot, or close), and a step change hides it, so it never covers the
 controls of another step.
 
+One Notification is read whole wherever it shows: the exit of the Welcome on the Library, "9 prompts
+added" then "Open your AI chat and type //" (My-Prompt-Manager-ojz.19), whose `//` is the next step.
+It is marked on the Notification itself (`whole` of `ToastOptions`), not on the screen, so every other
+Notification of the Library keeps the one-line pill. The pill grows as with `wrap` (`w-max min-h-10
+py-1.5 rounded-[20px]`), and the sub takes a line of its own under the message (`flex-col
+items-start`), never cut: 238px wide and 48px high, whole from the 320px side panel to the popup. It
+ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel); in a
+320px side panel it reaches the side panel's close button, as the one-line pill does.
+
 ```tsx
 <div role="status" className="
   animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50

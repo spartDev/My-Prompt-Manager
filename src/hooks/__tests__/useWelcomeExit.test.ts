@@ -9,6 +9,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { SELECTOR_TRIGGER } from '../../content/selector/inputText';
 import type { AddPacksResult } from '../../services/storage';
 import { MOTION } from '../../theme/motion';
 import type { ShowToast } from '../../types/hooks';
@@ -19,6 +20,10 @@ import { packsAddedNotice, useWelcomeExit, type WelcomeExitOptions } from '../us
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_IDS = DEFAULTS.map((pack) => pack.id);
 const DEFAULT_COUNT = DEFAULTS.reduce((count, pack) => count + pack.prompts.length, 0);
+/** The second line of every Notification of an exit with Packs: what to do next, in the AI chat (My-Prompt-Manager-ojz.19, decision D1) */
+const IN_THE_CHAT = 'Open your AI chat and type //';
+/** That second line, read whole on the Library: on its own line, never cut, even 320px wide */
+const EXIT_OPTIONS = { sub: IN_THE_CHAT, whole: true };
 
 /** An add the test settles itself */
 const deferred = <T,>() => {
@@ -72,7 +77,7 @@ describe('useWelcomeExit', () => {
       await flush();
 
       expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(DEFAULT_COUNT)} prompts added`]);
-      expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+      expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('finishes nothing while the add is under way', async () => {
@@ -114,15 +119,21 @@ describe('useWelcomeExit', () => {
   });
 
   describe('the Notification once the Packs are in', () => {
-    it('says how many Prompts were really added, the Packs that added some as its sub', () => {
-      expect(packsAddedNotice({ added: 9, skipped: 0, packNames: ['Product', 'Writing'] })).toEqual({ message: '9 prompts added', sub: 'Product, Writing' });
-      // Some were already there: only those added are counted, only the Packs that added some named
-      expect(packsAddedNotice({ added: 4, skipped: 5, packNames: ['Writing'] })).toEqual({ message: '4 prompts added', sub: 'Writing' });
-      expect(packsAddedNotice({ added: 1, skipped: 3, packNames: ['Hiring'] })).toEqual({ message: '1 prompt added', sub: 'Hiring' });
+    it('says how many Prompts were really added, and as its sub what to do next in the AI chat, whatever Packs added them', () => {
+      expect(packsAddedNotice({ added: 9, skipped: 0, packNames: ['Product', 'Writing'] })).toEqual({ message: '9 prompts added', sub: IN_THE_CHAT });
+      // Some were already there: only those added are counted
+      expect(packsAddedNotice({ added: 4, skipped: 5, packNames: ['Writing'] })).toEqual({ message: '4 prompts added', sub: IN_THE_CHAT });
+      expect(packsAddedNotice({ added: 1, skipped: 3, packNames: ['Hiring'] })).toEqual({ message: '1 prompt added', sub: IN_THE_CHAT });
     });
 
-    it('says the Library is ready when every Prompt was already there (added 0, no Pack named)', () => {
-      expect(packsAddedNotice({ added: 0, skipped: 9, packNames: [] })).toEqual({ message: 'Your library is ready', sub: 'Every prompt was already in it' });
+    it('says the Library is ready when every Prompt was already there (added 0), with the same next step', () => {
+      expect(packsAddedNotice({ added: 0, skipped: 9, packNames: [] })).toEqual({ message: 'Your library is ready', sub: IN_THE_CHAT });
+    });
+
+    it('names the characters that really open the Prompt selector in the chat', () => {
+      for (const added of [0, 1, 9]) {
+        expect(packsAddedNotice({ added, skipped: 0, packNames: [] }).sub.endsWith(` ${SELECTOR_TRIGGER}`)).toBe(true);
+      }
     });
 
     it('shows that one when the add adds nothing, and still finishes the Welcome', async () => {
@@ -134,7 +145,7 @@ describe('useWelcomeExit', () => {
       await flush();
 
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenCalledWith('Your library is ready', 'success', { sub: 'Every prompt was already in it' });
+      expect(showToast).toHaveBeenCalledWith('Your library is ready', 'success', EXIT_OPTIONS);
     });
   });
 
@@ -183,7 +194,7 @@ describe('useWelcomeExit', () => {
       expect(log).toEqual(['hideNotification', 'addPacks product,hiring', 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(count)} prompts added`]);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
       expect(focusFirstPrompt).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(count)} prompts added`, 'success', { sub: chosen.map((pack) => pack.name).join(', ') });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(count)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again refused too: the failure Notification again, with its Try again, and nothing finished; a third try adds the Packs', async () => {
@@ -208,7 +219,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(3);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('a second press of the primary button tries again too, and finishes once the Packs are in', async () => {
@@ -222,7 +233,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     // Start empty stays on the step: every Pack unselected, the primary button reads it
@@ -254,7 +265,7 @@ describe('useWelcomeExit', () => {
       expect(hideNotification).toHaveBeenCalledTimes(1);
       add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
       await flush();
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again does nothing once another exit is under way', async () => {
@@ -274,7 +285,7 @@ describe('useWelcomeExit', () => {
 
       expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
     });
 
     it('Try again that lands after the unmount (the popup closed) finishes nothing and shows nothing', async () => {

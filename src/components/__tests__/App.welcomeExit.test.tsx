@@ -32,7 +32,8 @@ const LIBRARY_HEADING = /my prompt manager/i;
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_PROMPTS = DEFAULTS.flatMap((pack) => pack.prompts);
 const ADDED = `${String(DEFAULT_PROMPTS.length)} prompts added`;
-const DEFAULT_NAMES = DEFAULTS.map((pack) => pack.name).join(', ');
+/** The Notification's second line after an exit with Packs: the next step, in the AI chat (My-Prompt-Manager-ojz.19) */
+const IN_THE_CHAT = 'Open your AI chat and type //';
 
 /** The store of an opening: the Library, the Welcome record, the What's new record, Debug mode */
 const openingOver = async ({
@@ -124,7 +125,7 @@ describe('App: leaving the Welcome for a ready Library', () => {
   });
 
   describe('S2, AC1: with Packs, the Packs added, the Welcome finished, the Library and the Notification', () => {
-    it('Skip, then Add 9 prompts: the Library lists the Packs\' Prompts on All, with "9 prompts added" and the Packs as its sub, and no loading or empty state on the way', async () => {
+    it('Skip, then Add 9 prompts: the Library lists the Packs\' Prompts on All, with "9 prompts added" and "Open your AI chat and type //" as its sub, and no loading or empty state on the way', async () => {
       await openingOver({ welcome: { status: 'pending', step: 0 } });
       await openWelcome(0);
 
@@ -145,7 +146,10 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(notification).toHaveAttribute('role', 'status');
       expect(notification).toHaveAttribute('data-type', 'success');
       expect(within(notification).getByText(ADDED)).toBeInTheDocument();
-      expect(within(notification).getByText(DEFAULT_NAMES)).toBeInTheDocument();
+      // Read whole on the Library: its second line on a line of its own, never cut (My-Prompt-Manager-ojz.19)
+      expect(within(notification).getByText(IN_THE_CHAT)).not.toHaveClass('truncate');
+      expect(within(notification).getByTestId('toast-text')).toHaveClass('flex-col');
+      expect(notification).toHaveClass('w-max', 'min-h-10');
 
       // Stored: the Prompts, each in its Pack's Category, and the Welcome finished
       const prompts = await stored<Prompt[]>('prompts');
@@ -579,7 +583,7 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(await screen.findByRole('dialog', { name: WHATS_NEW })).toBeInTheDocument();
       const notification = screen.getByTestId('toast');
       expect(notification).toHaveTextContent('Your library is ready');
-      expect(notification).toHaveTextContent('Every prompt was already in it');
+      expect(notification).toHaveTextContent(IN_THE_CHAT);
       expect(await stored<Prompt[]>('prompts')).toHaveLength(already.length);
       // Nothing recorded in Debug mode
       expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' });

@@ -7,17 +7,22 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { SELECTOR_TRIGGER } from '../../../content/selector/inputText';
 import { MOTION } from '../../../theme/motion';
 import { packColors } from '../../../welcome/packColors';
 import { PACKS } from '../../../welcome/packs';
 import type { WelcomeStep } from '../../../welcome/storage';
 import WelcomeHost, { type WelcomeHostProps } from '../WelcomeHost';
 
-/** The texts of the spec of record (epic My-Prompt-Manager-ojz, DESIGN, "Étape 1" to "Étape 3"), word for word */
+/**
+ * The texts of the spec of record (epic My-Prompt-Manager-ojz, DESIGN, "Étape 1" to "Étape 3"), word for
+ * word, but for step 1's "in this popup", now "here": the side panel is the default surface (decision D1,
+ * My-Prompt-Manager-ojz.19)
+ */
 const SPEC: Record<WelcomeStep, { title: string; text: string }> = {
   0: {
     title: 'Your best prompts, one tap away',
-    text: 'Save the prompts you reuse and find them in a second, in this popup or right inside your AI chat.'
+    text: 'Save the prompts you reuse and find them in a second, here or right inside your AI chat.'
   },
   1: {
     title: 'Leave blanks, fill them later',
@@ -28,6 +33,9 @@ const SPEC: Record<WelcomeStep, { title: string; text: string }> = {
     text: 'Pick what fits your work. Everything stays editable.'
   }
 };
+
+/** Step 3's caption before the Platform pills, and the name of their list (My-Prompt-Manager-ojz.19) */
+const CAPTION = 'Type // in the chat on';
 
 /** What step 2 types into its blank, and the whole sentence a screen reader reads instead */
 const NAME = 'Claire, Head of Sales';
@@ -366,7 +374,7 @@ describe('Welcome steps', () => {
     it('lists them as pills, by their short names, linked Platforms once', () => {
       renderWelcome({ step: 2 });
 
-      const list = screen.getByRole('list', { name: 'Works on' });
+      const list = screen.getByRole('list', { name: CAPTION });
       expect(within(list).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
         'Claude',
         'ChatGPT',
@@ -375,6 +383,38 @@ describe('Welcome steps', () => {
         'Perplexity',
         'Copilot'
       ]);
+    });
+
+    // My-Prompt-Manager-ojz.19, decision D1: the Welcome says how a Prompt gets into the chat
+    it('says what to do there in a visible caption before the pills, so the row reads as one sentence ending in the Platform names', () => {
+      renderWelcome({ step: 2 });
+
+      // The caption is the element whose whole text is the sentence (its "//" set apart in weight)
+      const caption = screen.getByText((_content, element) => element?.tagName === 'SPAN' && element.textContent === CAPTION);
+      expect(caption).toBeVisible();
+      const list = screen.getByRole('list', { name: CAPTION });
+      // Before the first pill, in the same row
+      const firstPill = within(list).getAllByRole('listitem')[0];
+      expect(caption.compareDocumentPosition(firstPill) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(caption.parentElement).toBe(list.parentElement);
+      // In the step's secondary text color, which follows the theme on its own
+      expect(caption).toHaveClass('text-secondary');
+    });
+
+    it('names the list with that caption: its accessible name is the caption itself, not a label of its own', () => {
+      renderWelcome({ step: 2 });
+
+      const list = screen.getByRole('list', { name: CAPTION });
+      expect(list).not.toHaveAttribute('aria-label');
+      const caption = document.getElementById(list.getAttribute('aria-labelledby') ?? '');
+      expect(caption).toBeVisible();
+      expect(caption?.textContent).toBe(CAPTION);
+      expect(list.contains(caption)).toBe(false);
+      expect(screen.queryByRole('list', { name: 'Works on' })).not.toBeInTheDocument();
+    });
+
+    it('names the characters that really open the Prompt selector in the chat', () => {
+      expect(CAPTION.startsWith(`Type ${SELECTOR_TRIGGER} `)).toBe(true);
     });
   });
 });

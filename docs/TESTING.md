@@ -67,6 +67,7 @@ The config is `playwright.config.ts`. Its global setup (`tests/e2e/global-setup.
 
 - Every test starts on a fresh profile, that is a first install: the service worker writes the What's new record and the Welcome record (pending) as the extension loads. The `storage` fixture waits for both (`waitForFirstInstallRecords`) before its reset, so no install write lands over a test's seed and a spec sees a Welcome record only if it seeds one. A spec that opens the popup or side panel without the `storage` fixture runs on the first install's store, a pending Welcome over an empty Library, so it opens on the Welcome, not the Library.
 - A relaunch of the persistent context on the same profile (`launchExtensionContext` of `tests/e2e/fixtures/extension.ts`, as a restart of Chrome) fires `onInstalled` with reason 'install' again, store kept: Chromium installs an extension loaded with `--load-extension` afresh at every launch, even after a build at a higher version was copied over its folder. A real 'update', with the previous version, is `updateExtensionInPlace` of `tests/e2e/fixtures/extension-update.ts`: it copies the build at a higher version over the loaded folder and reloads the extension from chrome://extensions with developer mode on (off, that reload disables it). `tests/e2e/welcome/welcome-record.spec.ts` uses both. The extension's own logs of those events are Logger.info, silent in a production build: to read which event fired and from which version, copy the build with `copyBuildAt(path, version, { onInstalledProbe: true })` (and pass the same option to `updateExtensionInPlace`), which adds the observer of `tests/e2e/fixtures/oninstalled-probe.ts`; it records each `onInstalled` event in `chrome.storage.session` and writes nothing to `chrome.storage.local`. The probe refuses `dist/` and any folder inside it, links followed, so it only ever changes a copy (`tests/e2e/welcome/oninstalled-probe.spec.ts`). `tests/e2e/welcome/scenarios.spec.ts` reads it: it holds the Welcome's twelve acceptance scenarios S1 to S12, four tests of the ways out of the Welcome (Skip then no Pack, a refused add then the retry by the primary button, a refused add then Try again in its Notification, a refused add then Start empty from the step), and two update cases ("Pending through an update…" and S7 with no Prompt).
+- A first install with a tab already open: `--load-extension` installs the extension before any tab exists, so `tests/e2e/welcome/chat-open-before-install.spec.ts` launches Chromium without it (`ignoreDefaultArgs: ['--disable-extensions']`, `--enable-unsafe-extension-debugging`), opens a Platform stand-in, then installs `dist/` into the running browser over CDP (`Extensions.loadUnpacked` on `context.browser().newBrowserCDPSession()`). `onInstalled` fires 'install' as for a Web Store install, and the open tab must answer `//` with no reload.
 - Page objects are in `tests/e2e/pages/`, workflows and assertions in `tests/e2e/utils/`, seeded data in `tests/e2e/fixtures/`. `tests/e2e/README.md` describes them.
 - Locally the browser is headed; CI runs headless with one retry.
 - A hover a test asserts on goes through `readWhileHovering` or `holdHover` (`tests/e2e/utils/hover.ts`), not a bare `locator.hover()`. A headed run opens one window per test, over one another; when one opens over the window under the real pointer, Chrome gives that page a real mouse event at the pointer's position and the hover Playwright set ends, which a bare `hover()` never takes back. CI, headless, has no real pointer.
@@ -131,8 +132,8 @@ Debug mode shows the Welcome from step 1 at each opening, then What's new once y
 2. Open the extension: you must see the Welcome at step 1 ("Your best prompts, one tap away", the first of the three dots long, no Back button). Click Next: step 2. Close.
 3. Open again: you must see step 1 again, not step 2. Click Skip: step 3 ("Start with a pack"). Click Writing to unselect it. Close.
 4. Open a third time: step 1 again. Click Skip: Product and Writing are selected again, as by default; your choice of step 3 was not kept.
-5. Click Add 9 prompts. You must see the Library and, at the top, the Notification "9 prompts added · Product, Writing" (or "Your library is ready · Every prompt was already in it" if those Prompts were already there). Then What's new rises over the Library: Debug mode shows it after the Welcome. Click Got it.
-6. Do step 5 again: open, Skip, Add 9 prompts. You must see "Your library is ready · Every prompt was already in it", then What's new; Got it. The Library holds as many Prompts as after step 5: none was added twice.
+5. Click Add 9 prompts. You must see the Library and, at the top, the Notification "9 prompts added · Open your AI chat and type //" (or "Your library is ready · Open your AI chat and type //" if those Prompts were already there). Then What's new rises over the Library: Debug mode shows it after the Welcome. Click Got it.
+6. Do step 5 again: open, Skip, Add 9 prompts. You must see "Your library is ready · Open your AI chat and type //", then What's new; Got it. The Library holds as many Prompts as after step 5: none was added twice.
 7. Turn Debug mode off. At every opening the Welcome covers the tab bar, so you reach Settings only by finishing the Welcome, then closing What's new. To finish without adding Prompts: Skip, unselect every Pack, click Start empty; What's new rises over the Library with the editor "New prompt" under it; click Got it, then Cancel in the editor. Then Settings, Advanced, Debug mode off.
 8. Close and open: you must see what you saw before step 1, the Library, with no Welcome and no What's new. Only the Pack Prompts of step 5 are new in it.
 
@@ -142,17 +143,17 @@ Debug mode shows the Welcome from step 1 at each opening, then What's new once y
 
 Do: make a test install (above). Open the extension (the side panel). Then open the popup's page in a tab (step 4 of "A test install").
 
-You must see, in both: the Welcome at step 1. At the top, the logo and "My Prompt Manager", Skip and a round close button. The title "Your best prompts, one tap away", the first of three dots long, a Next button and no Back button. No tab bar, no Library, no What's new, even after a few seconds.
+You must see, in both: the Welcome at step 1. At the top, the logo and "My Prompt Manager", Skip and a round close button. The title "Your best prompts, one tap away" and under it "Save the prompts you reuse and find them in a second, here or right inside your AI chat.", the first of three dots long, a Next button and no Back button. No tab bar, no Library, no What's new, even after a few seconds.
 
 Automated: `S1 I install the extension and open it: I see the Welcome, step 1`.
 
 #### S2 I go to the end choosing Packs
 
-Do: on a first install, open the extension. Click Next, then Next. On step 3, Product and Writing are selected; click Engineering to select it too. The button reads Add 15 prompts: click it.
+Do: on a first install, open the extension. Click Next, then Next. On step 3, under the Packs, read the row "Type // in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot", the Platforms as pills. Product and Writing are selected; click Engineering to select it too. The button reads Add 15 prompts: click it.
 
-You must see: the Library with 15 Prompts, those of Product, Engineering and Writing, the filter All selected; at the top, the Notification "15 prompts added · Product, Engineering, Writing". No What's new. The Categories tab shows Product, Engineering and Writing.
+You must see: the Library with 15 Prompts, those of Product, Engineering and Writing, the filter All selected; at the top, the Notification "15 prompts added" with, on a line of its own under it, "Open your AI chat and type //", whole with its `//`. No What's new. The Categories tab shows Product, Engineering and Writing. Do it again in the side panel made 320px wide (a new profile): the same two lines, neither cut, the Notification above the search field.
 
-Automated: `S2 I go to the end choosing Packs: …`.
+Automated: `S2 I go to the end choosing Packs: …`, and `the exit Notification shows whole, …` in `tests/e2e/welcome/welcome-exit.spec.ts` (popup 400 x 500, side panel 360 x 600 and 320 x 500, light and dark).
 
 #### S3 I go to the end choosing no Pack
 
@@ -212,7 +213,7 @@ Automated: `S8 I turn Debug mode on and open the extension three times: …`.
 
 Do: steps 5 and 6 of "Replay the Welcome". Then open the Categories tab.
 
-You must see: the first time "9 prompts added · Product, Writing" (or "Your library is ready" if they were there already), the second time "Your library is ready · Every prompt was already in it"; the same number of Prompts after both; no Prompt twice; Product and Writing once each in the Categories tab. What's new after each finish.
+You must see: the first time "9 prompts added · Open your AI chat and type //" (or "Your library is ready" if they were there already), the second time "Your library is ready · Open your AI chat and type //"; the same number of Prompts after both; no Prompt twice; Product and Writing once each in the Categories tab. What's new after each finish.
 
 Automated: `S9 In Debug mode, I finish the Welcome with the same Packs twice: …`.
 
@@ -257,6 +258,16 @@ Do: as in S7, build Release 1.9.0 and load it unpacked in a new test profile. Op
 You must see: after the update, What's new of 2.0.0 over the empty Library, never the Welcome; after Got it, "Your library is empty"; at the next openings, the empty Library alone.
 
 Automated: `S7 I start from an earlier Release with no Prompt, and update: I see my empty Library, never the Welcome`.
+
+### A chat open before the install
+
+The Welcome tells a new user to type `//` in their AI chat; a chat they had open while installing must answer it too.
+
+Do: in a new Chrome profile, open https://claude.ai (or another Platform) in a tab and sign in. In another tab, make a test install (above): Load unpacked the test folder. Open the extension and leave the Welcome with Skip, then Add 9 prompts. Go back to the chat tab, without reloading it, and type `//` in its message field.
+
+You must see: the Prompts button beside the field, and `//` opens the Prompt selector with the Prompts of the Packs. No reload needed.
+
+Automated: `AC5: a Platform tab open before the install gets the content script at the install: …` in `tests/e2e/welcome/chat-open-before-install.spec.ts`, on the Claude stand-in.
 
 ### Two checks of My-Prompt-Manager-ojz.20
 

@@ -9,7 +9,8 @@ import { WelcomeText, WelcomeTitle } from './WelcomeFrame';
 
 /**
  * What fills the frame's step slot for each step of the Welcome (Atelier 1C 'Premier lancement',
- * ob0 to ob2), with the texts of the spec word for word, and the label of the primary button.
+ * ob0 to ob2), with the texts of the spec word for word but step 1's "here", and the label of the
+ * primary button.
  */
 export interface WelcomeStepProps {
   /** The step shown and the Packs selected */
@@ -24,7 +25,8 @@ const WhatItDoes: FC = () => (
     <WelcomeCards />
     <div className="flex flex-col gap-2">
       <WelcomeTitle>Your best prompts, one tap away</WelcomeTitle>
-      <WelcomeText>Save the prompts you reuse and find them in a second, in this popup or right inside your AI chat.</WelcomeText>
+      {/* "here", not the spec's "in this popup": the Welcome shows in the side panel too, its default surface (decision D1) */}
+      <WelcomeText>Save the prompts you reuse and find them in a second, here or right inside your AI chat.</WelcomeText>
     </div>
   </div>
 );

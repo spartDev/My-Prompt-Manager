@@ -31,7 +31,7 @@ describe('Welcome step 3: the Platform pills read the config', () => {
   it('a Platform added to the config gets its pill; linked Platforms appear once', () => {
     render(<WelcomeHost step={2} saveStep={vi.fn()} finishWelcome={vi.fn()} />);
 
-    const pills = within(screen.getByRole('list', { name: 'Works on' }))
+    const pills = within(screen.getByRole('list', { name: 'Type // in the chat on' }))
       .getAllByRole('listitem')
       .map((item) => item.textContent);
 
