@@ -112,8 +112,24 @@ export const MOTION = {
   /** Welcome: Back popping in when a step change brings it, from the second step */
   welcomeBackPop: 350,
   /** Welcome: the primary button shrinking to 97% while pressed, on the spring */
-  welcomePress: 250
+  welcomePress: 250,
   // --- end Welcome frame ---
+
+  // --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+  /** Welcome step 1: the three Prompt cards floating 8px up and back, in a loop, each at its own pace (left, right after its delay, center after its delay) */
+  welcomeFloatLeft: 5800,
+  welcomeFloatRight: 6400,
+  welcomeFloatRightDelay: 900,
+  welcomeFloatCenter: 5200,
+  welcomeFloatCenterDelay: 400,
+  /** Welcome step 2: a letter of the name typed into the blank every welcomeTypeLetter; the whole name held welcomeTypePause, then typed again */
+  welcomeTypeLetter: 85,
+  welcomeTypePause: 1200,
+  /** Welcome step 2: the caret after the letters typed, blinking once a cycle */
+  welcomeCaretBlink: 1000,
+  /** Welcome step 3: the round check of a selected Pack popping in, on the spring */
+  welcomeCheck: 450
+  // --- end Welcome steps ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

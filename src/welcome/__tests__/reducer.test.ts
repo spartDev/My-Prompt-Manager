@@ -5,6 +5,7 @@ import {
   defaultPackSelection,
   initialWelcomeState,
   LAST_STEP,
+  promptCountOf,
   STEP_COUNT,
   transition,
   type WelcomeAction,
@@ -199,5 +200,19 @@ describe('Welcome reducer', () => {
         { id: 'b', name: 'B', color: '#15803D', defaultSelected: true, prompts: [] }
       ])
     ).toEqual(['b']);
+  });
+
+  describe('how many Prompts a selection holds (the "Add N prompts" of the last step)', () => {
+    it('adds up the Prompts of the Packs selected', () => {
+      const count = (id: string): number => PACKS.find((pack) => pack.id === id)?.prompts.length ?? 0;
+
+      expect(promptCountOf(DEFAULTS)).toBe(DEFAULTS.reduce((sum, id) => sum + count(id), 0));
+      expect(promptCountOf(['engineering', 'hiring'])).toBe(count('engineering') + count('hiring'));
+    });
+
+    it('is 0 with no Pack, and counts no id that is no Pack', () => {
+      expect(promptCountOf([])).toBe(0);
+      expect(promptCountOf(['nope'])).toBe(0);
+    });
   });
 });

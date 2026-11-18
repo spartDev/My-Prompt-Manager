@@ -182,3 +182,40 @@ describe('Welcome frame motion', () => {
   });
 });
 // --- end Welcome frame ---
+
+// --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+describe('Welcome steps motion', () => {
+  const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+  /** The Welcome steps' own block of popup.css */
+  const block = popupCss.slice(popupCss.indexOf('/* --- Welcome steps'), popupCss.indexOf('/* --- end Welcome steps --- */'));
+
+  it("floats the three cards of step 1 8px up and back, each at its own pace: 5.8s, 6.4s from 0.9s, 5.2s from 0.4s (the mockup's cFloat)", () => {
+    expect([MOTION.welcomeFloatLeft, MOTION.welcomeFloatRight, MOTION.welcomeFloatCenter]).toEqual([5800, 6400, 5200]);
+    expect([MOTION.welcomeFloatRightDelay, MOTION.welcomeFloatCenterDelay]).toEqual([900, 400]);
+    expect(tokens).toContain(`--animate-welcome-float-left: float ${MOTION.welcomeFloatLeft}ms ease-in-out infinite;`);
+    expect(tokens).toContain(`--animate-welcome-float-right: float ${MOTION.welcomeFloatRight}ms ease-in-out ${MOTION.welcomeFloatRightDelay}ms infinite;`);
+    expect(tokens).toContain(`--animate-welcome-float-center: float ${MOTION.welcomeFloatCenter}ms ease-in-out ${MOTION.welcomeFloatCenterDelay}ms infinite;`);
+    expect(tokens).toMatch(/@keyframes float \{\s*0%, 100% \{ transform: translateY\(0\); \}\s*50% \{ transform: translateY\(-8px\); \}/);
+  });
+
+  it("types a letter every 85ms, holds the whole name 1.2s, and blinks the caret once a second (the mockup's TYPE and cBlink)", () => {
+    expect([MOTION.welcomeTypeLetter, MOTION.welcomeTypePause, MOTION.welcomeCaretBlink]).toEqual([85, 1200, 1000]);
+    expect(tokens).toContain(`--animate-welcome-caret: welcome-blink ${MOTION.welcomeCaretBlink}ms steps(1) infinite;`);
+    expect(tokens).toMatch(/@keyframes welcome-blink \{\s*0%, 49% \{ opacity: 1; \}\s*50%, 100% \{ opacity: 0; \}/);
+  });
+
+  it("pops the check of a selected Pack over 450ms on the spring (the mockup's cPop)", () => {
+    expect(MOTION.welcomeCheck).toBe(450);
+    expect(tokens).toContain(`--animate-welcome-check: pop ${MOTION.welcomeCheck}ms var(--ease-spring) both;`);
+  });
+
+  it('under reduced motion nothing floats or blinks, and the check shows at once', () => {
+    const reduced = block.slice(block.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).not.toBe('');
+    expect(reduced).toMatch(
+      /\.animate-welcome-float-left,\s*\.animate-welcome-float-right,\s*\.animate-welcome-float-center,\s*\.animate-welcome-caret \{\s*animation: none;/
+    );
+    expect(reduced).toMatch(/\.animate-welcome-check \{\s*animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+  });
+});
+// --- end Welcome steps ---

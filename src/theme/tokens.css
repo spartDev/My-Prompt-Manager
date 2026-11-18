@@ -317,6 +317,31 @@
     to { opacity: 1; transform: none; }
   }
   /* --- end Welcome frame --- */
+
+  /* --- Welcome steps (My-Prompt-Manager-ojz.8; Atelier 1C 'Premier lancement') ---
+     Step 1: three Prompt cards, two on bg-card and an ink one in the middle (bg-inverse) whose blank
+     is dashed in the Notification's violet; each floats 8px up and back at its own pace (the
+     mockup's cFloat, on the float keyframes). Step 2: a card with a blank being filled, underlined in
+     the accent, a caret blinking after the letters (cBlink). Step 3: the round check of a selected
+     Pack pops in (cPop). The shadows are the mockup's, on a 50% violet tint (black at alpha x 1.6 in
+     dark) or on the ink tint of the primary button. Durations are MOTION.welcome* in motion.ts */
+  --border-color-blank: var(--background-color-accent);
+  --border-color-inverse-blank: var(--background-color-inverse-mark);
+  --shadow-tint-50: rgba(45, 25, 90, 0.5);
+  --shadow-welcome-card: 0 14px 30px -18px var(--shadow-tint-50);
+  --shadow-welcome-ink-card: 0 22px 40px -20px var(--shadow-tint-ink);
+  --shadow-welcome-demo: 0 18px 36px -22px var(--shadow-tint-50);
+  --animate-welcome-float-left: float 5800ms ease-in-out infinite;
+  --animate-welcome-float-right: float 6400ms ease-in-out 900ms infinite;
+  --animate-welcome-float-center: float 5200ms ease-in-out 400ms infinite;
+  --animate-welcome-caret: welcome-blink 1000ms steps(1) infinite;
+  --animate-welcome-check: pop 450ms var(--ease-spring) both;
+
+  @keyframes welcome-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  /* --- end Welcome steps --- */
 }
 
 /* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
@@ -435,5 +460,9 @@
     /* --- Welcome frame (My-Prompt-Manager-ojz.7): the primary button's shadow, the dark mockup's --- */
     --shadow-tint-ink: rgba(4, 2, 10, 0.92);
     /* --- end Welcome frame --- */
+
+    /* --- Welcome steps (My-Prompt-Manager-ojz.8): the cards' shadow, black at 0.5 x 1.6 --- */
+    --shadow-tint-50: rgba(0, 0, 0, 0.8);
+    /* --- end Welcome steps --- */
   }
 }

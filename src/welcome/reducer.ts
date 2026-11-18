@@ -54,6 +54,10 @@ export interface WelcomeTransition {
 export const defaultPackSelection = (packs: readonly PromptPack[] = PACKS): readonly string[] =>
   packs.filter((pack) => pack.defaultSelected).map((pack) => pack.id);
 
+/** How many Prompts the Packs of a selection hold together: the N of the last step's "Add N prompts" */
+export const promptCountOf = (selectedPacks: readonly string[], packs: readonly PromptPack[] = PACKS): number =>
+  packs.filter((pack) => selectedPacks.includes(pack.id)).reduce((count, pack) => count + pack.prompts.length, 0);
+
 /** The ids of the Packs the Welcome offers: the only ones a selection holds */
 const PACK_IDS: ReadonlySet<string> = new Set(PACKS.map((pack) => pack.id));
 

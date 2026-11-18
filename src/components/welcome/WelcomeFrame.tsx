@@ -84,7 +84,8 @@ const BackButton: FC<{ pop: boolean; onClick: () => void }> = ({ pop, onClick })
 /**
  * The step slot, mounted anew at each step. Reached by a step change, it slides in from the side the
  * step comes from and gives the keyboard to the step's title; at the opening it shows at once and
- * moves no focus
+ * moves no focus. It may shrink to the room left (min-h-0), so a step can scroll a part of itself
+ * (the Packs) rather than the whole step
  */
 const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: ReactNode }> = ({ direction, animated, children }) => {
   const slotRef = useRef<HTMLDivElement>(null);
@@ -101,7 +102,7 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
     <div
       ref={slotRef}
       data-testid="welcome-step"
-      className={cn('my-auto flex w-full flex-col py-3', animated && direction !== 'none' && SLIDE[direction])}
+      className={cn('my-auto flex min-h-0 w-full flex-col py-3', animated && direction !== 'none' && SLIDE[direction])}
     >
       {children}
     </div>

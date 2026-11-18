@@ -48,6 +48,14 @@ function truncateWithEllipsis(str: string, maxLength: number): string {
 }
 
 /**
+ * The short name of a Platform known by its id ('m365copilot' gives 'M365 Copilot'), whatever its
+ * case, or undefined for an id it does not know
+ */
+export function knownPlatformName(id: string): string | undefined {
+  return Object.hasOwn(PLATFORM_DISPLAY_NAMES, id.toLowerCase()) ? PLATFORM_DISPLAY_NAMES[id.toLowerCase()] : undefined;
+}
+
+/**
  * Formats a platform name for display in the UI
  *
  * - Known platforms (claude, chatgpt, etc.) return their display name
@@ -61,7 +69,7 @@ function truncateWithEllipsis(str: string, maxLength: number): string {
  */
 export function formatPlatformName(name: string): string {
   // Check for known platform first
-  const knownName = PLATFORM_DISPLAY_NAMES[name.toLowerCase()];
+  const knownName = knownPlatformName(name);
   if (knownName) {
     return knownName;
   }

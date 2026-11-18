@@ -337,3 +337,22 @@ body {
   }
 }
 /* --- end Welcome frame --- */
+
+/* --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+   Under prefers-reduced-motion the cards of step 1 stay still and the caret of step 2 does not
+   blink (a loop has no near-instant form), and the check of a Pack shows at once. The steps leave
+   these animations off then as well, and step 2 shows the whole name with no caret (BlankDemo.tsx) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-welcome-float-left,
+  .animate-welcome-float-right,
+  .animate-welcome-float-center,
+  .animate-welcome-caret {
+    animation: none;
+  }
+
+  .animate-welcome-check {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
+/* --- end Welcome steps --- */

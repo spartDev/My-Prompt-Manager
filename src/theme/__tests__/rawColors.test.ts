@@ -99,7 +99,11 @@ const MIGRATED = [
   // My-Prompt-Manager-ojz.7: the Welcome's frame and its step slot
   'components/welcome/WelcomeFrame.tsx',
   'components/welcome/WelcomeHost.tsx',
-  'components/welcome/WelcomeSteps.tsx'
+  'components/welcome/WelcomeSteps.tsx',
+  // My-Prompt-Manager-ojz.8: the content of the Welcome's three steps
+  'components/welcome/WelcomeCards.tsx',
+  'components/welcome/BlankDemo.tsx',
+  'components/welcome/PackPicker.tsx'
 ];
 
 // Agent guidance that prescribes classes follows the same rule, or it steers UI work off the tokens
