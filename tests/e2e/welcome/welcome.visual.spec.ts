@@ -61,7 +61,10 @@ const primary = (page: Page) => page.getByTestId('welcome-primary');
 
 const fileOf = (screen: string, surface: Surface, theme: Theme): string => path.join(OUTPUT_DIR, `${screen}-${surface}-${theme}.png`);
 
-/** Resolves once every finite animation of the page has ended; the endless ones are left out */
+/**
+ * Resolves once every finite animation of the page has ended, the endless ones left out, and two
+ * frames have been drawn since: a layer scaled by an animation is drawn again at its final size
+ */
 const animationsDone = (page: Page): Promise<void> =>
   page.evaluate(async () => {
     await Promise.all(
@@ -70,6 +73,9 @@ const animationsDone = (page: Page): Promise<void> =>
         .filter((animation) => animation.timeline instanceof DocumentTimeline && animation.effect?.getComputedTiming().endTime !== Infinity)
         .map((animation) => animation.finished.catch(() => undefined))
     );
+    for (let frame = 0; frame < 2; frame++) {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
   });
 
 /** The pointer off every control, on the header's middle, so nothing shows its hover */
