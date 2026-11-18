@@ -375,6 +375,116 @@ describe('App: leaving the Welcome for a ready Library', () => {
     });
   });
 
+  // My-Prompt-Manager-ojz.17: as the Welcome hands over, the keyboard lands where the next step is
+  describe('where the keyboard lands as the Welcome hands over', () => {
+    /** The first card the Library lists: its Prompt's title and its Copy */
+    const firstCard = (): { title: string; copy: HTMLElement } => {
+      const card = screen.getAllByTestId('prompt-card')[0];
+      const title = within(card).getByRole('heading').textContent ?? '';
+      return { title, copy: within(card).getByRole('button', { name: `Copy content of ${title} to clipboard` }) };
+    };
+
+    it('S2: with Packs, the keyboard is on the first Prompt\'s Copy as the cards show, named after that Prompt, so Enter copies it', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      primary().focus();
+
+      fireEvent.click(primary());
+
+      await waitFor(() => { expect(screen.queryByTestId('welcome')).not.toBeInTheDocument(); });
+      // In the same commit as the cards: no frame shows them with the keyboard nowhere
+      const { title, copy } = firstCard();
+      expect(document.activeElement).toBe(copy);
+      // The Notification says what was added; nothing else is announced
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      // Enter on a button presses it
+      fireEvent.click(copy);
+      const content = DEFAULT_PROMPTS.find((prompt) => prompt.title === title)?.content;
+      expect(content).toBeDefined();
+      await waitFor(() => { expect(navigator.clipboard.writeText).toHaveBeenCalledWith(content); });
+    });
+
+    it('S2: leaves the keyboard where the user already put it while the Packs were added', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      const add = addPacks.getMockImplementation() as typeof addPacks;
+      let release = (): void => undefined;
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      addPacks.mockImplementationOnce(async (packs) => {
+        await held;
+        return add(packs);
+      });
+      // Something outside the Welcome, which the exit does not take away
+      const elsewhere = document.createElement('button');
+      elsewhere.textContent = 'Elsewhere';
+      document.body.append(elsewhere);
+
+      try {
+        fireEvent.click(primary());
+        elsewhere.focus();
+        act(() => { release(); });
+
+        await waitFor(() => { expect(screen.queryByTestId('welcome')).not.toBeInTheDocument(); });
+        expect(screen.getAllByTestId('prompt-card')).toHaveLength(DEFAULT_PROMPTS.length);
+        await settle();
+        expect(document.activeElement).toBe(elsewhere);
+      } finally {
+        elsewhere.remove();
+      }
+    });
+
+    it('S2: moves the keyboard once: the Library shown again later, with the keyboard nowhere, leaves it there', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      fireEvent.click(primary());
+      await waitFor(() => { expect(document.activeElement).toBe(firstCard().copy); });
+
+      // The keyboard on nothing, and kept there: fireEvent.click moves no focus, so the round trip
+      // to Categories and back leaves it on body unless the Library takes it again
+      act(() => { (document.activeElement as HTMLElement).blur(); });
+      fireEvent.click(screen.getByRole('tab', { name: /categories/i }));
+      fireEvent.click(await screen.findByRole('tab', { name: /library/i }));
+      await screen.findAllByTestId('prompt-card');
+      await settle();
+
+      expect(document.activeElement).not.toBe(firstCard().copy);
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('S3: Start empty leaves the keyboard on the editor\'s title field, and nothing takes it to the Library', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2, packs: [] } });
+      await openWelcome(2);
+      primary().focus();
+
+      fireEvent.click(primary());
+
+      const editor = await screen.findByTestId('editor-sheet');
+      const title = within(editor).getByLabelText(/title/i);
+      await waitFor(() => { expect(document.activeElement).toBe(title); });
+      await settle(MOTION.welcomeEditorDelay);
+      expect(document.activeElement).toBe(title);
+    });
+
+    it('Debug mode: What\'s new over the Library keeps the keyboard, and gives it back to the first Prompt\'s Copy as it closes', async () => {
+      await openingOver({ welcome: { status: 'done' }, installedVersion: '1.9.0', lastSeenVersion: '1.9.0', debugMode: true });
+      await openWelcome(0);
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+
+      fireEvent.click(primary());
+
+      const whatsNew = await screen.findByRole('dialog', { name: WHATS_NEW });
+      await waitFor(() => { expect(whatsNew).toContainElement(document.activeElement as HTMLElement); });
+      const { copy } = firstCard();
+
+      fireEvent.click(within(whatsNew).getByRole('button', { name: /got it/i }));
+
+      await waitFor(() => { expect(document.activeElement).toBe(copy); });
+    });
+  });
+
   describe('Debug mode', () => {
     it('the Packs already in the Library from an earlier Debug finish: no duplicate, a Notification that the Library is ready, then What\'s new', async () => {
       const already = DEFAULTS.flatMap((pack) =>

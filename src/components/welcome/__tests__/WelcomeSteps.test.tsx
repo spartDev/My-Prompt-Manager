@@ -352,11 +352,11 @@ describe('Welcome steps', () => {
   // A short side panel cuts the Packs: Writing, selected by default, can be wholly below the grid's edge.
   // The cue is drawn by CSS on the grid's own scroll; tests/e2e/welcome/welcome-a11y.spec.ts measures it
   describe('step 3: a Pack beyond the grid\'s edge is never out of view unseen', () => {
-    it('the grid scrolls on its own timeline inside the edges that draw the cue, and a Pack reached with the keyboard stops clear of the fade', () => {
+    it('the grid scrolls on its own timeline inside the edges that draw the cue, with room for a Pack\'s focus outline (3px past it): 6px of padding, and 4px of scroll padding for a Pack the keyboard reaches', () => {
       renderWelcome({ step: 2 });
 
       const grid = screen.getByRole('group', { name: 'Packs' });
-      expect(grid).toHaveClass('welcome-packs-scroll', 'overflow-y-auto', 'scroll-py-4');
+      expect(grid).toHaveClass('welcome-packs-scroll', 'overflow-y-auto', 'scroll-py-1', 'p-1.5', '-m-1.5');
       expect(grid.parentElement).toHaveClass('welcome-packs-edges', 'relative', 'min-h-0');
       expect(within(grid).getAllByRole('button')).toHaveLength(PACKS.length);
     });

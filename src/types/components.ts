@@ -17,6 +17,8 @@ export interface PromptCardProps {
   showToast: ShowToast;
   isSelected?: boolean;
   searchQuery?: string;
+  /** The Copy button, for whoever gives it the keyboard: the Library, to its first card after the Welcome */
+  copyButtonRef?: RefObject<HTMLButtonElement | null>;
 }
 
 export interface SearchBarProps {
@@ -82,6 +84,12 @@ export interface LibraryViewProps {
   /** Move focus to the active Library filter pill (arriving from Review in Analytics), then call onLibraryFilterFocused */
   focusLibraryFilter?: boolean;
   onLibraryFilterFocused?: () => void;
+  /**
+   * Give the keyboard to the first card's Copy once the cards are listed, unless it is on an element
+   * already (the Welcome's exit with Packs), then call onFirstPromptFocused
+   */
+  focusFirstPrompt?: boolean;
+  onFirstPromptFocused?: () => void;
   loading?: boolean;
   context?: 'popup' | 'sidepanel';
 }

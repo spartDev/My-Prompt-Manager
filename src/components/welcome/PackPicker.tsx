@@ -88,19 +88,22 @@ export interface PackPickerProps {
  * Packs), so the Platforms, the dots and the primary button stay in view. While Packs remain beyond
  * its top or bottom, that edge fades out and a line shows along it (welcome-packs-* in src/popup.css,
  * driven by the grid's scroll), so a Pack, a selected one counted in the primary button included, is
- * never out of view unseen; a Pack the keyboard reaches scrolls into view clear of the fade.
+ * never out of view unseen. A Pack the keyboard reaches scrolls into view with its focus outline, and
+ * while a Pack has the focus the fades step aside, the lines staying, so its outline is whole.
  */
 const PackPicker: FC<PackPickerProps> = ({ selectedPacks, onTogglePack }) => (
   <>
     {/* The edges: they draw the lines of the cue, outside the grid's scroll box and its fade */}
     <div className="welcome-packs-edges relative flex min-h-0 flex-col">
-      {/* The padding leaves room for a toggle's focus outline inside the grid's scroll box; the negative
-          margins take it back, so the Packs line up with the title and the pills */}
+      {/* The padding leaves room for a toggle's focus outline (3px past its border) inside the grid's
+          scroll box, with some to spare, so a 320 x 420 side panel holds a whole Pack with its outline
+          whole; the negative margins take it back, so the Packs line up with the title and the pills.
+          The scroll padding brings a Pack the keyboard reaches into view with its outline */}
       <div
         role="group"
         aria-label="Packs"
         data-testid="welcome-packs"
-        className="welcome-packs-scroll -m-1 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto scroll-py-4 p-1"
+        className="welcome-packs-scroll -m-1.5 grid min-h-0 grid-cols-2 gap-2 overflow-y-auto scroll-py-1 p-1.5"
       >
         {PACKS.map((pack) => (
           <PackToggle key={pack.id} pack={pack} selected={selectedPacks.includes(pack.id)} onToggle={onTogglePack} />

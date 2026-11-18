@@ -14,6 +14,11 @@ export interface WelcomeExitOptions {
   readonly finishWelcome: () => void;
   /** Brings the Library on its All filter with no search, so nothing it holds is out of sight */
   readonly showLibrary: () => void;
+  /**
+   * Asks the Library to give the keyboard to its first Prompt once its cards are listed (the Copy of
+   * the first card), unless the user has put it somewhere already: after the Packs, one Enter copies
+   */
+  readonly focusFirstPrompt: () => void;
   /** Opens the editor on a new Prompt */
   readonly openNewPrompt: () => void;
   readonly showToast: ShowToast;
@@ -53,7 +58,9 @@ const START_EMPTY = 'Start empty';
  * added and the Library read again first; only then is the Welcome finished (so it is recorded done
  * only once the Packs are in), the Library shown on All and the Notification of the add shown. With
  * none, the Welcome is finished and the Library shown at once, and the editor opens on a new Prompt
- * `MOTION.welcomeEditorDelay` later, a timer cleared on unmount.
+ * `MOTION.welcomeEditorDelay` later, a timer cleared on unmount. Where the Welcome leads, the keyboard
+ * goes too: with Packs, to the first Prompt the Library lists, so the first copy is one Enter away;
+ * with none, the editor's title field takes it as the editor opens.
  *
  * A refused add finishes nothing: the Welcome stays at its last step, nothing is recorded, and a
  * failure Notification offers to start empty; the primary button tries again. Each exit, that Start
@@ -135,9 +142,10 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     if (!mounted.current) {
       return;
     }
-    const { finishWelcome, showLibrary, showToast } = latest.current;
+    const { finishWelcome, showLibrary, focusFirstPrompt, showToast } = latest.current;
     finishWelcome();
     showLibrary();
+    focusFirstPrompt();
     const { message, sub } = packsAddedNotice(result);
     showToast(message, 'success', { sub });
   }, [startEmptyAfterFailure]);

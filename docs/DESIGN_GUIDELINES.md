@@ -492,6 +492,12 @@ Flat accent: the brand gradient belongs to the logo only.
 </button>
 ```
 
+The Prompt card's Copy draws `focus-interactive`'s ring on `:focus-visible` only
+(`focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent`): after the
+Welcome's exit the Library gives it the keyboard by script, and Chrome matches `:focus-visible` there
+after a key press, not after a click (see Welcome exit), where `:focus` would draw the ring for a mouse
+user too.
+
 #### Icon Button
 
 ```tsx
@@ -1227,8 +1233,9 @@ Packs are cards outlined at 3:1 (`bg-card border-input`) until selected, then ta
 tint of their color, opaque over `bg-card`, the chip's text, and a border and a check round of their
 color (`src/welcome/packColors.ts`, through `--pack-*` variables as `CategoryChips` does): a Pack's
 color is user data. Its color is the mark as is in light, lifted toward white in dark as the chip's
-text is, and the check glyph is `text-on-pack-check`. The Packs' grid takes back its padding with
-`-m-1`, so the Packs line up with the title and the pills while a focused Pack's outline stays whole.
+text is, and the check glyph is `text-on-pack-check`. The Packs' grid pads its scroll box by 6px
+(`p-1.5`), room for a focused Pack's outline (3px past it) with some to spare, and takes it back with
+`-m-1.5`, so the Packs line up with the title and the pills while that outline stays whole.
 The Platform pills are `bg-card text-secondary`. Every pair is checked at its threshold, in light and
 dark, by "Welcome in light and dark" in `src/theme/__tests__/tokens.test.ts`.
 
@@ -1239,7 +1246,10 @@ and while Packs remain beyond its top or bottom, that edge fades out over 16px a
 never out of view unseen. Like the Sections' scroll lines, the grid's own scroll timeline draws it, with
 no scroll state in React; where the Packs fit, the timeline is inactive and neither shows. It is the
 scroll's state, not motion, so it stays under reduced motion. A Pack the keyboard reaches scrolls into
-view clear of the fades (`scroll-py-4`).
+view with its outline (`scroll-py-1`), and while a Pack has the focus the fades step aside and the lines
+stay (`welcome-packs-scroll:focus-within`, the lines on `z-index: 1` above the Packs that cross the
+edge): in a 320 x 420 side panel the view is barely one Pack high, and a fade would cut an edge of its
+outline.
 
 | Token | Value | Use |
 |---|---|---|
@@ -1262,6 +1272,15 @@ None of them touches the frame's primary button.
 sheet rises. It is a pause, not an animation: it stays under reduced motion, where the sheet itself
 rises at once. With Packs, the Library shows with its cards and the Notification together; the cards
 rise as any listed Prompts do (`animate-list-rise`).
+
+The keyboard goes where the Welcome leads. With Packs, it lands on the first card's Copy as the cards
+show (`focusFirstPrompt` of `LibraryView`), so one Enter copies that Prompt, whose name the button
+carries; only when it is on no element, so a user who has already reached one keeps it. Its ring is
+`focus-interactive`'s drawn on `:focus-visible` (see Small Action Button (Copy)): Chrome matches it for
+that scripted focus after a key press, not after a click, so a mouse user sees no ring appear. The
+Copy ignores a repeated Enter: the Enter on "Add N prompts" can still be held when the Copy takes the
+keyboard, and its auto-repeat copies nothing. With Start empty, the editor's title field takes it as
+the editor opens.
 
 #### Modal Fade In
 

@@ -10,7 +10,8 @@
  * - AC2: with the keyboard alone (Tab, Shift+Tab, Enter, Space, the arrows; no mouse), from the opening
  *   to the Library with Packs added, then a Prompt copied to the clipboard: the first use is within
  *   reach without a mouse. Every stop of the Welcome's Tab cycle is inside it and shows its focus
- *   outline. Enter on a focused Pack toggles it and does not press the primary button.
+ *   outline. Enter on a focused Pack toggles it and does not press the primary button. Past the exit
+ *   the keyboard is on the first card's Copy, so Enter alone copies (My-Prompt-Manager-ojz.17).
  * - AC3: after each step change the live region holds "Step N of 3" and the step's title has the
  *   keyboard; the dots, the Packs, Skip and close have the names and states of the spec, read from
  *   Chrome's own accessibility tree (what a screen reader is given), as is the typing demo, hidden with
@@ -20,20 +21,24 @@
  * - In a short side panel (320 x 500, 320 x 420) the Packs' grid scrolls: while Packs remain below
  *   (Writing, selected and counted in "Add 9 prompts"), the grid's bottom edge fades out and a line
  *   shows along it; the Pack reached with the keyboard scrolls into view and the cue moves to the top.
- *   Where the Packs fit, no cue. Light and dark screenshots in WELCOME_A11Y_SCREENSHOTS
+ *   Each Pack reached, forward and back, has its 2px focus ring whole: inside the grid's view, under
+ *   no fade (the fades step aside while a Pack has the focus, the lines stay) and drawn on its four
+ *   sides, read from the pixels (My-Prompt-Manager-ojz.17); the fade comes back as the keyboard leaves
+ *   the Packs. Where the Packs fit, no cue. Light and dark screenshots in WELCOME_A11Y_SCREENSHOTS
  *   (test-results/welcome-a11y when unset).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import AxeBuilder from '@axe-core/playwright';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import { SITE_SETTINGS_KEY } from '../../../src/services/siteSettings';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { PACKS } from '../../../src/welcome/packs';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
+import { focusRingOf, pixelsOf, RING_TOLERANCE, ringSides } from '../utils/focusRing';
 import { createPromptSeed } from '../utils/storage';
 
 const OUTPUT_DIR = 'test-results/welcome';
@@ -259,6 +264,52 @@ const placeOf = (page: Page, name: string) =>
 
 const shownOf = async (page: Page, name: string): Promise<number> => (await placeOf(page, name))?.shown ?? -1;
 
+/** The grid's view: the box its Packs scroll in, its scrollbar left out */
+const gridView = (page: Page) =>
+  page.evaluate(() => {
+    const grid = document.querySelector<HTMLElement>('[data-testid="welcome-packs"]');
+    if (!grid) {
+      return null;
+    }
+    const box = grid.getBoundingClientRect();
+    const left = box.left + grid.clientLeft;
+    const top = box.top + grid.clientTop;
+    return { left, top, right: left + grid.clientWidth, bottom: top + grid.clientHeight };
+  });
+
+/** Which edges of a toggle's focus ring lie inside the grid's view */
+const ringInView = async (page: Page, toggle: Locator) => {
+  const [ring, view] = [await focusRingOf(toggle), await gridView(page)];
+  return {
+    top: view !== null && ring.top >= view.top,
+    bottom: view !== null && ring.bottom <= view.bottom,
+    left: view !== null && ring.left >= view.left,
+    right: view !== null && ring.right <= view.right
+  };
+};
+
+/**
+ * The top line of the cue as drawn: across the grid's width (the Packs and the gap between them),
+ * the farthest any pixel of the line's row is from its color
+ */
+const topLineDrawn = async (page: Page): Promise<number> => {
+  const line = await page.evaluate(() => {
+    const edges = document.querySelector('[data-testid="welcome-packs"]')?.parentElement;
+    if (!edges) {
+      return null;
+    }
+    const box = edges.getBoundingClientRect();
+    const style = getComputedStyle(edges, '::before');
+    return { left: box.left, width: box.width, top: box.top + parseFloat(style.top), color: style.backgroundColor };
+  });
+  if (!line) {
+    return Infinity;
+  }
+  const pixels = await pixelsOf(page, { x: line.left, y: line.top, width: line.width, height: 1 });
+  const columns = Array.from({ length: Math.floor(line.width / 4) }, (_, index) => line.left + 2 + index * 4);
+  return Math.max(...columns.map((x) => pixels.distance(x, line.top + 0.5, line.color)));
+};
+
 test.describe('The Welcome for keyboard and screen-reader users', () => {
   for (const surface of ['popup', 'sidepanel'] as const) {
     for (const theme of ['light', 'dark'] as const) {
@@ -384,9 +435,13 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
     await expect(page.getByTestId('prompt-card')).toHaveCount(promptsOf(withHiring));
     await expect(page.getByTestId('toast')).toContainText(`${String(promptsOf(withHiring))} prompts added`);
 
-    // The first use: a Prompt copied, with the keyboard
-    const copy = await tabTo(page, /^Copy content of .+ to clipboard$/, 60);
-    const title = copy.name.replace(/^Copy content of /, '').replace(/ to clipboard$/, '');
+    // The first use: the keyboard is already on the first card's Copy (My-Prompt-Manager-ojz.17), named
+    // after its Prompt and showing its outline, so Enter alone copies that Prompt
+    const title = (await page.getByTestId('prompt-card').first().getByRole('heading').textContent())?.trim() ?? '';
+    const copy = await focused(page);
+    expect(copy?.name).toBe(`Copy content of ${title} to clipboard`);
+    expect(copy?.outline.style, 'the first Copy: focus outline').not.toBe('none');
+    expect(copy?.outline.width, 'the first Copy: focus outline width').toBeGreaterThanOrEqual(2);
     const content = PACKS.flatMap((pack) => pack.prompts).find((prompt) => prompt.title === title)?.content;
     expect(content, `${title} is a Prompt of the Packs`).toBeDefined();
     await page.keyboard.press('Enter');
@@ -497,7 +552,7 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
 
   for (const height of [500, 420] as const) {
     for (const theme of ['light', 'dark'] as const) {
-      test(`a short side panel, 320 x ${String(height)}, ${theme}: while Packs remain below, the grid's edge fades out with a line along it; the Pack reached with the keyboard scrolls into view`, async ({ page, storage, extensionId }) => {
+      test(`a short side panel, 320 x ${String(height)}, ${theme}: while Packs remain below, the grid's edge fades out with a line along it; each Pack the keyboard reaches scrolls into view with its focus ring whole, the fades stepping aside while it has the focus`, async ({ page, storage, extensionId }) => {
         await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
         await open(page, extensionId, 'sidepanel', 320, height);
         await expectTheme(page, theme);
@@ -518,20 +573,57 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
         // Not animations: 'disabled', which cancels the scroll-driven animations that draw the cue
         await page.screenshot({ path: name('cue') });
 
-        // The keyboard on Writing: the grid scrolls it wholly into view, its name and count clear of both
-        // fades; the cue shows at the top, where Product and Engineering now are. (At 320 x 420 the view is
-        // barely one Pack high: the scroll padding cannot fit, and the top fade covers Writing's top padding)
-        await tabTo(page, /^Writing /);
-        await expect.poll(() => shownOf(page, 'Writing')).toBe(1);
-        // The scroll timeline draws the cue at the next frame
-        await expect.poll(() => packsCue(page)).toMatchObject({ overflows: true, fadeTop: FADE_PX, lineTop: 1 });
-        const scrolled = await packsCue(page);
-        const writing = await placeOf(page, 'Writing');
-        test.info().annotations.push({ type: 'cue scrolled', description: JSON.stringify({ ...scrolled, writing }) });
-        expect(scrolled?.scrollTop).toBeGreaterThan(0);
-        expect(writing?.textAbove, "Writing's name below the top fade").toBeGreaterThanOrEqual(scrolled?.fadeTop ?? Infinity);
-        expect(writing?.textBelow, "Writing's count above the bottom fade").toBeGreaterThanOrEqual(scrolled?.fadeBottom ?? Infinity);
-        await page.screenshot({ path: name('scrolled') });
+        // The keyboard on each Pack in turn, forward then back: each scrolls into view with its focus ring
+        // whole: inside the grid's view, under no fade (they step aside while a Pack has the focus), and
+        // drawn in its color on its four sides, read from the pixels (My-Prompt-Manager-ojz.17). At
+        // 320 x 420 the view is barely one Pack high, where a fade would cut its ring
+        const packs = page.getByRole('group', { name: 'Packs' });
+        const walk = [
+          { pack: 'Product', key: null },
+          { pack: 'Engineering', key: 'Tab' },
+          { pack: 'Writing', key: 'Tab' },
+          { pack: 'Hiring', key: 'Tab' },
+          { pack: 'Writing', key: 'Shift+Tab' },
+          { pack: 'Engineering', key: 'Shift+Tab' },
+          { pack: 'Product', key: 'Shift+Tab' }
+        ] as const;
+        for (const [index, { pack, key }] of walk.entries()) {
+          if (key === null) {
+            await tabTo(page, new RegExp(`^${pack} `));
+          } else {
+            await page.keyboard.press(key);
+          }
+          const toggle = packs.getByRole('button', { name: new RegExp(`^${pack} `) });
+          await expect(toggle).toBeFocused();
+          // The scroll and the cue settle at the next frame
+          await expect.poll(() => packsCue(page)).toMatchObject({ overflows: true, fadeTop: 0, fadeBottom: 0 });
+          await expect.poll(() => ringInView(page, toggle)).toEqual({ top: true, bottom: true, left: true, right: true });
+          const ring = await focusRingOf(toggle);
+          const sides = await ringSides(page, ring);
+          const where = `${pack} (${String(index + 1)} of ${String(walk.length)})`;
+          test.info().annotations.push({ type: `ring of ${where}`, description: JSON.stringify({ ring: { top: ring.top, bottom: ring.bottom }, view: await gridView(page), sides }) });
+          expect(ring.width, `${where}: a 2px ring`).toBe(2);
+          for (const side of sides) {
+            expect(side.worst, `${where}: the ring's ${side.side} side, drawn in ${ring.color}`).toBeLessThanOrEqual(RING_TOLERANCE);
+          }
+          if (pack === 'Writing' && key === 'Tab') {
+            // Writing, below the view at first, is now in it, the cue's line at the top where
+            // Product and Engineering went, over them
+            const scrolled = await packsCue(page);
+            expect(scrolled?.scrollTop).toBeGreaterThan(0);
+            expect(scrolled?.lineTop, 'the line stays at the top').toBe(1);
+            expect(await topLineDrawn(page), 'the top line drawn over the Packs').toBeLessThanOrEqual(RING_TOLERANCE);
+            await page.screenshot({ path: name('scrolled') });
+          }
+          if (pack === 'Hiring') {
+            // The keyboard leaves the Packs for the dots: the fade comes back at the top
+            await page.keyboard.press('Tab');
+            await expect(page.getByRole('button', { name: 'Step 1 of 3' })).toBeFocused();
+            await expect.poll(() => packsCue(page)).toMatchObject({ overflows: true, fadeTop: FADE_PX, lineTop: 1 });
+            await page.keyboard.press('Shift+Tab');
+            await expect(toggle).toBeFocused();
+          }
+        }
       });
     }
   }

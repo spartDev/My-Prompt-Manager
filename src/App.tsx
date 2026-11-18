@@ -441,6 +441,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     clearSearch();
     setLibraryFilter(ALL_PROMPTS);
   }, [clearSearch]);
+  // After the Packs, the keyboard goes to the first Prompt the Library lists, so the first copy is one
+  // Enter away (My-Prompt-Manager-ojz.17). Asked once: the Library is done with it as its cards show
+  const [focusFirstPrompt, setFocusFirstPrompt] = useState(false);
+  const askFirstPromptFocus = useCallback(() => { setFocusFirstPrompt(true); }, []);
+  const handleFirstPromptFocused = useCallback(() => { setFocusFirstPrompt(false); }, []);
   // The only Notification over the Welcome is a refused add's: it goes as an exit starts
   const shownToastId = toast?.id;
   const hideShownToast = useCallback(() => {
@@ -452,6 +457,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     addPacks,
     finishWelcome: launch.finishWelcome,
     showLibrary: showWholeLibrary,
+    focusFirstPrompt: askFirstPromptFocus,
     openNewPrompt,
     showToast,
     hideNotification: hideShownToast
@@ -591,6 +597,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onLibraryFilterChange={setLibraryFilter}
           focusLibraryFilter={focusLibraryFilter}
           onLibraryFilterFocused={handleLibraryFilterFocused}
+          focusFirstPrompt={focusFirstPrompt}
+          onFirstPromptFocused={handleFirstPromptFocused}
           loading={loading}
           context={context}
         />

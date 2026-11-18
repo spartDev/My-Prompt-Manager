@@ -39,12 +39,13 @@ const renderExit = (overrides: Partial<WelcomeExitOptions> = {}) => {
   });
   const finishWelcome = vi.fn(() => { log.push('finishWelcome'); });
   const showLibrary = vi.fn(() => { log.push('showLibrary'); });
+  const focusFirstPrompt = vi.fn(() => { log.push('focusFirstPrompt'); });
   const openNewPrompt = vi.fn(() => { log.push('openNewPrompt'); });
   const showToast = vi.fn<ShowToast>((message) => { log.push(`toast ${message}`); });
   const hideNotification = vi.fn(() => { log.push('hideNotification'); });
-  const options: WelcomeExitOptions = { addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, hideNotification, ...overrides };
+  const options: WelcomeExitOptions = { addPacks, finishWelcome, showLibrary, focusFirstPrompt, openNewPrompt, showToast, hideNotification, ...overrides };
   const view = renderHook((props: WelcomeExitOptions) => useWelcomeExit(props), { initialProps: options });
-  return { ...view, log, addPacks, finishWelcome, showLibrary, openNewPrompt, showToast, hideNotification, options };
+  return { ...view, log, addPacks, finishWelcome, showLibrary, focusFirstPrompt, openNewPrompt, showToast, hideNotification, options };
 };
 
 /** Lets the promise callbacks of an add that has settled run */
@@ -61,7 +62,7 @@ describe('useWelcomeExit', () => {
   });
 
   describe('with Packs: the Packs added, then the Welcome finished, then the Library and the Notification', () => {
-    it('adds the Packs selected, finishes the Welcome only once they are in, then shows the Library on All and the Notification', async () => {
+    it('adds the Packs selected, finishes the Welcome only once they are in, then shows the Library on All with the keyboard asked to its first Prompt, and the Notification', async () => {
       const { result, log, showToast } = renderExit();
 
       act(() => { result.current(DEFAULT_IDS); });
@@ -69,7 +70,7 @@ describe('useWelcomeExit', () => {
 
       await flush();
 
-      expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', `toast ${String(DEFAULT_COUNT)} prompts added`]);
+      expect(log).toEqual(['hideNotification', `addPacks ${DEFAULT_IDS.join(',')}`, 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(DEFAULT_COUNT)} prompts added`]);
       expect(showToast).toHaveBeenCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: 'Product, Writing' });
     });
 
@@ -141,13 +142,15 @@ describe('useWelcomeExit', () => {
 
     it('finishes nothing and shows a failure Notification that offers to start empty', async () => {
       const addPacks = refused();
-      const { result, finishWelcome, showLibrary, openNewPrompt, showToast } = renderExit({ addPacks });
+      const { result, finishWelcome, showLibrary, focusFirstPrompt, openNewPrompt, showToast } = renderExit({ addPacks });
 
       act(() => { result.current(DEFAULT_IDS); });
       await flush();
 
       expect(finishWelcome).not.toHaveBeenCalled();
       expect(showLibrary).not.toHaveBeenCalled();
+      // The keyboard stays in the Welcome, on the primary button that tries again
+      expect(focusFirstPrompt).not.toHaveBeenCalled();
       expect(openNewPrompt).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(1);
       expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { action: { label: 'Start empty', onClick: expect.any(Function) } });
@@ -244,8 +247,8 @@ describe('useWelcomeExit', () => {
   });
 
   describe('Start empty: the Welcome finished, the Library, then the editor on a new Prompt', () => {
-    it('finishes the Welcome and shows the Library at once, and opens the editor 250ms later, not before', () => {
-      const { result, log, addPacks, openNewPrompt, showToast } = renderExit();
+    it('finishes the Welcome and shows the Library at once, and opens the editor 250ms later, not before; the keyboard is left to the editor\'s title', () => {
+      const { result, log, addPacks, focusFirstPrompt, openNewPrompt, showToast } = renderExit();
 
       act(() => { result.current([]); });
 
@@ -258,6 +261,7 @@ describe('useWelcomeExit', () => {
       act(() => { vi.advanceTimersByTime(1); });
       expect(openNewPrompt).toHaveBeenCalledTimes(1);
       expect(log).toEqual(['hideNotification', 'finishWelcome', 'showLibrary', 'openNewPrompt']);
+      expect(focusFirstPrompt).not.toHaveBeenCalled();
     });
 
     it('waits 250ms, within the 50ms the ticket allows, under reduced motion too: it is a pause to see the Library, no animation', () => {
@@ -342,7 +346,7 @@ describe('useWelcomeExit', () => {
 
   it('unmounted while the add is under way (the popup closed), finishes nothing and shows nothing once it lands', async () => {
     const add = deferred<AddPacksResult>();
-    const { result, unmount, finishWelcome, showToast, showLibrary } = renderExit({ addPacks: vi.fn(() => add.promise) });
+    const { result, unmount, finishWelcome, showToast, showLibrary, focusFirstPrompt } = renderExit({ addPacks: vi.fn(() => add.promise) });
 
     act(() => { result.current(DEFAULT_IDS); });
     unmount();
@@ -351,6 +355,7 @@ describe('useWelcomeExit', () => {
 
     expect(finishWelcome).not.toHaveBeenCalled();
     expect(showLibrary).not.toHaveBeenCalled();
+    expect(focusFirstPrompt).not.toHaveBeenCalled();
     expect(showToast).not.toHaveBeenCalled();
   });
 

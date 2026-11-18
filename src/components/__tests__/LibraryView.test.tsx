@@ -633,4 +633,58 @@ describe('LibraryView', () => {
       expect(sortPrompts).toHaveBeenLastCalledWith(expect.any(Array), 'title', 'asc');
     });
   });
+
+  // My-Prompt-Manager-ojz.17: after the Welcome's exit with Packs, one Enter copies the first Prompt
+  describe('the keyboard to the first Prompt, asked once', () => {
+    const listed: Prompt[] = [
+      { id: 'first', title: 'First', content: 'First content', category: 'Work', createdAt: 2, updatedAt: 2 },
+      { id: 'second', title: 'Second', content: 'Second content', category: 'Work', createdAt: 1, updatedAt: 1 }
+    ];
+    const props = { ...defaultProps, prompts: listed, searchWithDebounce: createMockSearchWithDebounce(listed) };
+    const firstCopy = (): HTMLElement => screen.getByRole('button', { name: 'Copy content of First to clipboard' });
+
+    it('with the keyboard nowhere, gives it to the first card\'s Copy, then says it is done', () => {
+      const onFirstPromptFocused = vi.fn();
+
+      render(<LibraryView {...props} focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+      expect(firstCopy()).toHaveFocus();
+      expect(onFirstPromptFocused).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the keyboard where the user put it, and is done all the same', () => {
+      const onFirstPromptFocused = vi.fn();
+      const elsewhere = document.createElement('button');
+      document.body.append(elsewhere);
+      elsewhere.focus();
+
+      try {
+        render(<LibraryView {...props} focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+        expect(elsewhere).toHaveFocus();
+        expect(onFirstPromptFocused).toHaveBeenCalledTimes(1);
+      } finally {
+        elsewhere.remove();
+      }
+    });
+
+    it('waits while the Library loads, then gives it to the first card listed', () => {
+      const onFirstPromptFocused = vi.fn();
+      const { rerender } = render(<LibraryView {...props} loading focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+      expect(onFirstPromptFocused).not.toHaveBeenCalled();
+      expect(document.body).toHaveFocus();
+
+      rerender(<LibraryView {...props} loading={false} focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+      expect(firstCopy()).toHaveFocus();
+      expect(onFirstPromptFocused).toHaveBeenCalledTimes(1);
+    });
+
+    it('moves nothing when not asked', () => {
+      render(<LibraryView {...props} />);
+
+      expect(document.body).toHaveFocus();
+    });
+  });
 });
