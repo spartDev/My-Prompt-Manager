@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
+import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
 import { getMockStorageManager } from '../../test/mocks';
 import { MOTION } from '../../theme/motion';
 import type { Category, Prompt } from '../../types';
+import { PACKS } from '../../welcome/packs';
 import { WELCOME_KEY } from '../../welcome/storage';
 import { markReleaseSeen, WHATS_NEW_KEY } from '../../whatsNew/storage';
 
@@ -178,6 +180,29 @@ describe("App: What's new", () => {
       expect(screen.getByTestId('editor-sheet')).toBeInTheDocument();
       expect(screen.getByLabelText(/title/i)).toHaveValue('');
       expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+    });
+
+    it('prompt-editor-new: an editor already open keeps its draft (Debug mode: Start empty opens it 250ms after the Library, under What\'s new)', async () => {
+      await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: { debugMode: true } });
+      render(<App />);
+      await screen.findByTestId('welcome');
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      for (const pack of PACKS.filter((candidate) => candidate.defaultSelected)) {
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${pack.name} `) }));
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Start empty' }));
+
+      // Debug mode brings What's new after the Welcome; the editor rises beneath it 250ms later
+      const sheet = await screen.findByRole('dialog', { name: WHATS_NEW });
+      const editorSheet = await screen.findByTestId('editor-sheet');
+      fireEvent.change(within(editorSheet).getByLabelText(/title/i), { target: { value: 'My draft' } });
+
+      fireEvent.click(within(sheet).getByRole('button', { name: /^Fill-in variables/ }));
+      await waitForElementToBeRemoved(sheet);
+
+      // The same editor, its draft kept
+      expect(screen.getByTestId('editor-sheet')).toBe(editorSheet);
+      expect(within(editorSheet).getByLabelText(/title/i)).toHaveValue('My draft');
     });
 
     it.each([

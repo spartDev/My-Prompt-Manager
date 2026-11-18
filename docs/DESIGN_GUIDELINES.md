@@ -1239,6 +1239,14 @@ dark, by "Welcome in light and dark" in `src/theme/__tests__/tokens.test.ts`.
 
 None of them touches the frame's primary button.
 
+#### Welcome exit
+
+"Start empty" shows the Library, then opens the editor on a new Prompt after `MOTION.welcomeEditorDelay`
+(250ms, a timer of `src/hooks/useWelcomeExit.ts`), so the user sees where the Welcome leads before the
+sheet rises. It is a pause, not an animation: it stays under reduced motion, where the sheet itself
+rises at once. With Packs, the Library shows with its cards and the Notification together; the cards
+rise as any listed Prompts do (`animate-list-rise`).
+
 #### Modal Fade In
 
 ```css

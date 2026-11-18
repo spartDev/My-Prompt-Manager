@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPrompt } from '../../test/builders';
 import { FakeLockManager, installNavigatorLocks } from '../../test/utils/FakeLockManager';
 import { DEFAULT_CATEGORY } from '../../types';
+import { PACKS } from '../../welcome/packs';
 import type { PromptPack } from '../../welcome/types';
 import { AdmissionRefusedError } from '../promptAdmission';
 import { StorageManager } from '../storage';
@@ -84,6 +85,19 @@ describe('StorageManager.addPacks', () => {
       ]);
       expect(prompts[0]).toMatchObject({ createdAt: NOW, updatedAt: NOW, usageCount: 0, lastUsedAt: NOW });
       expect(new Set(prompts.map(p => p.id)).size).toBe(packPromptCount);
+    });
+
+    it('takes every Pack the Welcome offers: each Prompt admitted as it is written, none skipped, none refused', async () => {
+      const result = await StorageManager.getInstance().addPacks(PACKS);
+
+      const offered = PACKS.flatMap(pack => pack.prompts.map(({ title, content }) => ({ title, content, category: pack.name })));
+      expect(result).toEqual({ added: offered.length, skipped: 0, packNames: PACKS.map(pack => pack.name) });
+      // Verbatim: Admission changes nothing in them
+      expect((await storedPrompts()).map(({ title, content, category }) => ({ title, content, category }))).toEqual(offered);
+      expect((await storedCategories()).map(({ name, color }) => ({ name, color }))).toEqual([
+        { name: DEFAULT_CATEGORY, color: undefined },
+        ...PACKS.map(({ name, color }) => ({ name, color }))
+      ]);
     });
 
     it('reads back as the Library: getPrompts and getCategories list what was added', async () => {
@@ -216,6 +230,18 @@ describe('StorageManager.addPacks', () => {
 
       expect(result).toEqual({ added: writing.prompts.length, skipped: 1, packNames: ['Writing'] });
       expect((await storedCategories()).map(c => c.name)).toEqual([DEFAULT_CATEGORY, 'Writing']);
+    });
+
+    it('skips a Prompt whose content an earlier Prompt of the same Pack has, keeping the first one\'s title', async () => {
+      const repeated: PromptPack = {
+        ...writing,
+        prompts: [writing.prompts[0], writing.prompts[1], { title: 'Same text, other title', content: writing.prompts[0].content }]
+      };
+
+      const result = await StorageManager.getInstance().addPacks([repeated]);
+
+      expect(result).toEqual({ added: 2, skipped: 1, packNames: ['Writing'] });
+      expect((await storedPrompts()).map(({ title, content }) => ({ title, content }))).toEqual(writing.prompts.map(({ title, content }) => ({ title, content })));
     });
 
     it('refuses every Pack when one Prompt is refused, and writes nothing', async () => {
