@@ -17,7 +17,8 @@ const V2_0_1_EMPTY: ReleaseNotes = { version: '2.0.1', items: [] };
 const REGISTRY: readonly ReleaseNotes[] = [V1_9, V2_0, V2_0_1_EMPTY];
 
 const NONE: LaunchScreen = { kind: 'none' };
-const welcomeAt = (step: 0 | 1 | 2): LaunchScreen => ({ kind: 'welcome', step });
+const welcomeAt = (step: 0 | 1 | 2, packs?: readonly string[]): LaunchScreen =>
+  packs === undefined ? { kind: 'welcome', step } : { kind: 'welcome', step, packs };
 const whatsNewOf = (shown: ReleaseNotes | null): LaunchScreen => (shown === null ? NONE : { kind: 'whats-new', notes: shown });
 
 // The dimensions of the table: every Welcome record, Library, Debug mode, What's new situation and
@@ -80,7 +81,7 @@ const isPending = (welcome: LaunchInputs['welcome']): welcome is Extract<Welcome
  * - Debug mode: the Welcome from its first step at every opening, whatever else holds, until it is
  *   finished in this opening; then What's new as Debug mode forces it.
  * - Normal: nothing right after the Welcome; the Welcome only for a pending record over a Library
- *   known to be empty (pending + Prompts is a Welcome finished; a Library not read is a doubt, and in
+ *   known to be empty, at its stored step with its stored Packs (pending + Prompts is a Welcome finished; a Library not read is a doubt, and in
  *   doubt neither the Welcome nor What's new shows to a user the record says is new); otherwise
  *   What's new by its own rule.
  */
@@ -98,7 +99,7 @@ const expectedScreen = (
     return NONE;
   }
   if (isPending(welcome) && libraryHasPrompts === false) {
-    return welcomeAt(welcome.step);
+    return welcomeAt(welcome.step, welcome.packs);
   }
   if (isPending(welcome) && libraryHasPrompts === undefined) {
     return NONE;
@@ -154,8 +155,9 @@ describe('decideLaunch', () => {
     it.each(TABLE)('$name', ({ inputs, expected }) => {
       const screen = decideLaunch(inputs);
       expect(screen).toEqual(expected);
-      // Never both: one kind, with only the fields of that kind
-      const fields = { welcome: ['kind', 'step'], 'whats-new': ['kind', 'notes'], none: ['kind'] }[screen.kind];
+      // Never both: one kind, with only the fields of that kind (the Welcome's Packs only when stored)
+      const welcomeFields = screen.kind === 'welcome' && screen.packs !== undefined ? ['kind', 'step', 'packs'] : ['kind', 'step'];
+      const fields = { welcome: welcomeFields, 'whats-new': ['kind', 'notes'], none: ['kind'] }[screen.kind];
       expect(Object.keys(screen).sort()).toEqual([...fields].sort());
     });
   });
@@ -163,6 +165,20 @@ describe('decideLaunch', () => {
   describe('the Welcome', () => {
     it.each([0, 1, 2] as const)('pending at step %i over an empty Library: the Welcome at that step', (step) => {
       expect(decideLaunch({ ...base, welcome: { status: 'pending', step }, libraryHasPrompts: false, isFirstInstall: true })).toEqual(welcomeAt(step));
+    });
+
+    it('pending with Packs selected over an empty Library: the Welcome at its step, with those Packs', () => {
+      expect(
+        decideLaunch({ ...base, welcome: { status: 'pending', step: 2, packs: ['product', 'writing'] }, libraryHasPrompts: false })
+      ).toEqual({ kind: 'welcome', step: 2, packs: ['product', 'writing'] });
+    });
+
+    it('pending with no Pack selected (an empty selection the user made): the Welcome with that empty selection', () => {
+      expect(decideLaunch({ ...base, welcome: { status: 'pending', step: 2, packs: [] }, libraryHasPrompts: false })).toEqual({
+        kind: 'welcome',
+        step: 2,
+        packs: []
+      });
     });
 
     it.each([0, 1, 2] as const)('pending at step %i with Prompts in the Library: not the Welcome (a Welcome finished whose done write was lost)', (step) => {
@@ -207,7 +223,7 @@ describe('decideLaunch', () => {
   });
 
   describe('Debug mode', () => {
-    it.each(RECORDS)('$name: the Welcome from its first step, whatever the Library and What\'s new', ({ welcome }) => {
+    it.each(RECORDS)('$name: the Welcome from its first step with the default Packs, whatever the Library and What\'s new', ({ welcome }) => {
       for (const library of LIBRARIES) {
         for (const whatsNew of WHATS_NEW) {
           expect(

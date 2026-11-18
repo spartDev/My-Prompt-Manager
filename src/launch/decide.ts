@@ -9,7 +9,13 @@ import { decideWhatsNew, type WhatsNewInputs } from '../whatsNew/decide';
 import type { ReleaseNotes } from '../whatsNew/types';
 
 export type LaunchScreen =
-  | { readonly kind: 'welcome'; readonly step: WelcomeStep }
+  | {
+      readonly kind: 'welcome';
+      /** The step the Welcome opens at */
+      readonly step: WelcomeStep;
+      /** The Packs the user selected at an earlier opening; absent, the Welcome's default selection */
+      readonly packs?: readonly string[];
+    }
   | { readonly kind: 'whats-new'; readonly notes: ReleaseNotes }
   | { readonly kind: 'none' };
 
@@ -36,12 +42,14 @@ const whatsNew = (inputs: WhatsNewInputs): LaunchScreen => {
 /**
  * The screen an opening shows. Pure.
  *
- * Debug mode: the Welcome from its first step at every opening, whatever else holds; once it is
- * finished in this opening, What's new as Debug mode forces it (the Welcome first, What's new after).
+ * Debug mode: the Welcome from its first step, with the default Packs, at every opening, whatever
+ * else holds; once it is finished in this opening, What's new as Debug mode forces it (the Welcome
+ * first, What's new after).
  *
  * Normal:
  * - The Welcome finished in this opening: nothing, so a new user never meets What's new right after it.
- * - The Welcome only for a pending record over a Library known to be empty, at the stored step. A
+ * - The Welcome only for a pending record over a Library known to be empty, at the stored step with
+ *   the stored Pack selection, so a Welcome closed before its end resumes where it was left. A
  *   pending record over a Library with Prompts is a Welcome finished (its done write was lost, or a
  *   relaunch of the command-line extension wrote pending over an existing Library): What's new by its rule.
  * - A pending record over a Library not read is a doubt: nothing, neither the Welcome nor What's new
@@ -62,7 +70,7 @@ export const decideLaunch = (inputs: LaunchInputs): LaunchScreen => {
   }
   if (typeof welcome === 'object' && welcome.status === 'pending') {
     if (libraryHasPrompts === false) {
-      return { kind: 'welcome', step: welcome.step };
+      return { kind: 'welcome', step: welcome.step, ...(welcome.packs === undefined ? {} : { packs: welcome.packs }) };
     }
     if (libraryHasPrompts === undefined) {
       return NOTHING;

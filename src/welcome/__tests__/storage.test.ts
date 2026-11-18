@@ -153,8 +153,53 @@ describe('Welcome record: writeWelcomeRecord', () => {
     expect(await stored()).toEqual({ status: 'pending', step: 2, packs: ['product'] });
   });
 
+  it('keeps the stored Packs when the step comes without any', async () => {
+    await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: ['writing'] } });
+
+    await expect(writeWelcomeRecord({ status: 'pending', step: 1 })).resolves.toBe(true);
+
+    expect(await stored()).toEqual({ status: 'pending', step: 1, packs: ['writing'] });
+  });
+
+  it('replaces the stored Packs with the ones given, an empty selection included', async () => {
+    await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: ['writing'] } });
+
+    await writeWelcomeRecord({ status: 'pending', step: 2, packs: [] });
+
+    expect(await stored()).toEqual({ status: 'pending', step: 2, packs: [] });
+  });
+
+  it.each<[string, unknown]>([
+    ['no record', undefined],
+    ['a value that is not a record', 'corrupted'],
+    ['an unknown status', { status: 'finished' }]
+  ])('never makes a pending record: a step over %s writes nothing (only the service worker records the Welcome as pending)', async (_label, value) => {
+    if (value !== undefined) {
+      await chrome.storage.local.set({ [WELCOME_KEY]: value });
+    }
+    vi.mocked(chrome.storage.local.set).mockClear();
+
+    await expect(writeWelcomeRecord({ status: 'pending', step: 1, packs: ['product'] })).resolves.toBe(false);
+
+    expect(welcomeWrites()).toEqual([]);
+    expect(await stored()).toEqual(value);
+  });
+
   it('writes the end over a pending record', async () => {
     await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+
+    await expect(writeWelcomeRecord({ status: 'done' })).resolves.toBe(true);
+
+    expect(await stored()).toEqual({ status: 'done' });
+  });
+
+  it.each<[string, unknown]>([
+    ['no record', undefined],
+    ['a value that is not a record', 'corrupted']
+  ])('writes the end over %s: a Welcome the user finished is final, whatever storage held', async (_label, value) => {
+    if (value !== undefined) {
+      await chrome.storage.local.set({ [WELCOME_KEY]: value });
+    }
 
     await expect(writeWelcomeRecord({ status: 'done' })).resolves.toBe(true);
 
@@ -176,6 +221,7 @@ describe('Welcome record: writeWelcomeRecord', () => {
   });
 
   it('stores only the fields of the record', async () => {
+    await chrome.storage.local.set({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
     const withExtra = { status: 'pending', step: 1, packs: ['product'], extra: 'x' } as WelcomeRecord;
 
     await writeWelcomeRecord(withExtra);
