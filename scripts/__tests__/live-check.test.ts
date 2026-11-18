@@ -186,6 +186,7 @@ function fakePage({ editor, typeThrows = false, text = '', restore, backspaceLea
     },
     locator: () => ({ waitFor: () => Promise.resolve(), isVisible: () => Promise.resolve(false), first: () => ({ waitFor: () => restoreOn('icon') }) }),
     evaluate: () => Promise.resolve(null),
+    evaluateHandle: () => Promise.resolve({ dispose: () => Promise.resolve() }),
     waitForTimeout: vi.fn(() => restoreOn('pause')),
     waitForFunction
   } as unknown as Page;
@@ -284,9 +285,12 @@ describe('runCase progress', () => {
 
 /**
  * A page for the case runner backed by the test's own DOM: the page evaluates against `document`,
- * the editor handle against the editor element, so the chain is read as the browser would read it
+ * the editor handle against the editor element, so the chain is read as the browser would read it.
+ * A handle the page returns stands for its value when sent back to the page, as Playwright's does.
+ *
+ * @param onType - What the Platform does to its DOM while the case types
  */
-function domPage(html: string, lang: string) {
+function domPage(html: string, lang: string, onType?: () => void) {
   document.documentElement.lang = lang;
   document.body.innerHTML = html;
   const editor = document.querySelector<HTMLElement>('textarea, [contenteditable="true"]');
@@ -295,10 +299,20 @@ function domPage(html: string, lang: string) {
     dispose: () => Promise.resolve(),
     evaluate: (fn: (element: HTMLElement, arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(editor as HTMLElement, arg))
   };
+  const handles = new Map<object, unknown>();
+  const unwrap = (arg: unknown): unknown =>
+    (arg && typeof arg === 'object' && !Array.isArray(arg)
+      ? Object.fromEntries(Object.entries(arg).map(([key, value]) => [key, typeof value === 'object' && value !== null && handles.has(value) ? handles.get(value) : value]))
+      : arg);
   return {
-    evaluate: (fn: (arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(arg)),
+    evaluate: (fn: (arg: unknown) => unknown, arg: unknown) => Promise.resolve(fn(unwrap(arg))),
+    evaluateHandle: (fn: (arg: unknown) => unknown, arg: unknown) => {
+      const jsHandle = { dispose: () => Promise.resolve() };
+      handles.set(jsHandle, fn(unwrap(arg)));
+      return Promise.resolve(jsHandle);
+    },
     waitForFunction: () => (editor ? Promise.resolve({ asElement: () => handle }) : Promise.reject(new Error('Timeout exceeded'))),
-    keyboard: { press: () => Promise.resolve(), type: () => Promise.resolve() },
+    keyboard: { press: () => Promise.resolve(), type: () => { onType?.(); return Promise.resolve(); } },
     locator: () => ({ waitFor: () => Promise.resolve(), first: () => ({ waitFor: () => Promise.resolve() }) }),
     waitForTimeout: () => Promise.resolve()
   } as unknown as Page;
@@ -395,6 +409,80 @@ describe('runCase reads a rich-text field line by line', () => {
     await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10, progress);
 
     expect(progress.typed).toBe(true);
+  });
+});
+
+describe('runCase icon-steady holds the anchor across the typing', () => {
+  const toolbarIcon = '<button class="prompt-library-integrated-icon" data-mpm-placement="toolbar" data-mpm-anchor="0">P</button>';
+  const icon = () => document.querySelector('.prompt-library-integrated-icon') as HTMLElement;
+  const button = (label: string): HTMLButtonElement => {
+    const element = document.createElement('button');
+    element.setAttribute('aria-label', label);
+    return element;
+  };
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  // ChatGPT's chain finds the dictate button first: one shows earlier in the form while typing
+  const chatgpt = `<form><textarea></textarea><div id="tools"></div><div>${toolbarIcon}<button aria-label="Dictate">m</button></div></form>`;
+
+  it('fails when the button is re-placed beside another element the anchor selector finds', async () => {
+    const page = domPage(chatgpt, 'en', () => {
+      const other = button('Dictate');
+      document.querySelector('#tools')?.append(other);
+      other.before(icon());
+    });
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, no longer beside its anchor (0.0px on the page)' });
+  });
+
+  it('passes when another element the anchor selector finds shows, the button still beside its own', async () => {
+    const page = domPage(chatgpt, 'en', () => {
+      document.querySelector('#tools')?.append(button('Dictate'));
+    });
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor (0.0px on the page)' });
+  });
+
+  // Mistral, live 2026-11-18: once the field has text, the voice control's div holds the send
+  // button instead, and a new voice div shows between the Prompts button and it
+  const mistral = `<form><textarea></textarea>${toolbarIcon}<div id="voice"><button aria-label="Voice Mode">v</button></div></form>`;
+  const sendButtonShows = (newVoice: 'before' | 'after') => () => {
+    const old = document.querySelector('#voice') as HTMLElement;
+    old.replaceChildren(button('Send'));
+    const voice = document.createElement('div');
+    voice.append(button('Voice Mode'));
+    old[newVoice](voice);
+  };
+
+  it('passes on Mistral, the button beside the voice control the Platform rendered anew, and says so', async () => {
+    const page = domPage(mistral, 'en', sendButtonShows('before'));
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.mistral, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor, its anchor re-rendered (0.0px on the page)' });
+  });
+
+  it('fails on Mistral when the new voice control is not the one beside the button', async () => {
+    const page = domPage(mistral, 'en', sendButtonShows('after'));
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.mistral, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, no longer beside its anchor, its anchor re-rendered (0.0px on the page)' });
+  });
+
+  it('says when the anchor is not found and the button is measured on the page', async () => {
+    const page = domPage(`<form><textarea></textarea>${toolbarIcon}</form>`, 'en');
+
+    const verdict = await runCase(page, SUPPORTED_PLATFORMS.chatgpt, 'icon-steady', 10);
+
+    expect(verdict).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.0px, anchor not found, measured on the page' });
   });
 });
 
@@ -572,12 +660,15 @@ describe('cleanUpNote', () => {
 });
 
 describe('judgeSteady', () => {
-  const at = (x: number, y: number, placement = 'toolbar', anchor = '0') => ({ placement, anchor, x, y, fromAnchor: null });
+  /** At (x, y) on the page, no anchor found: on the toolbar by default */
+  const at = (x: number, y: number, placement = 'toolbar', anchor = '0') =>
+    ({ placement, anchor, x, y, fromAnchor: null, anchorElement: null, beside: null });
   /** On the toolbar, at (x, y) on the page, (dx, dy) from the element it was placed against */
-  const beside = (x: number, y: number, dx: number, dy: number) => ({ placement: 'toolbar', anchor: '0', x, y, fromAnchor: { x: dx, y: dy } });
+  const beside = (x: number, y: number, dx: number, dy: number, anchorElement: 'held' | 'new' = 'held', next = true) =>
+    ({ placement: 'toolbar', anchor: '0', x, y, fromAnchor: { x: dx, y: dy }, anchorElement, beside: next });
 
-  it('passes when the Prompts button keeps its place, a subpixel re-layout aside', () => {
-    expect(judgeSteady(at(10, 20), at(10.5, 20))).toEqual({ pass: true, detail: 'placement toolbar, anchor 0, moved 0.5px' });
+  it('passes when the Prompts button keeps its place on the overlay, a subpixel re-layout aside', () => {
+    expect(judgeSteady(at(10, 20, 'overlay', 'none'), at(10.5, 20, 'overlay', 'none'))).toEqual({ pass: true, detail: 'placement overlay, anchor none, moved 0.5px' });
   });
 
   // Gemini and Mistral, live 2026-11-18: the send button the Platform shows once the field has text
@@ -589,6 +680,13 @@ describe('judgeSteady', () => {
     });
   });
 
+  it('passes beside an anchor the Platform rendered anew, and says so', () => {
+    expect(judgeSteady(beside(854, 434, -109, 0), beside(814, 434, -109, 0, 'new'))).toEqual({
+      pass: true,
+      detail: 'placement toolbar, anchor 0, moved 0.0px from its anchor, its anchor re-rendered (40.0px on the page)'
+    });
+  });
+
   it('fails when the button moves away from its anchor', () => {
     expect(judgeSteady(beside(1022, 434, -36, 0), beside(980, 434, -78, 0))).toEqual({
       pass: false,
@@ -596,12 +694,22 @@ describe('judgeSteady', () => {
     });
   });
 
-  it('measures on the page when the anchor is not found on either side', () => {
-    expect(judgeSteady(beside(1022, 434, -36, 0), at(980, 434))).toEqual({ pass: false, detail: 'placement toolbar, anchor 0, moved 42.0px' });
+  it('fails when the button no longer stands against its anchor, even the same distance from it', () => {
+    expect(judgeSteady(beside(1022, 434, -36, 0), beside(980, 434, -36, 0, 'held', false))).toEqual({
+      pass: false,
+      detail: 'placement toolbar, anchor 0, no longer beside its anchor (42.0px on the page)'
+    });
   });
 
   it.each([
-    ['it moved', at(10, 20), at(40, 20), 'placement toolbar, anchor 0, moved 30.0px'],
+    ['on either side', at(1022, 434), at(1022.5, 434), true, 'placement toolbar, anchor 0, moved 0.5px, anchor not found, measured on the page'],
+    ['after typing', beside(1022, 434, -36, 0), at(980, 434), false, 'placement toolbar, anchor 0, moved 42.0px, anchor not found after typing, measured on the page']
+  ])('measures on the page when the anchor is not found %s, and says so', (_case, before, after, pass, detail) => {
+    expect(judgeSteady(before, after)).toEqual({ pass, detail });
+  });
+
+  it.each([
+    ['it moved', at(10, 20, 'overlay', 'none'), at(40, 20, 'overlay', 'none'), 'placement overlay, anchor none, moved 30.0px'],
     ['it changed anchor', at(10, 20), at(10, 20, 'toolbar', '1'), 'placement toolbar, anchor 0 became placement toolbar, anchor 1'],
     ['it went to the overlay', at(10, 20), at(10, 20, 'overlay', 'none'), 'placement toolbar, anchor 0 became placement overlay, anchor none'],
     ['it went away', at(10, 20), null, 'Prompts button gone while typing'],
