@@ -21,6 +21,12 @@ export interface WelcomeHostProps {
    * out. My-Prompt-Manager-ojz.9 passes the add of the Packs here
    */
   onFinish?: (packs: readonly string[]) => void;
+  /**
+   * Called when the user moves to another step (Back, a dot, an arrow, Next, Skip). App hides the
+   * failure Notification of a refused add there: it belongs to the last step, and would otherwise
+   * stay over a step whose header has Skip (My-Prompt-Manager-ojz.20)
+   */
+  onStepChange?: (step: WelcomeStep) => void;
   context?: 'popup' | 'sidepanel';
 }
 
@@ -34,7 +40,7 @@ export interface WelcomeHostProps {
  * new selection. The primary button of the last step finishes, with the Packs selected. The close
  * button records nothing: the step shown is already recorded.
  */
-const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, context = 'popup' }) => {
+const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, onStepChange, context = 'popup' }) => {
   const [state, setState] = useState<WelcomeState>(() => initialWelcomeState(step, packs));
   // The state the next action applies to: two actions in a row never read a render behind
   const current = useRef(state);
@@ -55,11 +61,12 @@ const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcom
       if (after.step !== before.step) {
         // The Packs left out: those already recorded are kept
         saveStep(after.step);
+        onStepChange?.(after.step);
       } else if (after.selectedPacks !== before.selectedPacks) {
         saveStep(after.step, after.selectedPacks);
       }
     },
-    [onFinish, saveStep]
+    [onFinish, saveStep, onStepChange]
   );
 
   const togglePack = useCallback(

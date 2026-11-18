@@ -8,13 +8,13 @@
  * goes from step to step by pointer clicks on the primary button, as a person does.
  *
  * The images are made to be compared with the mockup, so each is taken at a fixed moment:
- * - motion is left on (the look most users get), and every finite animation (the opening fade, the
- *   slide of a step, the dot, the Back pop, the Notification's entrance) has ended;
- * - the screenshot cancels the endless ones (the floating cards of step 1, the caret's blink), so the
- *   cards stand at rest and the caret shows;
+ * - motion is left on (the look most users get), and every animation (the opening fade, the slide
+ *   of a step, the dot, the Back pop, the Notification's entrance, the floating cards of step 1 and
+ *   the caret's blink, which all end within 5s, My-Prompt-Manager-ojz.20) has ended, so the cards
+ *   stand at rest and the caret shows;
  * - step 2 is taken while its blank holds the whole name, "Claire, Head of Sales", as the mockup
- *   shows it: the test waits for the letter that completes it, shoots, and shoots again if the blank
- *   changed meanwhile;
+ *   shows it: once the demo holds it for good, at once; before, the test waits for the letter that
+ *   completes it, shoots, and shoots again if the blank changed meanwhile;
  * - the pointer rests where it lights nothing up; on the Library it rests on the Notification's text,
  *   which has no hover look and keeps the Notification on screen until the screenshot is taken;
  * - no keyboard focus is shown: every move is a pointer click, so no control draws its focus ring.
@@ -50,7 +50,7 @@ const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them
 /** The name step 2 types into its blank */
 const BLANK_NAME = 'Claire, Head of Sales';
 
-/** How many cycles of the typing demo the test waits for a screenshot the blank did not change during */
+/** How many typings of the demo the test waits for a screenshot the blank did not change during */
 const BLANK_ATTEMPTS = 5;
 
 const DEFAULT_PACKS = PACKS.filter((pack) => pack.defaultSelected);
@@ -86,11 +86,17 @@ const restPointer = async (page: Page, surface: Surface): Promise<void> => {
 const shoot = (page: Page, file: string): Promise<Buffer> => page.screenshot({ path: file, animations: 'disabled' });
 
 /**
- * Takes step 2 while its blank holds the whole name: waits for the letter that completes it (the
- * name then stays about 1.2 s), shoots, and checks the blank did not change during the screenshot.
- * Tries again at the next cycle if it did.
+ * Takes step 2 while its blank holds the whole name. Once the demo holds it for good (it types it
+ * twice, then stays), at once; before that, waits for the letter that completes it (the name then
+ * stays about 1.2 s, or for good), shoots, and checks the blank did not change during the screenshot.
+ * Tries again at the next typing if it did.
  */
 const shootWholeBlank = async (page: Page, file: string): Promise<void> => {
+  if ((await page.locator('[data-welcome-demo]').getAttribute('data-welcome-demo')) === 'done') {
+    await expect(page.getByTestId('welcome-blank')).toHaveText(BLANK_NAME);
+    await shoot(page, file);
+    return;
+  }
   for (let attempt = 1; attempt <= BLANK_ATTEMPTS; attempt++) {
     await page.evaluate(
       (name) =>
@@ -126,7 +132,7 @@ const shootWholeBlank = async (page: Page, file: string): Promise<void> => {
     }
     test.info().annotations.push({ type: 'step 2', description: `attempt ${String(attempt)}: the blank changed during the screenshot, taken again` });
   }
-  throw new Error(`Step 2: no screenshot with the whole name in ${String(BLANK_ATTEMPTS)} cycles of the typing demo`);
+  throw new Error(`Step 2: no screenshot with the whole name in ${String(BLANK_ATTEMPTS)} typings of the demo`);
 };
 
 const open = async (page: Page, extensionId: string, surface: Surface, theme: Theme): Promise<void> => {

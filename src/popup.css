@@ -340,7 +340,7 @@ body {
 
 /* --- Welcome steps (My-Prompt-Manager-ojz.8) ---
    Under prefers-reduced-motion the cards of step 1 stay still and the caret of step 2 does not
-   blink (a loop has no near-instant form), and the check of a Pack shows at once. The steps leave
+   blink (a float or a blink has no near-instant form), and the check of a Pack shows at once. The steps leave
    these animations off then as well, and step 2 shows the whole name with no caret (BlankDemo.tsx) */
 @media (prefers-reduced-motion: reduce) {
   .animate-welcome-float-left,

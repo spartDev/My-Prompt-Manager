@@ -34,7 +34,7 @@
  * - Journey (target 1, under 45 s reading each screen) and first copy through a Pack (target 3,
  *   under 60 s): the reading model of the epic's measurement plan. The words a reader sees on each
  *   screen, counted from the text the built extension renders, read at 238 words a minute (Brysbaert
- *   2019); one full cycle of step 2's typing demo watched, as the page plays it; 1.1 s of pointing
+ *   2019); step 2's typing demo watched to its end (typed twice, then held), as the page plays it; 1.1 s of pointing
  *   and 0.2 s of click per action (Keystroke-Level Model, Card, Moran & Newell); plus the machine
  *   time, measured. The copy is read back from the clipboard. Five runs each, from the store a first
  *   install leaves.
@@ -74,6 +74,7 @@ import {
   waitForFirstInstallRecords
 } from '../fixtures/extension';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
+import { typingDemoMs, watchWelcomeMotion } from '../utils/welcomeMotion';
 
 const MEASURE = process.env.MEASURE === '1';
 const REPORT_PATH = process.env.MEASURE_OUT ?? 'test-results/welcome/measures.json';
@@ -552,39 +553,6 @@ const visibleText = (container: Locator): Promise<string> =>
     return words.join(' ');
   });
 
-/** One full cycle of step 2's typing demo, as the page plays it: from the blank emptied to the blank emptied again */
-const typingCycleMs = (page: Page): Promise<number> =>
-  page.evaluate(
-    () =>
-      new Promise<number>((resolve, reject) => {
-        const blank = document.querySelector('[data-testid="welcome-blank"]');
-        if (blank === null) {
-          reject(new Error('No typing demo on the page'));
-          return;
-        }
-        let emptiedAt: number | null = null;
-        let wasEmpty = (blank.textContent ?? '').length === 0;
-        const observer = new MutationObserver(() => {
-          const empty = (blank.textContent ?? '').length === 0;
-          if (empty && !wasEmpty) {
-            const now = performance.now();
-            if (emptiedAt === null) {
-              emptiedAt = now;
-            } else {
-              observer.disconnect();
-              resolve(now - emptiedAt);
-            }
-          }
-          wasEmpty = empty;
-        });
-        observer.observe(blank, { childList: true, characterData: true, subtree: true });
-        setTimeout(() => {
-          observer.disconnect();
-          reject(new Error('The typing demo did not complete a cycle in 15s'));
-        }, 15_000);
-      })
-  );
-
 /** A screen of a timed run: what the reader reads there, and the action that leaves it */
 interface Screen {
   readonly screen: string;
@@ -691,14 +659,15 @@ const copyFirstCard = async (page: Page, act: (name: string, target: Locator) =>
 };
 
 /**
- * The whole journey, every screen read (target 1): step 1, Next, step 2 read and one cycle of its
- * typing demo watched, Next, step 3, Add N prompts, the Library and its Notification. Then the reader
+ * The whole journey, every screen read (target 1): step 1, Next, step 2 read and its typing demo
+ * watched to its end, Next, step 3, Add N prompts, the Library and its Notification. Then the reader
  * reads the first card and copies it: the first copy by the longest way (a check on target 3)
  */
 const journeyRun = async (context: BrowserContext, extensionId: string) => {
   const { actions, act } = actionCounter();
   const page = await openPage(context, 'popup');
   await probeCopy(page);
+  await watchWelcomeMotion(page);
   const loadAtStart = load();
   const screens: Screen[] = [];
 
@@ -712,10 +681,10 @@ const journeyRun = async (context: BrowserContext, extensionId: string) => {
     await act('Next', primary(page));
     await atStep(page, 1);
   });
-  const cycle = await typingCycleMs(page);
+  const demo = await typingDemoMs(page);
   // The words counted with the blank filled, as the reader sees the sentence whole
   await expect(page.getByTestId('welcome-blank')).toHaveText('Claire, Head of Sales');
-  screens.push(screenOf('step 2', await visibleText(welcome(page)), 'Next', toStep2, cycle));
+  screens.push(screenOf('step 2', await visibleText(welcome(page)), 'Next', toStep2, demo));
 
   const toStep3 = await timed(async () => {
     await act('Next', primary(page));
@@ -742,7 +711,7 @@ const journeyRun = async (context: BrowserContext, extensionId: string) => {
 
   return {
     load: loadAtStart,
-    typingCycleMs: round(cycle),
+    typingDemoMs: round(demo),
     actionNames: [...actions],
     actionsToReadyLibrary,
     journey: { screens: journeyScreens, ...totalOf(journeyScreens) },
@@ -1183,7 +1152,7 @@ test.describe('Measures of the Welcome on the built extension (MEASURE=1)', () =
     const journey = {
       totalMs: stats(runs.map((run) => run.journey.totalMs)),
       machineMs: stats(runs.map((run) => run.journey.machineMs)),
-      typingCycleMs: stats(runs.map((run) => run.typingCycleMs)),
+      typingDemoMs: stats(runs.map((run) => run.typingDemoMs)),
       words: runs[0].journey.screens.map((screen) => ({ screen: screen.screen, words: screen.words, text: screen.text })),
       readingMs: runs[0].journey.readingMs,
       klmMs: runs[0].journey.klmMs,
@@ -1195,10 +1164,10 @@ test.describe('Measures of the Welcome on the built extension (MEASURE=1)', () =
       machineMs: stats(runs.map((run) => run.copyAfterEveryScreen.machineMs)),
       actionNames: runs[0].actionNames
     };
-    note('journey', `median ${String(journey.totalMs.median)}ms (${String(journey.totalMs.min)}-${String(journey.totalMs.max)}): words ${journey.words.map((screen) => screen.words).join(' + ')}, reading ${String(journey.readingMs)}ms, demo median ${String(journey.typingCycleMs.median)}ms, KLM ${String(journey.klmMs)}ms, machine median ${String(journey.machineMs.median)}ms; load 1m ${String(journey.load1m.min)}-${String(journey.load1m.max)}`);
+    note('journey', `median ${String(journey.totalMs.median)}ms (${String(journey.totalMs.min)}-${String(journey.totalMs.max)}): words ${journey.words.map((screen) => screen.words).join(' + ')}, reading ${String(journey.readingMs)}ms, demo median ${String(journey.typingDemoMs.median)}ms, KLM ${String(journey.klmMs)}ms, machine median ${String(journey.machineMs.median)}ms; load 1m ${String(journey.load1m.min)}-${String(journey.load1m.max)}`);
     note('first copy after every screen', `median ${String(copyAfterEveryScreen.totalMs.median)}ms`);
     await writeSection('journey', {
-      tool: 'Playwright on the built extension, the reading model: rendered words at 238 wpm, one typing-demo cycle watched, KLM 1.3 s per action, machine time by the test clock',
+      tool: 'Playwright on the built extension, the reading model: rendered words at 238 wpm, the typing demo watched to its end, KLM 1.3 s per action, machine time by the test clock',
       model: { wpm: READING_WPM, klmPointMs: KLM_POINT_MS, klmClickMs: KLM_CLICK_MS },
       targetMs: TARGETS.journeyMs,
       ...journey,

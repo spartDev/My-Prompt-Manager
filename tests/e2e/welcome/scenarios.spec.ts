@@ -65,6 +65,8 @@ import { copyBuildAt, updateExtensionInPlace } from '../fixtures/extension-updat
 import { type OnInstalledEvent, onInstalledEvents } from '../fixtures/oninstalled-probe';
 import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from '../fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
+import { emptyFiller, fillStorage } from '../utils/storageFiller';
+import { typingDemoMs, watchWelcomeMotion } from '../utils/welcomeMotion';
 import { PLATFORMS_CAPTION } from '../utils/welcomePlatforms';
 import { promptWorkflows } from '../utils/workflows';
 
@@ -300,39 +302,6 @@ const visibleWords = (container: Locator): Promise<number> =>
     }
     return words;
   });
-
-/** One full cycle of step 2's typing demo, as the page plays it: from the blank emptied to the blank emptied again */
-const typingCycleMs = (page: Page): Promise<number> =>
-  page.evaluate(
-    () =>
-      new Promise<number>((resolve, reject) => {
-        const blank = document.querySelector('[data-testid="welcome-blank"]');
-        if (blank === null) {
-          reject(new Error('No typing demo on the page'));
-          return;
-        }
-        let emptiedAt: number | null = null;
-        let wasEmpty = (blank.textContent ?? '').length === 0;
-        const observer = new MutationObserver(() => {
-          const empty = (blank.textContent ?? '').length === 0;
-          if (empty && !wasEmpty) {
-            const now = performance.now();
-            if (emptiedAt === null) {
-              emptiedAt = now;
-            } else {
-              observer.disconnect();
-              resolve(now - emptiedAt);
-            }
-          }
-          wasEmpty = empty;
-        });
-        observer.observe(blank, { childList: true, characterData: true, subtree: true });
-        setTimeout(() => {
-          observer.disconnect();
-          reject(new Error('The typing demo did not complete a cycle in 15s'));
-        }, 15_000);
-      })
-  );
 
 /** A screen of a timed journey: what the reader reads there, and the action that leaves it */
 interface JourneyStep {
@@ -976,6 +945,7 @@ test.describe('The journey, timed with the reading model', () => {
   test(`S11 I time the whole journey reading each screen: under ${String(JOURNEY_TARGET_MS / 1000)}s`, async ({ context, extensionId }) => {
     await firstInstallStorage(context);
     const page = await context.newPage();
+    await watchWelcomeMotion(page);
     await page.setViewportSize({ width: SURFACES.popup.width, height: SURFACES.popup.height });
     const steps: JourneyStep[] = [];
 
@@ -990,11 +960,12 @@ test.describe('The journey, timed with the reading model', () => {
       await primary(page).click();
       await expectWelcomeAt(page, 1);
     });
-    // One full cycle of the typing demo, watched; the words counted with the blank filled
-    const cycle = await typingCycleMs(page);
+    // The typing demo watched to its end (typed twice, then held, My-Prompt-Manager-ojz.20); the words
+    // counted with the blank filled
+    const demo = await typingDemoMs(page);
     await expect(page.getByTestId('welcome-blank')).toHaveText('Claire, Head of Sales');
     const screen2 = await visibleWords(welcome(page));
-    steps.push({ screen: 'step 2', words: screen2, readingMs: readingMs(screen2), watchingMs: cycle, action: 'Next', machineMs: toStep2 });
+    steps.push({ screen: 'step 2', words: screen2, readingMs: readingMs(screen2), watchingMs: demo, action: 'Next', machineMs: toStep2 });
 
     const toStep3 = await timed(async () => {
       await primary(page).click();
@@ -1124,23 +1095,6 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     await page.close();
   });
 
-  /**
-   * The add refused for real: chrome.storage.local filled past the 98% the extension keeps free
-   * (checkQuotaAvailability, src/utils/storageQuota.ts) with a key of the test's, so the built
-   * extension's own quota check refuses the Packs. A first install has no such store; it is the honest
-   * way to make the add fail without changing the build
-   */
-  const FILLER_KEY = 'e2eFiller';
-  const fillStorage = async (worker: Worker): Promise<number> =>
-    worker.evaluate(async (key) => {
-      const quota = chrome.storage.local.QUOTA_BYTES;
-      const used = await chrome.storage.local.getBytesInUse();
-      // 98.5% of the quota in use; the key and the quotes of its JSON count too
-      const length = Math.floor(quota * 0.985) - used - key.length - 2;
-      await chrome.storage.local.set({ [key]: 'x'.repeat(length) });
-      return (await chrome.storage.local.getBytesInUse()) / quota;
-    }, FILLER_KEY);
-
   /** Opens the Welcome of the first install at its last step, the Packs selected by default */
   const atLastStep = async (context: BrowserContext, extensionId: string): Promise<Page> => {
     const page = await context.newPage();
@@ -1157,6 +1111,7 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
   const expectRefusedAdd = async (page: Page, storage: ExtensionStorage): Promise<void> => {
     await expect(notification(page)).toHaveAttribute('data-type', 'error');
     await expect(notification(page).getByText("Couldn't add the prompts", { exact: true })).toBeVisible();
+    await expect(notification(page).getByRole('button', { name: 'Try again' })).toBeVisible();
     await expectWelcomeAt(page, 2);
     await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
     expect(await storage.getPrompts()).toEqual([]);
@@ -1174,7 +1129,7 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     await expectRefusedAdd(page, storage);
 
     // Room again, the same button: the Packs are added and the Welcome finished
-    await worker.evaluate((key) => chrome.storage.local.remove(key), FILLER_KEY);
+    await emptyFiller(worker);
     await primary(page).click();
     await expect(welcome(page)).toHaveCount(0);
     await expect(cards(page)).toHaveCount(DEFAULT_COUNT);
@@ -1185,7 +1140,30 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     await page.close();
   });
 
-  test("a refused add, then Start empty from the failure Notification: the Library, then the editor of a new Prompt", async ({ context, extensionId }) => {
+  test("a refused add, then Try again in the failure Notification: the same Packs added, once each", async ({ context, extensionId }) => {
+    const { worker, storage } = await storageOf(context);
+    await waitForFirstInstallRecords(storage);
+    const page = await atLastStep(context, extensionId);
+
+    await fillStorage(worker);
+    await primary(page).click();
+    await expectRefusedAdd(page, storage);
+
+    await emptyFiller(worker);
+    await notification(page).getByRole('button', { name: 'Try again' }).click();
+    await expect(welcome(page)).toHaveCount(0);
+    await expect(cards(page)).toHaveCount(DEFAULT_COUNT);
+    await expect(notification(page).getByText(`${String(DEFAULT_COUNT)} prompts added`, { exact: true })).toBeVisible();
+    const contents = (await storage.getPrompts()).map((prompt) => prompt.content);
+    expect(contents).toHaveLength(DEFAULT_COUNT);
+    expect(new Set(contents).size).toBe(DEFAULT_COUNT);
+    expect(contents.every((content) => PACK_CONTENTS.has(content))).toBe(true);
+    await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+    noteLibraryExit('a refused add, then Try again', DEFAULT_COUNT);
+    await page.close();
+  });
+
+  test("a refused add, then Start empty from the step: the Packs unselected, the Library, then the editor of a new Prompt", async ({ context, extensionId }) => {
     const { worker, storage } = await storageOf(context);
     await waitForFirstInstallRecords(storage);
     const page = await atLastStep(context, extensionId);
@@ -1195,9 +1173,13 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     await expectRefusedAdd(page, storage);
 
     // Storage still full: the end of the Welcome is a few bytes, and fits
-    await notification(page).getByRole('button', { name: 'Start empty' }).click();
+    await unselectEveryPack(page);
+    // Toggling the Packs is no answer to the failure: it stays until the exit starts
+    await expect(notification(page).getByText("Couldn't add the prompts", { exact: true })).toBeVisible();
+    await primary(page).click();
     await expectLibraryThenEditor(page, 'a refused add, then Start empty');
     await expect(welcome(page)).toHaveCount(0);
+    await expect(notification(page)).toHaveCount(0);
     await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
     expect(await storage.getPrompts()).toEqual([]);
     await page.close();

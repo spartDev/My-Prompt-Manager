@@ -14,7 +14,7 @@ tests/e2e/
 ├── sidepanel/          # Component-specific tests
 ├── content/            # Content script tests
 ├── whats-new/          # What's new sheet tests and proof screenshots
-├── welcome/           # The Welcome; scenarios.spec.ts runs its twelve acceptance scenarios; measures.spec.ts measures its numeric targets, on demand only (MEASURE=1, see its header)
+├── welcome/           # The Welcome; scenarios.spec.ts runs its twelve acceptance scenarios; measures.spec.ts measures its numeric targets, on demand only (MEASURE=1, see its header); welcome-motion.spec.ts proves its motion ends within 5s; welcome-add-failure.spec.ts the failure Notification of a refused add
 └── user-journeys/      # End-to-end user workflow tests
 ```
 
@@ -40,6 +40,8 @@ Centralized utilities reduce code duplication and improve maintainability:
 - **`workflows.ts`** - Complete user workflow functions
 - **`navigation.ts`** - Navigation between pages and contexts
 - **`enhanced-storage.ts`** - Advanced test data management
+- **`storageFiller.ts`** - Fills `chrome.storage.local` to 98.5% of its quota from the service worker, so an add of Prompts is refused for real (the Welcome's refused add), and empties it again
+- **`welcomeMotion.ts`** - Reads the Welcome's motion on the page's own clock: when each step shows, when step 2's typing demo holds the name for good, and when each animation ends
 
 ### Test Data Fixtures
 

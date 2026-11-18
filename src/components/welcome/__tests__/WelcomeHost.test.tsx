@@ -343,6 +343,25 @@ describe('Welcome frame', () => {
       expect(saveStep).not.toHaveBeenCalled();
       expect(finishWelcome).not.toHaveBeenCalled();
     });
+
+    // App hides the failure Notification of a refused add there (My-Prompt-Manager-ojz.20)
+    it('says each step change to onStepChange, the new step with it; not a Pack toggled, the finish or the opening', async () => {
+      const onStepChange = vi.fn<NonNullable<WelcomeHostProps['onStepChange']>>();
+      const onFinish = vi.fn();
+      const { user } = renderWelcome({ step: 2, onStepChange, onFinish });
+      expect(onStepChange).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: /^Engineering / }));
+      await user.click(primary());
+      expect(onFinish).toHaveBeenCalledTimes(1);
+      expect(onStepChange).not.toHaveBeenCalled();
+
+      await user.click(back() as HTMLElement);
+      await user.click(dot(1));
+      fireEvent.keyDown(document, { key: 'ArrowRight' });
+
+      expect(onStepChange.mock.calls).toEqual([[1], [0], [1]]);
+    });
   });
 
   describe('AC3: no animation ever holds the primary button', () => {

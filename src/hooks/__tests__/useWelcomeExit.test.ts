@@ -2,8 +2,9 @@
  * The way out of the Welcome (My-Prompt-Manager-ojz.9, architecture A8 of My-Prompt-Manager-ojz):
  * with Packs, the Packs are added, then the Welcome is finished, then the Library shows on All with
  * a Notification of what was added; with none, the Welcome is finished, the Library shows, and the
- * editor opens on a new Prompt 250ms later. A failed add finishes nothing. A second press while the
- * first is under way does nothing.
+ * editor opens on a new Prompt 250ms later. A failed add finishes nothing and shows a failure
+ * Notification that stays, whose Try again adds the same Packs through the same exit
+ * (My-Prompt-Manager-ojz.20). A second press while the first is under way does nothing.
  */
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -148,8 +149,14 @@ describe('useWelcomeExit', () => {
 
   describe('the add refused: the Welcome stays, nothing is finished, and the user can try again or start empty', () => {
     const refused = () => vi.fn<WelcomeExitOptions['addPacks']>().mockRejectedValueOnce(new Error('Storage quota exceeded'));
+    /** The Try again of the failure Notification the hook showed last */
+    const tryAgainOf = (showToast: ReturnType<typeof renderExit>['showToast']): (() => void) => {
+      const action = showToast.mock.lastCall?.[2]?.action;
+      expect(action?.label).toBe('Try again');
+      return action?.onClick ?? (() => undefined);
+    };
 
-    it('finishes nothing and shows a failure Notification that offers to start empty', async () => {
+    it('finishes nothing and shows a failure Notification that stays until the user acts, with Try again', async () => {
       const addPacks = refused();
       const { result, finishWelcome, showLibrary, focusFirstPrompt, openNewPrompt, showToast } = renderExit({ addPacks });
 
@@ -162,10 +169,58 @@ describe('useWelcomeExit', () => {
       expect(focusFirstPrompt).not.toHaveBeenCalled();
       expect(openNewPrompt).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(1);
-      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { action: { label: 'Start empty', onClick: expect.any(Function) } });
+      // duration 0: no time of its own, it stays until the user acts (useToast)
+      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) } });
     });
 
-    it('a second press tries again, and finishes once the Packs are in', async () => {
+    it('Try again adds the same Packs again, through the same exit as the primary button: the Notification hidden, then the Packs, the finish and the Notification of the add', async () => {
+      const { result, log, addPacks, showToast, finishWelcome, focusFirstPrompt } = renderExit();
+      addPacks.mockRejectedValueOnce(new Error('Storage quota exceeded'));
+      const chosen = PACKS.filter((pack) => pack.id === 'product' || pack.id === 'hiring');
+      const count = chosen.reduce((sum, pack) => sum + pack.prompts.length, 0);
+      act(() => { result.current(['hiring', 'product']); });
+      await flush();
+      log.length = 0;
+
+      act(() => { tryAgainOf(showToast)(); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(2);
+      // The same Packs, in the order the last step offers them, as the first add
+      expect(addPacks.mock.calls[1]?.[0]).toEqual(addPacks.mock.calls[0]?.[0]);
+      expect(addPacks.mock.calls[1]?.[0].map((pack) => pack.id)).toEqual(['product', 'hiring']);
+      expect(log).toEqual(['hideNotification', 'addPacks product,hiring', 'finishWelcome', 'showLibrary', 'focusFirstPrompt', `toast ${String(count)} prompts added`]);
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(focusFirstPrompt).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenLastCalledWith(`${String(count)} prompts added`, 'success', { sub: IN_THE_CHAT });
+    });
+
+    it('Try again refused too: the failure Notification again, with its Try again, and nothing finished; a third try adds the Packs', async () => {
+      const addPacks = vi.fn<WelcomeExitOptions['addPacks']>()
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+        .mockResolvedValueOnce({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
+      const { result, showToast, finishWelcome } = renderExit({ addPacks });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+
+      act(() => { tryAgainOf(showToast)(); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(2);
+      expect(finishWelcome).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledTimes(2);
+      expect(showToast).toHaveBeenLastCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) } });
+
+      act(() => { tryAgainOf(showToast)(); });
+      await flush();
+
+      expect(addPacks).toHaveBeenCalledTimes(3);
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+    });
+
+    it('a second press of the primary button tries again too, and finishes once the Packs are in', async () => {
       const addPacks = refused().mockResolvedValueOnce({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
       const { result, finishWelcome, showToast } = renderExit({ addPacks });
 
@@ -179,23 +234,9 @@ describe('useWelcomeExit', () => {
       expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
     });
 
-    it('Start empty in the Notification finishes the Welcome with no Pack and opens the editor 250ms later', async () => {
-      const { result, finishWelcome, showLibrary, openNewPrompt, showToast } = renderExit({ addPacks: refused() });
-      act(() => { result.current(DEFAULT_IDS); });
-      await flush();
-      const options = showToast.mock.calls[0]?.[2];
-
-      act(() => { options?.action?.onClick(); });
-
-      expect(finishWelcome).toHaveBeenCalledTimes(1);
-      expect(showLibrary).toHaveBeenCalledTimes(1);
-      act(() => { vi.advanceTimersByTime(MOTION.welcomeEditorDelay); });
-      expect(openNewPrompt).toHaveBeenCalledTimes(1);
-    });
-
-    // A stale failure Notification left over the Library or the editor would offer a Start empty that does nothing
-    it('the primary button pressed again, now Start empty (the Packs unselected), hides the failure Notification as it leaves', async () => {
-      const { result, log, hideNotification } = renderExit({ addPacks: refused() });
+    // Start empty stays on the step: every Pack unselected, the primary button reads it
+    it('Start empty from the step, the primary button pressed with no Pack, hides the failure Notification as it leaves, then the editor opens 250ms later', async () => {
+      const { result, log, hideNotification, finishWelcome, openNewPrompt } = renderExit({ addPacks: refused() });
       act(() => { result.current(DEFAULT_IDS); });
       await flush();
       hideNotification.mockClear();
@@ -204,9 +245,12 @@ describe('useWelcomeExit', () => {
 
       expect(hideNotification).toHaveBeenCalledTimes(1);
       expect(log.slice(log.indexOf("toast Couldn't add the prompts") + 1)).toEqual(['hideNotification', 'finishWelcome', 'showLibrary']);
+      expect(finishWelcome).toHaveBeenCalledTimes(1);
+      act(() => { vi.advanceTimersByTime(MOTION.welcomeEditorDelay); });
+      expect(openNewPrompt).toHaveBeenCalledTimes(1);
     });
 
-    it('the primary button pressed again with Packs hides the failure Notification while that add runs, so its Start empty is never on screen doing nothing', async () => {
+    it('the primary button pressed again with Packs hides the failure Notification while that add runs, so its Try again is never on screen beside an add under way', async () => {
       const add = deferred<AddPacksResult>();
       const addPacks = refused().mockImplementationOnce(() => add.promise);
       const { result, hideNotification, showToast } = renderExit({ addPacks });
@@ -222,36 +266,40 @@ describe('useWelcomeExit', () => {
       expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
     });
 
-    it('Start empty in the Notification hides it as it leaves', async () => {
-      const { result, log, hideNotification, showToast } = renderExit({ addPacks: refused() });
-      act(() => { result.current(DEFAULT_IDS); });
-      await flush();
-      const options = showToast.mock.calls[0]?.[2];
-      hideNotification.mockClear();
-
-      act(() => { options?.action?.onClick(); });
-
-      expect(hideNotification).toHaveBeenCalledTimes(1);
-      expect(log.slice(-3)).toEqual(['hideNotification', 'finishWelcome', 'showLibrary']);
-    });
-
-    it('Start empty in the Notification does nothing once another exit is under way', async () => {
+    it('Try again does nothing once another exit is under way', async () => {
       const add = deferred<AddPacksResult>();
       const addPacks = refused().mockImplementationOnce(() => add.promise);
       const { result, finishWelcome, showToast } = renderExit({ addPacks });
       act(() => { result.current(DEFAULT_IDS); });
       await flush();
-      const options = showToast.mock.calls[0]?.[2];
-      // Tried again: that add is under way when the old Notification's Start empty is pressed
+      const tryAgain = tryAgainOf(showToast);
+      // Tried again from the primary button: that add is under way when the old Notification's Try again is pressed
       act(() => { result.current(DEFAULT_IDS); });
 
-      act(() => { options?.action?.onClick(); });
+      act(() => { tryAgain(); });
       add.resolve({ added: DEFAULT_COUNT, skipped: 0, packNames: ['Product', 'Writing'] });
       await flush();
       act(() => { vi.advanceTimersByTime(1_000); });
 
+      expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
       expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', { sub: IN_THE_CHAT });
+    });
+
+    it('Try again that lands after the unmount (the popup closed) finishes nothing and shows nothing', async () => {
+      const addPacks = refused();
+      const { result, unmount, showToast, finishWelcome } = renderExit({ addPacks });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      const tryAgain = tryAgainOf(showToast);
+
+      unmount();
+      act(() => { tryAgain(); });
+      await flush();
+
+      // The same exit as the primary button's: once the Welcome is gone, nothing is finished or shown
+      expect(finishWelcome).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledTimes(1);
     });
   });
 
