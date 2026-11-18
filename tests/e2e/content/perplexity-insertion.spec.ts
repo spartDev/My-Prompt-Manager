@@ -4,8 +4,8 @@
  * Perplexity's live composer is a Lexical editor. On 2026-11-11 a Prompt reached it twice in one
  * line: once from the editing command, its line breaks dropped, and once more from the `input`
  * event the Insertion sent with the text (My-Prompt-Manager-e66). These run the real content
- * script on a stand-in that treats a paste, the editing command, an `input` event and a Backspace
- * as the live editor does (fixtures/platform-pages.ts, lexicalEditor).
+ * script on a stand-in that mounts a real Lexical editor, at the version the live site serves
+ * (fixtures/platform-pages.ts, lexicalEditor).
  *
  * The // typed in the empty field opens the Prompt selector, and keeps it, and a key typed right
  * after the // is not lost: the // taken out of its text node, the live editor took that emptied

@@ -77,7 +77,7 @@ describe('icon placement chains on the live composers', () => {
 
     const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
 
-    expect(resolution?.index).toBe(2);
+    expect(resolution?.index).toBe(3);
     expect(resolution?.anchor).toBe(document.querySelector('button[type="submit"]'));
   });
 
@@ -89,16 +89,40 @@ describe('icon placement chains on the live composers', () => {
       </div>`;
     const editor = document.getElementById('m365-chat-editor-target-element') as HTMLElement;
 
-    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)?.index).toBe(1);
+    expect(resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement)?.index).toBe(2);
   });
 
-  it('m365copilot places the icon right after the plus menu of copilot.cloud.microsoft', () => {
+  it('m365copilot places the icon first in the actions of copilot.cloud.microsoft, before the dictation button, not in the plus menu\'s div', () => {
+    // The plus menu sits in a block div: an icon put after it in there went to a second line under
+    // the "+" and widened the composer's first column, which pushed the field (seen live on 2026-11-18)
     const editor = loadComposer('m365copilot');
-
+    const plus = document.querySelector('[data-testid="PlusMenuButton"]') as HTMLElement;
+    const actions = document.querySelector('.fai-BebopLiteChatInput__actions') as HTMLElement;
+    const dictation = actions.firstElementChild;
     const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+    expect(resolution).not.toBeNull();
+    const icon = document.createElement('button');
 
-    expect(resolution?.anchor).toBe(document.querySelector('[data-testid="PlusMenuButton"]'));
-    expect(SUPPORTED_PLATFORMS.m365copilot.iconPlacement?.anchors[0].relation).toBe('after');
+    placeAtAnchor(icon, resolution as NonNullable<typeof resolution>);
+
+    expect(icon.parentElement).toBe(actions);
+    expect(icon.nextElementSibling).toBe(dictation);
+    expect(plus.parentElement?.contains(icon)).toBe(false);
+  });
+
+  it('m365copilot puts the icon beside the plus menu\'s div, on its row, once the actions lose their class', () => {
+    document.body.innerHTML = readFileSync(fixtureOf('m365copilot'), 'utf8').replace(' class="fai-BebopLiteChatInput__actions"', '');
+    const editor = document.querySelector<HTMLElement>('[contenteditable="true"]') as HTMLElement;
+    const plusWrapper = document.querySelector('[data-testid="PlusMenuButton"]')?.parentElement as HTMLElement;
+    const resolution = resolveIconPlacement(editor, SUPPORTED_PLATFORMS.m365copilot.iconPlacement);
+    expect(resolution).not.toBeNull();
+    const icon = document.createElement('button');
+
+    placeAtAnchor(icon, resolution as NonNullable<typeof resolution>);
+
+    expect(resolution?.index).toBe(1);
+    expect(icon.previousElementSibling).toBe(plusWrapper);
+    expect(icon.parentElement).toBe(plusWrapper.parentElement);
   });
 
   it('m365copilot finds its composer still when a capture folds the span around the editor', () => {

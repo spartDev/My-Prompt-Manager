@@ -26,7 +26,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { type BrowserContext, chromium, type Page } from 'playwright';
+import { type BrowserContext, chromium, type ElementHandle, type JSHandle, type Page } from 'playwright';
 
 import { type PlatformDefinition, SUPPORTED_PLATFORMS } from '../src/config/platforms';
 import { IconPlacementController } from '../src/content/core/icon-placement';
@@ -230,8 +230,31 @@ export interface SlashObservation {
 export interface IconState {
   placement: string | null;
   anchor: string | null;
+  /** Where the button is on the page */
   x: number;
   y: number;
+  /**
+   * Where the button is from the element of the chain it was placed against (data-mpm-anchor): the
+   * element held from before typing while the chain's selector still finds it in the button's
+   * composer, else the first one the selector finds there now. Null when the button is not on the
+   * toolbar or no such element is found
+   */
+  fromAnchor: { x: number; y: number } | null;
+  /**
+   * Which element fromAnchor is measured from: the one held from before typing, or a new one when
+   * the held one no longer matches the selector (Mistral re-renders its controls). Null with fromAnchor
+   */
+  anchorElement: 'held' | 'new' | null;
+  /**
+   * The button stands in its chain's relation to that element: right before it, right after it, or
+   * its first or last child. Null with fromAnchor
+   */
+  beside: boolean | null;
+  /**
+   * The button is in the composer of the field typed in, found from that field as
+   * resolveIconPlacement finds it. Null when the button is not on the toolbar or that composer is not found
+   */
+  inComposer: boolean | null;
 }
 
 export interface Verdict {
@@ -290,19 +313,53 @@ export function judgeLateToolbar(icon: IconState | null, fallbackLanguage?: stri
 /** How far the Prompts button may shift while the user types, in px: a subpixel re-layout is not a move */
 const STEADY_TOLERANCE = 1;
 
-/** The typing case passes when the Prompts button keeps its placement, its anchor and its position */
+const distance = (from: { x: number; y: number }, to: { x: number; y: number }): number =>
+  Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y));
+
+/**
+ * The typing case passes when the Prompts button keeps its placement, its anchor and its position.
+ * On the toolbar, the button must stay in the composer of the field typed in, and still stand
+ * against the element it stood against before typing, held across the typing, at the same distance
+ * from it (a button against no element of its anchor before typing fails as such). A Platform may move its own controls as the
+ * field gets text, and the button with them: Gemini and Mistral show a send button that pushes
+ * their right-aligned group, the button included, 42 and 40 px left (live, 2026-11-18). So a move
+ * on the page is not a fail; a button beside another element the anchor selector also finds is.
+ * Mistral also turns its voice control's div into the send button's and renders a new voice div
+ * between it and the Prompts button: the held element no longer matches the selector. The button
+ * must then stand against the element the selector finds now, at the same distance, and the line
+ * says the anchor was re-rendered. With no anchor found before or after typing, the position on
+ * the page, and the line says when it was not found
+ */
 export function judgeSteady(before: IconState | null, after: IconState | null): Verdict {
   if (!before || !after) {
     return { pass: false, detail: `${before ? 'Prompts button gone while typing' : 'no Prompts button before typing'}` };
   }
-  const moved = Math.max(Math.abs(after.x - before.x), Math.abs(after.y - before.y));
-  const same = before.placement === after.placement && before.anchor === after.anchor;
-  return {
-    pass: same && moved <= STEADY_TOLERANCE,
-    detail: same
-      ? `${describeIcon(after)}, moved ${moved.toFixed(1)}px`
-      : `${describeIcon(before)} became ${describeIcon(after)}`
-  };
+  if (before.placement !== after.placement || before.anchor !== after.anchor) {
+    return { pass: false, detail: `${describeIcon(before)} became ${describeIcon(after)}` };
+  }
+  const onPage = distance(before, after);
+  if (after.inComposer === false) {
+    return { pass: false, detail: `${describeIcon(after)}, outside the composer of the field typed in (${onPage.toFixed(1)}px on the page)` };
+  }
+  // Whatever is found after typing: the baseline itself is off
+  if (before.fromAnchor && before.beside === false) {
+    return { pass: false, detail: `${describeIcon(after)}, not beside its anchor before typing (${onPage.toFixed(1)}px on the page)` };
+  }
+  if (before.fromAnchor && after.fromAnchor) {
+    const reRendered = after.anchorElement === 'new' ? ', its anchor re-rendered' : '';
+    if (!after.beside) {
+      return { pass: false, detail: `${describeIcon(after)}, no longer beside its anchor${reRendered} (${onPage.toFixed(1)}px on the page)` };
+    }
+    const moved = distance(before.fromAnchor, after.fromAnchor);
+    return {
+      pass: moved <= STEADY_TOLERANCE,
+      detail: `${describeIcon(after)}, moved ${moved.toFixed(1)}px from its anchor${reRendered} (${onPage.toFixed(1)}px on the page)`
+    };
+  }
+  // A button that kept its place on the page did not move, whatever anchor shows after typing
+  const missing = before.fromAnchor ? ' after typing' : after.fromAnchor ? ' before typing' : '';
+  const notFound = after.placement === 'toolbar' ? `, anchor not found${missing}, measured on the page` : '';
+  return { pass: onPage <= STEADY_TOLERANCE, detail: `${describeIcon(after)}, moved ${onPage.toFixed(1)}px${notFound}` };
 }
 
 export interface CaseResult extends Verdict {
@@ -327,15 +384,72 @@ export const liveCheckExitCode = (results: readonly CaseResult[]): number =>
 
 // ---- In the browser ----
 
-const readIcon = (page: Page): Promise<IconState | null> =>
-  page.evaluate((selector) => {
+/** What the page needs to find the Prompts button and the element of its chain it stands against */
+const iconLookup = (platform: PlatformDefinition) => ({
+  selector: ICON,
+  chain: platform.iconPlacement
+    ? { composer: platform.iconPlacement.composer, anchors: platform.iconPlacement.anchors.map(({ find, relation }) => ({ find, relation })) }
+    : null
+});
+
+/**
+ * The element of the chain the Prompts button stands against, held so that the same element is read
+ * after typing: in the composer of the field typed in, as resolveIconPlacement finds it, the match
+ * the button stands against, else the first. The extension places the button against the first
+ * match and leaves it there: one that shows earlier in the form afterwards is not its anchor. A
+ * handle to null when the button is not on the toolbar or no match is found. Sent to the page as
+ * it is: no inner function
+ */
+const holdAnchor = (page: Page, platform: PlatformDefinition, editor: ElementHandle<HTMLElement> | null): Promise<JSHandle<Element | null>> =>
+  page.evaluateHandle(({ selector, chain, editor: field }) => {
+    const icon = document.querySelector(selector);
+    const anchor = icon?.getAttribute('data-mpm-anchor') ?? null;
+    const link = chain && icon?.getAttribute('data-mpm-placement') === 'toolbar' && anchor !== null ? chain.anchors[Number(anchor)] : undefined;
+    const composer = chain && link ? (field ?? icon)?.closest(chain.composer) : null;
+    if (!icon || !link || !composer) {
+      return null;
+    }
+    const against = link.relation === 'before' ? icon.nextElementSibling : link.relation === 'after' ? icon.previousElementSibling : icon.parentElement;
+    return against && composer.contains(against) && against.matches(link.find) ? against : composer.querySelector(link.find);
+  }, { ...iconLookup(platform), editor });
+
+/**
+ * The Prompts button, and where it is from the element of its chain it stands against: the held
+ * element while the chain's selector still finds it in the composer of the field typed in (of the
+ * button, with no field given), else (or with none held) the first one the selector finds there
+ * now. Sent to the page as it is: no inner function
+ */
+const readIcon = (page: Page, platform: PlatformDefinition, held?: JSHandle<Element | null>, editor?: ElementHandle<HTMLElement> | null): Promise<IconState | null> =>
+  page.evaluate(({ selector, chain, held: heldElement, editor: field }) => {
     const icon = document.querySelector(selector);
     if (!icon) {
       return null;
     }
     const box = icon.getBoundingClientRect();
-    return { placement: icon.getAttribute('data-mpm-placement'), anchor: icon.getAttribute('data-mpm-anchor'), x: box.x, y: box.y };
-  }, ICON);
+    const placement = icon.getAttribute('data-mpm-placement');
+    const anchor = icon.getAttribute('data-mpm-anchor');
+    const link = chain && placement === 'toolbar' && anchor !== null ? chain.anchors[Number(anchor)] : undefined;
+    const composer = chain && link ? (field ?? icon).closest(chain.composer) : null;
+    const kept = Boolean(link && composer && heldElement?.isConnected && composer.contains(heldElement) && heldElement.matches(link.find));
+    const element = kept ? heldElement : (link ? composer?.querySelector(link.find) : null) ?? null;
+    const anchorBox = element?.getBoundingClientRect();
+    const relation = link?.relation;
+    return {
+      placement,
+      anchor,
+      x: box.x,
+      y: box.y,
+      fromAnchor: anchorBox ? { x: box.x - anchorBox.x, y: box.y - anchorBox.y } : null,
+      anchorElement: element ? (kept ? 'held' as const : 'new' as const) : null,
+      beside: element
+        ? (relation === 'before' && icon.nextElementSibling === element)
+          || (relation === 'after' && element.nextElementSibling === icon)
+          || (relation === 'inside-start' && element.firstElementChild === icon)
+          || (relation === 'inside-end' && element.lastElementChild === icon)
+        : null,
+      inComposer: composer ? composer.contains(icon) : null
+    };
+  }, { ...iconLookup(platform), held: held ?? null, editor: editor ?? null });
 
 /** The editor's text, found again each time: a Platform may replace its editor. Null when there is none */
 async function readField(page: Page, platform: PlatformDefinition): Promise<string | null> {
@@ -357,6 +471,34 @@ async function observeSlash(page: Page, platform: PlatformDefinition): Promise<S
   };
 }
 
+/** How many editors clickField finds and clicks before it gives up on a Platform that keeps replacing its editor */
+export const FIELD_CLICK_ATTEMPTS = 3;
+
+/**
+ * Finds the field and clicks it, found again when the Platform replaced it between the lookup and
+ * the click: Gemini mounts its editor, then replaces it with a new one some 200 ms later, which a
+ * lookup in between finds (seen on 2026-11-18). The click then throws as the element is detached,
+ * before any key. Null when no field shows; throws the click's error once FIELD_CLICK_ATTEMPTS
+ * editors were replaced, or on any other error.
+ */
+async function clickField(page: Page, platform: PlatformDefinition, timeout: number): Promise<ElementHandle<HTMLElement> | null> {
+  for (let attempt = 1; ; attempt++) {
+    const editor = await findEditor(page, editorSelectorsOf(platform), timeout);
+    if (!editor) {
+      return null;
+    }
+    try {
+      await editor.click();
+      return editor;
+    } catch (err: unknown) {
+      await editor.dispose();
+      if (attempt >= FIELD_CLICK_ATTEMPTS || !(err instanceof Error && err.message.includes('not attached to the DOM'))) {
+        throw err;
+      }
+    }
+  }
+}
+
 /**
  * Puts the caret in the field, once the Prompts button shows (the content script is ready). The
  * field is never emptied: a Platform may restore a saved draft, which a case would otherwise
@@ -365,12 +507,17 @@ async function observeSlash(page: Page, platform: PlatformDefinition): Promise<S
  * text, left as it was.
  */
 async function focusEmptyField(page: Page, platform: PlatformDefinition, timeout: number): Promise<'ready' | 'no-field' | 'draft'> {
-  const editor = await findEditor(page, editorSelectorsOf(platform), timeout);
+  const shown = await findEditor(page, editorSelectorsOf(platform), timeout);
+  if (!shown) {
+    return 'no-field';
+  }
+  await shown.dispose();
+  await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
+  // Found again after the wait, and again when it was replaced before the click
+  const editor = await clickField(page, platform, timeout);
   if (!editor) {
     return 'no-field';
   }
-  await page.locator(ICON).first().waitFor({ state: 'attached', timeout });
-  await editor.click();
   const text = await editor.evaluate(fieldTextOf);
   await editor.dispose();
   return isEmptyField(text) ? 'ready' : 'draft';
@@ -436,12 +583,11 @@ export type CleanUpResult = 'emptied' | 'not emptied' | 'not ours';
 export async function cleanUp(page: Page, platform: PlatformDefinition, owned: readonly string[]): Promise<CleanUpResult> {
   await page.keyboard.press('Escape');
   await page.locator(SELECTOR_DIALOG).waitFor({ state: 'hidden', timeout: 2_000 }).catch(() => undefined);
-  const editor = await findEditor(page, editorSelectorsOf(platform), 2_000);
+  const editor = await clickField(page, platform, 2_000);
   if (!editor) {
-    // Replaced or removed: the keys would go nowhere, and a draft may be kept
+    // Removed: the keys would go nowhere, and a draft may be kept
     return 'not emptied';
   }
-  await editor.click();
   if (!ownsField(await editor.evaluate(fieldTextOf), owned)) {
     await editor.dispose();
     return 'not ours';
@@ -509,6 +655,9 @@ export const CASE_FIELDS: Record<Exclude<CaseId, 'late-toolbar'>, { typed: reado
   'icon-steady': { typed: ['Hello world'], typing: startsOf('Hello world') }
 };
 
+/** A case not run: the field holds a draft, never typed into */
+const DRAFT_NOT_RUN: Verdict = { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
+
 /**
  * Runs one case on its page
  *
@@ -520,7 +669,7 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
     await settlePlacement(page, timeout);
     const pageLanguage = await page.evaluate(() => document.documentElement.lang);
     const fallback = overlayIsFallback(platform, pageLanguage, await probeChain(page, platform));
-    return judgeLateToolbar(await readIcon(page), fallback ? pageLanguage : undefined);
+    return judgeLateToolbar(await readIcon(page, platform), fallback ? pageLanguage : undefined);
   }
   if (id === 'icon-steady') {
     // Settled first, as the late-composer case waits for it: the case is about typing, not about
@@ -534,7 +683,10 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
     return { pass: false, detail: 'no field (signed out?)' };
   }
   if (field === 'draft') {
-    return { pass: false, detail: 'the field holds a draft: case not run, field left as it was' };
+    return DRAFT_NOT_RUN;
+  }
+  if (id === 'icon-steady') {
+    return runSteady(page, platform, progress);
   }
   const fields = CASE_FIELDS[id];
   progress.owned = [...fields.typed, ...fields.typing];
@@ -564,14 +716,57 @@ export async function runCase(page: Page, platform: PlatformDefinition, id: Case
       await page.keyboard.type('//');
       allTyped();
       return judgeSlash(await settleSlash(page, platform, 'Hi there', timeout), 'Hi there');
-    case 'icon-steady': {
-      const before = await readIcon(page);
-      await page.keyboard.type('Hello world', { delay: 50 });
-      allTyped();
-      await page.waitForTimeout(500);
-      return judgeSteady(before, await readIcon(page));
-    }
   }
+}
+
+/**
+ * icon-steady, once the caret is in the empty field. The element the button stands against is
+ * held across the typing: a button then beside another element the anchor selector also finds has
+ * moved. The composer is the field's: the one typed in while it is on the page (another editor may
+ * show earlier meanwhile), else the one found again (a Platform may replace its editor)
+ */
+async function runSteady(page: Page, platform: PlatformDefinition, progress: CaseProgress): Promise<Verdict> {
+  const editor = await findEditor(page, editorSelectorsOf(platform), 1_000);
+  if (!editor) {
+    return { pass: false, detail: 'no field (signed out?)' };
+  }
+  const held = await holdAnchor(page, platform, editor);
+  let found: ElementHandle<HTMLElement> | null = null;
+  try {
+    const before = await readIcon(page, platform, held, editor);
+    // The reads above come after the field was found empty: a draft restored meanwhile is not typed into
+    if (!isEmptyField(await editor.evaluate(fieldTextOf))) {
+      return DRAFT_NOT_RUN;
+    }
+    const { typed, typing } = CASE_FIELDS['icon-steady'];
+    progress.owned = [...typed, ...typing];
+    progress.typed = true;
+    await page.keyboard.type('Hello world', { delay: 50 });
+    // Once every key is typed, a field cut short is not the case's any more
+    progress.owned = typed;
+    await page.waitForTimeout(500);
+    const kept = await editor.evaluate((element) => element.isConnected);
+    found = kept ? null : await findEditor(page, editorSelectorsOf(platform), 1_000);
+    return judgeSteady(before, await readIcon(page, platform, held, kept ? editor : found));
+  } finally {
+    await held.dispose();
+    await editor.dispose();
+    await found?.dispose();
+  }
+}
+
+/**
+ * Sends the page's requests to the network, past any service worker the profile holds for the
+ * Platform: a worker answers a navigation before the context's routes see it, so the stand-in
+ * would never load. chat.mistral.ai registers one for a signed-in user (its sw.js answers fetches),
+ * and a live-check profile signed in there got Mistral's own page instead of the stand-in: no
+ * field, no Prompts button (My-Prompt-Manager-h6o). Playwright's `serviceWorkers: 'block'` only
+ * stops new registrations, not a worker already installed in the profile. Chromium only, as the script.
+ */
+export async function bypassServiceWorkers(context: BrowserContext, page: Page): Promise<void> {
+  const session = await context.newCDPSession(page);
+  await session.send('Network.enable');
+  await session.send('Network.setBypassServiceWorker', { bypass: true });
 }
 
 /** Opens the Platform in a new tab: the live page, or its stand-in served on the Platform's own hostname */
@@ -583,6 +778,9 @@ async function openPage(context: BrowserContext, id: string, platform: PlatformD
     url = await routePlatform(context, STAND_INS[id]);
   }
   const page = await context.newPage();
+  if (options.standIn) {
+    await bypassServiceWorkers(context, page);
+  }
   // A Platform may ask before leaving a page with a draft
   page.on('dialog', (dialog) => { void dialog.accept(); });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
