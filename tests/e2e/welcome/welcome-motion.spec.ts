@@ -16,7 +16,9 @@
  *   they are exactly these four, each on a ScrollTimeline, and none of them moves over 500ms with no
  *   input.
  * - AC5, reduced motion: the static rendering: step 2's whole name at once with no caret, nothing
- *   floating on step 1, no animation running on any step.
+ *   floating on step 1, no animation running on any step. The blank is read from its first rendering
+ *   by an observer that runs from the page's first script: the whole name is the first and only text
+ *   it holds, and no caret is ever in the page.
  */
 import type { Page } from '@playwright/test';
 
@@ -38,6 +40,35 @@ const SCROLL_LINKED = ['welcome-packs-fade-bottom', 'welcome-packs-fade-top', 'w
 
 const welcome = (page: Page) => page.getByTestId('welcome');
 const primary = (page: Page) => page.getByTestId('welcome-primary');
+
+/** What step 2's blank held, each text once in the order shown, and whether a caret was ever in the page */
+interface BlankSeen {
+  texts: string[];
+  caret: boolean;
+}
+
+/**
+ * Notes every text of step 2's blank and any caret, from the page's first script on: call before the
+ * page opens the Welcome. Each change of the page is read before the frame that draws it
+ */
+const watchBlank = async (page: Page): Promise<void> => {
+  await page.addInitScript(() => {
+    const seen: BlankSeen = { texts: [], caret: false };
+    (globalThis as unknown as { blankSeen: BlankSeen }).blankSeen = seen;
+    new MutationObserver(() => {
+      const blank = document.querySelector('[data-testid="welcome-blank"]');
+      const text = blank?.textContent;
+      if (typeof text === 'string' && text !== seen.texts[seen.texts.length - 1]) {
+        seen.texts.push(text);
+      }
+      if (document.querySelector('[data-welcome-caret]')) {
+        seen.caret = true;
+      }
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+};
+
+const blankSeen = (page: Page): Promise<BlankSeen> => page.evaluate(() => (globalThis as unknown as { blankSeen: BlankSeen }).blankSeen);
 
 /** What runs on the page `LIMIT_MS` after `shownAt`, read on the page's clock at that moment */
 const fiveSecondsAfter = (page: Page, shownAt: number) =>
@@ -158,6 +189,7 @@ test.describe('Motion on the Welcome stops by itself', () => {
 
   test('AC5: under reduced motion, the static rendering: the whole name at once with no caret, nothing floating, no animation running on any step', async ({ page, storage, extensionId }) => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
+    await watchBlank(page);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.setViewportSize({ width: 400, height: 500 });
     await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
@@ -176,6 +208,13 @@ test.describe('Motion on the Welcome stops by itself', () => {
       }
       // Within a few frames of the step, nothing runs that lasts (the frame's own 1ms transitions done)
       await page.evaluate(() => new Promise((resolve) => { setTimeout(resolve, 100); }));
+      if (step === 1) {
+        // From the blank's first rendering on, as the page drew it: the whole name and never a caret
+        const seen = await blankSeen(page);
+        expect(seen.texts[0], 'the first text of the blank').toBe(NAME);
+        expect(seen.texts, 'every text the blank held').toEqual([NAME]);
+        expect(seen.caret, 'a caret, at any moment').toBe(false);
+      }
       const running = await page.evaluate(() =>
         document
           .getAnimations()

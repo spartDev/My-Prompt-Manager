@@ -8,9 +8,11 @@
  * class: a control not mounted yet then mounts dark. The snapshot records which controls were
  * mounted when `dark` landed, and the colors each one that was not had when it mounted, which must
  * be its dark colors (My-Prompt-Manager-ojz.11): so the check never passes having checked nothing.
+ * Its dark colors are told from its light ones, read on a light opening of the same page first
+ * (My-Prompt-Manager-ojz.23): the token values themselves are src/theme/__tests__/tokens.test.ts's.
  */
 
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
@@ -44,10 +46,66 @@ const WELCOME_TARGETS: Record<string, string> = {
 };
 
 /**
- * Opens the page and checks each target: mounted when `dark` landed, nothing of it animating then;
- * mounted later, already in the colors it keeps; and nothing animating once the switch is over
+ * The colors each target draws, as JSON, once its own entrance or transition has ended: its
+ * background when not transparent, its text color when it holds text, a field's value or an icon
+ * (currentColor), and its top border's color when that border is drawn. A color it computes but does
+ * not draw is left out: a button with no border still computes a border color, and that one follows
+ * the theme whatever the button's own colors do
  */
-const expectNoLightFlash = async (page: Page, url: string, targets: Record<string, string>): Promise<void> => {
+const drawnColorsOf = (page: Page, targets: Record<string, string>): Promise<Record<string, string>> =>
+  page.evaluate(async (targets: Record<string, string>) => {
+    const elements = Object.entries(targets).map(([name, selector]) => [name, document.querySelector(selector)] as const);
+    await Promise.all(
+      elements.flatMap(([, el]) =>
+        (el?.getAnimations() ?? [])
+          .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+          .map((a) => a.finished.catch(() => undefined))
+      )
+    );
+    const shows = (color: string): boolean => color !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(color);
+    return Object.fromEntries(elements.map(([name, el]) => {
+      if (!el) {
+        return [name, '<missing>'];
+      }
+      const style = getComputedStyle(el);
+      const drawn: Record<string, string> = {};
+      if (shows(style.backgroundColor)) {
+        drawn.background = style.backgroundColor;
+      }
+      if ((el.textContent ?? '').trim() !== '' || el instanceof HTMLInputElement || el.querySelector('svg')) {
+        drawn.text = style.color;
+      }
+      if (parseFloat(style.borderTopWidth) > 0 && style.borderTopStyle !== 'none' && shows(style.borderTopColor)) {
+        drawn.border = style.borderTopColor;
+      }
+      return [name, JSON.stringify(drawn)];
+    }));
+  }, targets);
+
+/**
+ * The colors each target draws at rest on a light opening of `url`, in a page of its own, closed
+ * after: the colors a control must not keep once `dark` lands
+ */
+const lightColorsOf = async (context: BrowserContext, url: string, targets: Record<string, string>): Promise<Record<string, string>> => {
+  const page = await context.newPage();
+  try {
+    await page.goto(url);
+    for (const selector of Object.values(targets)) {
+      await expect(page.locator(selector).first()).toBeAttached();
+    }
+    await expect(page.locator('html')).not.toHaveClass(/\bdark\b|theme-switching/);
+    return await drawnColorsOf(page, targets);
+  } finally {
+    await page.close();
+  }
+};
+
+/**
+ * Opens the page and checks each target: mounted when `dark` landed, nothing of it animating then;
+ * mounted later, already in the colors it keeps; in colors other than its `light` ones; and nothing
+ * animating once the switch is over
+ */
+const expectNoLightFlash = async (page: Page, url: string, targets: Record<string, string>, light: Record<string, string>): Promise<void> => {
   await page.addInitScript((targets: Record<string, string>) => {
     /** The transitions of an element that change a value: only those are visible to the user
         (Chromium may run no-op scrollbar-color transitions with identical keyframes) */
@@ -132,6 +190,13 @@ const expectNoLightFlash = async (page: Page, url: string, targets: Record<strin
   // Which controls the check at the switch saw, and which it saw mount later: shown in the report
   const mounted = Object.fromEntries(Object.entries(controls).map(([name, check]) => [name, check.mountedWhenDark]));
   test.info().annotations.push({ type: 'mounted when dark landed', description: JSON.stringify(mounted) });
+  // What each control draws in dark, against what it draws on the light opening: a control mounted
+  // after `dark` landed mounted in the colors it keeps (above), so those are not its light ones either
+  const dark = await drawnColorsOf(page, targets);
+  test.info().annotations.push({
+    type: 'colors drawn, light then dark',
+    description: JSON.stringify(Object.fromEntries(Object.keys(targets).map((name) => [name, [light[name], dark[name]]])))
+  });
 
   for (const [name, check] of Object.entries(controls)) {
     if (check.mountedWhenDark) {
@@ -140,26 +205,30 @@ const expectNoLightFlash = async (page: Page, url: string, targets: Record<strin
       expect(check.colorsAtMount, `${name}, mounted after dark landed: its colors as it mounted`).toBe(after[name].colors);
     }
     expect(after[name].running, `${name}, once the switch is over: nothing animating`).toEqual([]);
+    expect(light[name], `${name}: drawn on the light opening`).not.toBe('<missing>');
+    expect(dark[name], `${name}: the colors it draws in dark are not the ones it draws in light`).not.toBe(light[name]);
   }
 };
 
 test.describe('Dark theme on open', () => {
   for (const url of ['src/popup.html', 'src/sidepanel.html']) {
-    test(`controls are already dark when the dark class is applied (${url})`, async ({ page, storage, extensionId }) => {
-      await seedLibrary(storage, {
-        prompts: [createPromptSeed({ id: 'p', title: 'Prompt', content: 'Content' })],
-        settings: { theme: 'dark' },
-      });
+    test(`controls are already dark when the dark class is applied (${url})`, async ({ page, context, storage, extensionId }) => {
+      const prompts = [createPromptSeed({ id: 'p', title: 'Prompt', content: 'Content' })];
+      await seedLibrary(storage, { prompts, settings: { theme: 'light' } });
+      const light = await lightColorsOf(context, `chrome-extension://${extensionId}/${url}`, LIBRARY_TARGETS);
+      await seedLibrary(storage, { prompts, settings: { theme: 'dark' } });
 
-      await expectNoLightFlash(page, `chrome-extension://${extensionId}/${url}`, LIBRARY_TARGETS);
+      await expectNoLightFlash(page, `chrome-extension://${extensionId}/${url}`, LIBRARY_TARGETS, light);
     });
 
     // My-Prompt-Manager-ojz.11: the Welcome's primary button turns from ink to the accent in dark
-    test(`the Welcome's controls are already dark when the dark class is applied (${url})`, async ({ page, storage, extensionId }) => {
+    test(`the Welcome's controls are already dark when the dark class is applied (${url})`, async ({ page, context, storage, extensionId }) => {
       // At step 2, so that Back is there too
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 1 }, settings: { ...DEFAULT_SETTINGS, theme: 'light' } });
+      const light = await lightColorsOf(context, `chrome-extension://${extensionId}/${url}`, WELCOME_TARGETS);
       await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 1 }, settings: { ...DEFAULT_SETTINGS, theme: 'dark' } });
 
-      await expectNoLightFlash(page, `chrome-extension://${extensionId}/${url}`, WELCOME_TARGETS);
+      await expectNoLightFlash(page, `chrome-extension://${extensionId}/${url}`, WELCOME_TARGETS, light);
       await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '1');
     });
   }
