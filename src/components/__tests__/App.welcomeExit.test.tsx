@@ -10,12 +10,14 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { type LaunchStateChange, writeLaunchState } from '../../launch/write';
 import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
 import { getMockStorageManager } from '../../test/mocks';
+import { keyboardAtCommits } from '../../test/utils/keyboardAtCommits';
 import { MOTION } from '../../theme/motion';
 import type { Prompt } from '../../types';
 import { PACKS } from '../../welcome/packs';
@@ -66,9 +68,9 @@ const settle = (ms = 20): Promise<void> => act(async () => { await new Promise((
 
 const primary = (): HTMLElement => screen.getByTestId('welcome-primary');
 
-/** Renders the popup and waits for the Welcome at `step` (0 to 2) */
-const openWelcome = async (step: number): Promise<void> => {
-  render(<App />);
+/** Renders the popup, in `wrap` when given, and waits for the Welcome at `step` (0 to 2) */
+const openWelcome = async (step: number, wrap: (app: ReactElement) => ReactElement = (app) => app): Promise<void> => {
+  render(wrap(<App />));
   expect(await screen.findByTestId('welcome')).toHaveAttribute('data-welcome-step', String(step));
 };
 
@@ -647,20 +649,26 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
     // My-Prompt-Manager-ou48, AC1: the exit of the Welcome asked the keyboard for the first Prompt's
     // Copy, and the Library has not shown since: Try again from the keyboard gives it there
-    it('Try again from the keyboard, the Library read: the keyboard on the first Prompt\'s Copy, where the Welcome\'s exit puts it', async () => {
+    it('Try again from the keyboard, the Library read: the keyboard on the first Prompt\'s Copy, where the Welcome\'s exit puts it, never on the document on the way', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });
-      await openWelcome(2);
+      const keyboard = keyboardAtCommits();
+      await openWelcome(2, keyboard.wrap);
       readsFailOnceAfterTheAdd(['getPrompts']);
       const user = userEvent.setup();
       fireEvent.click(primary());
       const tryAgain = await screen.findByRole('button', { name: 'Try again' });
       act(() => { tryAgain.focus(); });
+      keyboard.start();
 
       await user.keyboard('{Enter}');
 
       const cards = await screen.findAllByTestId('prompt-card');
       const title = within(cards[0]).getByRole('heading').textContent ?? '';
       await waitFor(() => { expect(within(cards[0]).getByRole('button', { name: `Copy content of ${title} to clipboard` })).toHaveFocus(); });
+      // Every commit since the press ended with the keyboard on an element: the Copy takes it in the
+      // commit that lists the cards (a layout effect), not after (My-Prompt-Manager-ou48)
+      expect(keyboard.commits()).toBeGreaterThan(0);
+      expect(keyboard.onDocument()).toEqual([]);
     });
 
     it('Try again from the keyboard, the read failing again: the keyboard stays on Try again', async () => {

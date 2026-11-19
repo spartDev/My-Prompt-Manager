@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { getMockStorageManager } from '../../test/mocks';
+import { type KeyboardAtCommits, keyboardAtCommits } from '../../test/utils/keyboardAtCommits';
 import { type Category, DEFAULT_CATEGORY, type Prompt } from '../../types';
 
 const ERROR_TITLE = 'Error Loading Data';
@@ -57,6 +58,15 @@ const tabToTryAgain = async (user: ReturnType<typeof userEvent.setup>): Promise<
   return tryAgain;
 };
 
+/**
+ * No commit since the press of Try again ended with the keyboard on the document: the control asked to
+ * take it does so in the commit that shows it (a layout effect), not after (a passive effect)
+ */
+const expectNeverOnTheDocument = (keyboard: KeyboardAtCommits): void => {
+  expect(keyboard.commits()).toBeGreaterThan(0);
+  expect(keyboard.onDocument()).toEqual([]);
+};
+
 describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Manager-ou48)', () => {
   beforeEach(() => {
     window.location.search = '';
@@ -91,12 +101,14 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
     });
 
-    it('the Library back, with Prompts: the keyboard is on its active Library filter, All', async () => {
+    it('the Library back, with Prompts: the keyboard is on its active Library filter, All, never on the document on the way', async () => {
       await seed();
       getMockStorageManager().getPrompts.mockRejectedValueOnce(new Error('Storage unavailable'));
       const user = userEvent.setup();
-      render(<App />);
+      const keyboard = keyboardAtCommits();
+      render(keyboard.wrap(<App />));
       await tabToTryAgain(user);
+      keyboard.start();
 
       await user.keyboard('{Enter}');
 
@@ -104,19 +116,23 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
       await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
       expect(screen.getByRole('radio', { name: 'All' })).toBeChecked();
+      expectNeverOnTheDocument(keyboard);
     });
 
-    it('the Library back, with no Prompt: the keyboard is on the main action of the empty Library', async () => {
+    it('the Library back, with no Prompt: the keyboard is on the main action of the empty Library, never on the document on the way', async () => {
       await seed({ prompts: [] });
       getMockStorageManager().getPrompts.mockRejectedValueOnce(new Error('Storage unavailable'));
       const user = userEvent.setup();
-      render(<App />);
+      const keyboard = keyboardAtCommits();
+      render(keyboard.wrap(<App />));
       await tabToTryAgain(user);
+      keyboard.start();
 
       await user.keyboard('{Enter}');
 
       const empty = await screen.findByTestId('library-empty');
       await waitFor(() => { expect(within(empty).getByRole('button', { name: /write your first prompt/i })).toHaveFocus(); });
+      expectNeverOnTheDocument(keyboard);
     });
 
     it('a Try again that fails, then one that reads the Library: the keyboard on Try again, then on All', async () => {
@@ -140,10 +156,11 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
     });
 
-    it('another Section back (Categories, after a deletion whose Prompts could not be read again): the keyboard is on its tab', async () => {
+    it('another Section back (Categories, after a deletion whose Prompts could not be read again): the keyboard is on its tab, never on the document on the way', async () => {
       await seed();
       const user = userEvent.setup();
-      render(<App />);
+      const keyboard = keyboardAtCommits();
+      render(keyboard.wrap(<App />));
       await user.click(await screen.findByRole('tab', { name: 'Categories' }));
       await user.click(await screen.findByRole('button', { name: 'Edit category Work' }));
       // The deletion itself goes through; the read of the Prompts after it fails
@@ -153,12 +170,14 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       await user.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
       const tryAgain = await screen.findByRole('button', { name: 'Try again' });
       act(() => { tryAgain.focus(); });
+      keyboard.start();
 
       await user.keyboard('{Enter}');
 
       await waitFor(() => { expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument(); });
       await waitFor(() => { expect(screen.getByRole('tab', { name: 'Categories' })).toHaveFocus(); });
       expect(screen.getByRole('tab', { name: 'Categories' })).toHaveAttribute('aria-selected', 'true');
+      expectNeverOnTheDocument(keyboard);
     });
   });
 

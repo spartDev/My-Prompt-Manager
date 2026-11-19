@@ -1,16 +1,24 @@
 /**
  * E2E: where the keyboard is after Try again on Error Loading Data (My-Prompt-Manager-ou48, AC1), on
- * the built extension, at an ordinary opening of the popup (a Library with Prompts, the Welcome
- * finished long ago). chrome.storage.local.get is patched from the page's first script: its first
- * reads of the Prompts reject, as many as the test says, then the reads go through.
+ * the built extension. chrome.storage.local is patched from the page's first script: the next reads of
+ * the Prompts reject, as many as the test says, from the opening or once a write the test names has
+ * landed; then the reads go through. Each of the four places Try again gives the keyboard:
  *
- * - Read failing twice (the opening and the first Try again): Enter on Try again leaves the keyboard on
- *   Try again, its focus ring (focus-primary) drawn whole, read back from the pixels; the screen never
- *   gives way on the way. The next Try again brings the Library.
- * - Read failing once: Enter on Try again brings the Library, the keyboard on its active Library filter,
- *   All, drawn as :focus-visible.
- * - In both, the document never has the keyboard from the first Enter on: an in-page probe reads
- *   document.activeElement at every animation frame and at every change of the document.
+ * - The Library, at an ordinary opening (a Library with Prompts, no Welcome under way):
+ *   - read failing twice (the opening and the first Try again): Enter on Try again leaves the keyboard
+ *     on Try again, its focus ring (focus-primary) drawn whole, read back from the pixels; the screen
+ *     never gives way on the way. The next Try again brings the Library, the keyboard on All;
+ *   - read failing once: Enter on Try again brings the Library, the keyboard on its active Library
+ *     filter, All, drawn as :focus-visible.
+ * - The empty Library (no Prompt stored, read failing once): the keyboard on "Write your first prompt".
+ * - Another Section: Work deleted from its Category sheet, the read of the Prompts after the deletion
+ *   failing. Try again brings the Categories back, the keyboard on their tab, selected.
+ * - The Welcome's exit with Packs (Skip, then Enter on "Add 9 prompts", the read of the Prompts after
+ *   the add failing): Try again brings the Library, the keyboard on the first card's Copy.
+ * - In each, the document never has the keyboard from the press of Try again on: an in-page probe reads
+ *   document.activeElement at every animation frame and at every change of the document. The keyboard
+ *   moves in the commit that shows its control (layout effects of LibraryFilterBar, LibraryView and
+ *   TabBar); moved by a passive effect, it is on the document in between, and the probe sees it.
  *
  * Light and dark, popup 400 x 500. Screenshots in LOAD_ERROR_FOCUS_SCREENSHOTS
  * (test-results/load-error-focus when unset): try-again-failed-again-<theme>.png (the keyboard on Try
@@ -19,9 +27,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import { DEFAULT_SETTINGS } from '../../../src/types';
+import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
 import { focusRingOf, RING_TOLERANCE, ringSides } from '../utils/focusRing';
 import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
@@ -47,20 +56,44 @@ const CATEGORIES = [
   createCategorySeed({ id: 'cat-writing', name: 'Writing', color: '#10B981' })
 ];
 
-/** What the patch of the page records: how many reads of the Prompts it made fail */
+/** What the patch of the page records: whether its reads fail yet, and how many reads of the Prompts it made fail */
 interface ReadFailure {
+  failing: boolean;
   rejected: number;
 }
 
-/** In the page, before its own scripts: the first `count` reads of the Prompts reject; every other read goes through */
-const failThePromptsReads = ({ message, count }: { message: string; count: number }): void => {
-  const state: ReadFailure = { rejected: 0 };
+/** The reads of the Prompts to fail: how many, and from when, the opening or a resolved write carrying `afterWriteOf` */
+interface ReadsToFail {
+  message: string;
+  count: number;
+  afterWriteOf?: 'prompts' | 'categories';
+}
+
+/**
+ * In the page, before its own scripts: the next `count` reads of the Prompts reject, from the opening,
+ * or once a set carrying `afterWriteOf` has resolved (the Packs added, a Category deleted). Every other
+ * read and write goes through
+ */
+const failThePromptsReads = ({ message, count, afterWriteOf }: ReadsToFail): void => {
+  const state: ReadFailure = { failing: afterWriteOf === undefined, rejected: 0 };
   (window as Window & { __promptsReads?: ReadFailure }).__promptsReads = state;
   const local = chrome.storage.local;
   const get = local.get.bind(local) as (keys?: unknown) => Promise<Record<string, unknown>>;
-  (local as unknown as { get: (keys?: unknown) => Promise<Record<string, unknown>> }).get = (keys) => {
+  const set = local.set.bind(local) as (items: Record<string, unknown>) => Promise<void>;
+  const patched = local as unknown as {
+    get: (keys?: unknown) => Promise<Record<string, unknown>>;
+    set: (items: Record<string, unknown>) => Promise<void>;
+  };
+  patched.set = (items) => {
+    const written = set(items);
+    if (afterWriteOf !== undefined && Object.keys(items).includes(afterWriteOf)) {
+      written.then(() => { state.failing = true; }, () => undefined);
+    }
+    return written;
+  };
+  patched.get = (keys) => {
     const names = keys === null || keys === undefined ? [] : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
-    if (names.includes('prompts') && state.rejected < count) {
+    if (state.failing && names.includes('prompts') && state.rejected < count) {
       state.rejected += 1;
       return Promise.reject(new Error(message));
     }
@@ -114,6 +147,38 @@ const animationsDone = (page: Page): Promise<void> =>
     );
   });
 
+/** Opens the popup at 400 x 500, its reads patched from the first script, and waits for the theme */
+const openPopup = async (page: Page, extensionId: string, theme: 'light' | 'dark', reads: ReadsToFail): Promise<void> => {
+  await page.addInitScript(failThePromptsReads, reads);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+  await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+  if (theme === 'dark') {
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  } else {
+    await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+  }
+};
+
+/** A keyboard user's way to Error Loading Data's Try again: Tab, from where the keyboard is, until Try again has it */
+const tabToTryAgain = async (page: Page): Promise<Locator> => {
+  const tryAgain = page.getByRole('button', { name: 'Try again' });
+  await expect(tryAgain).toBeVisible();
+  for (let presses = 0; presses < 6 && !(await tryAgain.evaluate((element) => element === document.activeElement)); presses++) {
+    await page.keyboard.press('Tab');
+  }
+  await expect(tryAgain).toBeFocused();
+  return tryAgain;
+};
+
+/** The probe's reads since the press of Try again: some, and none that found the keyboard on the document */
+const expectNeverOnTheDocument = async (page: Page, landing: string): Promise<void> => {
+  const probe = await focusProbe(page);
+  test.info().annotations.push({ type: 'keyboard', description: JSON.stringify({ landing, ...probe }) });
+  expect(probe?.samples).toBeGreaterThan(0);
+  expect(probe?.onDocument, `the reads of document.activeElement that found the keyboard on the document, on the way to ${landing}`).toEqual([]);
+};
+
 test.describe('Error Loading Data: the keyboard after Try again', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const failures of [2, 1] as const) {
@@ -122,15 +187,7 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
         : `the Prompts read fails once (${theme}): Enter on Try again brings the Library, the keyboard on its active Library filter, All; never on the document`;
       test(title, async ({ page, storage, extensionId }) => {
         await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
-        await page.addInitScript(failThePromptsReads, { message: READ_FAILURE, count: failures });
-        await page.emulateMedia({ reducedMotion: 'no-preference' });
-        await page.setViewportSize({ width: WIDTH, height: HEIGHT });
-        await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
-        if (theme === 'dark') {
-          await expect(page.locator('html')).toHaveClass(/\bdark\b/);
-        } else {
-          await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
-        }
+        await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: failures });
 
         const heading = page.getByRole('heading', { name: ERROR_TITLE });
         const tryAgain = page.getByRole('button', { name: 'Try again' });
@@ -176,10 +233,7 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
         expect(await all.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
         expect(await rejectedReads(page)).toBe(failures);
 
-        const probe = await focusProbe(page);
-        test.info().annotations.push({ type: 'keyboard', description: JSON.stringify({ theme, failures, ...probe }) });
-        expect(probe?.samples).toBeGreaterThan(0);
-        expect(probe?.onDocument, 'the reads of document.activeElement that found the keyboard on the document').toEqual([]);
+        await expectNeverOnTheDocument(page, `All (${theme}, ${String(failures)} failed reads)`);
 
         if (failures === 1) {
           await animationsDone(page);
@@ -188,5 +242,75 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
         }
       });
     }
+
+    test(`the empty Library, its Prompts read failing once (${theme}): Enter on Try again brings it, the keyboard on "Write your first prompt"; never on the document`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: CATEGORIES, prompts: [], settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1 });
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+
+      await page.keyboard.press('Enter');
+
+      const writeFirst = page.getByTestId('library-empty').getByRole('button', { name: /write your first prompt/i });
+      await expect(writeFirst).toBeFocused();
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toHaveCount(0);
+      expect(await writeFirst.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      expect(await rejectedReads(page)).toBe(1);
+      await expectNeverOnTheDocument(page, `Write your first prompt (${theme})`);
+    });
+
+    test(`another Section, the Prompts read after a Category's deletion failing (${theme}): Enter on Try again brings the Categories back, the keyboard on their tab; never on the document`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1, afterWriteOf: 'categories' });
+      await expect(page.getByTestId('prompt-card')).toHaveCount(PROMPTS.length);
+      await page.getByTestId('tab-categories').click();
+      await page.getByRole('button', { name: 'Edit category Work', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Edit category', exact: true }).getByRole('button', { name: /delete/i }).click();
+
+      // The deletion stored, the read of the Prompts after it refused: Error Loading Data over the Categories
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      expect(await rejectedReads(page)).toBe(1);
+      expect((await storage.getCategories()).map((category) => category.name)).not.toContain('Work');
+      await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+
+      await page.keyboard.press('Enter');
+
+      const tab = page.getByRole('tab', { name: 'Categories' });
+      await expect(tab).toBeFocused();
+      await expect(tab).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toHaveCount(0);
+      expect(await tab.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      expect(await rejectedReads(page)).toBe(1);
+      await expectNeverOnTheDocument(page, `the Categories tab (${theme})`);
+    });
+
+    test(`the Welcome's exit with Packs, the Prompts read after the add failing (${theme}): Enter on Try again brings the Library, the keyboard on the first card's Copy; never on the document`, async ({ page, storage, extensionId }) => {
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1, afterWriteOf: 'prompts' });
+      await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '0');
+      await page.getByRole('button', { name: 'Skip' }).click();
+      await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+      await page.getByTestId('welcome-primary').press('Enter');
+
+      // The Packs stored, the read of the Prompts after them refused: Error Loading Data
+      await expect(page.getByTestId('welcome')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      expect(await rejectedReads(page)).toBe(1);
+      await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+
+      await page.keyboard.press('Enter');
+
+      const firstCard = page.getByTestId('prompt-card').first();
+      await expect(firstCard).toBeVisible();
+      const copy = firstCard.getByRole('button', { name: /^Copy content of .+ to clipboard$/ });
+      await expect(copy).toBeFocused();
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toHaveCount(0);
+      expect(await copy.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      expect(await rejectedReads(page)).toBe(1);
+      await expectNeverOnTheDocument(page, `the first card's Copy (${theme})`);
+    });
   }
 });
