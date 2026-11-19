@@ -35,7 +35,7 @@ Visual reference (both modes side by side): the palette canvas linked from beads
 |---|---|---|---|
 | `bg-app` | `#F4F1FA` | `#120E1B` | Page and header (seamless, no white band) |
 | `bg-card` | `#FFFFFF` | `#231C34` | Cards, form sections, and the search field and pills that sit on `bg-app` |
-| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light |
+| `bg-subtle` | `#F4F1FA` | `#2B2340` | Chips and fields **on a card**. Never directly on `bg-app`: same value in light. Also the full screen of the Welcome, which covers `bg-app` |
 | `bg-raised` | `#F8F6FC` | `#1B1528` | Light fills: empty states, nested panels |
 | `bg-muted` | `#F1EDF8` | `#2E2645` | Hover of neutral elements (`hover:bg-muted`) |
 | `bg-inverse` | `#1D1530` | `#4A3D6B` | Notification pill, tooltips (the chart tooltip included), the Analytics hero |
@@ -52,7 +52,7 @@ Surfaces are **opaque**. `bg-backdrop` is the only translucent one: no transluce
 | `border-default` | `#ECE6F5` | `#352C4C` | Cards, unselected pills. Also the color of a bare `border` |
 | `border-divider` | `#F0EBF8` | `#2F2744` | Dividers inside a card |
 | `border-strong` | `#DCD4EA` | `#41375A` | Secondary button; the line under the header, shown only once the list scrolls |
-| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star (3:1 on every surface) |
+| `border-input` | `#8F87A5` | `#766C8E` | Field outlines, off track of a switch, unpinned star, the Welcome's Back and unselected Packs (3:1 on every surface) |
 | `border-focus` | accent | accent | A focused field (`focus-input` applies it) |
 | `border-error` | danger | danger | A field in error |
 | `border-ghost` | `#CFC5E3` | `#4A4066` | Dashed outline of what is not there yet, in an [empty state](#empty-states): ghost cards and tiles on `bg-app` |
@@ -365,6 +365,7 @@ shadow-2xl  /* 0 25px 50px -12px, tint 25 - dialogs */
 shadow-puck /* 0 2px 6px -2px, tint 25 - the puck of a segmented control */
 shadow-knob /* 0 2px 4px, tint 25 - the knob of a switch */
 shadow-tile-icon /* 0 4px 10px -6px, tint 40 - the icon square of a What's new Feature tile */
+shadow-welcome-primary /* 0 14px 26px -16px, tint ink - the primary button of the Welcome */
 ```
 
 ### Custom Shadows
@@ -490,6 +491,12 @@ Flat accent: the brand gradient belongs to the logo only.
   Copy
 </button>
 ```
+
+The Prompt card's Copy draws `focus-interactive`'s ring on `:focus-visible` only
+(`focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent`): after the
+Welcome's exit the Library gives it the keyboard by script, and Chrome matches `:focus-visible` there
+after a key press, not after a click (see Welcome exit), where `:focus` would draw the ring for a mouse
+user too.
 
 #### Icon Button
 
@@ -917,6 +924,25 @@ The bold message stays whole; the optional sub (the object's name, or the reason
 ellipsis when the pill runs out of room. Write the message short (`Prompt saved`, `Couldn't delete
 Prompt`) and put the name in the sub.
 
+On the Welcome (My-Prompt-Manager-ojz.20), the Notification passes two opt-in props of
+`ToastContainer` that nothing else passes. `wrap`: the message wraps onto a second line instead of
+being cut, in a pill as wide as its text, `min-h-10`, `rounded-[20px]`. `clearRight`: the room on the
+right kept free for the Welcome's close button (`WELCOME_CLOSE_ROOM`, the frame's 18px padding, the
+32px button and 8px), the pill centered in what is left, never under 16px from the left edge. At 320px
+"Couldn't add the prompts" takes two lines, from 16px to 262px, and the close button starts at 270px.
+The failure of the Packs' add has no timer: it stays until the user acts (Try again, the primary
+button, Start empty, Back, a dot, or close), and a step change hides it, so it never covers the
+controls of another step.
+
+One Notification is read whole wherever it shows: the exit of the Welcome on the Library, "9 prompts
+added" then "Open your AI chat and type //" (My-Prompt-Manager-ojz.19), whose `//` is the next step.
+It is marked on the Notification itself (`whole` of `ToastOptions`), not on the screen, so every other
+Notification of the Library keeps the one-line pill. The pill grows as with `wrap` (`w-max min-h-10
+py-1.5 rounded-[20px]`), and the sub takes a line of its own under the message (`flex-col
+items-start`), never cut: 238px wide and 48px high, whole from the 320px side panel to the popup. It
+ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel); in a
+320px side panel it reaches the side panel's close button, as the one-line pill does.
+
 ```tsx
 <div role="status" className="
   animate-toast-in fixed top-3 left-1/2 [transform:translateX(-50%)] z-50
@@ -1182,6 +1208,112 @@ checked for contrast in light and dark by "What's new in light and dark" in
 `src/theme/__tests__/tokens.test.ts`. Under
 `prefers-reduced-motion`, `src/popup.css` makes all of them last 1ms, and the caller's timer waits
 for nothing (`motionDuration`).
+
+#### Welcome frame
+
+The Welcome (`src/components/welcome/WelcomeFrame.tsx`, Atelier 1C 'Premier lancement') fills the
+popup or the side panel on `bg-subtle` (the mockups' `#F4F1FA` light, `#2B2340` dark), with no tab bar.
+Its primary button is `bg-welcome-primary text-on-welcome-primary`, 48px high over the rest of the
+width: ink in light, the accent in dark, as the two mockups draw it (the dark ink, `bg-inverse`, is
+1.5:1 on the frame; the accent 3.0:1, its white label 4.9:1). Back is outlined in `border-input`, 3:1
+on the frame in both modes. The step's area clips sideways at the screen's edge (`-mx-[18px] px-[18px]`),
+so a card's shadow fades out in the side margins. No animation of the frame disables, covers or delays
+the primary button: a click lands while they play.
+
+Each progress dot is a button of 24 x 24px at least (`h-6 min-w-6`), its pill centered in it, so the
+dots meet WCAG 2.5.8 (Target Size): the pills stand 24px apart, center to center, where the mockups'
+6px gap left 13px-wide targets too close together. The state is the pill's shape: in dark the active
+pill (`bg-accent`, 3.0:1 on the frame) and an inactive dot (`bg-step-dot`, 3.0:1) are 1.01:1 to each
+other, and the 22px pill against the 7px dot carries it, each 3:1 on the frame (WCAG 1.4.1 and 1.4.11);
+`aria-current="step"` and the "Step N of 3" announcement carry it for assistive technology.
+
+| Token | Value | Use |
+|---|---|---|
+| `animate-welcome-in` (`MOTION.welcomeIn`) | `backdrop-in` 100ms, ease | the screen fading in at the opening; the mockup's 500ms is shortened so the screen is whole within the 200ms the Welcome has to show (150ms was not enough) |
+| `animate-welcome-step-forward` / `-back` (`MOTION.welcomeStep`) | `welcome-from-right` / `welcome-from-left` 500ms, `ease-section` | a step sliding 26px in from the side it comes from as it fades in; the step of the opening shows at once |
+| `animate-welcome-back-pop` (`MOTION.welcomeBackPop`) | `pop` 350ms, ease-spring | Back popping in when a step change brings it |
+| `transition-welcome-dot` (`src/popup.css`, `MOTION.welcomeDot`) | width 450ms ease-spring, background 300ms | the active dot widening from 7 to 22px |
+| `transition-welcome-press` (`src/popup.css`, `MOTION.welcomePress`) | scale 250ms ease-spring, background and color 200ms | the primary button (`active:scale-97`, `hover:bg-welcome-primary/90`), the close button (`active:scale-90`), Skip and Back |
+| `bg-welcome-primary` / `text-on-welcome-primary` | `bg-inverse` / `text-on-inverse-strong` (`#1D1530` / `#FFFFFF`) in light, `bg-accent` / `text-on-accent` (`#844BF2` / `#FFFFFF`) in dark | the primary button and its label |
+| `bg-step-dot` | `border-input` (`#8F87A5` / `#766C8E`) | an inactive progress dot, a control with nothing else to show it: 3:1 on the frame (the mockups' `#DCD4EA` / `#41375A` are 1.3:1); the active one is `bg-accent` |
+| `shadow-welcome-primary` (`--shadow-tint-ink`) | `0 14px 26px -16px`, ink at 0.9 in light, near black at 0.92 in dark | the shadow of the primary button |
+
+Under `prefers-reduced-motion` the frame plays none of them (it reads the setting as it opens), and
+`src/popup.css` makes them last 1ms besides.
+
+#### Welcome steps
+
+The content of the three steps (`src/components/welcome/WelcomeCards.tsx`, `BlankDemo.tsx`,
+`PackPicker.tsx`). Step 1's cards are `bg-card` and, in the middle, `bg-inverse` with the Notification's
+violet (`bg-inverse-mark/35` for its chip); their lines are `bg-(--border-color-default)`, `bg-muted`,
+`bg-inverse-bar` and `bg-inverse-action`, their chips the empty Categories' tile colors. Step 2's blank
+is `bg-accent-selected text-accent-strong` with `border-blank` under it and a `bg-accent` caret. Step 3's
+Packs are cards outlined at 3:1 (`bg-card border-input`) until selected, then take the Category chip
+tint of their color, opaque over `bg-card`, the chip's text, and a border and a check round of their
+color (`src/welcome/packColors.ts`, through `--pack-*` variables as `CategoryChips` does): a Pack's
+color is user data. Its color is the mark as is in light, lifted toward white in dark as the chip's
+text is, and the check glyph is `text-on-pack-check`. The Packs' grid pads its scroll box by 6px
+(`p-1.5`), room for a focused Pack's outline (3px past it) with some to spare, and takes it back with
+`-m-1.5`, so the Packs line up with the title and the pills while that outline stays whole.
+The Platform pills are `bg-card text-secondary`. Every pair is checked at its threshold, in light and
+dark, by "Welcome in light and dark" in `src/theme/__tests__/tokens.test.ts`.
+
+Where the Packs do not fit (a side panel under about 600px high), their grid scrolls within itself,
+and while Packs remain beyond its top or bottom, that edge fades out over 16px and a line in
+`border-input` (3:1 on the frame) shows along it (`welcome-packs-edges` around the grid,
+`welcome-packs-scroll` on it, in `src/popup.css`), so a selected Pack, counted in "Add N prompts", is
+never out of view unseen. Like the Sections' scroll lines, the grid's own scroll timeline draws it, with
+no scroll state in React; where the Packs fit, the timeline is inactive and neither shows. It is the
+scroll's state, not motion, so it stays under reduced motion. A Pack the keyboard reaches scrolls into
+view with its outline (`scroll-py-1`), and while a Pack has the focus the fades step aside and the lines
+stay (`welcome-packs-scroll:focus-within`, the lines on `z-index: 1` above the Packs that cross the
+edge): in a 320 x 420 side panel the view is barely one Pack high, and a fade would cut an edge of its
+outline.
+
+| Token | Value | Use |
+|---|---|---|
+| `animate-welcome-float-left` / `-right` / `-center` (`MOTION.welcomeFloat*`) | `float` 3400ms / 3800ms from 500ms / 3000ms from 250ms, ease-in-out, once | step 1's cards, 8px up and back once, each at its own pace, all at rest 4.3s after the step shows; still under reduced motion |
+| `MOTION.welcomeTypeLetter`, `MOTION.welcomeTypePause`, `MOTION.welcomeTypings` (timers) | 85ms a letter, the whole name held about 1.2s (14 letters' time, 1190ms), 2 typings | step 2's name typed into the blank, held, typed again, then held for good with a still caret, 4.76s after the step shows; the whole name at once under reduced motion |
+| `animate-welcome-caret` (`MOTION.welcomeCaretBlink`, `MOTION.welcomeCaretBlinks`) | `welcome-blink` 1000ms, `steps(1)`, 4 times | the caret after the letters typed, blinking while it types; still once the name is held, none under reduced motion |
+| `animate-welcome-check` (`MOTION.welcomeCheck`) | `pop` 450ms, ease-spring | the round check of a selected Pack; the Pack itself presses with `active:scale-95` on `transition-chip` |
+| `border-blank` | `bg-accent` (`#6D28D9` / `#844BF2`) | the underline of step 2's blank |
+| `border-inverse-blank` | `bg-inverse-mark` (`#A78BFA`, both modes) | the dashed blank of step 1's ink card |
+| `text-on-pack-check` | `text-on-accent` (`#FFFFFF`) in light, `text-on-inverse-mark` (`#1D1530`) in dark | the glyph on a selected Pack's check round: white is under 3:1 on a color lifted for dark |
+| `shadow-welcome-card` / `shadow-welcome-demo` (`--shadow-tint-50`) | `0 14px 30px -18px` / `0 18px 36px -22px`, violet at 0.5 in light, black at 0.8 in dark | step 1's light cards / step 2's card |
+| `shadow-welcome-ink-card` (`--shadow-tint-ink`) | `0 22px 40px -20px` | step 1's ink card |
+
+None of them touches the frame's primary button.
+
+Nothing on the Welcome loops: everything that moves by itself on a step ends within
+`MOTION.welcomeMotionLimit` (5s) of the step's display (WCAG 2.2.2 Pause, Stop, Hide, Level A;
+My-Prompt-Manager-ojz.20), measured on the built extension by `tests/e2e/welcome/welcome-motion.spec.ts`:
+step 1's cards at rest by 4.3s, step 2's caret still by 4.0s and its typing held by 4.76s, step 3's
+check and slide by about 0.5s. The Atelier 1C mockup loops the cards, the typing and the caret; the
+Welcome plays the floats once and the typing twice instead (D28 and D29 of My-Prompt-Manager-ojz.20).
+The Packs grid's edges are drawn by its scroll timeline, which Chromium lists as running animations
+while the grid shows; they move only as the user scrolls, which the criterion leaves out.
+
+#### Welcome exit
+
+"Start empty" shows the Library, then opens the editor on a new Prompt after `MOTION.welcomeEditorDelay`
+(250ms, a timer of `src/hooks/useWelcomeExit.ts`), so the user sees where the Welcome leads before the
+sheet rises. It is a pause, not an animation: it stays under reduced motion, where the sheet itself
+rises at once. With Packs, the Library shows with its cards and the Notification together; the cards
+rise as any listed Prompts do (`animate-list-rise`).
+
+The keyboard goes where the Welcome leads. With Packs, it lands on the first card's Copy as the cards
+show (`focusFirstPrompt` of `LibraryView`), so one Enter copies that Prompt, whose name the button
+carries; only when it is on no element, so a user who has already reached one keeps it. Its ring is
+`focus-interactive`'s drawn on `:focus-visible` (see Small Action Button (Copy)): Chrome matches it for
+that scripted focus after a key press, not after a click, so a mouse user sees no ring appear. The
+Copy ignores a repeated Enter: the Enter on "Add N prompts" can still be held when the Copy takes the
+keyboard, and its auto-repeat copies nothing. With Start empty, the editor's title field takes it as
+the editor opens.
+
+A refused add keeps the Welcome at its last step with the failure Notification "Couldn't add the
+prompts" (see Notification, On the Welcome). Its action is Try again, the same add with the same Packs;
+the primary button also tries again, and with every Pack unselected it reads Start empty. The keyboard
+stays on the primary button, so Enter tries again.
 
 #### Modal Fade In
 

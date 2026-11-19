@@ -142,3 +142,114 @@ describe("What's new tiles motion", () => {
   });
 });
 // --- end What's new tiles ---
+
+// --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+describe('Welcome frame motion', () => {
+  const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+  /** The Welcome's own block of popup.css, wherever other blocks sit around it */
+  const block = popupCss.slice(popupCss.indexOf('/* --- Welcome frame'), popupCss.indexOf('/* --- end Welcome frame --- */'));
+
+  it('fades the screen in at the opening in 100ms, not the mockup\'s 500ms, so it is whole within the 200ms the Welcome has', () => {
+    expect(MOTION.welcomeIn).toBe(100);
+    expect(tokens).toContain(`--animate-welcome-in: backdrop-in ${MOTION.welcomeIn}ms ease both;`);
+    expect(tokens).toMatch(/@keyframes backdrop-in \{\s*from \{ opacity: 0; \}\s*to \{ opacity: 1; \}/);
+  });
+
+  it("slides a step 26px in from the side it comes from with a fade, over 500ms on the Section curve (the mockup's cL and cR)", () => {
+    expect(MOTION.welcomeStep).toBe(500);
+    expect(EASE.section).toBe('cubic-bezier(0.32, 0.72, 0, 1)');
+    expect(tokens).toContain(`--animate-welcome-step-forward: welcome-from-right ${MOTION.welcomeStep}ms var(--ease-section) both;`);
+    expect(tokens).toContain(`--animate-welcome-step-back: welcome-from-left ${MOTION.welcomeStep}ms var(--ease-section) both;`);
+    expect(tokens).toMatch(/@keyframes welcome-from-right \{\s*from \{ opacity: 0; transform: translateX\(26px\); \}\s*to \{ opacity: 1; transform: none; \}/);
+    expect(tokens).toMatch(/@keyframes welcome-from-left \{\s*from \{ opacity: 0; transform: translateX\(-26px\); \}\s*to \{ opacity: 1; transform: none; \}/);
+  });
+
+  it('pops Back in over 350ms and widens the active dot over 450ms, on the spring; the primary button presses over 250ms', () => {
+    expect([MOTION.welcomeBackPop, MOTION.welcomeDot, MOTION.welcomePress]).toEqual([350, 450, 250]);
+    expect(tokens).toContain(`--animate-welcome-back-pop: pop ${MOTION.welcomeBackPop}ms var(--ease-spring) both;`);
+    expect(block).toMatch(new RegExp(`@utility transition-welcome-dot \\{\\s*transition:\\s*width ${MOTION.welcomeDot}ms var\\(--ease-spring\\),`));
+    expect(block).toMatch(new RegExp(`@utility transition-welcome-press \\{\\s*transition:\\s*scale ${MOTION.welcomePress}ms var\\(--ease-spring\\),`));
+  });
+
+  it('makes every animation and transition of the frame near instant, with no delay, under reduced motion', () => {
+    const reduced = block.slice(block.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).not.toBe('');
+    for (const name of ['welcome-in', 'welcome-step-forward', 'welcome-step-back', 'welcome-back-pop']) {
+      expect(reduced).toContain(`.animate-${name}`);
+    }
+    expect(reduced).toMatch(/animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+    expect(reduced).toMatch(/\.transition-welcome-dot,\s*\.transition-welcome-press \{\s*transition-duration: 1ms;/);
+  });
+});
+// --- end Welcome frame ---
+
+// --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+describe('Welcome steps motion', () => {
+  const popupCss = readFileSync(path.resolve(__dirname, '../../popup.css'), 'utf8');
+  /** The Welcome steps' own block of popup.css */
+  const block = popupCss.slice(popupCss.indexOf('/* --- Welcome steps'), popupCss.indexOf('/* --- end Welcome steps --- */'));
+
+  /** The Welcome steps' own block of tokens.css */
+  const stepsTokens = tokens.slice(tokens.indexOf('/* --- Welcome steps'), tokens.indexOf('/* --- end Welcome steps --- */'));
+
+  it("floats the three cards of step 1 8px up and back once, each at its own pace: 3.4s, 3.8s from 0.5s, 3s from 0.25s (the mockup's cFloat, which loops)", () => {
+    expect([MOTION.welcomeFloatLeft, MOTION.welcomeFloatRight, MOTION.welcomeFloatCenter]).toEqual([3400, 3800, 3000]);
+    expect([MOTION.welcomeFloatRightDelay, MOTION.welcomeFloatCenterDelay]).toEqual([500, 250]);
+    // One iteration each: no count is written, and none is infinite
+    expect(tokens).toContain(`--animate-welcome-float-left: float ${MOTION.welcomeFloatLeft}ms ease-in-out;`);
+    expect(tokens).toContain(`--animate-welcome-float-right: float ${MOTION.welcomeFloatRight}ms ease-in-out ${MOTION.welcomeFloatRightDelay}ms;`);
+    expect(tokens).toContain(`--animate-welcome-float-center: float ${MOTION.welcomeFloatCenter}ms ease-in-out ${MOTION.welcomeFloatCenterDelay}ms;`);
+    expect(tokens).toMatch(/@keyframes float \{\s*0%, 100% \{ transform: translateY\(0\); \}\s*50% \{ transform: translateY\(-8px\); \}/);
+  });
+
+  it("types a letter every 85ms, holds the whole name 1.2s, twice, and blinks the caret once a second, four times (the mockup's TYPE and cBlink, which loop)", () => {
+    expect([MOTION.welcomeTypeLetter, MOTION.welcomeTypePause, MOTION.welcomeTypings]).toEqual([85, 1200, 2]);
+    expect([MOTION.welcomeCaretBlink, MOTION.welcomeCaretBlinks]).toEqual([1000, 4]);
+    expect(tokens).toContain(`--animate-welcome-caret: welcome-blink ${MOTION.welcomeCaretBlink}ms steps(1) ${String(MOTION.welcomeCaretBlinks)};`);
+    expect(tokens).toMatch(/@keyframes welcome-blink \{\s*0%, 49% \{ opacity: 1; \}\s*50%, 100% \{ opacity: 0; \}/);
+  });
+
+  // WCAG 2.2.2 Pause, Stop, Hide (Level A): motion that starts by itself beside the text ends within 5s
+  it('nothing on a step moves for ever: no animation of the Welcome steps is infinite', () => {
+    expect(stepsTokens).not.toBe('');
+    expect(stepsTokens).not.toMatch(/infinite/);
+  });
+
+  it('everything that moves on a step by itself ends within 5s of the step showing', () => {
+    expect(MOTION.welcomeMotionLimit).toBe(5000);
+    const floats = [
+      MOTION.welcomeFloatLeft,
+      MOTION.welcomeFloatRight + MOTION.welcomeFloatRightDelay,
+      MOTION.welcomeFloatCenter + MOTION.welcomeFloatCenterDelay
+    ];
+    for (const end of floats) {
+      expect(end).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    }
+    expect(MOTION.welcomeCaretBlink * MOTION.welcomeCaretBlinks).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    // The typing of BlankDemo: each typing but the last is followed by its hold (14 letters' time)
+    const name = 'Claire, Head of Sales';
+    const holdTicks = Math.round(MOTION.welcomeTypePause / MOTION.welcomeTypeLetter);
+    const typingEnds = ((name.length + holdTicks) * (MOTION.welcomeTypings - 1) + name.length) * MOTION.welcomeTypeLetter;
+    expect(typingEnds).toBe(4760);
+    expect(typingEnds).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    // The step slide, the dot, Back's pop and a Pack's check are shorter still
+    for (const once of [MOTION.welcomeStep, MOTION.welcomeDot, MOTION.welcomeBackPop, MOTION.welcomeCheck]) {
+      expect(once).toBeLessThanOrEqual(MOTION.welcomeMotionLimit);
+    }
+  });
+
+  it("pops the check of a selected Pack over 450ms on the spring (the mockup's cPop)", () => {
+    expect(MOTION.welcomeCheck).toBe(450);
+    expect(tokens).toContain(`--animate-welcome-check: pop ${MOTION.welcomeCheck}ms var(--ease-spring) both;`);
+  });
+
+  it('under reduced motion nothing floats or blinks, and the check shows at once', () => {
+    const reduced = block.slice(block.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).not.toBe('');
+    expect(reduced).toMatch(
+      /\.animate-welcome-float-left,\s*\.animate-welcome-float-right,\s*\.animate-welcome-float-center,\s*\.animate-welcome-caret \{\s*animation: none;/
+    );
+    expect(reduced).toMatch(/\.animate-welcome-check \{\s*animation-duration: 1ms;\s*animation-delay: 0ms !important;/);
+  });
+});
+// --- end Welcome steps ---

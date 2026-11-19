@@ -94,8 +94,66 @@ export const MOTION = {
   /** What's new: its backdrop fading in */
   whatsNewBackdropIn: 300,
   /** What's new: its backdrop fading out, with the sheet */
-  whatsNewBackdropOut: 340
+  whatsNewBackdropOut: 340,
   // --- end What's new sheet ---
+
+  // --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+  /**
+   * Welcome: the screen fading in at the opening, in 100ms rather than the mockup's 500ms, so the
+   * Welcome is whole within the 200ms it has to be on screen (decision Q3 of My-Prompt-Manager-ojz).
+   * Fully opaque, as a median of 10 openings from navigation start: about 534ms with 500ms, 204 to
+   * 212ms with 150ms (over the target), about 140ms with 100ms
+   */
+  welcomeIn: 100,
+  /** Welcome: a step sliding 26px in from the side it comes from while it fades in, on the Section curve (EASE.section) */
+  welcomeStep: 500,
+  /** Welcome: the active progress dot widening from 7 to 22px, on the spring */
+  welcomeDot: 450,
+  /** Welcome: Back popping in when a step change brings it, from the second step */
+  welcomeBackPop: 350,
+  /** Welcome: the primary button shrinking to 97% while pressed, on the spring */
+  welcomePress: 250,
+  // --- end Welcome frame ---
+
+  // --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+  /**
+   * Welcome: everything that moves on a step by itself ends within this of the step's display, so
+   * nothing moves beside the text with no way to stop it (WCAG 2.2.2 Pause, Stop, Hide, Level A;
+   * My-Prompt-Manager-ojz.20). The mockup loops the cards and the typing; here they play, then rest
+   */
+  welcomeMotionLimit: 5000,
+  /**
+   * Welcome step 1: the three Prompt cards floating 8px up and back once, each at its own pace (left,
+   * right after its delay, center after its delay), the last one at rest 4.3s after the step shows.
+   * The mockup's 5.8s, 6.4s from 0.9s and 5.2s from 0.4s, in a loop, would not end within welcomeMotionLimit
+   */
+  welcomeFloatLeft: 3400,
+  welcomeFloatRight: 3800,
+  welcomeFloatRightDelay: 500,
+  welcomeFloatCenter: 3000,
+  welcomeFloatCenterDelay: 250,
+  /**
+   * Welcome step 2: a letter of the name typed into the blank every welcomeTypeLetter; the whole name
+   * held welcomeTypePause, then typed again, welcomeTypings times in all; the last one stays, whole,
+   * with a still caret: 4.76s after the step shows
+   */
+  welcomeTypeLetter: 85,
+  welcomeTypePause: 1200,
+  welcomeTypings: 2,
+  /** Welcome step 2: the caret after the letters typed, blinking once a cycle, welcomeCaretBlinks cycles, then still */
+  welcomeCaretBlink: 1000,
+  welcomeCaretBlinks: 4,
+  /** Welcome step 3: the round check of a selected Pack popping in, on the spring */
+  welcomeCheck: 450,
+  // --- end Welcome steps ---
+
+  // --- Welcome exit (My-Prompt-Manager-ojz.9) ---
+  /**
+   * Welcome, "Start empty": the Library shows, then the editor opens on a new Prompt this long after.
+   * A pause to see where the Welcome leads, not an animation: it stays under reduced motion
+   */
+  welcomeEditorDelay: 250
+  // --- end Welcome exit ---
 } as const;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';

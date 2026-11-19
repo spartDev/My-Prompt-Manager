@@ -1,0 +1,473 @@
+/**
+ * E2E: leaving the Welcome for a ready Library, in the real extension (My-Prompt-Manager-ojz.9).
+ *
+ * - S2, AC1: Skip, then "Add 9 prompts": the Library lists the Prompts of the Packs selected on All,
+ *   with the Notification "9 prompts added" and "Open your AI chat and type //" as its sub
+ *   (My-Prompt-Manager-ojz.19); neither the Library's loading state nor its empty state ever shows
+ *   on the way; the Prompts stored in their Packs' Categories and the Welcome recorded finished.
+ * - The exit Notification read whole (My-Prompt-Manager-ojz.19): in the popup 400 x 500 and the side
+ *   panel 360 x 600 and 320 x 500, light and dark, "Open your AI chat and type //" on a line of its
+ *   own under the message, neither cut, the pill in its room, over none of the controls under the
+ *   header, above the search field, off the first card's Copy, which has the keyboard; "Your library
+ *   is ready" (a Debug replay over Packs already in) as well. Screenshots in WELCOME_EXIT_SCREENSHOTS
+ *   (test-results/welcome-exit when unset).
+ * - S3, AC2: no Pack, "Start empty": the empty Library, then the editor on a new Prompt about 250ms
+ *   later, both times read in the page as they are first seen. The exact 250ms is proven with fake
+ *   timers in src/hooks/__tests__/useWelcomeExit.test.ts.
+ * - S12, AC5: from the store a first install leaves, the popup opened, Skip, "Add 9 prompts", then
+ *   one click on a card's copy button: the clipboard holds that Prompt's content, read back from
+ *   the clipboard. The clicks are counted and the time from opening the popup to the clipboard
+ *   holding the content is measured, the script going as fast as the page lets it (a floor: the
+ *   reading model is My-Prompt-Manager-ojz.13's), over several runs, in
+ *   test-results/welcome/first-copy-times.json.
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import type { BrowserContext, Locator, Page } from '@playwright/test';
+
+import { defaultSiteSettings, SITE_SETTINGS_KEY } from '../../../src/services/siteSettings';
+import { DEFAULT_SETTINGS } from '../../../src/types';
+import { PACKS } from '../../../src/welcome/packs';
+import { WELCOME_KEY } from '../../../src/welcome/storage';
+import { WHATS_NEW_KEY } from '../../../src/whatsNew/storage';
+import { createStorageController, type ExtensionStorage, expect, test, waitForBackgroundTarget, waitForFirstInstallRecords } from '../fixtures/extension';
+
+const OUTPUT_DIR = 'test-results/welcome';
+
+/** How many runs the first-copy probe times */
+const COPY_RUNS = 5;
+
+/** The first copy must come within this of the first opening (the spec's target) */
+const FIRST_COPY_TARGET_MS = 60_000;
+
+/** What the clipboard holds before each run: no Prompt has it, so the read sees that run's copy */
+const CLIPBOARD_BEFORE = '-';
+
+const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
+const DEFAULT_PROMPTS = DEFAULTS.flatMap((pack) => pack.prompts);
+const ADDED = `${String(DEFAULT_PROMPTS.length)} prompts added`;
+/** The Notification's second line after the Packs: the next step, in the AI chat (My-Prompt-Manager-ojz.19) */
+const IN_THE_CHAT = 'Open your AI chat and type //';
+
+/** What the page notes, from its first script on: when each part of the way out was first in the document */
+interface ExitProbe {
+  libraryAt?: number;
+  editorAt?: number;
+  loadingSeen?: boolean;
+  emptySeen?: boolean;
+  /** When the Library's empty state was first in the document */
+  emptyAt?: number;
+  copiedAt?: number;
+}
+
+type ProbeWindow = typeof globalThis & { welcomeExitProbe: ExitProbe };
+
+/**
+ * Notes, in the page, the first time the Library (its Section), the editor, the Library's loading
+ * state and its empty state are in the document, and when a copy to the clipboard has landed
+ */
+const probeTheExit = async (page: Page): Promise<void> => {
+  await page.addInitScript((before: string) => {
+    const probe: ExitProbe = {};
+    (globalThis as ProbeWindow).welcomeExitProbe = probe;
+    const look = (records: readonly MutationRecord[]): void => {
+      const now = performance.now();
+      if (probe.libraryAt === undefined && document.querySelector('[data-testid="section"]')) {
+        probe.libraryAt = now;
+      }
+      if (probe.editorAt === undefined && document.querySelector('[data-testid="editor-sheet"]')) {
+        probe.editorAt = now;
+      }
+      // Each node added, even one gone again by now
+      for (const node of records.flatMap((record) => [...record.addedNodes])) {
+        const text = node.textContent ?? '';
+        probe.loadingSeen ||= text.includes('Loading your prompts');
+        probe.emptySeen ||= text.includes('Your library is empty');
+        if (probe.emptySeen && probe.emptyAt === undefined) {
+          probe.emptyAt = now;
+        }
+      }
+    };
+    new MutationObserver(look).observe(document, { childList: true, subtree: true });
+    // The clipboard itself is read back by the test; this only notes when the copy landed
+    const clipboard = navigator.clipboard;
+    const write = clipboard.writeText.bind(clipboard);
+    clipboard.writeText = async (data: string): Promise<void> => {
+      await write(data);
+      if (data !== before) {
+        probe.copiedAt = performance.now();
+      }
+    };
+  }, CLIPBOARD_BEFORE);
+};
+
+const probeOf = (page: Page): Promise<ExitProbe> => page.evaluate(() => (globalThis as ProbeWindow).welcomeExitProbe);
+
+const openPopup = async (page: Page, extensionId: string): Promise<void> => {
+  await page.setViewportSize({ width: 400, height: 500 });
+  await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+};
+
+const welcome = (page: Page) => page.getByTestId('welcome');
+const primary = (page: Page) => page.getByTestId('welcome-primary');
+const cards = (page: Page) => page.getByTestId('prompt-card');
+
+/** Where the exit Notification is checked whole: the popup, and the side panel at its usual and narrowest widths */
+const EXIT_SURFACES = [
+  { file: 'popup', width: 400, height: 500 },
+  { file: 'sidepanel', width: 360, height: 600 },
+  { file: 'sidepanel', width: 320, height: 500 }
+] as const;
+
+const EXIT_SCREENSHOTS_DIR = process.env.WELCOME_EXIT_SCREENSHOTS ?? 'test-results/welcome-exit';
+
+/** The room a Notification leaves on each side of the screen (ToastContainer) */
+const NOTIFICATION_EDGE = 16;
+
+const firstCardCopy = (page: Page) => cards(page).first().getByRole('button', { name: /^Copy content of / });
+
+const expectTheme = async (page: Page, theme: 'light' | 'dark'): Promise<void> => {
+  if (theme === 'dark') {
+    await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+  } else {
+    await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+  }
+};
+
+/** From wherever the Welcome opens to its last step, the default Packs selected */
+const toAddPrompts = async (page: Page): Promise<void> => {
+  await expect(welcome(page)).toBeVisible();
+  for (let step = 0; step < 2 && (await primary(page).textContent()) === 'Next'; step++) {
+    await primary(page).click();
+  }
+  await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+};
+
+/** Resolves once every finite animation of the page has ended: the pill's entrance, the cards' rise */
+const animationsDone = (page: Page): Promise<void> =>
+  page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.timeline instanceof DocumentTimeline && animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+  });
+
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+interface TextLine extends Box {
+  scrollWidth: number;
+  clientWidth: number;
+  lineHeight: number;
+}
+
+interface ExitNotificationLayout {
+  pill: Box;
+  message: TextLine;
+  sub: TextLine;
+  /** The first card's Copy and the search field (its rounded box), read where they rest */
+  copy: Box;
+  search: Box;
+  /** The controls outside the Notification whose box meets the pill's */
+  covered: (Box & { name: string })[];
+}
+
+/**
+ * The one control a Notification may cover: the side panel's close button, at the header's top right,
+ * which any Notification of a 320px side panel reaches, one line high or more, and which nobody needs
+ * right after the Welcome; it is free again when the Notification leaves
+ */
+const MAY_COVER = new Set(['Close side panel']);
+
+const boxOf = (box: { x: number; y: number; width: number; height: number } | null, what: string): Box => {
+  if (!box) {
+    throw new Error(`${what} has no box`);
+  }
+  return { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height, width: box.width, height: box.height };
+};
+
+const overlaps = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * The exit Notification as it rests over the Library, hovered so it keeps its time while it is read:
+ * its pill, its two lines, and the controls it would cover
+ */
+const exitNotificationLayout = async (page: Page, message: string): Promise<ExitNotificationLayout> => {
+  const notification = page.getByTestId('toast');
+  await expect(notification.getByText(message, { exact: true })).toBeVisible();
+  // The whole second line, so a shorter one cannot pass the measures for it
+  await expect(notification.getByTestId('toast-sub')).toHaveText(IN_THE_CHAT);
+  await notification.hover();
+  await animationsDone(page);
+  await notification.hover();
+  const inPage = await notification.evaluate((pill) => {
+    const rect = (element: Element) => {
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      return { left, top, right, bottom, width, height };
+    };
+    const line = (testId: string) => {
+      const element = pill.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+      if (!element) {
+        throw new Error(`No ${testId}`);
+      }
+      return { ...rect(element), scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight) };
+    };
+    const box = rect(pill);
+    const covered = [...document.querySelectorAll('button, input, select, textarea, a[href], [role="radio"], [role="tab"], [tabindex]:not([tabindex="-1"])')]
+      .filter((control) => !pill.contains(control))
+      .filter((control) => {
+        const r = control.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && r.left < box.right && box.left < r.right && r.top < box.bottom && box.top < r.bottom;
+      })
+      .map((control) => ({ ...rect(control), name: control.getAttribute('aria-label') ?? control.textContent?.trim() ?? control.tagName }));
+    return { pill: box, message: line('toast-message'), sub: line('toast-sub'), covered };
+  });
+  return {
+    ...inPage,
+    copy: boxOf(await firstCardCopy(page).boundingBox(), 'the first Copy'),
+    search: boxOf(await page.getByRole('searchbox', { name: 'Search prompts' }).locator('..').boundingBox(), 'the search field')
+  };
+};
+
+/** The screenshot and the measures of a Notification, kept before they are judged, so a failure keeps them too */
+const keepEvidence = async (page: Page, name: string, layout: ExitNotificationLayout): Promise<void> => {
+  test.info().annotations.push({ type: 'exit Notification (px)', description: JSON.stringify(layout) });
+  await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
+  await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `${name}.json`), `${JSON.stringify(layout, null, 2)}\n`);
+  await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `${name}.png`) });
+};
+
+/** Both lines whole, each on one line, the second under the first, the pill in its room on the screen */
+const expectWhole = (layout: ExitNotificationLayout, width: number): void => {
+  const { pill, message, sub } = layout;
+  expect(sub.scrollWidth, 'the second line, not cut').toBeLessThanOrEqual(sub.clientWidth);
+  expect(sub.height, 'the second line, on one line').toBeLessThan(sub.lineHeight * 1.5);
+  expect(sub.top, 'the second line, under the message').toBeGreaterThanOrEqual(message.bottom - 0.5);
+  expect(message.scrollWidth, 'the message, not cut').toBeLessThanOrEqual(message.clientWidth);
+  expect(message.height, 'the message, on one line').toBeLessThan(message.lineHeight * 1.5);
+  expect(pill.left, 'the pill, in its room').toBeGreaterThanOrEqual(NOTIFICATION_EDGE - 0.5);
+  expect(pill.right, 'the pill, in its room').toBeLessThanOrEqual(width - NOTIFICATION_EDGE + 0.5);
+};
+
+const recordOf = async (storage: ExtensionStorage, key: string): Promise<unknown> => (await storage.get<Record<string, unknown>>(key))[key];
+
+const median = (values: readonly number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+};
+
+test.describe('Leaving the Welcome in the real extension', () => {
+  test('S2, AC1: Skip, then Add 9 prompts: the Library lists them on All with "9 prompts added" and "Open your AI chat and type //", no loading or empty state on the way, the Welcome recorded finished', async ({ page, storage, extensionId }) => {
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 } });
+    await probeTheExit(page);
+    await openPopup(page, extensionId);
+    await expect(welcome(page)).toHaveAttribute('data-welcome-step', '0');
+
+    await page.getByRole('button', { name: 'Skip' }).click();
+    await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+    await primary(page).click();
+
+    await expect(welcome(page)).toHaveCount(0);
+    await expect(cards(page)).toHaveCount(DEFAULT_PROMPTS.length);
+    const titles = await cards(page).getByRole('heading').allTextContents();
+    expect(titles.sort()).toEqual(DEFAULT_PROMPTS.map((prompt) => prompt.title).sort());
+    const notification = page.getByTestId('toast');
+    await expect(notification).toHaveAttribute('data-type', 'success');
+    await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
+    await expect(notification.getByText(IN_THE_CHAT, { exact: true })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /^All/ })).toHaveAttribute('aria-checked', 'true');
+    expect(await probeOf(page)).toMatchObject({ loadingSeen: false, emptySeen: false });
+
+    const prompts = await storage.getPrompts();
+    expect(prompts.map(({ title, content, category }) => ({ title, content, category }))).toEqual(
+      DEFAULTS.flatMap((pack) => pack.prompts.map(({ title, content }) => ({ title, content, category: pack.name })))
+    );
+    const categories = await storage.getCategories();
+    for (const pack of DEFAULTS) {
+      expect(categories).toContainEqual(expect.objectContaining({ name: pack.name, color: pack.color }));
+    }
+    await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+    await expect(page.getByRole('dialog', { name: /what.s new/i })).toHaveCount(0);
+  });
+
+  // My-Prompt-Manager-ojz.19: the second line says what to do in the chat, so its "//" must show
+  // wherever the Library opens, the 320px side panel, the default surface, included. The exit
+  // Notification is read whole (Toast.whole): the pill grows, its second line on a line of its own
+  // under the message, never cut; any other Notification of the Library stays one line. It must not
+  // cover what the user needs right after the exit: the first card's Copy, which has the keyboard,
+  // the search field, the add button and the filters
+  for (const { file, width, height } of EXIT_SURFACES) {
+    for (const theme of ['light', 'dark'] as const) {
+      test(`the exit Notification shows whole, "${IN_THE_CHAT}" on a line of its own, over nothing the user needs next (${file} ${String(width)} x ${String(height)}, ${theme})`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
+        await expectTheme(page, theme);
+        await primary(page).click();
+
+        const layout = await exitNotificationLayout(page, ADDED);
+        await keepEvidence(page, `exit-notification-${file}-${String(width)}x${String(height)}-${theme}`, layout);
+        expectWhole(layout, width);
+        // The first card's Copy has the keyboard, and the Notification is over none of the controls under the header
+        await expect(firstCardCopy(page)).toBeFocused();
+        expect(layout.covered.map(({ name }) => name).filter((name) => !MAY_COVER.has(name)), 'controls under the Notification').toEqual([]);
+        expect(layout.pill.bottom, 'the Notification above the search field').toBeLessThanOrEqual(layout.search.top);
+        expect(overlaps(layout.pill, layout.copy), 'the Notification over the first Copy').toBe(false);
+      });
+    }
+
+    // "Your library is ready", the owner's Debug replay over Packs already in: the longer message, the same second line
+    test(`the exit Notification when every Prompt was already in: "Your library is ready" and "${IN_THE_CHAT}" whole (${file} ${String(width)} x ${String(height)})`, async ({ page, storage, extensionId }) => {
+      await storage.seed({
+        [WELCOME_KEY]: { status: 'pending', step: 2 },
+        [SITE_SETTINGS_KEY]: { ...defaultSiteSettings(), debugMode: true }
+      });
+      await page.setViewportSize({ width, height });
+      await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
+      await toAddPrompts(page);
+      await primary(page).click();
+      await expect(page.getByTestId('toast').getByText(ADDED, { exact: true })).toBeVisible();
+
+      // Debug mode replays the Welcome at each opening: the same Packs again, all in already
+      await page.reload();
+      await toAddPrompts(page);
+      await primary(page).click();
+
+      const layout = await exitNotificationLayout(page, 'Your library is ready');
+      await keepEvidence(page, `exit-notification-ready-${file}-${String(width)}x${String(height)}-light`, layout);
+      expectWhole(layout, width);
+      expect(await storage.getPrompts()).toHaveLength(DEFAULT_PROMPTS.length);
+    });
+  }
+
+  test('S3, AC2: no Pack, Start empty: the empty Library, then the editor on a new Prompt about 250ms later', async ({ page, storage, extensionId }) => {
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: [] } });
+    await probeTheExit(page);
+    await openPopup(page, extensionId);
+    await expect(primary(page)).toHaveText('Start empty');
+
+    await primary(page).click();
+
+    const editor = page.getByTestId('editor-sheet');
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel(/title/i)).toHaveValue('');
+    const { libraryAt, editorAt, emptySeen, emptyAt } = await probeOf(page);
+    expect(emptySeen, 'the empty Library showed').toBe(true);
+    expect(libraryAt).toBeDefined();
+    expect(editorAt).toBeDefined();
+    expect(emptyAt).toBeDefined();
+    const delay = (editorAt ?? 0) - (libraryAt ?? 0);
+    const emptyBeforeEditor = (editorAt ?? 0) - (emptyAt ?? 0);
+    test.info().annotations.push({ type: 'Library to editor (ms)', description: delay.toFixed(1) });
+    test.info().annotations.push({ type: 'empty Library before the editor (ms)', description: emptyBeforeEditor.toFixed(1) });
+    await fs.mkdir(OUTPUT_DIR, { recursive: true });
+    await fs.writeFile(path.join(OUTPUT_DIR, 'start-empty-editor-delay.json'), `${JSON.stringify({ libraryAt, emptyAt, editorAt, delay, emptyBeforeEditor }, null, 2)}\n`);
+    // The empty Library is what the user sees first, then the editor opens over it
+    expect(emptyAt ?? Number.NaN, 'the empty Library showed before the editor').toBeLessThan(editorAt ?? Number.NaN);
+    // The timer starts at the click, a little before the Library is in the document; a loaded machine may run it late
+    expect(delay).toBeGreaterThanOrEqual(200);
+    expect(delay).toBeLessThan(1_000);
+
+    await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+    expect(await storage.getPrompts()).toEqual([]);
+  });
+
+  test(`S12, AC5: from a first install, Skip, Add 9 prompts, then one click on a card's copy button puts that Prompt's content in the clipboard, under ${String(FIRST_COPY_TARGET_MS / 1000)}s, over ${String(COPY_RUNS)} runs`, async ({ context, extensionId }) => {
+    test.slow();
+    const storage = createStorageController(await waitForBackgroundTarget(context));
+    // The store a first install leaves: the Welcome pending at its first step, over an empty Library
+    await waitForFirstInstallRecords(storage);
+    const installed = await storage.get<Record<string, unknown>>([WELCOME_KEY, WHATS_NEW_KEY]);
+    // CDP takes a chrome-extension:// origin for an opaque one: granted to every origin of this test's own browser
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await clearClipboard(context, extensionId);
+
+    const runs: { clicks: number; clicksAfterWelcome: number; wallMs: number; pageMs: number; title: string }[] = [];
+    for (let run = 0; run < COPY_RUNS; run++) {
+      if (run > 0) {
+        // The same first install again: nothing else in storage
+        await storage.reset();
+        await storage.seed(installed);
+      }
+      const page = await context.newPage();
+      await probeTheExit(page);
+      runs.push(await firstCopy(page, extensionId));
+      await page.close();
+      await clearClipboard(context, extensionId);
+    }
+
+    const wall = runs.map((run) => run.wallMs);
+    const inPage = runs.map((run) => run.pageMs);
+    const report = {
+      runs,
+      clicks: runs[0]?.clicks,
+      clicksAfterWelcome: runs[0]?.clicksAfterWelcome,
+      wallMs: { median: median(wall), max: Math.max(...wall) },
+      pageMs: { median: median(inPage), max: Math.max(...inPage) }
+    };
+    await fs.mkdir(OUTPUT_DIR, { recursive: true });
+    await fs.writeFile(path.join(OUTPUT_DIR, 'first-copy-times.json'), `${JSON.stringify(report, null, 2)}\n`);
+    test.info().annotations.push({ type: 'first copy', description: JSON.stringify({ clicks: report.clicks, wallMs: report.wallMs, pageMs: report.pageMs }) });
+
+    for (const run of runs) {
+      // Skip, the primary button, the copy button: two after the Welcome's last step, one after the Welcome
+      expect(run.clicks).toBe(3);
+      expect(run.clicksAfterWelcome).toBe(1);
+      expect(run.wallMs).toBeLessThan(FIRST_COPY_TARGET_MS);
+    }
+  });
+});
+
+/** Puts CLIPBOARD_BEFORE in the clipboard, from a page of the extension that is not timed */
+const clearClipboard = async (context: BrowserContext, extensionId: string): Promise<void> => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/src/analytics.html`);
+  await page.evaluate((text) => navigator.clipboard.writeText(text), CLIPBOARD_BEFORE);
+  await page.close();
+};
+
+/**
+ * One run of the first copy: the popup opened on the Welcome, Skip, the primary button, then the copy
+ * button of the Library's first card, each click counted; done once the clipboard holds that card's
+ * Prompt. Timed from just before the popup opens (wall clock, up to the clipboard read back) and from
+ * the popup's navigation start to the copy landing (in the page)
+ */
+const firstCopy = async (
+  page: Page,
+  extensionId: string
+): Promise<{ clicks: number; clicksAfterWelcome: number; wallMs: number; pageMs: number; title: string }> => {
+  let clicks = 0;
+  const click = async (target: Locator): Promise<void> => {
+    clicks++;
+    await target.click();
+  };
+
+  const startedAt = Date.now();
+  await openPopup(page, extensionId);
+  await click(page.getByRole('button', { name: 'Skip' }));
+  await click(primary(page));
+  await expect(welcome(page)).toHaveCount(0);
+  const clicksInWelcome = clicks;
+
+  const card = cards(page).first();
+  const title = (await card.getByRole('heading').textContent()) ?? '';
+  await click(card.getByRole('button', { name: /^Copy content of / }));
+  const content = PACKS.flatMap((pack) => pack.prompts).find((prompt) => prompt.title === title)?.content;
+  expect(content, `the first card, ${title}, is a Prompt of the Packs`).toBeDefined();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()), { intervals: [5] }).toBe(content);
+  const wallMs = Date.now() - startedAt;
+
+  const { copiedAt } = await probeOf(page);
+  expect(copiedAt).toBeDefined();
+  return { clicks, clicksAfterWelcome: clicks - clicksInWelcome, wallMs, pageMs: copiedAt ?? Number.NaN, title };
+};

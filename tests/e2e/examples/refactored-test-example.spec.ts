@@ -208,7 +208,9 @@ test.describe('Example: Using Test Data Scenarios', () => {
 });
 
 test.describe('Example: Navigation Utilities', () => {
-  test('should navigate between views using utilities', async ({ context, extensionId }) => {
+  // The storage fixture empties the store of the first install, so the opening shows the Library, not the Welcome
+  test('should navigate between views using utilities', async ({ context, storage, extensionId }) => {
+    void storage;
     // BEFORE (old approach):
     // Manual page.goto() calls, waitForSelector, etc.
 

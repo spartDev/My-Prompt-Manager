@@ -9,14 +9,19 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
+import { WELCOME_CLOSE_ROOM } from './components/welcome/WelcomeFrame';
+import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { useAddPacks } from './hooks/useAddPacks';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
 import { useCategories } from './hooks/useCategories';
 import { useClipboard } from './hooks/useClipboard';
+import { useLaunchScreen } from './hooks/useLaunchScreen';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
+import { useWelcomeExit } from './hooks/useWelcomeExit';
 import { ALL_PROMPTS } from './services/libraryFilter';
 import { onLibraryReviewRequested, takePendingLibraryReview } from './services/libraryReview';
 import { MOTION } from './theme/motion';
@@ -51,6 +56,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const isPickerMode = urlParams.get('picker') === 'true';
   
   const [currentView, setCurrentView] = useState<Section>(isPickerMode ? 'settings' : 'library');
+  // What this opening shows first: the Welcome, What's new over the Library, or the Library alone.
+  // Neither in the element picker's Settings window, where nothing of it is even read
+  const launch = useLaunchScreen({ enabled: !isPickerMode });
+  const welcomeShown = launch.screen.kind === 'welcome';
   // Arriving on a Section slides it in from the side of its tab; the first Section shows at once
   const [sectionMotion, setSectionMotion] = useState<'forward' | 'back' | null>(null);
   // The editor rises as a sheet over the Section and leaves to the bottom: it stays in the
@@ -103,6 +112,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const {
     categories,
     loading: categoriesLoading,
+    error: categoriesError,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -127,6 +137,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const handleCreateFromSearch = (title: string, category?: string) => { openEditor({ mode: 'add', title, category }); };
 
   const handleEditPrompt = (prompt: Prompt) => { openEditor({ mode: 'edit', prompt }); };
+
+  // The editor on a new Prompt, from What's new or after the Welcome: an editor already open keeps
+  // its draft, as a new one would remount it (editorKey)
+  const openNewPrompt = () => {
+    if (editor === null) {
+      openEditor({ mode: 'add' });
+    }
+  };
 
   const editorShown = editorSheet.shown !== null;
   useEffect(() => {
@@ -362,7 +380,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [currentView, refreshPrompts, refreshCategories]);
 
   // Cmd/Ctrl+K, from any Section: back to the Library if need be, and the keyboard goes into its search
-  // field. Not while the editor or a dialog is open over the Section, nor in the element picker's Settings
+  // field. Not while the editor or a dialog is open over the Section, nor in the element picker's
+  // Settings, nor while the Welcome covers the Library
   const [focusSearch, setFocusSearch] = useState(false);
   const handleSearchFocused = useCallback(() => { setFocusSearch(false); }, []);
   // Back to the Library if need be, with the keyboard in its search field: Cmd/Ctrl+K, and the
@@ -373,7 +392,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }, [handleSelectSection]);
   const editorOpen = editor !== null;
   useEffect(() => {
-    if (isPickerMode) { return; }
+    if (isPickerMode || welcomeShown) { return; }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') { return; }
       if (editorOpen || document.querySelector('[aria-modal="true"]')) { return; }
@@ -382,7 +401,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); };
-  }, [isPickerMode, editorOpen, goToLibrarySearch]);
+  }, [isPickerMode, welcomeShown, editorOpen, goToLibrarySearch]);
 
   // A Feature tile of What's new, once the sheet has started to leave: where the Feature lives
   const handleWhatsNewOpen = (destination: WhatsNewDestination) => {
@@ -391,10 +410,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         goToLibrarySearch();
         return;
       case 'prompt-editor-new':
-        // An editor already open keeps its draft: a new one would remount it (editorKey)
-        if (editor === null) {
-          openEditor({ mode: 'add' });
-        }
+        openNewPrompt();
         return;
       case 'library':
       case 'categories':
@@ -416,6 +432,38 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     setFocusLibraryFilter(true);
     handleSelectSection('library');
   }, [clearSearch, refreshPrompts, handleSelectSection]);
+
+  // The way out of the Welcome's last step: the Packs selected added, then the Welcome finished, then
+  // the Library on All with the Notification of the add; with none, the Library, then the editor
+  const addPacks = useAddPacks({ refreshPrompts, refreshCategories });
+  // Defensive: the Welcome replaced the Library in this opening, so its filter is still All and its
+  // search empty. This puts them back if something set them while the Welcome was up (a review the
+  // side panel takes), so no Prompt the Packs added is filtered out of sight
+  const showWholeLibrary = useCallback(() => {
+    clearSearch();
+    setLibraryFilter(ALL_PROMPTS);
+  }, [clearSearch]);
+  // After the Packs, the keyboard goes to the first Prompt the Library lists, so the first copy is one
+  // Enter away (My-Prompt-Manager-ojz.17). Asked once: the Library is done with it as its cards show
+  const [focusFirstPrompt, setFocusFirstPrompt] = useState(false);
+  const askFirstPromptFocus = useCallback(() => { setFocusFirstPrompt(true); }, []);
+  const handleFirstPromptFocused = useCallback(() => { setFocusFirstPrompt(false); }, []);
+  // The only Notification over the Welcome is a refused add's: it goes as an exit starts, or the step changes
+  const shownToastId = toast?.id;
+  const hideShownToast = useCallback(() => {
+    if (shownToastId !== undefined) {
+      hideToast(shownToastId);
+    }
+  }, [shownToastId, hideToast]);
+  const leaveWelcome = useWelcomeExit({
+    addPacks,
+    finishWelcome: launch.finishWelcome,
+    showLibrary: showWholeLibrary,
+    focusFirstPrompt: askFirstPromptFocus,
+    openNewPrompt,
+    showToast,
+    hideNotification: hideShownToast
+  });
 
   // A review asked from the full-page Analytics view opens the side panel and waits in session
   // storage: the side panel takes it, on opening or while it is already open
@@ -469,13 +517,64 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const loading = promptsLoading || categoriesLoading;
 
-  if (promptsError) {
+  // Try again on Error Loading Data: the Prompts and the Categories read again. Each read clears its
+  // error as it starts, so the Library comes back once both work, and the screen with its Try again
+  // once more while one still fails. Nothing else is redone: after the Welcome's Packs, the add has
+  // resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
+  const retryLoad = useCallback(() => {
+    void refreshPrompts();
+    void refreshCategories();
+  }, [refreshPrompts, refreshCategories]);
+
+  // Until the opening knows what it shows, only the background: the Library never flashes before the Welcome
+  if (launch.loading) {
+    return (
+      <ThemeProvider>
+        <div data-testid="launch-deciding" className="h-full w-full bg-app" />
+      </ThemeProvider>
+    );
+  }
+
+  // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered
+  // behind it. Its Notification shows over it: a refused add of the Packs keeps the Welcome on screen.
+  // That one is read whole (wrapped where the room is short) and clear of the close button, at 320px
+  // wide too; it belongs to the last step, so a step change hides it (My-Prompt-Manager-ojz.20)
+  if (launch.screen.kind === 'welcome') {
+    return (
+      <ThemeProvider>
+        <WelcomeHost
+          step={launch.screen.step}
+          packs={launch.screen.packs}
+          saveStep={launch.saveStep}
+          finishWelcome={launch.finishWelcome}
+          onFinish={leaveWelcome}
+          onStepChange={hideShownToast}
+          context={context}
+        />
+        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} wrap clearRight={WELCOME_CLOSE_ROOM} />
+      </ThemeProvider>
+    );
+  }
+
+  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
+  // Packs were stored: Try again is the way on, so no one is left on a screen with nothing to do but
+  // close it, nor on a Library that lacks its Categories and says nothing (CR26 of PR #607)
+  const loadError = promptsError ?? categoriesError;
+  if (loadError) {
     return (
       <ThemeProvider>
         <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
-            <p className="text-secondary">{promptsError.message}</p>
+            <p className="text-secondary">{loadError.message}</p>
+            {/* The Primary Button of docs/DESIGN_GUIDELINES.md */}
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="mt-5 px-6 py-3 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl focus-primary"
+            >
+              Try again
+            </button>
           </div>
         </div>
         {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
@@ -524,6 +623,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onLibraryFilterChange={setLibraryFilter}
           focusLibraryFilter={focusLibraryFilter}
           onLibraryFilterFocused={handleLibraryFilterFocused}
+          focusFirstPrompt={focusFirstPrompt}
+          onFirstPromptFocused={handleFirstPromptFocused}
           loading={loading}
           context={context}
         />
@@ -607,9 +708,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
         <StorageWarning reason={storageRefusal} onClose={handleCloseStorageWarning} />
       )}
 
-      {/* What's new, over the Library at the opening that follows an update; never over the
-          element picker's Settings */}
-      {!isPickerMode && <WhatsNewHost onOpen={handleWhatsNewOpen} />}
+      {/* What's new, over the Library at the opening that follows an update, as the launch decided;
+          never over the element picker's Settings, where the launch decides nothing */}
+      <WhatsNewHost
+        notes={launch.screen.kind === 'whats-new' ? launch.screen.notes : null}
+        onClose={launch.closeWhatsNew}
+        onOpen={handleWhatsNewOpen}
+      />
 
       <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>

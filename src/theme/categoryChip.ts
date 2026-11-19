@@ -13,7 +13,8 @@ const isHexColor = (color: string): boolean => /^#[0-9A-F]{6}$/i.test(color);
 // The Library card the soft badge renders on (bg-card). The badge background is translucent, so the
 // safety net must measure on this surface: change it with the card's background
 const SOFT_BADGE_SURFACES = { light: '#FFFFFF', dark: '#231C34' } as const;
-const SOFT_BADGE_ALPHA = 0.13;
+/** The opacity of the Category color in the chip's background, the same in both modes */
+export const SOFT_BADGE_ALPHA = 0.13;
 
 const hexChannels = (hex: string): number[] =>
   [0, 2, 4].map(i => parseInt(hex.replace('#', '').substring(i, i + 2), 16));

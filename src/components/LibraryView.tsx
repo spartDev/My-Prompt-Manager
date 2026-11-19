@@ -42,6 +42,8 @@ const LibraryView: FC<LibraryViewProps> = ({
   onLibraryFilterChange,
   focusLibraryFilter,
   onLibraryFilterFocused,
+  focusFirstPrompt,
+  onFirstPromptFocused,
   loading,
   context = 'popup'
 }) => {
@@ -85,6 +87,19 @@ const LibraryView: FC<LibraryViewProps> = ({
       onSearchFocused?.();
     }
   }, [focusSearch, onSearchFocused]);
+
+  // After the Welcome's exit with Packs, the keyboard goes to the first card's Copy as the cards are
+  // listed, so one Enter copies that Prompt; its name says which. Only when the keyboard is on no
+  // element: one the user has already reached keeps it. Asked once, whatever happens
+  const firstCopyRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focusFirstPrompt || loading) { return; }
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      firstCopyRef.current?.focus();
+    }
+    onFirstPromptFocused?.();
+  }, [focusFirstPrompt, loading, onFirstPromptFocused]);
 
   // The sort is chosen in Settings. Read it once, then follow every later save: a save can
   // land after this view has mounted (or come from the other context)
@@ -304,8 +319,10 @@ const LibraryView: FC<LibraryViewProps> = ({
                 aria-label={`${String(resultCount)} prompt${resultCount !== 1 ? 's' : ''} found`}
               >
                 {finalFilteredPrompts.map((prompt: Prompt, index) => (
+                  // An item of the list: a screen reader counts the Prompts as it enters it
                   <div
                     key={prompt.id}
+                    role="listitem"
                     className={cn('min-w-0', riseClass)}
                     style={{ animationDelay: `${String(Math.min(index, MOTION.listStaggerSteps) * MOTION.listStagger)}ms` }}
                   >
@@ -317,6 +334,7 @@ const LibraryView: FC<LibraryViewProps> = ({
                       onCopy={onCopyPrompt}
                       showToast={showToast}
                       searchQuery={debouncedQuery}
+                      copyButtonRef={index === 0 ? firstCopyRef : undefined}
                     />
                   </div>
                 ))}

@@ -291,6 +291,67 @@
   --animate-whats-new-backdrop-in: backdrop-in 300ms ease both;
   --animate-whats-new-backdrop-out: backdrop-out 340ms ease both;
   /* --- end What's new sheet --- */
+
+  /* --- Welcome frame (My-Prompt-Manager-ojz.7; Atelier 1C 'Premier lancement') ---
+     The screen fades in at the opening (the mockup's cFade, on the backdrop-in keyframes, in 100ms
+     rather than 500ms so the Welcome is whole within 200ms of opening: 150ms reached 204 to 212ms);
+     a step slides 26px in from the side it comes from while it fades in, on the Section curve (the mockup's
+     cL and cR); Back pops in when a step change brings it (cPop). None of them covers or holds the
+     primary button. The progress dots and the presses are transitions in popup.css; durations are
+     MOTION.welcome* in motion.ts. An inactive dot is a control with nothing else to show it, so it
+     takes the field border color, 3:1 on the frame (the mockups' #DCD4EA light and #41375A dark are
+     1.3:1, My-Prompt-Manager-ojz.11). The primary button is ink in light and the accent in dark, as
+     the mockups draw it (the dark ink, bg-inverse, is 1.5:1 on the frame), and casts their ink shadow */
+  --background-color-step-dot: var(--border-color-input);
+  --background-color-welcome-primary: var(--background-color-inverse);
+  --text-color-on-welcome-primary: var(--text-color-on-inverse-strong);
+  --shadow-tint-ink: rgba(29, 21, 48, 0.9);
+  --shadow-welcome-primary: 0 14px 26px -16px var(--shadow-tint-ink);
+  --animate-welcome-in: backdrop-in 100ms ease both;
+  --animate-welcome-step-forward: welcome-from-right 500ms var(--ease-section) both;
+  --animate-welcome-step-back: welcome-from-left 500ms var(--ease-section) both;
+  --animate-welcome-back-pop: pop 350ms var(--ease-spring) both;
+
+  @keyframes welcome-from-right {
+    from { opacity: 0; transform: translateX(26px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes welcome-from-left {
+    from { opacity: 0; transform: translateX(-26px); }
+    to { opacity: 1; transform: none; }
+  }
+  /* --- end Welcome frame --- */
+
+  /* --- Welcome steps (My-Prompt-Manager-ojz.8; Atelier 1C 'Premier lancement') ---
+     Step 1: three Prompt cards, two on bg-card and an ink one in the middle (bg-inverse) whose blank
+     is dashed in the Notification's violet; each floats 8px up and back once, at its own pace (the
+     mockup's cFloat, on the float keyframes). Step 2: a card with a blank being filled, underlined in
+     the accent, a caret blinking after the letters (cBlink), four times, then still. Step 3: the round
+     check of a selected Pack pops in (cPop). Nothing loops: all of it ends within 5s of the step's
+     display (MOTION.welcomeMotionLimit, WCAG 2.2.2; the mockup's cFloat and cBlink loop,
+     My-Prompt-Manager-ojz.20). The shadows are the mockup's, on a 50% violet tint (black at alpha x
+     1.6 in dark) or on the ink tint of the primary button. Durations are MOTION.welcome* in motion.ts */
+  --border-color-blank: var(--background-color-accent);
+  --border-color-inverse-blank: var(--background-color-inverse-mark);
+  /* The glyph on a selected Pack's check round, which takes the Pack's color (src/welcome/packColors.ts):
+     white on the color in light, ink on the color lifted toward white in dark, where white would be
+     under 3:1 (My-Prompt-Manager-ojz.11) */
+  --text-color-on-pack-check: var(--text-color-on-accent);
+  --shadow-tint-50: rgba(45, 25, 90, 0.5);
+  --shadow-welcome-card: 0 14px 30px -18px var(--shadow-tint-50);
+  --shadow-welcome-ink-card: 0 22px 40px -20px var(--shadow-tint-ink);
+  --shadow-welcome-demo: 0 18px 36px -22px var(--shadow-tint-50);
+  --animate-welcome-float-left: float 3400ms ease-in-out;
+  --animate-welcome-float-right: float 3800ms ease-in-out 500ms;
+  --animate-welcome-float-center: float 3000ms ease-in-out 250ms;
+  --animate-welcome-caret: welcome-blink 1000ms steps(1) 4;
+  --animate-welcome-check: pop 450ms var(--ease-spring) both;
+
+  @keyframes welcome-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  /* --- end Welcome steps --- */
 }
 
 /* Reduced motion: every motion token becomes near instant, so a component that reads them needs no
@@ -405,5 +466,19 @@
     /* --- What's new sheet (My-Prompt-Manager-d1g.5): its upward shadow, black at 0.45 x 1.6 --- */
     --shadow-tint-sheet: rgba(0, 0, 0, 0.72);
     /* --- end What's new sheet --- */
+
+    /* --- Welcome frame (My-Prompt-Manager-ojz.7): the primary button's shadow, the dark mockup's;
+       the button itself takes the accent, as the dark mockup draws it: 3:1 on the frame, its label
+       4.9:1 (My-Prompt-Manager-ojz.11) --- */
+    --shadow-tint-ink: rgba(4, 2, 10, 0.92);
+    --background-color-welcome-primary: var(--background-color-accent);
+    --text-color-on-welcome-primary: var(--text-color-on-accent);
+    /* --- end Welcome frame --- */
+
+    /* --- Welcome steps (My-Prompt-Manager-ojz.8): the cards' shadow, black at 0.5 x 1.6; the check
+       glyph of a selected Pack in ink (My-Prompt-Manager-ojz.11) --- */
+    --shadow-tint-50: rgba(0, 0, 0, 0.8);
+    --text-color-on-pack-check: var(--text-color-on-inverse-mark);
+    /* --- end Welcome steps --- */
   }
 }

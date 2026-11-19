@@ -53,6 +53,25 @@ describe('useToast', () => {
     expect(result.current.toast?.sub).toBeUndefined();
   });
 
+  it('marks a Notification to read whole only when asked (the exit of the Welcome), and no other', () => {
+    const { result } = renderHook(() => useToast());
+
+    act(() => {
+      result.current.showToast('9 prompts added', 'success', { sub: 'Open your AI chat and type //', whole: true });
+    });
+    expect(result.current.toast).toMatchObject({ message: '9 prompts added', sub: 'Open your AI chat and type //', whole: true });
+
+    act(() => {
+      result.current.showToast('Prompt saved', 'success', { sub: 'Weekly status update' });
+    });
+    expect(result.current.toast).not.toHaveProperty('whole');
+
+    act(() => {
+      result.current.showToast('Prompt copied', 'success', { whole: false });
+    });
+    expect(result.current.toast).not.toHaveProperty('whole');
+  });
+
   it('keeps the whole message, however long', () => {
     const { result } = renderHook(() => useToast());
     const message = 'x'.repeat(200);

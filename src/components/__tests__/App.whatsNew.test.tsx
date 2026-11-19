@@ -3,18 +3,20 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
+import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
 import { getMockStorageManager } from '../../test/mocks';
 import { MOTION } from '../../theme/motion';
 import type { Category, Prompt } from '../../types';
-import { markReleaseSeen, readWhatsNewRecord, WHATS_NEW_KEY } from '../../whatsNew/storage';
+import { PACKS } from '../../welcome/packs';
+import { WELCOME_KEY } from '../../welcome/storage';
+import { markReleaseSeen, WHATS_NEW_KEY } from '../../whatsNew/storage';
 
-// The real storage module, watched: when the Release is marked seen, and whether the record is read at all
+// The real storage module, watched: when the Release is marked seen
 vi.mock('../../whatsNew/storage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../whatsNew/storage')>();
   return {
     ...actual,
-    markReleaseSeen: vi.fn(actual.markReleaseSeen),
-    readWhatsNewRecord: vi.fn(actual.readWhatsNewRecord)
+    markReleaseSeen: vi.fn(actual.markReleaseSeen)
   };
 });
 
@@ -25,11 +27,20 @@ const prompts: Prompt[] = [
 
 const WHATS_NEW = /what.s new/i;
 
-/** An opening of the popup after the update from 1.9.0 to 2.0.0, whose Release notes ship */
+/**
+ * An opening of the popup after the update from 1.9.0 to 2.0.0, whose Release notes ship: an
+ * existing user, whose update marked the Welcome done
+ */
 const updateTo2_0 = async (): Promise<void> => {
   vi.mocked(chrome.runtime.getManifest).mockReturnValue({ version: '2.0.0' } as chrome.runtime.Manifest);
-  await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '1.9.0' } });
+  await chrome.storage.local.set({
+    [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '1.9.0' },
+    [WELCOME_KEY]: { status: 'done' }
+  });
 };
+
+/** Whether a call to chrome.storage.local.get asked for the What's new record */
+const readsWhatsNew = ([keys]: unknown[]): boolean => (Array.isArray(keys) ? keys.includes(WHATS_NEW_KEY) : keys === WHATS_NEW_KEY);
 
 /** Renders the popup and waits for What's new over the Library */
 const openWithWhatsNew = async () => {
@@ -171,21 +182,21 @@ describe("App: What's new", () => {
       expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
     });
 
-    it('prompt-editor-new: an editor already open keeps its draft', async () => {
-      // The decision lands only once the user has opened the editor and typed a title
-      let decide: () => void = () => undefined;
-      const stored = readWhatsNewRecord();
-      vi.mocked(readWhatsNewRecord).mockImplementationOnce(
-        () => new Promise((resolve) => { decide = () => { resolve(stored); }; })
-      );
-      const user = userEvent.setup();
+    it('prompt-editor-new: an editor already open keeps its draft (Debug mode: Start empty opens it 250ms after the Library, under What\'s new)', async () => {
+      await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: { debugMode: true } });
       render(<App />);
-      await user.click(await screen.findByRole('button', { name: /add new prompt/i }));
-      const editorSheet = await screen.findByTestId('editor-sheet');
-      await user.type(within(editorSheet).getByLabelText(/title/i), 'My draft');
+      await screen.findByTestId('welcome');
+      fireEvent.click(screen.getByRole('button', { name: 'Skip' }));
+      for (const pack of PACKS.filter((candidate) => candidate.defaultSelected)) {
+        fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${pack.name} `) }));
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Start empty' }));
 
-      act(() => { decide(); });
+      // Debug mode brings What's new after the Welcome; the editor rises beneath it 250ms later
       const sheet = await screen.findByRole('dialog', { name: WHATS_NEW });
+      const editorSheet = await screen.findByTestId('editor-sheet');
+      fireEvent.change(within(editorSheet).getByLabelText(/title/i), { target: { value: 'My draft' } });
+
       fireEvent.click(within(sheet).getByRole('button', { name: /^Fill-in variables/ }));
       await waitForElementToBeRemoved(sheet);
 
@@ -364,12 +375,10 @@ describe("App: What's new", () => {
     await waitForElementToBeRemoved(sheet);
     await waitFor(async () => { expect(await storedLastSeen()).toBe('2.0.0'); });
     cleanup();
-    vi.mocked(readWhatsNewRecord).mockClear();
 
-    // The popup opens again over the same storage
+    // The popup opens again over the same storage: the Library shows only once the launch decided
     render(<App />);
     await screen.findByRole('heading', { name: /my prompt manager/i });
-    await waitFor(() => { expect(readWhatsNewRecord).toHaveBeenCalled(); });
     await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20); }); });
 
     expect(screen.queryByRole('dialog', { name: WHATS_NEW })).not.toBeInTheDocument();
@@ -382,7 +391,7 @@ describe("App: What's new", () => {
     await screen.findByRole('heading', { name: 'Settings', level: 1 });
     await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20); }); });
 
-    expect(readWhatsNewRecord).not.toHaveBeenCalled();
+    expect(vi.mocked(chrome.storage.local.get).mock.calls.filter(readsWhatsNew)).toEqual([]);
     expect(screen.queryByRole('dialog', { name: WHATS_NEW })).not.toBeInTheDocument();
   });
 
@@ -390,8 +399,9 @@ describe("App: What's new", () => {
     await chrome.storage.local.set({ [WHATS_NEW_KEY]: { installedVersion: '1.9.0', lastSeenVersion: '2.0.0' } });
     render(<App />);
 
+    // The Library shows only once the launch decided
     await screen.findByRole('heading', { name: /my prompt manager/i });
-    await waitFor(() => { expect(readWhatsNewRecord).toHaveBeenCalled(); });
+    expect(vi.mocked(chrome.storage.local.get).mock.calls.filter(readsWhatsNew)).toHaveLength(1);
     await act(async () => { await new Promise((resolve) => { setTimeout(resolve, 20); }); });
 
     expect(screen.queryByRole('dialog', { name: WHATS_NEW })).not.toBeInTheDocument();

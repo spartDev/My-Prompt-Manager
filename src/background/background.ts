@@ -25,6 +25,7 @@ import { StorageManager } from "../services/storage";
 import { UsageTracker } from "../services/UsageTracker";
 import type { ElementFingerprint, PlatformType } from "../types";
 import { getErrorMessage, Logger, toError } from "../utils";
+import { markExistingUserDone, recordWelcomePending } from "../welcome/storage";
 import { recordInstall, recordUpdateFrom } from "../whatsNew/storage";
 
 /** An Element picker open in a tab, from START_ELEMENT_PICKER until the pick or its cancel */
@@ -1168,10 +1169,15 @@ async function handlePromptUsageIncrement(
 }
 
 /**
- * Handle extension updates by re-injecting content scripts
- * This method gracefully handles existing tabs that may have orphaned content scripts
+ * Gives the content script to each open tab of a site the extension works on, as the extension
+ * starts in it. After an update, the tabs' content scripts are orphaned: this handles them gracefully.
+ * After a first install, a tab opened before has none: Chrome runs a manifest's content scripts only
+ * in pages loaded after the extension, and the Welcome tells a new user to type // in their AI chat
+ * (decision D1, My-Prompt-Manager-ojz.19), so that chat must answer without a reload. On a fresh
+ * install no Site settings are stored (the defaults apply) and no icon placement either, so the
+ * count of the placement reports below does nothing.
  */
-async function handleExtensionUpdate(): Promise<void> {
+async function injectIntoOpenTabs(reason: "install" | "update"): Promise<void> {
   try {
     const allEnabledHosts = enabledHostnames(await readSiteSettings());
 
@@ -1210,7 +1216,7 @@ async function handleExtensionUpdate(): Promise<void> {
     const failedReinjections = reinjectionResults.filter((r) => !r.success);
     if (failedReinjections.length > 0) {
       Logger.warn(
-        `Some tabs could not be re-injected after extension update (${failedReinjections.length.toString()}/${reinjectionResults.length.toString()} failed). This is normal for orphaned tabs - they will work after refresh.`,
+        `Some tabs could not be re-injected after extension ${reason} (${failedReinjections.length.toString()}/${reinjectionResults.length.toString()} failed). This is normal for orphaned tabs - they will work after refresh.`,
         {
           component: "ContentScriptInjector",
           failedCount: failedReinjections.length,
@@ -1220,19 +1226,17 @@ async function handleExtensionUpdate(): Promise<void> {
       );
     } else if (reinjectionResults.length > 0) {
       Logger.info(
-        `Successfully re-injected content scripts in ${reinjectionResults.length.toString()} tabs after extension update`,
+        `Successfully re-injected content scripts in ${reinjectionResults.length.toString()} tabs after extension ${reason}`,
         {
           component: "ContentScriptInjector",
           totalTabs: reinjectionResults.length,
         },
       );
     }
-
-    // Extension update processing complete
   } catch (error) {
-    Logger.error("Error handling extension update", toError(error), {
+    Logger.error(`Error handling extension ${reason}`, toError(error), {
       component: "Background",
-      phase: "extension_update",
+      phase: `extension_${reason}`,
     });
   }
 }
@@ -1241,9 +1245,10 @@ async function handleExtensionUpdate(): Promise<void> {
  * An extension update or a browser restart emptied the icon placement of each tab (session storage)
  * while the repairs stay: each open tab of an enabled Platform, discarded ones included, counts as
  * waiting until its content script reports, so the first report does not drop a pick another tab
- * needs. On update, before the re-injection, so no report comes first; the update read the open tabs
- * before, for the re-injection. At startup, `readOpenTabs` reads them under the repairs lock, with the
- * count. A failure is logged: the re-injection, or the startup, goes on.
+ * needs. On update (and on install, which finds no repair), before the re-injection, so no report
+ * comes first; the update read the open tabs before, for the re-injection. At startup,
+ * `readOpenTabs` reads them under the repairs lock, with the count. A failure is logged: the
+ * re-injection, or the startup, goes on.
  */
 async function expectPlacementReports(
   readOpenTabs: () => Promise<{ tabs: chrome.tabs.Tab[]; enabledHosts: readonly string[] }>,
@@ -1875,6 +1880,52 @@ async function recordUpdateOrigin(previousVersion: string | undefined): Promise<
   }
 }
 
+/**
+ * Records the Welcome as pending at a first install, so the first opening shows it from its first
+ * step (CONTEXT.md, Welcome). A record already stored is kept.
+ */
+async function recordWelcomeOfFirstInstall(): Promise<void> {
+  try {
+    const recorded = await recordWelcomePending();
+    Logger.info(
+      recorded
+        ? "Recorded the Welcome as pending"
+        : "Kept the Welcome record already stored",
+      { component: "Background" },
+    );
+  } catch (error) {
+    Logger.error(
+      "Could not record the Welcome of the first install",
+      toError(error),
+      { component: "Background" },
+    );
+  }
+}
+
+/**
+ * Marks the Welcome as done at an update when there is no Welcome record: the user installed a
+ * Release from before the Welcome and never sees it (CONTEXT.md, Welcome). A record is kept.
+ */
+async function markWelcomeDoneForExistingUser(
+  previousVersion: string | undefined,
+): Promise<void> {
+  try {
+    const marked = await markExistingUserDone();
+    if (marked) {
+      Logger.info("Marked the Welcome as done for an existing user", {
+        component: "Background",
+        previousVersion,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Could not mark the Welcome as done for an existing user",
+      toError(error),
+      { component: "Background", previousVersion },
+    );
+  }
+}
+
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
   // Clean stored data of Hidden characters after an update, alongside (not before) the rest
@@ -1884,12 +1935,16 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 
   // A first install records its Release; an update records where it came from, only when the
-  // What's new record has no Release of install yet
+  // What's new record has no Release of install yet. A first install records the Welcome as
+  // pending; an update marks it done when there is no Welcome record (an existing user). Other
+  // reasons (chrome_update, shared_module_update) write neither record
   if (details.reason === "install") {
     void recordFirstInstall();
+    void recordWelcomeOfFirstInstall();
   }
   if (details.reason === "update") {
     void recordUpdateOrigin(details.previousVersion);
+    void markWelcomeDoneForExistingUser(details.previousVersion);
   }
 
   void (async () => {
@@ -1897,10 +1952,10 @@ chrome.runtime.onInstalled.addListener((details) => {
       const mode = await getInterfaceMode();
       await updateActionBehavior(mode);
 
-      // Re-inject content scripts after extension updates
-      if (details.reason === "update") {
-        // Extension updated, re-injecting content scripts
-        await handleExtensionUpdate();
+      // The content script in the open tabs of the sites the extension works on: re-injected after
+      // an update, injected after a first install into the tabs opened before it
+      if (details.reason === "update" || details.reason === "install") {
+        await injectIntoOpenTabs(details.reason);
       }
     } catch (error) {
       Logger.error(

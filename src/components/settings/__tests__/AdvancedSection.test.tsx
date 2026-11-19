@@ -58,14 +58,14 @@ describe('AdvancedSection', () => {
       expect(screen.getByText(/debug logging is now active/i)).toBeInTheDocument();
     });
 
-    it("says What's new shows at every opening only while it is on", () => {
+    it("says the Welcome then What's new show at every opening, without recording progress, only while it is on", () => {
       const { rerender } = render(<AdvancedSection {...defaultProps} />);
-      expect(screen.queryByText(/what's new shows each time you open the extension/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/the welcome shows from its first step/i)).not.toBeInTheDocument();
 
       rerender(<AdvancedSection {...defaultProps} debugMode={true} />);
       expect(
         screen.getByText(
-          "Debug logging is now active, and What's new shows each time you open the extension. Check the browser console for detailed information."
+          "Debug logging is now active. Each time you open the extension, the Welcome shows from its first step, then What's new. Neither records your progress, but Packs you add stay in your Library. Check the browser console for detailed information."
         )
       ).toBeInTheDocument();
     });

@@ -187,7 +187,7 @@ test.describe('Full-page Analytics view', () => {
     const analytics = new AnalyticsPage(dashboardPage);
 
     await expect(analytics.getBackButton()).toBeVisible();
-    await Promise.all([dashboardPage.waitForEvent('close'), analytics.navigateBack()]);
+    await analytics.navigateBack();
     expect(dashboardPage.isClosed()).toBe(true);
   });
 });

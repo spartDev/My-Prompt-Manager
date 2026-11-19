@@ -225,8 +225,8 @@ src/content/
 
 1. **First Time Setup:**
    - Install the extension following the installation guide
-   - Click the extension icon to open the popup
-   - Create your first category (e.g., "Coding", "Writing", "Research")
+   - Click the extension icon: the first opening shows the Welcome, three steps that end with Packs of ready-made Prompts to add, or with Start empty, which opens the editor of a new Prompt
+   - Create your own categories (e.g., "Coding", "Writing", "Research")
    - Add your frequently used prompts
 
 2. **Managing Prompts:**
@@ -448,7 +448,7 @@ For more complex integrations, see our comprehensive [Platform Integration Guide
 
 ### Debug Mode
 
-Turn on **Settings → Advanced → Debug mode**: detailed logging on the Platforms, and What's new shows each time you open the popup or side panel, with the installed Release's notes (else the newest Release that has notes). Closing it in Debug mode does not change the Last seen Release, so turning Debug mode off gives back the normal What's new behaviour.
+Turn on **Settings → Advanced → Debug mode**: detailed logging on the Platforms, and each time you open the popup or side panel the Welcome shows from its first step; once you finish it, What's new follows, with the installed Release's notes (else the newest Release that has notes). Debug mode records nothing about either: not the step reached, not the Welcome finished, not the Last seen Release, so turning Debug mode off gives back what you saw before. The Packs you add at the Welcome's end do go into your Library, as in normal use, and adding them again adds no duplicate. To reach Settings again and turn it off, finish the Welcome and close What's new. [docs/TESTING.md](docs/TESTING.md#the-welcome-by-hand) walks through a replay step by step, and through each of the Welcome's twelve scenarios by hand.
 
 The localStorage flag below turns on debug logging on a Platform page only; it does not show What's new, which reads the Settings switch alone.
 ```javascript

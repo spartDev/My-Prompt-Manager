@@ -169,7 +169,11 @@ a message for it.
 That needs a content script in the tab. A Platform's tabs get one from the manifest when they load,
 on or off (a tab open across an extension update while its Platform was off keeps only the old one,
 which no longer receives storage changes, until a click on the extension icon in side panel mode or
-an icon placement repair pick injects a fresh one), and adding a Custom site asks the service worker
+an icon placement repair pick injects a fresh one). Chrome runs the manifest's content scripts only
+in pages loaded after the extension, so at a first install and at an update the service worker
+injects one into each open tab of a site that is on (`injectIntoOpenTabs`, from
+`chrome.runtime.onInstalled`): a chat open before the install answers `//` without a reload, as the
+Welcome tells a new user it will. Adding a Custom site asks the service worker
 to inject into its open tabs (`REQUEST_INJECTION` from `AddCustomSiteForm`). A Custom site that was
 off when its tab loaded has none, unless one was injected since: in side panel mode (the default) a
 click on the extension icon injects one into its tab, and so does the Element picker. Turning its switch back on

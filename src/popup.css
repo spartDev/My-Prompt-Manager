@@ -303,3 +303,182 @@ body {
   }
 }
 /* --- end What's new sheet --- */
+
+/* --- Welcome frame (My-Prompt-Manager-ojz.7) ---
+   The active progress dot widens on the spring as the dots change color; the primary button and the
+   close button press on the spring (scale) and change their fill on hover. Under
+   prefers-reduced-motion the opening fade, the step slide, the pop of Back and these transitions are
+   near instant; the frame leaves its animations off then as well (WelcomeFrame.tsx) */
+@utility transition-welcome-dot {
+  transition:
+    width 450ms var(--ease-spring),
+    background-color 300ms;
+}
+
+@utility transition-welcome-press {
+  transition:
+    scale 250ms var(--ease-spring),
+    background-color 200ms,
+    color 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-welcome-in,
+  .animate-welcome-step-forward,
+  .animate-welcome-step-back,
+  .animate-welcome-back-pop {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+
+  .transition-welcome-dot,
+  .transition-welcome-press {
+    transition-duration: 1ms;
+  }
+}
+/* --- end Welcome frame --- */
+
+/* --- Welcome steps (My-Prompt-Manager-ojz.8) ---
+   Under prefers-reduced-motion the cards of step 1 stay still and the caret of step 2 does not
+   blink (a float or a blink has no near-instant form), and the check of a Pack shows at once. The steps leave
+   these animations off then as well, and step 2 shows the whole name with no caret (BlankDemo.tsx) */
+@media (prefers-reduced-motion: reduce) {
+  .animate-welcome-float-left,
+  .animate-welcome-float-right,
+  .animate-welcome-float-center,
+  .animate-welcome-caret {
+    animation: none;
+  }
+
+  .animate-welcome-check {
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* The Packs' grid in a short side panel (My-Prompt-Manager-ojz.10). While Packs remain beyond its
+   top or its bottom, that edge fades out over 16px and a line in the field border color (3:1 on the
+   frame) shows along it, so a Pack, a selected one counted in "Add N prompts" included, is never out
+   of view unseen. Driven by the grid's own scroll timeline, as the Sections' scroll lines are: no
+   scroll state in React. Where the Packs fit, the timeline is inactive and neither shows. It is no
+   motion, only the scroll's state: it stays under prefers-reduced-motion. The lines sit at the grid's
+   edges, 0.375rem outside the edges' box (the grid's -m-1.5), drawn above the Packs. While a Pack has
+   the focus, the fades step aside and the lines stay (My-Prompt-Manager-ojz.17): in a 320 x 420 side
+   panel the view is barely one Pack high, and a fade there would hide an edge of its focus outline */
+@property --welcome-packs-fade-top {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --welcome-packs-fade-bottom {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --welcome-packs-line-top {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --welcome-packs-line-bottom {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+.welcome-packs-edges {
+  timeline-scope: --welcome-packs;
+  animation:
+    welcome-packs-line-top linear both,
+    welcome-packs-line-bottom linear both;
+  animation-timeline: --welcome-packs, --welcome-packs;
+  animation-range:
+    0 8px,
+    calc(100% - 8px) 100%;
+}
+
+.welcome-packs-edges::before,
+.welcome-packs-edges::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  pointer-events: none;
+  /* Over a Pack that crosses the edge, which nothing fades out while a Pack has the focus */
+  z-index: 1;
+}
+
+.welcome-packs-edges::before {
+  top: -0.375rem;
+  background-color: var(--welcome-packs-line-top);
+}
+
+.welcome-packs-edges::after {
+  bottom: -0.375rem;
+  background-color: var(--welcome-packs-line-bottom);
+}
+
+.welcome-packs-scroll {
+  scroll-timeline: --welcome-packs block;
+  /* Only the mask's alpha counts, so any opaque token serves: the Packs fade to the frame behind them,
+     in either theme */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    var(--background-color-app) var(--welcome-packs-fade-top),
+    var(--background-color-app) calc(100% - var(--welcome-packs-fade-bottom)),
+    transparent
+  );
+  animation:
+    welcome-packs-fade-top linear both,
+    welcome-packs-fade-bottom linear both;
+  animation-timeline: --welcome-packs, --welcome-packs;
+  animation-range:
+    0 8px,
+    calc(100% - 8px) 100%;
+}
+
+/* A Pack has the focus: no fade, so its outline is drawn whole wherever the scroll left it */
+.welcome-packs-scroll:focus-within {
+  animation: none;
+}
+
+@keyframes welcome-packs-line-top {
+  from {
+    --welcome-packs-line-top: transparent;
+  }
+  to {
+    --welcome-packs-line-top: var(--border-color-input);
+  }
+}
+
+@keyframes welcome-packs-line-bottom {
+  from {
+    --welcome-packs-line-bottom: var(--border-color-input);
+  }
+  to {
+    --welcome-packs-line-bottom: transparent;
+  }
+}
+
+@keyframes welcome-packs-fade-top {
+  from {
+    --welcome-packs-fade-top: 0px;
+  }
+  to {
+    --welcome-packs-fade-top: 16px;
+  }
+}
+
+@keyframes welcome-packs-fade-bottom {
+  from {
+    --welcome-packs-fade-bottom: 16px;
+  }
+  to {
+    --welcome-packs-fade-bottom: 0px;
+  }
+}
+/* --- end Welcome steps --- */

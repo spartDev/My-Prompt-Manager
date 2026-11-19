@@ -24,12 +24,13 @@ export const useCategories = (): UseCategoriesReturn => {
     }
   }, []);
 
+  // A failed create, update, delete or restore is not stored as `error`: App treats that as a failed
+  // read and replaces the Library. The rejection reaches the caller, which shows it.
   // Resolves to the Category as stored: its name is the admitted one, so callers select that
   const createCategory = useCallback(async (category: Omit<Category, 'id'>): Promise<Category> => {
     try {
       setLoading(true);
-      setError(null);
-      
+
       // Validate category data
       const validationError = PromptManager.getInstance().validateCategoryData(category);
       if (validationError) {
@@ -40,9 +41,6 @@ export const useCategories = (): UseCategoriesReturn => {
       
       setCategories(prev => [...prev, newCategory]);
       return newCategory;
-    } catch (err) {
-      setError(err as AppError);
-      throw err; // Re-throw for component error handling
     } finally {
       setLoading(false);
     }
@@ -52,8 +50,7 @@ export const useCategories = (): UseCategoriesReturn => {
   const updateCategory = useCallback(async (id: string, updates: Partial<Category>): Promise<Category> => {
     try {
       setLoading(true);
-      setError(null);
-      
+
       // Validate category data
       const validationError = PromptManager.getInstance().validateCategoryData(updates);
       if (validationError) {
@@ -66,9 +63,6 @@ export const useCategories = (): UseCategoriesReturn => {
         prev.map(category => category.id === id ? updatedCategory : category)
       );
       return updatedCategory;
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -78,15 +72,11 @@ export const useCategories = (): UseCategoriesReturn => {
   const deleteCategory = useCallback(async (id: string): Promise<DeletedCategory> => {
     try {
       setLoading(true);
-      setError(null);
-      
+
       const deleted = await StorageManager.getInstance().deleteCategory(id);
       
       setCategories(prev => prev.filter(category => category.id !== id));
       return deleted;
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -96,7 +86,6 @@ export const useCategories = (): UseCategoriesReturn => {
   const restoreCategory = useCallback(async (deleted: DeletedCategory): Promise<Category> => {
     try {
       setLoading(true);
-      setError(null);
 
       const restored = await StorageManager.getInstance().restoreCategory(deleted);
 
@@ -106,9 +95,6 @@ export const useCategories = (): UseCategoriesReturn => {
         return next;
       });
       return restored;
-    } catch (err) {
-      setError(err as AppError);
-      throw err;
     } finally {
       setLoading(false);
     }

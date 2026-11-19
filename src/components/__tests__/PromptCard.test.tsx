@@ -65,6 +65,46 @@ describe('PromptCard - Basic Rendering', () => {
     expect(onEdit).toHaveBeenCalledWith(mockPrompt);
   });
 
+  // After the Welcome the Library gives the Copy the keyboard while the Enter that added the Packs
+  // can still be down: its auto-repeat must not copy a Prompt nobody asked for
+  it('should copy once when Enter is held on Copy, the repeats ignored', async () => {
+    const onCopy = vi.fn();
+    const user = userEvent.setup();
+    render(<PromptCard {...mockProps} onCopy={onCopy} />);
+    screen.getByRole('button', { name: 'Copy content of Test Prompt to clipboard' }).focus();
+
+    await user.keyboard('{Enter>4/}');
+
+    expect(onCopy).toHaveBeenCalledTimes(1);
+    expect(onCopy).toHaveBeenCalledWith(mockPrompt);
+  });
+
+  it('should not copy when only the repeats of a held Enter reach Copy', () => {
+    const onCopy = vi.fn();
+    render(<PromptCard {...mockProps} onCopy={onCopy} />);
+    const copy = screen.getByRole('button', { name: 'Copy content of Test Prompt to clipboard' });
+
+    const repeat = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true });
+    copy.dispatchEvent(repeat);
+
+    expect(repeat.defaultPrevented).toBe(true);
+    expect(onCopy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Enter', '{Enter}'],
+    ['Space', ' '],
+  ])('should copy with a fresh %s on Copy', async (_key, keys) => {
+    const onCopy = vi.fn();
+    const user = userEvent.setup();
+    render(<PromptCard {...mockProps} onCopy={onCopy} />);
+    screen.getByRole('button', { name: 'Copy content of Test Prompt to clipboard' }).focus();
+
+    await user.keyboard(keys);
+
+    expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     'Pin Test Prompt',
     'Copy content of Test Prompt to clipboard',
