@@ -64,6 +64,7 @@ import {
 import { copyBuildAt, updateExtensionInPlace } from '../fixtures/extension-update';
 import { type OnInstalledEvent, onInstalledEvents } from '../fixtures/oninstalled-probe';
 import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from '../fixtures/whats-new-build';
+import { clickToClose } from '../utils/closingClick';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 import { emptyFiller, fillStorage } from '../utils/storageFiller';
 import { typingDemoMs, watchWelcomeMotion } from '../utils/welcomeMotion';
@@ -546,9 +547,7 @@ test.describe('A new user, from the first install of the Release that brings the
     await primary(second).click();
     await expectWelcomeAt(second, 1);
     await second.waitForTimeout(S6_CLOSE_AFTER_MS);
-    const closed = second.waitForEvent('close');
-    await second.getByRole('button', { name: 'Close', exact: true }).click();
-    await closed;
+    await clickToClose(second, second.getByRole('button', { name: 'Close', exact: true }));
 
     for (const surface of ['popup', 'sidepanel'] as const) {
       const again = await openExtension(context, extensionId, surface);

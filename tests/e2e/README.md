@@ -42,6 +42,7 @@ Centralized utilities reduce code duplication and improve maintainability:
 - **`enhanced-storage.ts`** - Advanced test data management
 - **`storageFiller.ts`** - Fills `chrome.storage.local` to 98.5% of its quota from the service worker, so an add of Prompts is refused for real (the Welcome's refused add), and empties it again
 - **`welcomeMotion.ts`** - Reads the Welcome's motion on the page's own clock: when each step shows, when step 2's typing demo holds the name for good, and when each animation ends
+- **`closingClick.ts`** - `clickToClose(page, control)`: the click on a control whose handler closes its own page (`window.close()`: Go back on the full-page Analytics view, the Welcome's close button) resolves once the page has closed. A bare `locator.click()` there can reject with "Target page, context or browser has been closed" although the page closed; the helper forgives that, and throws when the page stays open
 
 ### Test Data Fixtures
 
