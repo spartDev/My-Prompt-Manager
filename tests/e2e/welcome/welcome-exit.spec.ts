@@ -13,9 +13,9 @@
  *   (test-results/welcome-exit when unset).
  * - The exit Notification stays 6 s (My-Prompt-Manager-syj): its 9 words take about 2.3 s to read and
  *   its `//` comes last. In the popup 400 x 500 and the side panel 320 x 600, light and dark, it is
- *   still on screen 5.5 s after the click on "Add 9 prompts" and gone by 7 s, by the page's own clock
- *   (the click's event time, the pill's removal), never hovered nor focused on the way; in every frame
- *   it shows, it is off the first card, whose Copy keeps the keyboard. "Your library is ready" (the
+ *   still drawn 5.5 s after the click on "Add 9 prompts" (visible, opaque, within the viewport, read on
+ *   every frame) and removed by 7 s, by the page's own clock (the click's event time), never hovered nor
+ *   focused on the way; in every frame it shows, it is off the first card, whose Copy keeps the keyboard. "Your library is ready" (the
  *   Debug replay) stays as long. Screenshots and measures in WELCOME_EXIT_SCREENSHOTS too.
  * - S3, AC2: no Pack, "Start empty": the empty Library, then the editor on a new Prompt about 250ms
  *   later, both times read in the page as they are first seen. The exact 250ms is proven with fake
@@ -295,6 +295,15 @@ interface ExitTimeline {
   held: string[];
   /** Frames sampled while it showed */
   frames: number;
+  /**
+   * The first and the last frame where the pill was drawn: visible (checkVisibility, opacity and
+   * visibility included), fully opaque through its ancestors (its entrance ended), and a box of its own
+   * inside the viewport. In the document is not enough: a pill made transparent or moved away still is
+   */
+  firstDrawnAt?: number;
+  lastDrawnAt?: number;
+  /** Frames, after the first drawn one, where the pill was in the document but not drawn */
+  undrawn: number;
   /** Frames where the pill met the first card, or that card's Copy */
   overCard: number;
   overCopy: number;
@@ -316,13 +325,25 @@ type TimelineWindow = typeof globalThis & { exitTimeline: ExitTimeline };
  */
 const watchTheExitNotification = (page: Page, message: string): Promise<void> =>
   page.evaluate((watched) => {
-    const timeline: ExitTimeline = { shown: 0, held: [], frames: 0, overCard: 0, overCopy: 0, copyFocused: 0, copyLost: 0, minGapToCard: null };
+    const timeline: ExitTimeline = { shown: 0, held: [], frames: 0, undrawn: 0, overCard: 0, overCopy: 0, copyFocused: 0, copyLost: 0, minGapToCard: null };
     (globalThis as TimelineWindow).exitTimeline = timeline;
     const box = (element: Element): Box => {
       const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
       return { left, top, right, bottom, width, height };
     };
     const meet = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    // Drawn: visible as Chrome sees it, opaque through every ancestor, a box of its own within the viewport
+    const drawn = (element: HTMLElement, at: Box): boolean => {
+      if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) {
+        return false;
+      }
+      for (let node: Element | null = element; node !== null; node = node.parentElement) {
+        if (Number.parseFloat(getComputedStyle(node).opacity) < 1) {
+          return false;
+        }
+      }
+      return at.width > 0 && at.height > 0 && at.left >= 0 && at.top >= 0 && at.right <= innerWidth && at.bottom <= innerHeight;
+    };
 
     document.addEventListener('click', (event) => {
       const primaryButton = document.querySelector('[data-testid="welcome-primary"]');
@@ -342,6 +363,13 @@ const watchTheExitNotification = (page: Page, message: string): Promise<void> =>
       const cardBox = card ? box(card) : null;
       const copyBox = copy ? box(copy) : null;
       timeline.frames++;
+      if (drawn(pill, pillBox)) {
+        const now = performance.now();
+        timeline.firstDrawnAt ??= now;
+        timeline.lastDrawnAt = now;
+      } else if (timeline.firstDrawnAt !== undefined) {
+        timeline.undrawn++;
+      }
       if (cardBox) {
         timeline.overCard += meet(pillBox, cardBox) ? 1 : 0;
         const gap = cardBox.top - pillBox.bottom;
@@ -409,6 +437,8 @@ const followTheExitNotification = async (page: Page, message: string, name: stri
     shownAfterClickMs: (timeline.shownAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
     goneAfterClickMs: (timeline.goneAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
     onScreenMs: (timeline.goneAt ?? Number.NaN) - (timeline.shownAt ?? Number.NaN),
+    firstDrawnAfterClickMs: (timeline.firstDrawnAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
+    lastDrawnAfterClickMs: (timeline.lastDrawnAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
     lateShotAfterClickMs: lateShotAt
   };
   test.info().annotations.push({ type: 'exit Notification time (ms) and place (px)', description: JSON.stringify(report) });
@@ -416,12 +446,16 @@ const followTheExitNotification = async (page: Page, message: string, name: stri
   return timeline;
 };
 
-/** Still on screen STILL_THERE_MS after the click, gone by GONE_BY_MS, one pill all along, its time never stopped */
+/**
+ * Drawn STILL_THERE_MS after the click, and without a break from the end of its entrance on; removed
+ * from the document by GONE_BY_MS; one pill all along, its time never stopped
+ */
 const expectSixSeconds = async (page: Page, timeline: ExitTimeline): Promise<void> => {
   expect(timeline.held, 'nothing hovered or focused the Notification, which would stop its time').toEqual([]);
   expect(timeline.shown, 'one Notification, from the add to its end').toBe(1);
-  const { clickAt = Number.NaN, goneAt = Number.NaN } = timeline;
-  expect(goneAt - clickAt, `still on screen ${String(STILL_THERE_MS)}ms after the click`).toBeGreaterThanOrEqual(STILL_THERE_MS);
+  const { clickAt = Number.NaN, lastDrawnAt = Number.NaN, goneAt = Number.NaN } = timeline;
+  expect(lastDrawnAt - clickAt, `still drawn on screen ${String(STILL_THERE_MS)}ms after the click`).toBeGreaterThanOrEqual(STILL_THERE_MS);
+  expect(timeline.undrawn, 'frames where it was in the document but not drawn, once drawn').toBe(0);
   expect(goneAt - clickAt, `gone by ${String(GONE_BY_MS)}ms after the click`).toBeLessThanOrEqual(GONE_BY_MS);
   await expect(page.getByTestId('toast')).toHaveCount(0);
 };
