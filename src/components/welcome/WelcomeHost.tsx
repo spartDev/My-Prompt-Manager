@@ -33,6 +33,11 @@ export interface WelcomeHostProps {
    * button, which follows the selection, is the way on (My-Prompt-Manager-5lf)
    */
   onPacksChange?: (packs: readonly string[]) => void;
+  /**
+   * While true, a Pack toggle does nothing: App sets it while the Packs selected are being added, so
+   * the selection on screen stays the one a refusal's Try again adds (My-Prompt-Manager-5lf)
+   */
+  packsLocked?: boolean;
   /** The Notification over the Welcome, which the frame shows under its header (WelcomeFrame's notification) */
   notification?: ReactNode;
   context?: 'popup' | 'sidepanel';
@@ -47,10 +52,11 @@ export interface WelcomeHostProps {
  * handler requests the Welcome lock, and the step is written once the lock is granted and the record
  * read, a few milliseconds later. A popup closed after that write reopens on the step; one closed
  * before it reopens one step earlier, the window the epic accepted (D24). A Pack toggled records
- * the step with the new selection, and says it to onPacksChange. The primary button of the last step finishes, with the Packs
- * selected. The close button records nothing: the step shown is already recorded, or being recorded.
+ * the step with the new selection, and says it to onPacksChange; while packsLocked, a toggle does
+ * nothing. The primary button of the last step finishes, with the Packs selected. The close button
+ * records nothing: the step shown is already recorded, or being recorded.
  */
-const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, onStepChange, onPacksChange, notification, context = 'popup' }) => {
+const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, onStepChange, onPacksChange, packsLocked = false, notification, context = 'popup' }) => {
   const [state, setState] = useState<WelcomeState>(() => initialWelcomeState(step, packs));
   // The state the next action applies to: two actions in a row never read a render behind
   const current = useRef(state);
@@ -82,9 +88,11 @@ const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcom
 
   const togglePack = useCallback(
     (id: string) => {
-      apply({ type: 'togglePack', id });
+      if (!packsLocked) {
+        apply({ type: 'togglePack', id });
+      }
     },
-    [apply]
+    [apply, packsLocked]
   );
 
   const close = useCallback(() => {

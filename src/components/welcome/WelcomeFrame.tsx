@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { prefersReducedMotion } from '../../theme/motion';
 import { cn } from '../../utils';
@@ -86,6 +86,57 @@ const BackButton: FC<{ pop: boolean; onClick: () => void }> = ({ pop, onClick })
     >
       Back
     </button>
+  );
+};
+
+/**
+ * The room of the Notification, under the header, 8px below it. Empty, it takes none. Once a
+ * Notification has shown there, it keeps the tallest room one took for as long as the step stays: a
+ * Notification that goes (a Pack toggled hides the failure of a refused add) moves no Pack, title or
+ * text under the pointer, and the next failure shows in the same room. Mounted anew at each step
+ * change, which gives the room back (My-Prompt-Manager-5lf)
+ */
+const NotificationSlot: FC<{ children: ReactNode }> = ({ children }) => {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+
+  // The slot's height while a Notification is in it, the tallest kept
+  const keep = useCallback((): void => {
+    const slot = slotRef.current;
+    if (!slot || slot.childElementCount === 0) {
+      return;
+    }
+    const { height } = slot.getBoundingClientRect();
+    if (height > 0) {
+      setRoom((kept) => (kept !== null && kept >= height ? kept : height));
+    }
+  }, []);
+
+  // After each render, before the paint: the one that brings a Notification records its room
+  useLayoutEffect(keep);
+
+  // And when the slot grows outside a render (a late font swap wrapping the pill onto two lines)
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(keep);
+    observer.observe(slot);
+    return () => {
+      observer.disconnect();
+    };
+  }, [keep]);
+
+  return (
+    <div
+      ref={slotRef}
+      data-testid="welcome-notification"
+      className={cn('flex-none pt-2', room === null && 'empty:hidden')}
+      style={room === null ? undefined : { minHeight: room }}
+    >
+      {children}
+    </div>
   );
 };
 
@@ -216,8 +267,9 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
         </header>
 
         {/* The Notification, under the header: the room it takes comes from the step, whose own 12px
-            (py-3) stand between it and the title. Empty, the slot takes none */}
-        {notification !== undefined && <div className="flex-none pt-2 empty:hidden">{notification}</div>}
+            (py-3) stand between it and the title. Keyed by the step: the room a Notification took stays
+            until the step changes */}
+        {notification !== undefined && <NotificationSlot key={step}>{notification}</NotificationSlot>}
 
         {/* The step slot: centered in the room left, scrolling there when taller. Clipped sideways for
             the slide, at the screen's edge rather than the content's (-mx/px), so a card's shadow fades

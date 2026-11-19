@@ -4,13 +4,19 @@
  * and the keyboard; each step change recorded, so a Welcome closed early resumes there; no
  * animation ever holding the primary button.
  */
+
+
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { PACKS } from '../../../welcome/packs';
 import type { WelcomeStep } from '../../../welcome/storage';
 import WelcomeHost, { type WelcomeHostProps } from '../WelcomeHost';
+
+/** What App passes as the notification with none on screen: a ToastContainer that renders nothing */
+const Nothing = () => null;
 
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected).map((pack) => pack.id);
 
@@ -408,6 +414,41 @@ describe('Welcome frame', () => {
       renderWelcome({ step: 2 });
 
       expect(welcome().querySelector('.empty\\:hidden')).toBeNull();
+    });
+
+    // Review round 1 of My-Prompt-Manager-5lf: the toggle that hides the failure moves no Pack under the pointer
+    it('keeps the room a Notification took once it goes, while the step stays, for the next one too; a step change gives it back', async () => {
+      // happy-dom lays nothing out: the slot measures what it does at 320px wide with the two-line failure
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+        const height = this.dataset.testid === 'welcome-notification' && this.childElementCount > 0 ? 56.4 : 0;
+        return { x: 0, y: 0, left: 0, top: 0, width: 0, height, right: 0, bottom: height, toJSON: () => ({}) } as DOMRect;
+      });
+      const failure = <div data-testid="slot-notification">Couldn&apos;t add the prompts</div>;
+      const { rerender, saveStep, finishWelcome, user } = renderWelcome({ step: 2, notification: <Nothing /> });
+      const slot = (): HTMLElement => screen.getByTestId('welcome-notification');
+      const withNotification = (notification: ReactNode) => <WelcomeHost step={2} saveStep={saveStep} finishWelcome={finishWelcome} notification={notification} />;
+
+      expect(slot()).toHaveClass('empty:hidden');
+      expect(slot().style.minHeight).toBe('');
+
+      rerender(withNotification(failure));
+      expect(slot().style.minHeight).toBe('56.4px');
+
+      // The failure hidden (a Pack toggled): its room stays
+      rerender(withNotification(<Nothing />));
+      expect(slot()).toBeEmptyDOMElement();
+      expect(slot()).not.toHaveClass('empty:hidden');
+      expect(slot().style.minHeight).toBe('56.4px');
+
+      // The next failure shows in the same room
+      rerender(withNotification(failure));
+      expect(slot().style.minHeight).toBe('56.4px');
+
+      // A step change gives it back
+      rerender(withNotification(<Nothing />));
+      await user.click(back() as HTMLElement);
+      expect(slot()).toHaveClass('empty:hidden');
+      expect(slot().style.minHeight).toBe('');
     });
   });
 

@@ -171,8 +171,9 @@ describe('useWelcomeExit', () => {
       expect(focusFirstPrompt).not.toHaveBeenCalled();
       expect(openNewPrompt).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(1);
-      // duration 0: no time of its own, it stays until the user acts (useToast)
-      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) } });
+      // duration 0: no time of its own, it stays until the user acts (useToast); focusAction false: the
+      // keyboard stays on the primary button, which is still on screen
+      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) }, focusAction: false });
     });
 
     it('Try again adds the same Packs again, through the same exit as the primary button: the Notification hidden, then the Packs, the finish and the Notification of the add', async () => {
@@ -233,7 +234,7 @@ describe('useWelcomeExit', () => {
 
       act(() => { result.current(DEFAULT_IDS); });
       await flush();
-      expect(showToast.mock.lastCall?.[2]).not.toHaveProperty('focusAction');
+      expect(showToast.mock.lastCall?.[2]).toHaveProperty('focusAction', false);
 
       act(() => { tryAgainOf(showToast)(); });
       await flush();
@@ -244,7 +245,7 @@ describe('useWelcomeExit', () => {
       act(() => { result.current(DEFAULT_IDS); });
       await flush();
       expect(showToast).toHaveBeenCalledTimes(3);
-      expect(showToast.mock.lastCall?.[2]).not.toHaveProperty('focusAction');
+      expect(showToast.mock.lastCall?.[2]).toHaveProperty('focusAction', false);
     });
 
     it('a second press of the primary button tries again too, and finishes once the Packs are in', async () => {

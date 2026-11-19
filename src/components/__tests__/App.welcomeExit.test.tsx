@@ -422,6 +422,39 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(cardTitles().sort()).toEqual(hiring?.prompts.map((prompt) => prompt.title).sort());
     });
 
+    // My-Prompt-Manager-5lf, R3 of review round 1: a toggle during the add would bring back a Try again about other Packs
+    it('a Pack toggled while the Packs are being added does nothing, so the refusal\'s Try again adds the Packs on screen; once refused, a toggle works again', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      let refuse = (): void => undefined;
+      addPacks.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+        refuse = () => { reject(Object.assign(new Error('Storage quota exceeded'), { type: 'STORAGE_QUOTA_EXCEEDED' })); };
+      }));
+      const product = (): HTMLElement => screen.getByRole('button', { name: /^Product / });
+
+      fireEvent.click(primary());
+      fireEvent.click(product());
+
+      expect(product()).toHaveAttribute('aria-pressed', 'true');
+      expect(primary()).toHaveTextContent(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+      act(() => { refuse(); });
+      const alert = await screen.findByRole('alert');
+      expect(product()).toHaveAttribute('aria-pressed', 'true');
+
+      // Its Try again adds what the screen shows: the Packs of the first add
+      refuseOnce();
+      fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+      await waitFor(() => { expect(addPacks).toHaveBeenCalledTimes(2); });
+      expect(addPacks.mock.calls[1]?.[0]).toEqual(addPacks.mock.calls[0]?.[0]);
+      await screen.findByRole('alert');
+
+      // The add refused, the Packs answer again, and the toggle hides the failure
+      fireEvent.click(product());
+      expect(product()).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
     // My-Prompt-Manager-5lf: the pressed Try again leaves with its Notification, which would drop the keyboard to the body
     it('Try again from the keyboard, refused again: the keyboard is on the Try again of the failure Notification now on screen', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });

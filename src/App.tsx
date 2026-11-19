@@ -434,7 +434,18 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   // The way out of the Welcome's last step: the Packs selected added, then the Welcome finished, then
   // the Library on All with the Notification of the add; with none, the Library, then the editor
-  const addPacks = useAddPacks({ refreshPrompts, refreshCategories });
+  const addPacksToLibrary = useAddPacks({ refreshPrompts, refreshCategories });
+  // While the Packs are being added, a Pack toggle does nothing: the selection on screen stays the one
+  // being added, so a refusal's Try again is about the Packs on screen (My-Prompt-Manager-5lf, R3)
+  const [addingPacks, setAddingPacks] = useState(false);
+  const addPacks = useCallback(async (packs: Parameters<typeof addPacksToLibrary>[0]) => {
+    setAddingPacks(true);
+    try {
+      return await addPacksToLibrary(packs);
+    } finally {
+      setAddingPacks(false);
+    }
+  }, [addPacksToLibrary]);
   // Defensive: the Welcome replaced the Library in this opening, so its filter is still All and its
   // search empty. This puts them back if something set them while the Welcome was up (a review the
   // side panel takes), so no Prompt the Packs added is filtered out of sight
@@ -559,6 +570,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           onFinish={leaveWelcome}
           onStepChange={hideShownToast}
           onPacksChange={hideAddFailure}
+          packsLocked={addingPacks}
           notification={<ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} wrap inFlow />}
           context={context}
         />

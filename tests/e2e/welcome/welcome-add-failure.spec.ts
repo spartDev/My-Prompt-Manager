@@ -158,6 +158,48 @@ const atLastStepWithStoreFull = async (page: Page, extensionId: string, file: st
   await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
   await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
   await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+  // The font in (Schibsted Grotesk swaps in), so a late swap does not move what is measured
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+};
+
+interface StepLayout {
+  title: Box;
+  text: Box;
+  packs: (Box & { name: string })[];
+}
+
+/** Where the last step's title, its text and every Pack are, in viewport pixels */
+const stepLayoutOf = (page: Page): Promise<StepLayout> =>
+  page.evaluate(() => {
+    const box = (element: Element) => {
+      const { left, top, right, bottom } = element.getBoundingClientRect();
+      return { left, top, right, bottom };
+    };
+    const title = document.querySelector('[data-testid="welcome"] [data-welcome-title]');
+    const text = title?.nextElementSibling;
+    if (!title || !text) {
+      throw new Error('No step title or text on the page');
+    }
+    return {
+      title: box(title),
+      text: box(text),
+      packs: [...document.querySelectorAll('[data-testid="welcome-packs"] button')].map((pack) => ({ name: pack.textContent?.trim() ?? '', ...box(pack) }))
+    };
+  });
+
+/** Every box of `now` within 0.5px of the same box in `then`, side by side */
+const expectStill = (now: StepLayout, then: StepLayout, what: string): void => {
+  const boxes = (layout: StepLayout): [string, Box][] => [['the title', layout.title], ['the text', layout.text], ...layout.packs.map((pack): [string, Box] => [pack.name, pack])];
+  const was = new Map(boxes(then));
+  expect(boxes(now).map(([name]) => name)).toEqual(boxes(then).map(([name]) => name));
+  for (const [name, box] of boxes(now)) {
+    for (const side of ['left', 'top', 'right', 'bottom'] as const) {
+      const moved = box[side] - (was.get(name)?.[side] ?? Number.NaN);
+      expect(Math.abs(moved), `${what}: ${name}'s ${side} moved by ${moved.toFixed(1)}px`).toBeLessThanOrEqual(0.5);
+    }
+  }
 };
 
 test.describe('The failure Notification of a refused add', () => {
@@ -224,7 +266,62 @@ test.describe('The failure Notification of a refused add', () => {
         await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
         // The pointer off the controls, so none shows its hover
         await page.mouse.move(2, height - 2);
-        await page.screenshot({ path: `${SCREENSHOTS_DIR}/error-${surface}-${String(width)}x${String(height)}-${theme}.png`, animations: 'disabled' });
+        // Not animations: 'disabled', which would cancel the scroll-driven fade and line of the Packs
+        await page.screenshot({ path: `${SCREENSHOTS_DIR}/error-${surface}-${String(width)}x${String(height)}-${theme}.png` });
+      });
+    }
+  }
+
+  // Review round 1 of My-Prompt-Manager-5lf, fix 2: once the failure has made room under the header, the
+  // room stays while the step does, so the toggle that hides it moves nothing the pointer is on
+  for (const { surface, file, width, height } of SURFACES.filter((candidate) => candidate.height === 500)) {
+    for (const theme of ['light', 'dark'] as const satisfies readonly Theme[]) {
+      test(`5lf round 2: a Pack toggled after a refused add moves nothing: the title, the text and every Pack stay put, and a double-click on Product's lower half leaves Writing selected, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ context, page, storage, extensionId }) => {
+        const product = packNamed('Product');
+        const writing = packNamed('Writing');
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await atLastStepWithStoreFull(page, extensionId, file, width, height);
+        const opening = await stepLayoutOf(page);
+        await fillStorage(await backgroundWorker(context));
+        await primary(page).click();
+        await expect(page.getByRole('alert')).toContainText(MESSAGE);
+        await animationsDone(page);
+        const withFailure = await stepLayoutOf(page);
+
+        // The double-click of the review, 12px above Product's bottom: both clicks must land on Product
+        const aimed = withFailure.packs.find((pack) => pack.name.startsWith(`${product.name} `));
+        if (!aimed) {
+          throw new Error('No Product on the step');
+        }
+        const x = (aimed.left + aimed.right) / 2;
+        const y = aimed.bottom - 12;
+        expect(await page.evaluate(([pointX, pointY]) => document.elementFromPoint(pointX, pointY)?.closest('button')?.textContent?.trim() ?? null, [x, y])).toMatch(/^Product /);
+        await page.mouse.dblclick(x, y);
+
+        await expect(notification(page)).toHaveCount(0);
+        // Toggled twice, Product is selected again; Writing, under it, untouched
+        await expect(packToggle(page, product)).toHaveAttribute('aria-pressed', 'true');
+        await expect(packToggle(page, writing)).toHaveAttribute('aria-pressed', 'true');
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+        await animationsDone(page);
+        const toggled = await stepLayoutOf(page);
+        const combination = `${theme}, ${surface} ${String(width)}x${String(height)}`;
+        console.log(`[welcome add failure] 5lf round 2, ${combination}: title top ${opening.title.top.toFixed(1)} at the opening, ${withFailure.title.top.toFixed(1)} with the failure, ${toggled.title.top.toFixed(1)} after the double-click; Product ${withFailure.packs[0]?.top.toFixed(1) ?? '?'}-${withFailure.packs[0]?.bottom.toFixed(1) ?? '?'} then ${toggled.packs[0]?.top.toFixed(1) ?? '?'}-${toggled.packs[0]?.bottom.toFixed(1) ?? '?'}`);
+        test.info().annotations.push({ type: 'round 2', description: `${combination}: title ${opening.title.top.toFixed(1)} / ${withFailure.title.top.toFixed(1)} / ${toggled.title.top.toFixed(1)}` });
+        expectStill(toggled, withFailure, 'after the double-click that hid the failure');
+
+        await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+        await page.mouse.move(2, height - 2);
+        await animationsDone(page);
+        await page.screenshot({ path: `${SCREENSHOTS_DIR}/toggled-${surface}-${String(width)}x${String(height)}-${theme}.png` });
+
+        // The room goes with the step: Back, then Next to the Packs again, and the step is where it was at the opening
+        await page.getByRole('button', { name: 'Back' }).click();
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
+        await primary(page).click();
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
+        await animationsDone(page);
+        expectStill(await stepLayoutOf(page), opening, 'back on the Packs after a step change');
       });
     }
   }
@@ -279,12 +376,13 @@ test.describe('The failure Notification of a refused add', () => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
     await atLastStepWithStoreFull(page, extensionId, 'popup', 400, 500);
     const titleTop = () => page.locator('[data-welcome-title]').evaluate((title) => title.getBoundingClientRect().top);
-    const before = await titleTop();
     const worker = await backgroundWorker(context);
     await fillStorage(worker);
     await primary(page).click();
     await expect(page.getByRole('alert')).toContainText(MESSAGE);
     await expect(tryAgain(page)).toBeVisible();
+    await animationsDone(page);
+    const withFailure = await titleTop();
 
     // Product, selected by default, unselected from the keyboard: its Try again was about Product and Writing
     await packToggle(page, product).focus();
@@ -294,8 +392,8 @@ test.describe('The failure Notification of a refused add', () => {
     await expect(notification(page)).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
     await expect(packToggle(page, product)).toBeFocused();
-    // The Notification's room under the header is given back: the title is where it was before the add
-    expect(await titleTop()).toBeCloseTo(before, 1);
+    // The Notification's room stays while the step does: the title has not moved (round 2 below has every box)
+    expect(Math.abs((await titleTop()) - withFailure)).toBeLessThanOrEqual(0.5);
 
     // Writing unselected and Hiring selected: the screen offers Hiring alone
     await packToggle(page, writing).click();

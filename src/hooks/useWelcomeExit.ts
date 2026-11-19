@@ -158,7 +158,8 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
       // No time of its own (duration 0): it stays until the user acts, so it is read whole and the
       // retry stays within reach. Try again is the primary button's exit, with the same Packs. After a
       // Try again, whose button left with its Notification, the new Try again takes the keyboard the
-      // pressed one had, rather than leave it on the body (My-Prompt-Manager-5lf)
+      // pressed one had, rather than leave it on the body (My-Prompt-Manager-5lf); useToast keeps the
+      // flag only when it is true
       latest.current.showToast(ADD_FAILED, 'error', {
         duration: 0,
         action: {
@@ -167,7 +168,7 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
             exitRef.current(packIds, true);
           }
         },
-        ...(fromTryAgain ? { focusAction: true } : {})
+        focusAction: fromTryAgain
       });
       return;
     }
