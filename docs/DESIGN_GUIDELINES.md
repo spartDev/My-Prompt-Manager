@@ -914,8 +914,9 @@ A choice among two or three options (the theme, popup or side panel): `src/compo
 A Notification (Atelier 1C) is a 40px pill at the top center of the popup or side panel, on
 `bg-inverse` in both modes (`#1D1530` in light, `#4A3D6B` in dark). Only one shows at a time: a new
 one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
-leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
-`role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+leaves after 2.7s (the exit of the Welcome, below, after 6s); a failure (error, warning) has a red !
+round (`bg-inverse-alert`), is a `role="alert"`, and leaves after 6s. There is no close button and no
+progress bar: Escape closes it.
 Its time stops while the pointer or the focus is on it, so its action (the 6s Undo of a deleted
 Category) can be reached and read; it runs out the rest once neither is.
 Settings has one switch for all of them.
@@ -952,6 +953,13 @@ py-1.5 rounded-[20px]`), and the sub takes a line of its own under the message (
 items-start`), never cut: 238px wide and 48px high, whole from the 320px side panel to the popup. It
 ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel); in a
 320px side panel it reaches the side panel's close button, as the one-line pill does.
+
+It stays 6s, not a confirmation's 2.7s (My-Prompt-Manager-syj): its 9 words take about 2.3s to read
+and `//` comes last. `useWelcomeExit` passes `duration: 6000`, for "Your library is ready" (a Debug
+replay) too, and no other Notification changes (`src/test/guardrails/notificationDurations.test.ts`).
+Its time runs from the add's end, about 60ms after the click, and stops while it is hovered or
+focused, as any Notification's. All that time it stays off the first card, whose Copy has the
+keyboard: 167px above it in the popup, 195px in a 320 x 600 side panel.
 
 ```tsx
 <div role="status" className="

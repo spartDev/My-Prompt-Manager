@@ -93,7 +93,7 @@ const SURFACES = {
 type Surface = keyof typeof SURFACES;
 
 /** The title of each step, as the user reads it */
-const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+const STEP_TITLES = ['Your best prompts, one tap away', 'Add Variables, fill them in later', 'Start with a pack'] as const;
 /** Step 1's text: "here", on the popup and the side panel alike (My-Prompt-Manager-ojz.19) */
 const STEP_1_TEXT = 'Save the prompts you reuse and find them in a second, here or right inside your AI chat.';
 

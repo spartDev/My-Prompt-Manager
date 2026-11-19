@@ -22,8 +22,11 @@ const DEFAULT_IDS = DEFAULTS.map((pack) => pack.id);
 const DEFAULT_COUNT = DEFAULTS.reduce((count, pack) => count + pack.prompts.length, 0);
 /** The second line of every Notification of an exit with Packs: what to do next, in the AI chat (My-Prompt-Manager-ojz.19, decision D1) */
 const IN_THE_CHAT = 'Open your AI chat and type //';
-/** That second line, read whole on the Library: on its own line, never cut, even 320px wide */
-const EXIT_OPTIONS = { sub: IN_THE_CHAT, whole: true };
+/**
+ * That second line, read whole on the Library: on its own line, never cut, even 320px wide; and on
+ * screen 6 s, long enough to read it to its "//" (My-Prompt-Manager-syj), the Debug replay's included
+ */
+const EXIT_OPTIONS = { sub: IN_THE_CHAT, whole: true, duration: 6000 };
 
 /** An add the test settles itself */
 const deferred = <T,>() => {

@@ -3,7 +3,7 @@
 
 ### ✨ Added
 
--  Welcome: three steps at the first opening after a first install (what the extension is for, blanks to fill in a Prompt, Packs to start with), which leave for a Library holding the chosen Packs' Prompts, or for the editor of a new Prompt. Closed early, it resumes at the same step; once finished it never shows again, not after an update nor after Clear All Data; a user who updates never sees it ([#607](https://github.com/spartDev/My-Prompt-Manager/pull/607))
+-  Welcome: three steps at the first opening after a first install (what the extension is for; a Prompt's Variables, filled in when it is inserted with //; Packs to start with), which leave for a Library holding the chosen Packs' Prompts, or for the editor of a new Prompt. Closed early, it resumes at the same step; once finished it never shows again, not after an update nor after Clear All Data; a user who updates never sees it ([#607](https://github.com/spartDev/My-Prompt-Manager/pull/607))
 -  Packs: ready-made Prompts in a Category of their own (Product, Engineering, Writing, Hiring; Product and Writing selected), added all together through Admission, with no duplicate ([#607](https://github.com/spartDev/My-Prompt-Manager/pull/607))
 -  On a first install, the chat tabs already open get the Prompts button and `//`, as after an update ([#607](https://github.com/spartDev/My-Prompt-Manager/pull/607))
 
