@@ -97,6 +97,12 @@ export const expectPlatformsRowWhole = async (page: Page, what: string): Promise
     expect(inside(pill, row), `${what}: the pill ${pill.text} inside the row`).toBe(true);
     expect(overlap(pill, caption), `${what}: the pill ${pill.text} clear of the caption`).toBe(false);
   }
+  // Every two pills apart, on one line or on two once the row wraps
+  pills.forEach((pill, index) => {
+    for (const other of pills.slice(index + 1)) {
+      expect(overlap(pill, other), `${what}: the pills ${pill.text} and ${other.text} apart ${JSON.stringify([pill, other])}`).toBe(false);
+    }
+  });
   // Read first: on the first pill's line, before it, or on a line above it
   const first = pills[0];
   const sameLine = caption.top < first.bottom && first.top < caption.bottom;

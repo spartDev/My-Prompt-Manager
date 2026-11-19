@@ -22,6 +22,20 @@ const filesOf = async (folder: string): Promise<Record<string, string>> => {
   return Object.fromEntries(await Promise.all(files.sort().map(async (file) => [path.relative(folder, file), (await fs.readFile(file)).toString('base64')] as const)));
 };
 
+/**
+ * Puts `folder` back as `files` held it: a file it did not hold is removed, a file changed or gone is
+ * written again. A guard that lets a write through then fails this test alone, not every later test
+ * that copies dist/. Returns the files it put back
+ */
+const restoreFiles = async (folder: string, files: Record<string, string>): Promise<string[]> => {
+  const now = await filesOf(folder);
+  const added = Object.keys(now).filter((file) => !(file in files));
+  const changed = Object.keys(files).filter((file) => now[file] !== files[file]);
+  await Promise.all(added.map((file) => fs.rm(path.join(folder, file), { force: true })));
+  await Promise.all(changed.map((file) => fs.writeFile(path.join(folder, file), Buffer.from(files[file], 'base64'))));
+  return [...added, ...changed];
+};
+
 test.describe('The onInstalled probe', () => {
   let scratch: string;
 
@@ -47,12 +61,18 @@ test.describe('The onInstalled probe', () => {
       link,
       path.join(link, 'not-yet-there')
     ];
-    for (const target of refused) {
-      expect(resolvesInsideDist(target), target).toBe(true);
-      expect(() => addOnInstalledProbe(target), target).toThrow(/never in dist\//);
+    try {
+      for (const target of refused) {
+        expect(resolvesInsideDist(target), target).toBe(true);
+        expect(() => addOnInstalledProbe(target), target).toThrow(/never in dist\//);
+      }
+      expect(await filesOf(dist)).toEqual(before);
+    } finally {
+      const restored = await restoreFiles(dist, before);
+      if (restored.length > 0) {
+        console.log(`[probe guard] dist/ put back as before the refusals: ${JSON.stringify(restored)}`);
+      }
     }
-
-    expect(await filesOf(dist)).toEqual(before);
     console.log(`[probe guard] refused ${String(refused.length)} paths: ${JSON.stringify(refused)}; dist/ unchanged (${String(Object.keys(before).length)} files)`);
   });
 
