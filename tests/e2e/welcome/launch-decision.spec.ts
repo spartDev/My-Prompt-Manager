@@ -44,12 +44,29 @@ const storageOf = async (context: BrowserContext): Promise<{ storage: ExtensionS
   return { storage: createStorageController(background), extensionId: new URL(background.url()).host };
 };
 
-/** A browser on a profile and an extension folder of its own, removed when the test ends */
+/**
+ * A browser on a profile and an extension folder of its own, removed when the test ends; removed at
+ * once when the copy or the launch fails, since the test then has no install to dispose of
+ */
 const ownInstall = async (version: string) => {
-  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-launch-profile-'));
-  const extensionPath = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-launch-extension-'));
-  copyBuildAt(extensionPath, version);
-  let context = await launchExtensionContext(profile, extensionPath);
+  const folders: string[] = [];
+  const removeFolders = async (): Promise<void> => {
+    await Promise.all(folders.map((folder) => fs.rm(folder, { recursive: true, force: true })));
+  };
+  let profile: string;
+  let extensionPath: string;
+  let context: BrowserContext;
+  try {
+    profile = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-launch-profile-'));
+    folders.push(profile);
+    extensionPath = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-launch-extension-'));
+    folders.push(extensionPath);
+    copyBuildAt(extensionPath, version);
+    context = await launchExtensionContext(profile, extensionPath);
+  } catch (error) {
+    await removeFolders();
+    throw error;
+  }
 
   return {
     extensionPath,
@@ -61,10 +78,13 @@ const ownInstall = async (version: string) => {
       await context.close();
       context = await launchExtensionContext(profile, extensionPath);
     },
+    /** Closes the browser, then removes both folders, even when the close fails */
     dispose: async (): Promise<void> => {
-      await context.close();
-      await fs.rm(profile, { recursive: true, force: true });
-      await fs.rm(extensionPath, { recursive: true, force: true });
+      try {
+        await context.close();
+      } finally {
+        await removeFolders();
+      }
     }
   };
 };

@@ -56,6 +56,8 @@ interface ExitProbe {
   editorAt?: number;
   loadingSeen?: boolean;
   emptySeen?: boolean;
+  /** When the Library's empty state was first in the document */
+  emptyAt?: number;
   copiedAt?: number;
 }
 
@@ -82,6 +84,9 @@ const probeTheExit = async (page: Page): Promise<void> => {
         const text = node.textContent ?? '';
         probe.loadingSeen ||= text.includes('Loading your prompts');
         probe.emptySeen ||= text.includes('Your library is empty');
+        if (probe.emptySeen && probe.emptyAt === undefined) {
+          probe.emptyAt = now;
+        }
       }
     };
     new MutationObserver(look).observe(document, { childList: true, subtree: true });
@@ -199,6 +204,8 @@ const overlaps = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.rig
 const exitNotificationLayout = async (page: Page, message: string): Promise<ExitNotificationLayout> => {
   const notification = page.getByTestId('toast');
   await expect(notification.getByText(message, { exact: true })).toBeVisible();
+  // The whole second line, so a shorter one cannot pass the measures for it
+  await expect(notification.getByTestId('toast-sub')).toHaveText(IN_THE_CHAT);
   await notification.hover();
   await animationsDone(page);
   await notification.hover();
@@ -354,14 +361,19 @@ test.describe('Leaving the Welcome in the real extension', () => {
     const editor = page.getByTestId('editor-sheet');
     await expect(editor).toBeVisible();
     await expect(editor.getByLabel(/title/i)).toHaveValue('');
-    const { libraryAt, editorAt, emptySeen } = await probeOf(page);
-    expect(emptySeen, 'the empty Library showed before the editor').toBe(true);
+    const { libraryAt, editorAt, emptySeen, emptyAt } = await probeOf(page);
+    expect(emptySeen, 'the empty Library showed').toBe(true);
     expect(libraryAt).toBeDefined();
     expect(editorAt).toBeDefined();
+    expect(emptyAt).toBeDefined();
     const delay = (editorAt ?? 0) - (libraryAt ?? 0);
+    const emptyBeforeEditor = (editorAt ?? 0) - (emptyAt ?? 0);
     test.info().annotations.push({ type: 'Library to editor (ms)', description: delay.toFixed(1) });
+    test.info().annotations.push({ type: 'empty Library before the editor (ms)', description: emptyBeforeEditor.toFixed(1) });
     await fs.mkdir(OUTPUT_DIR, { recursive: true });
-    await fs.writeFile(path.join(OUTPUT_DIR, 'start-empty-editor-delay.json'), `${JSON.stringify({ libraryAt, editorAt, delay }, null, 2)}\n`);
+    await fs.writeFile(path.join(OUTPUT_DIR, 'start-empty-editor-delay.json'), `${JSON.stringify({ libraryAt, emptyAt, editorAt, delay, emptyBeforeEditor }, null, 2)}\n`);
+    // The empty Library is what the user sees first, then the editor opens over it
+    expect(emptyAt ?? Number.NaN, 'the empty Library showed before the editor').toBeLessThan(editorAt ?? Number.NaN);
     // The timer starts at the click, a little before the Library is in the document; a loaded machine may run it late
     expect(delay).toBeGreaterThanOrEqual(200);
     expect(delay).toBeLessThan(1_000);

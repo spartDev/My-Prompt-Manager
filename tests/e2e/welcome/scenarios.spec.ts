@@ -217,13 +217,28 @@ const firstInstallStorage = async (context: BrowserContext): Promise<ExtensionSt
 /**
  * A browser on a profile and an extension folder of its own, the build copied there at `version` with
  * the onInstalled observer, so the test can restart the browser and update the extension in place.
- * Removed, browser closed, when the test ends.
+ * Removed, browser closed, when the test ends; removed at once when the copy or the launch fails,
+ * since the test then has no install to dispose of.
  */
 const ownInstall = async (version: string) => {
-  const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-scenario-profile-'));
-  const extensionPath = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-scenario-extension-'));
-  copyBuildAt(extensionPath, version, { onInstalledProbe: true });
-  let context = await launchExtensionContext(profile, extensionPath);
+  const folders: string[] = [];
+  const removeFolders = async (): Promise<void> => {
+    await Promise.all(folders.map((folder) => fs.rm(folder, { recursive: true, force: true })));
+  };
+  let profile: string;
+  let extensionPath: string;
+  let context: BrowserContext;
+  try {
+    profile = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-scenario-profile-'));
+    folders.push(profile);
+    extensionPath = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-scenario-extension-'));
+    folders.push(extensionPath);
+    copyBuildAt(extensionPath, version, { onInstalledProbe: true });
+    context = await launchExtensionContext(profile, extensionPath);
+  } catch (error) {
+    await removeFolders();
+    throw error;
+  }
 
   return {
     get context(): BrowserContext {
@@ -237,10 +252,13 @@ const ownInstall = async (version: string) => {
     /** A real update to `next`: onInstalled fires 'update'. Resolves with the new service worker */
     update: async (extensionId: string, next: string): Promise<Worker> =>
       updateExtensionInPlace(context, extensionId, extensionPath, next, { onInstalledProbe: true }),
+    /** Closes the browser, then removes both folders, even when the close fails */
     dispose: async (): Promise<void> => {
-      await context.close();
-      await fs.rm(profile, { recursive: true, force: true });
-      await fs.rm(extensionPath, { recursive: true, force: true });
+      try {
+        await context.close();
+      } finally {
+        await removeFolders();
+      }
     }
   };
 };
@@ -773,8 +791,13 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
       await expect(welcome(resumed)).toHaveCount(0);
       await expect(notification(resumed).getByText(`${String(DEFAULT_COUNT)} prompts added`, { exact: true })).toBeVisible();
       await expectLibraryAlone(resumed, DEFAULT_COUNT);
-      // Closed once the end of the Welcome is stored, as a person closes it
-      await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
+      // Closed once the end of the Welcome is stored, both its records, as a person closes it: the
+      // Welcome done and the installed Release marked seen (S5 polls the same pair, for the same reason)
+      const finished = {
+        [WELCOME_KEY]: { status: 'done' },
+        [WHATS_NEW_KEY]: { installedVersion: PENDING_INSTALLED, lastSeenVersion: NEW_RELEASE }
+      };
+      await expect.poll(async () => storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(finished);
       await resumed.close();
 
       // The next openings: the Library alone, in the popup and in the side panel
@@ -784,10 +807,7 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
         await again.close();
       }
       // The finish marked the installed Release seen: that, not the Welcome, keeps What's new away from now on
-      expect(await storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual({
-        [WELCOME_KEY]: { status: 'done' },
-        [WHATS_NEW_KEY]: { installedVersion: PENDING_INSTALLED, lastSeenVersion: NEW_RELEASE }
-      });
+      expect(await storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(finished);
     } finally {
       await install.dispose();
     }
@@ -1107,7 +1127,11 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     return page;
   };
 
-  /** The refused add: the Welcome still at its last step with a failure Notification, nothing stored */
+  /**
+   * The refused add: the Welcome still at its last step with a failure Notification, nothing stored,
+   * no Prompt and no Category of a Pack (the default Category the Library writes on its first read is
+   * none of the Packs')
+   */
   const expectRefusedAdd = async (page: Page, storage: ExtensionStorage): Promise<void> => {
     await expect(notification(page)).toHaveAttribute('data-type', 'error');
     await expect(notification(page).getByText("Couldn't add the prompts", { exact: true })).toBeVisible();
@@ -1115,6 +1139,8 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
     await expectWelcomeAt(page, 2);
     await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
     expect(await storage.getPrompts()).toEqual([]);
+    const packCategories = (await storage.getCategories()).filter((category) => PACK_NAMES.has(category.name.toLowerCase()));
+    expect(packCategories, 'the Categories of the Packs, after the refusal').toEqual([]);
     expect(await recordOf(storage, WELCOME_KEY)).toEqual({ status: 'pending', step: 2 });
   };
 
