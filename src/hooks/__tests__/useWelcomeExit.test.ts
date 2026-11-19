@@ -12,10 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SELECTOR_TRIGGER } from '../../content/selector/inputText';
 import type { AddPacksResult } from '../../services/storage';
 import { MOTION } from '../../theme/motion';
-import type { ShowToast } from '../../types/hooks';
+import type { ShowToast, Toast } from '../../types/hooks';
 import { PACKS } from '../../welcome/packs';
 import type { PromptPack } from '../../welcome/types';
-import { packsAddedNotice, useWelcomeExit, type WelcomeExitOptions } from '../useWelcomeExit';
+import { isAddFailure, packsAddedNotice, useWelcomeExit, type WelcomeExitOptions } from '../useWelcomeExit';
 
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_IDS = DEFAULTS.map((pack) => pack.id);
@@ -174,8 +174,9 @@ describe('useWelcomeExit', () => {
       expect(focusFirstPrompt).not.toHaveBeenCalled();
       expect(openNewPrompt).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(1);
-      // duration 0: no time of its own, it stays until the user acts (useToast)
-      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) } });
+      // duration 0: no time of its own, it stays until the user acts (useToast); focusAction false: the
+      // keyboard stays on the primary button, which is still on screen
+      expect(showToast).toHaveBeenCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) }, focusAction: false });
     });
 
     it('Try again adds the same Packs again, through the same exit as the primary button: the Notification hidden, then the Packs, the finish and the Notification of the add', async () => {
@@ -215,7 +216,8 @@ describe('useWelcomeExit', () => {
       expect(addPacks).toHaveBeenCalledTimes(2);
       expect(finishWelcome).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(2);
-      expect(showToast).toHaveBeenLastCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) } });
+      // Its Try again takes the keyboard the pressed one had (My-Prompt-Manager-5lf)
+      expect(showToast).toHaveBeenLastCalledWith("Couldn't add the prompts", 'error', { duration: 0, action: { label: 'Try again', onClick: expect.any(Function) }, focusAction: true });
 
       act(() => { tryAgainOf(showToast)(); });
       await flush();
@@ -223,6 +225,30 @@ describe('useWelcomeExit', () => {
       expect(addPacks).toHaveBeenCalledTimes(3);
       expect(finishWelcome).toHaveBeenCalledTimes(1);
       expect(showToast).toHaveBeenLastCalledWith(`${String(DEFAULT_COUNT)} prompts added`, 'success', EXIT_OPTIONS);
+    });
+
+    // My-Prompt-Manager-5lf: Try again leaves with its Notification, so the keyboard on it would fall to the body
+    it('Try again refused again: the new failure Notification asks its Try again to take the keyboard; the first failure, and one after the primary button, ask nothing', async () => {
+      const addPacks = vi.fn<WelcomeExitOptions['addPacks']>()
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'));
+      const { result, showToast } = renderExit({ addPacks });
+
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      expect(showToast.mock.lastCall?.[2]).toHaveProperty('focusAction', false);
+
+      act(() => { tryAgainOf(showToast)(); });
+      await flush();
+      expect(showToast).toHaveBeenCalledTimes(2);
+      expect(showToast.mock.lastCall?.[2]).toEqual({ duration: 0, action: { label: 'Try again', onClick: expect.any(Function) }, focusAction: true });
+
+      // The primary button stays on screen with the keyboard: the failure after it asks for none
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      expect(showToast).toHaveBeenCalledTimes(3);
+      expect(showToast.mock.lastCall?.[2]).toHaveProperty('focusAction', false);
     });
 
     it('a second press of the primary button tries again too, and finishes once the Packs are in', async () => {
@@ -305,6 +331,50 @@ describe('useWelcomeExit', () => {
       // The same exit as the primary button's: once the Welcome is gone, nothing is finished or shown
       expect(finishWelcome).not.toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // A Pack toggled hides the Notification on screen only when it is this one (My-Prompt-Manager-5lf, App's onPacksChange)
+  describe('isAddFailure: the failure Notification of a refused add, the only one a Pack toggled hides', () => {
+    /** The Notification useToast puts on screen for a call of showToast */
+    const shown = ([message, type = 'info', options = {}]: Parameters<ShowToast>): Toast => ({
+      id: 'shown',
+      message,
+      type,
+      duration: options.duration ?? 6000,
+      ...(options.sub === undefined ? {} : { sub: options.sub }),
+      ...(options.action === undefined ? {} : { action: options.action })
+    });
+
+    it('is the failure Notification as the hook shows it, the first and the one after a Try again refused again', async () => {
+      const addPacks = vi.fn<WelcomeExitOptions['addPacks']>()
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'))
+        .mockRejectedValueOnce(new Error('Storage quota exceeded'));
+      const { result, showToast } = renderExit({ addPacks });
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      act(() => { showToast.mock.lastCall?.[2]?.action?.onClick(); });
+      await flush();
+
+      expect(showToast).toHaveBeenCalledTimes(2);
+      for (const call of showToast.mock.calls) {
+        expect(isAddFailure(shown(call))).toBe(true);
+      }
+    });
+
+    it('is no other Notification: none on screen, the one of the add, another failure, even with a Try again', async () => {
+      const { result, showToast } = renderExit();
+      act(() => { result.current(DEFAULT_IDS); });
+      await flush();
+      const added = showToast.mock.lastCall;
+      expect(added?.[0]).toBe(`${String(DEFAULT_COUNT)} prompts added`);
+
+      expect(isAddFailure(null)).toBe(false);
+      expect(isAddFailure(shown(added as Parameters<ShowToast>))).toBe(false);
+      expect(isAddFailure(shown(["Couldn't delete Category", 'error', { action: { label: 'Try again', onClick: vi.fn() } }]))).toBe(false);
+      expect(isAddFailure(shown(['Prompt saved', 'success']))).toBe(false);
+      // Its words in a confirmation are no failure
+      expect(isAddFailure(shown(["Couldn't add the prompts", 'info']))).toBe(false);
     });
   });
 

@@ -127,6 +127,12 @@ export interface ToastOptions {
    * takes a line of its own under the message, and neither is cut. Left out, the sub is cut as above
    */
   whole?: boolean;
+  /**
+   * For a Notification that follows one whose action the user pressed, which left with the keyboard
+   * on it (the Welcome's Try again refused again): its own action takes the keyboard as it shows,
+   * unless the keyboard is on an element already. Left out, a Notification never takes the keyboard
+   */
+  focusAction?: boolean;
 }
 
 export interface Toast {
@@ -138,6 +144,8 @@ export interface Toast {
   action?: ToastAction;
   /** Read whole: the sub on a line of its own, nothing cut (ToastOptions.whole) */
   whole?: boolean;
+  /** Its action takes the keyboard as it shows, when the keyboard is on no element (ToastOptions.focusAction) */
+  focusAction?: boolean;
 }
 
 export interface ToastSettings {

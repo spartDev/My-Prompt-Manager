@@ -60,6 +60,26 @@ describe('Welcome frame: the Packs selected', () => {
     expect(screen.getByRole('button', { name: 'Hiring' })).toHaveFocus();
   });
 
+  // My-Prompt-Manager-5lf, R3: App locks the Packs while they are being added
+  it('while packsLocked, a Pack toggle does nothing: the selection, nothing recorded, nothing said; unlocked, it toggles', async () => {
+    const saveStep = vi.fn();
+    const onPacksChange = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<WelcomeHost step={2} saveStep={saveStep} finishWelcome={vi.fn()} onPacksChange={onPacksChange} packsLocked />);
+
+    await user.click(screen.getByRole('button', { name: 'Hiring' }));
+
+    expect(screen.getByRole('button', { name: 'Hiring' })).toHaveAttribute('aria-pressed', 'false');
+    expect(saveStep).not.toHaveBeenCalled();
+    expect(onPacksChange).not.toHaveBeenCalled();
+
+    rerender(<WelcomeHost step={2} saveStep={saveStep} finishWelcome={vi.fn()} onPacksChange={onPacksChange} packsLocked={false} />);
+    await user.click(screen.getByRole('button', { name: 'Hiring' }));
+
+    expect(screen.getByRole('button', { name: 'Hiring' })).toHaveAttribute('aria-pressed', 'true');
+    expect(onPacksChange).toHaveBeenCalledWith([...DEFAULTS, 'hiring']);
+  });
+
   it('Enter on a Pack toggle toggles it, and does not press the primary button', async () => {
     const onFinish = vi.fn();
     const user = userEvent.setup();

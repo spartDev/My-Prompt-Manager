@@ -3,7 +3,8 @@
  * opening: the Packs selected added, the Welcome finished, the Library on All with a Notification
  * (scenario 2); or no Pack, the Library, then the editor on a new Prompt (scenario 3); a refused
  * add keeping the Welcome at its last step, its failure Notification staying with Try again
- * (My-Prompt-Manager-ojz.20); never What's new right after the Welcome out of Debug
+ * (My-Prompt-Manager-ojz.20) until a Pack is toggled, and its Try again refused again keeping the
+ * keyboard (My-Prompt-Manager-5lf); never What's new right after the Welcome out of Debug
  * mode. StorageManager is the real one over the test storage, so the Prompts listed are the ones
  * stored.
  */
@@ -387,16 +388,93 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
-    it('a Pack toggled keeps the failure Notification: the user has not acted on it', async () => {
+    // My-Prompt-Manager-5lf: its Try again would add the refused selection, no longer the one on screen
+    it('a Pack toggled hides the failure Notification, the keyboard stays on that Pack, and the primary button adds exactly the Packs on screen', async () => {
+      const packToggle = (id: string): HTMLElement => {
+        const pack = PACKS.find((candidate) => candidate.id === id);
+        return screen.getByRole('button', { name: new RegExp(`^${pack?.name ?? id} `) });
+      };
+      const hiring = PACKS.find((pack) => pack.id === 'hiring');
       await openingOver({ welcome: { status: 'pending', step: 2 } });
       await openWelcome(2);
       refuseOnce();
       fireEvent.click(primary());
       await screen.findByRole('alert');
 
-      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${DEFAULTS[0]?.name ?? ''} `) }));
+      packToggle('product').focus();
+      fireEvent.click(packToggle('product'));
 
-      expect(screen.getByRole('alert')).toHaveTextContent("Couldn't add the prompts");
+      expect(packToggle('product')).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      expect(packToggle('product')).toHaveFocus();
+
+      // Writing out and Hiring in: the screen offers Hiring alone, and the primary button adds it
+      fireEvent.click(packToggle('writing'));
+      fireEvent.click(packToggle('hiring'));
+      expect(primary()).toHaveTextContent(`Add ${String(hiring?.prompts.length)} prompts`);
+      fireEvent.click(primary());
+
+      await waitFor(() => { expect(screen.queryByTestId('welcome')).not.toBeInTheDocument(); });
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      expect(addPacks).toHaveBeenCalledTimes(2);
+      expect(addPacks.mock.calls[1]?.[0].map((pack) => pack.id)).toEqual(['hiring']);
+      expect(cardTitles().sort()).toEqual(hiring?.prompts.map((prompt) => prompt.title).sort());
+    });
+
+    // My-Prompt-Manager-5lf, R3 of review round 1: a toggle during the add would bring back a Try again about other Packs
+    it('a Pack toggled while the Packs are being added does nothing, so the refusal\'s Try again adds the Packs on screen; once refused, a toggle works again', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      const addPacks = vi.mocked(getMockStorageManager().addPacks);
+      let refuse = (): void => undefined;
+      addPacks.mockImplementationOnce(() => new Promise((_resolve, reject) => {
+        refuse = () => { reject(Object.assign(new Error('Storage quota exceeded'), { type: 'STORAGE_QUOTA_EXCEEDED' })); };
+      }));
+      const product = (): HTMLElement => screen.getByRole('button', { name: /^Product / });
+
+      fireEvent.click(primary());
+      fireEvent.click(product());
+
+      expect(product()).toHaveAttribute('aria-pressed', 'true');
+      expect(primary()).toHaveTextContent(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+      act(() => { refuse(); });
+      const alert = await screen.findByRole('alert');
+      expect(product()).toHaveAttribute('aria-pressed', 'true');
+
+      // Its Try again adds what the screen shows: the Packs of the first add
+      refuseOnce();
+      fireEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+      await waitFor(() => { expect(addPacks).toHaveBeenCalledTimes(2); });
+      expect(addPacks.mock.calls[1]?.[0]).toEqual(addPacks.mock.calls[0]?.[0]);
+      await screen.findByRole('alert');
+
+      // The add refused, the Packs answer again, and the toggle hides the failure
+      fireEvent.click(product());
+      expect(product()).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    // My-Prompt-Manager-5lf: the pressed Try again leaves with its Notification, which would drop the keyboard to the body
+    it('Try again from the keyboard, refused again: the keyboard is on the Try again of the failure Notification now on screen', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      refuseOnce();
+      refuseOnce();
+      fireEvent.click(primary());
+      const first = await screen.findByRole('alert');
+      const firstTryAgain = within(first).getByRole('button', { name: 'Try again' });
+      firstTryAgain.focus();
+
+      fireEvent.click(firstTryAgain);
+
+      await waitFor(() => { expect(getMockStorageManager().addPacks).toHaveBeenCalledTimes(2); });
+      await waitFor(() => { expect(screen.getByRole('alert')).not.toBe(first); });
+      const again = screen.getByRole('alert');
+      expect(again).toHaveTextContent("Couldn't add the prompts");
+      await waitFor(() => { expect(within(again).getByRole('button', { name: 'Try again' })).toHaveFocus(); });
+      expect(document.activeElement).not.toBe(document.body);
+      expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
     });
 
     it('Start empty stays on the step: the Packs unselected, the primary button, now Start empty, leaves for the Library, then the editor, the failure Notification gone with the Welcome', async () => {

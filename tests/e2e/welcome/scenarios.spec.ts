@@ -1199,8 +1199,8 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
 
     // Storage still full: the end of the Welcome is a few bytes, and fits
     await unselectEveryPack(page);
-    // Toggling the Packs is no answer to the failure: it stays until the exit starts
-    await expect(notification(page).getByText("Couldn't add the prompts", { exact: true })).toBeVisible();
+    // A Pack toggled hides the failure: its Try again was about the Packs refused (My-Prompt-Manager-5lf)
+    await expect(notification(page)).toHaveCount(0);
     await primary(page).click();
     await expectLibraryThenEditor(page, 'a refused add, then Start empty');
     await expect(welcome(page)).toHaveCount(0);

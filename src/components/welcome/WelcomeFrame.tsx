@@ -1,5 +1,5 @@
 import type { FC, ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { prefersReducedMotion } from '../../theme/motion';
 import { cn } from '../../utils';
@@ -23,18 +23,18 @@ export interface WelcomeFrameProps {
   /** The round close button: closes the popup or the side panel, the Welcome left unfinished */
   onClose: () => void;
   context?: 'popup' | 'sidepanel';
+  /**
+   * The Notification over the Welcome (App's ToastContainer, in the flow): it takes room under the
+   * header, 8px below it, and the step gives way below it, so it covers neither the brand, the close
+   * button nor the step's title, at 320px wide too (My-Prompt-Manager-5lf). With no Notification on
+   * screen it takes no room
+   */
+  notification?: ReactNode;
   /** The step's content, in the step slot; its title is a WelcomeTitle, which takes the keyboard after a step change */
   children: ReactNode;
 }
 
 const STEPS: readonly WelcomeStep[] = [0, 1, 2];
-
-/**
- * The pixels at the right of the screen that the round close button and the room around it take: the
- * frame's side padding (18), the button (32) and a gap of 8. A Notification over the Welcome leaves
- * them free (ToastContainer's clearRight), so it never covers the close button, at 320px wide too
- */
-export const WELCOME_CLOSE_ROOM = 18 + 32 + 8;
 
 /** "Step 2 of 3": a dot's name, and what a step change announces */
 const stepName = (step: WelcomeStep): string => `Step ${String(step + 1)} of ${String(STEP_COUNT)}`;
@@ -90,6 +90,57 @@ const BackButton: FC<{ pop: boolean; onClick: () => void }> = ({ pop, onClick })
 };
 
 /**
+ * The room of the Notification, under the header, 8px below it. Empty, it takes none. Once a
+ * Notification has shown there, it keeps the tallest room one took for as long as the step stays: a
+ * Notification that goes (a Pack toggled hides the failure of a refused add) moves no Pack, title or
+ * text under the pointer, and the next failure shows in the same room. Mounted anew at each step
+ * change, which gives the room back (My-Prompt-Manager-5lf)
+ */
+const NotificationSlot: FC<{ children: ReactNode }> = ({ children }) => {
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<number | null>(null);
+
+  // The slot's height while a Notification is in it, the tallest kept
+  const keep = useCallback((): void => {
+    const slot = slotRef.current;
+    if (!slot || slot.childElementCount === 0) {
+      return;
+    }
+    const { height } = slot.getBoundingClientRect();
+    if (height > 0) {
+      setRoom((kept) => (kept !== null && kept >= height ? kept : height));
+    }
+  }, []);
+
+  // After each render, before the paint: the one that brings a Notification records its room
+  useLayoutEffect(keep);
+
+  // And when the slot grows outside a render (a late font swap wrapping the pill onto two lines)
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(keep);
+    observer.observe(slot);
+    return () => {
+      observer.disconnect();
+    };
+  }, [keep]);
+
+  return (
+    <div
+      ref={slotRef}
+      data-testid="welcome-notification"
+      className={cn('flex-none pt-2', room === null && 'empty:hidden')}
+      style={room === null ? undefined : { minHeight: room }}
+    >
+      {children}
+    </div>
+  );
+};
+
+/**
  * The step slot, mounted anew at each step. Reached by a step change, it slides in from the side the
  * step comes from and gives the keyboard to the step's title; at the opening it shows at once and
  * moves no focus. It may shrink to the room left (min-h-0), so a step can scroll a part of itself
@@ -120,7 +171,8 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
 /**
  * The frame of the Welcome (Atelier 1C 'Premier lancement'): it fills the popup or the side panel,
  * with no tab bar. A header (the logo in its violet square and the name; Skip and the round close
- * button), the step's content centered in the room left (it scrolls there when it is taller, so the
+ * button), under it the Notification while one shows (a refused add of the Packs), the step's
+ * content centered in the room left (it scrolls there when it is taller, so the
  * dots and the buttons always stay in view), three progress dots, each a button to its step, then
  * Back from the second step and the primary button in ink (the accent in dark) over the rest of the
  * width.
@@ -135,7 +187,7 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
  *
  * Presentation and keyboard only: the state, its recording and the finish are WelcomeHost's.
  */
-const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, onAction, onClose, context = 'popup', children }) => {
+const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, onAction, onClose, context = 'popup', notification, children }) => {
   // Read once: a setting changed while the Welcome is open never starts the opening fade late
   const [animated] = useState(() => !prefersReducedMotion());
   const closeName = context === 'sidepanel' ? 'Close side panel' : 'Close';
@@ -213,6 +265,11 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
             </button>
           </div>
         </header>
+
+        {/* The Notification, under the header: the room it takes comes from the step, whose own 12px
+            (py-3) stand between it and the title. Keyed by the step: the room a Notification took stays
+            until the step changes */}
+        {notification !== undefined && <NotificationSlot key={step}>{notification}</NotificationSlot>}
 
         {/* The step slot: centered in the room left, scrolling there when taller. Clipped sideways for
             the slide, at the screen's edge rather than the content's (-mx/px), so a card's shadow fades

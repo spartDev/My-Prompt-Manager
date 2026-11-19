@@ -92,7 +92,8 @@ export const useToast = (): UseToastReturn => {
       type,
       duration: options.duration ?? (isFailure(type) ? TOAST_DURATION.failure : TOAST_DURATION.confirmation),
       action: options.action,
-      ...(options.whole === true ? { whole: true } : {})
+      ...(options.whole === true ? { whole: true } : {}),
+      ...(options.focusAction === true ? { focusAction: true } : {})
     };
 
     // A new Notification replaces the one on screen, and its own time starts
