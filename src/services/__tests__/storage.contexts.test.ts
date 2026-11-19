@@ -118,6 +118,28 @@ describe('StorageManager across contexts', () => {
     expect(stored).toContainEqual(saved);
   });
 
+  // My-Prompt-Manager-ou48: the read skips the entries that are not a Category, but the default
+  // Category it writes goes before the whole stored list, read again under the lock
+  it('a Category list read in the popup over malformed entries, with no default Category stored, cannot drop a Category the service worker adds meanwhile, nor a malformed entry', async () => {
+    const work = { id: 'work', name: 'Work', color: '#DB2777' };
+    const nameless = { id: 'nameless' };
+    await chrome.storage.local.set({ categories: [null, work, nameless] });
+    const worker = context();
+    const popup = context();
+    slowRead('categories'); // the popup's read, made first, returns after the worker's write
+
+    const [read] = await Promise.all([
+      popup.getCategories(),
+      worker.addPacks([{ id: 'product', name: 'Product', color: '#2563EB', defaultSelected: true, prompts: [{ title: 'User story', content: 'Write a user story.' }] }])
+    ]);
+
+    const stored = (await chrome.storage.local.get('categories')).categories as unknown[];
+    const [created, ...rest] = stored;
+    expect(created).toEqual({ id: expect.any(String), name: DEFAULT_CATEGORY });
+    expect(rest).toEqual([null, work, nameless, { id: expect.any(String), name: 'Product', color: '#2563EB' }]);
+    expect(read).toEqual([created, work, stored[4]]);
+  });
+
   it('a Category list read takes no lock when the default Category is stored', async () => {
     uninstall();
     const locks = new FakeLockManager();

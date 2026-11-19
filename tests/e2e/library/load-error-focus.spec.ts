@@ -1,0 +1,192 @@
+/**
+ * E2E: where the keyboard is after Try again on Error Loading Data (My-Prompt-Manager-ou48, AC1), on
+ * the built extension, at an ordinary opening of the popup (a Library with Prompts, the Welcome
+ * finished long ago). chrome.storage.local.get is patched from the page's first script: its first
+ * reads of the Prompts reject, as many as the test says, then the reads go through.
+ *
+ * - Read failing twice (the opening and the first Try again): Enter on Try again leaves the keyboard on
+ *   Try again, its focus ring (focus-primary) drawn whole, read back from the pixels; the screen never
+ *   gives way on the way. The next Try again brings the Library.
+ * - Read failing once: Enter on Try again brings the Library, the keyboard on its active Library filter,
+ *   All, drawn as :focus-visible.
+ * - In both, the document never has the keyboard from the first Enter on: an in-page probe reads
+ *   document.activeElement at every animation frame and at every change of the document.
+ *
+ * Light and dark, popup 400 x 500. Screenshots in LOAD_ERROR_FOCUS_SCREENSHOTS
+ * (test-results/load-error-focus when unset): try-again-failed-again-<theme>.png (the keyboard on Try
+ * again after a Try again that failed) and library-back-<theme>.png (the keyboard on All).
+ */
+import fs from 'node:fs/promises';
+import path from 'node:path';
+
+import type { Page } from '@playwright/test';
+
+import { DEFAULT_SETTINGS } from '../../../src/types';
+import { expect, test } from '../fixtures/extension';
+import { focusRingOf, RING_TOLERANCE, ringSides } from '../utils/focusRing';
+import { createCategorySeed, createPromptSeed, seedLibrary } from '../utils/storage';
+
+const SCREENSHOTS_DIR = process.env.LOAD_ERROR_FOCUS_SCREENSHOTS ?? 'test-results/load-error-focus';
+
+const WIDTH = 400;
+const HEIGHT = 500;
+
+/** The ring of focus-primary: a 2px outline, 2px off the button */
+const PRIMARY_RING = { width: 2, offset: 2 };
+
+const ERROR_TITLE = 'Error Loading Data';
+const READ_FAILURE = 'forced: the Prompts could not be read';
+
+const PROMPTS = [
+  createPromptSeed({ id: 'draft-email', title: 'Draft email', category: 'Work' }),
+  createPromptSeed({ id: 'summarize', title: 'Summarize', category: 'Writing' }),
+  createPromptSeed({ id: 'standup', title: 'Standup notes' })
+];
+const CATEGORIES = [
+  createCategorySeed({ id: 'cat-work', name: 'Work', color: '#3B82F6' }),
+  createCategorySeed({ id: 'cat-writing', name: 'Writing', color: '#10B981' })
+];
+
+/** What the patch of the page records: how many reads of the Prompts it made fail */
+interface ReadFailure {
+  rejected: number;
+}
+
+/** In the page, before its own scripts: the first `count` reads of the Prompts reject; every other read goes through */
+const failThePromptsReads = ({ message, count }: { message: string; count: number }): void => {
+  const state: ReadFailure = { rejected: 0 };
+  (window as Window & { __promptsReads?: ReadFailure }).__promptsReads = state;
+  const local = chrome.storage.local;
+  const get = local.get.bind(local) as (keys?: unknown) => Promise<Record<string, unknown>>;
+  (local as unknown as { get: (keys?: unknown) => Promise<Record<string, unknown>> }).get = (keys) => {
+    const names = keys === null || keys === undefined ? [] : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
+    if (names.includes('prompts') && state.rejected < count) {
+      state.rejected += 1;
+      return Promise.reject(new Error(message));
+    }
+    return get(keys);
+  };
+};
+
+const rejectedReads = (page: Page): Promise<number | undefined> =>
+  page.evaluate(() => (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.rejected);
+
+/** What the probe saw: how many times it read the keyboard, and the times the document had it */
+interface FocusProbe {
+  samples: number;
+  onDocument: string[];
+}
+
+/**
+ * In the page: from now on, reads document.activeElement at every animation frame and after every
+ * change of the document, and notes each time the keyboard is on no element (the body)
+ */
+const watchTheKeyboard = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    const probe: FocusProbe = { samples: 0, onDocument: [] };
+    (window as Window & { __focusProbe?: FocusProbe }).__focusProbe = probe;
+    const read = (when: string): void => {
+      probe.samples += 1;
+      const active = document.activeElement;
+      if (active === null || active === document.body) {
+        probe.onDocument.push(`${when} at ${String(Math.round(performance.now()))}ms`);
+      }
+    };
+    new MutationObserver(() => { read('a change of the document'); }).observe(document.body, { childList: true, subtree: true, attributes: true });
+    const frame = (): void => {
+      read('a frame');
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+
+const focusProbe = (page: Page): Promise<FocusProbe | undefined> =>
+  page.evaluate(() => (window as Window & { __focusProbe?: FocusProbe }).__focusProbe);
+
+/** Resolves once every finite animation of the page has ended */
+const animationsDone = (page: Page): Promise<void> =>
+  page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.timeline instanceof DocumentTimeline && animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    );
+  });
+
+test.describe('Error Loading Data: the keyboard after Try again', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const failures of [2, 1] as const) {
+      const title = failures === 2
+        ? `the Prompts read fails twice (${theme}): Enter on Try again, refused again, leaves the keyboard on Try again with its ring drawn whole; the next Try again brings the Library, the keyboard on All; never on the document`
+        : `the Prompts read fails once (${theme}): Enter on Try again brings the Library, the keyboard on its active Library filter, All; never on the document`;
+      test(title, async ({ page, storage, extensionId }) => {
+        await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.addInitScript(failThePromptsReads, { message: READ_FAILURE, count: failures });
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+        await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+        if (theme === 'dark') {
+          await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+        } else {
+          await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+        }
+
+        const heading = page.getByRole('heading', { name: ERROR_TITLE });
+        const tryAgain = page.getByRole('button', { name: 'Try again' });
+        await expect(heading).toBeVisible();
+        await expect(page.getByText(READ_FAILURE)).toBeVisible();
+        expect(await rejectedReads(page)).toBe(1);
+
+        // A keyboard user: Tab to Try again, then Enter
+        await page.keyboard.press('Tab');
+        await expect(tryAgain).toBeFocused();
+        await watchTheKeyboard(page);
+        await page.keyboard.press('Enter');
+        await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+
+        if (failures === 2) {
+          await expect.poll(() => rejectedReads(page)).toBe(2);
+          // Refused again: the screen, its Try again with the keyboard, the ring of focus-primary drawn whole
+          await expect(heading).toBeVisible();
+          await expect(tryAgain).toBeFocused();
+          expect(await tryAgain.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+          await expect(page.getByTestId('prompt-card')).toHaveCount(0);
+          // The Primary Button's transition-all brings the ring in over 200ms: read it once drawn
+          await animationsDone(page);
+          await page.mouse.move(2, HEIGHT - 2);
+          const ring = await focusRingOf(tryAgain);
+          expect({ style: ring.style, width: ring.width, reach: ring.reach }).toEqual({ style: 'solid', width: PRIMARY_RING.width, reach: PRIMARY_RING.width + PRIMARY_RING.offset });
+          const sides = await ringSides(page, ring);
+          test.info().annotations.push({ type: 'ring', description: JSON.stringify({ theme, color: ring.color, sides }) });
+          for (const side of sides) {
+            expect(side.worst, `the Try again ring's ${side.side} side, drawn in ${ring.color}`).toBeLessThanOrEqual(RING_TOLERANCE);
+          }
+          await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `try-again-failed-again-${theme}.png`) });
+
+          await page.keyboard.press('Enter');
+        }
+
+        // The Library back: its Prompts, and the keyboard on All, the active Library filter
+        await expect(page.getByTestId('prompt-card')).toHaveCount(PROMPTS.length);
+        await expect(heading).toHaveCount(0);
+        const all = page.getByRole('radio', { name: 'All' });
+        await expect(all).toBeFocused();
+        await expect(all).toBeChecked();
+        expect(await all.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+        expect(await rejectedReads(page)).toBe(failures);
+
+        const probe = await focusProbe(page);
+        test.info().annotations.push({ type: 'keyboard', description: JSON.stringify({ theme, failures, ...probe }) });
+        expect(probe?.samples).toBeGreaterThan(0);
+        expect(probe?.onDocument, 'the reads of document.activeElement that found the keyboard on the document').toEqual([]);
+
+        if (failures === 1) {
+          await animationsDone(page);
+          await page.mouse.move(2, HEIGHT - 2);
+          await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `library-back-${theme}.png`) });
+        }
+      });
+    }
+  }
+});

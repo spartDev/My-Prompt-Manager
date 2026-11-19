@@ -445,6 +445,60 @@ describe('StorageManager', () => {
         expect((result.prompts as Prompt[]).find(p => p.id === 'in-work')?.category).toBe(DEFAULT_CATEGORY);
       });
     });
+
+    // My-Prompt-Manager-ou48: a stored entry that is not a Category is skipped, as readPrompts skips
+    // what is not a Prompt, so the read neither throws (Error Loading Data at every opening) nor hands
+    // the render an entry it cannot draw (a TypeError)
+    describe('reading Categories that storage holds malformed', () => {
+      const uncategorized: Category = { id: 'default', name: DEFAULT_CATEGORY };
+      const work: Category = { id: 'work', name: 'Work', color: '#DB2777' };
+      const notes: Category = { id: 'notes', name: 'Notes', color: '#0F766E' };
+
+      const storedCategories = async (): Promise<unknown> => (await chrome.storage.local.get('categories')).categories;
+
+      it.each<{ stored: string; value: unknown[] }>([
+        { stored: '[null, Uncategorized, Work]', value: [null, uncategorized, work] },
+        { stored: '[Uncategorized, null, Work]', value: [uncategorized, null, work] },
+        { stored: '[Uncategorized, an entry without a name, Work]', value: [uncategorized, { id: 'nameless', color: '#0F766E' }, work] },
+        { stored: '[an entry whose name is a number, Uncategorized, Work]', value: [{ id: 'numbered', name: 42 }, uncategorized, work] },
+        { stored: '[Uncategorized, a string, Work, a list]', value: [uncategorized, 'Notes', work, ['Notes']] }
+      ])('$stored reads as Uncategorized and Work, and writes nothing', async ({ value }) => {
+        await chrome.storage.local.set({ categories: value });
+        vi.mocked(chrome.storage.local.set).mockClear();
+
+        const categories = await storageManager.getCategories();
+
+        // Every field as stored, in the stored order: nothing renamed, recoloured or reordered
+        expect(categories).toEqual([uncategorized, work]);
+        expect(chrome.storage.local.set).not.toHaveBeenCalled();
+        expect(await storedCategories()).toEqual(value);
+      });
+
+      it('a stored value that is not a list reads as no Categories: the default Category alone, written as for an empty store', async () => {
+        await chrome.storage.local.set({ categories: { id: 'work', name: 'Work' } });
+
+        const categories = await storageManager.getCategories();
+
+        expect(categories).toEqual([{ id: expect.any(String), name: DEFAULT_CATEGORY }]);
+        expect(await storedCategories()).toEqual(categories);
+      });
+
+      it('without the default Category stored: it is written first, every stored entry kept after it in its order, the malformed ones as they are', async () => {
+        const nameless = { id: 'nameless' };
+        await chrome.storage.local.set({ categories: [null, work, nameless, notes] });
+
+        const categories = await storageManager.getCategories();
+
+        const created = categories[0];
+        expect(categories).toEqual([{ id: expect.any(String), name: DEFAULT_CATEGORY }, work, notes]);
+        expect(await storedCategories()).toEqual([created, null, work, nameless, notes]);
+
+        // Read again: the same default Category, nothing written
+        vi.mocked(chrome.storage.local.set).mockClear();
+        expect(await storageManager.getCategories()).toEqual([created, work, notes]);
+        expect(chrome.storage.local.set).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('Race Condition Prevention', () => {

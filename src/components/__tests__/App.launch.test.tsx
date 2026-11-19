@@ -258,6 +258,73 @@ describe('App: what an opening shows first', () => {
     await expectWelcomeAlone(1);
   });
 
+  // My-Prompt-Manager-ou48, AC3: what a step change or a Pack toggle whose write is lost (the popup
+  // closed before the write is issued) does at the next opening. The next opening shows what the last
+  // write that landed recorded: for Next, one step earlier than the step left on screen; for Back, one
+  // step later; for Skip or a dot, the step left; for a Pack toggle, the same step with the selection
+  // from before the toggle
+  describe('a write of the Welcome lost to a popup closed early', () => {
+    /** The next write of the Welcome record is attempted and never lands, as when the popup closes before it is issued */
+    const loseTheNextWelcomeWrite = (): (() => boolean) => {
+      const write = vi.mocked(chrome.storage.local.set).getMockImplementation() as unknown as (items: Record<string, unknown>) => Promise<void>;
+      let lost = false;
+      vi.mocked(chrome.storage.local.set).mockImplementation(async (items: Record<string, unknown>) => {
+        if (!lost && WELCOME_KEY in items) {
+          lost = true;
+          return;
+        }
+        await write(items);
+      });
+      return () => lost;
+    };
+
+    const selectedPacks = (): string[] =>
+      screen.getAllByRole('button', { pressed: true }).map((pack) => pack.textContent?.replace(/\d+ prompts$/, '').trim() ?? '');
+
+    it.each<{ action: string; record: WelcomeRecord; act: () => void; shownAfter: number; reopensAt: number }>([
+      { action: 'Next', record: { status: 'pending', step: 1 }, act: () => { fireEvent.click(screen.getByTestId('welcome-primary')); }, shownAfter: 2, reopensAt: 1 },
+      { action: 'Back', record: { status: 'pending', step: 2 }, act: () => { fireEvent.click(screen.getByRole('button', { name: 'Back' })); }, shownAfter: 1, reopensAt: 2 },
+      { action: 'Skip', record: { status: 'pending', step: 0 }, act: () => { fireEvent.click(screen.getByRole('button', { name: 'Skip' })); }, shownAfter: 2, reopensAt: 0 },
+      { action: 'a dot', record: { status: 'pending', step: 2 }, act: () => { fireEvent.click(screen.getByRole('button', { name: 'Step 1 of 3' })); }, shownAfter: 0, reopensAt: 2 }
+    ])('$action: the next opening shows the step recorded before it', async ({ record, act: press, shownAfter, reopensAt }) => {
+      await openingOver({ prompts: [], welcome: record, installedVersion: '2.0.0' });
+      const { unmount } = render(<App />);
+      await expectWelcomeAlone(record.status === 'pending' ? record.step : 0);
+      const lost = loseTheNextWelcomeWrite();
+
+      press();
+
+      expect(screen.getByTestId('welcome')).toHaveAttribute('data-welcome-step', String(shownAfter));
+      await waitFor(() => { expect(lost()).toBe(true); });
+      expect((await chrome.storage.local.get(WELCOME_KEY))[WELCOME_KEY]).toEqual(record);
+
+      unmount();
+      render(<App />);
+      await expectWelcomeAlone(reopensAt);
+    });
+
+    it.each<{ recorded: string; record: WelcomeRecord; toggle: string; before: string[] }>([
+      { recorded: 'no selection recorded', record: { status: 'pending', step: 2 }, toggle: 'Writing', before: ['Product', 'Writing'] },
+      { recorded: 'a selection recorded', record: { status: 'pending', step: 2, packs: ['engineering'] }, toggle: 'Hiring', before: ['Engineering'] }
+    ])('a Pack toggle, $recorded: the next opening shows the same step with the selection from before the toggle', async ({ record, toggle, before }) => {
+      await openingOver({ prompts: [], welcome: record, installedVersion: '2.0.0' });
+      const { unmount } = render(<App />);
+      await expectWelcomeAlone(2);
+      expect(selectedPacks()).toEqual(before);
+      const lost = loseTheNextWelcomeWrite();
+
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${toggle} `) }));
+
+      expect(selectedPacks()).not.toEqual(before);
+      await waitFor(() => { expect(lost()).toBe(true); });
+
+      unmount();
+      render(<App />);
+      await expectWelcomeAlone(2);
+      expect(selectedPacks()).toEqual(before);
+    });
+  });
+
   it('Skip, then the primary button of the last step: the Welcome finished and recorded, the Library shown, in two actions', async () => {
     await openingOver({ prompts: [], welcome: { status: 'pending', step: 0 }, installedVersion: '2.0.0' });
     render(<App />);

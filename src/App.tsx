@@ -535,14 +535,44 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const loading = promptsLoading || categoriesLoading;
 
-  // Try again on Error Loading Data: the Prompts and the Categories read again. Each read clears its
-  // error as it starts, so the Library comes back once both work, and the screen with its Try again
-  // once more while one still fails. Nothing else is redone: after the Welcome's Packs, the add has
-  // resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
+  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
+  // Packs were stored: Error Loading Data, with Try again as the way on (CR26 of PR #607)
+  const loadError = promptsError ?? categoriesError;
+  // While Try again reads the Library, the error it is trying past: each read clears its own error as
+  // it starts, and the screen stays on this one until both have ended, so its Try again keeps the
+  // keyboard and nothing of the Library shows on the way (My-Prompt-Manager-ou48)
+  const [retryError, setRetryError] = useState<AppError | null>(null);
+  const retrying = useRef(false);
+  const shownLoadError = loadError ?? retryError;
+  // The Section back after Error Loading Data, other than the Library: its tab takes the keyboard
+  const [focusSectionTab, setFocusSectionTab] = useState(false);
+  const handleSectionTabFocused = useCallback(() => { setFocusSectionTab(false); }, []);
+
+  // Try again on Error Loading Data: the Prompts and the Categories read again. Once both have ended,
+  // the Section comes back if both worked, else the screen with the new error, its Try again still
+  // with the keyboard. Nothing else is redone: after the Welcome's Packs, the add has resolved and the
+  // Welcome is finished (My-Prompt-Manager-ojz.22). The Try again pressed leaves with the screen, so
+  // the keyboard is asked where it goes, never left on the document (My-Prompt-Manager-ou48): in the
+  // Library, which a normal opening leaves with the keyboard on no control, its active Library filter
+  // (All, as at every opening), or with no Prompt the main action of its empty state, the place the
+  // Library gives the keyboard when the control that had it leaves; the first Prompt's Copy instead
+  // when the Welcome's exit asked for it and the Library has not shown since; another Section, its tab
   const retryLoad = useCallback(() => {
-    void refreshPrompts();
-    void refreshCategories();
-  }, [refreshPrompts, refreshCategories]);
+    if (retrying.current || loadError === null) {
+      return;
+    }
+    retrying.current = true;
+    setRetryError(loadError);
+    if (currentView !== 'library') {
+      setFocusSectionTab(true);
+    } else if (!focusFirstPrompt) {
+      setFocusLibraryFilter(true);
+    }
+    void Promise.all([refreshPrompts(), refreshCategories()]).finally(() => {
+      retrying.current = false;
+      setRetryError(null);
+    });
+  }, [loadError, currentView, focusFirstPrompt, refreshPrompts, refreshCategories]);
 
   // Until the opening knows what it shows, only the background: the Library never flashes before the Welcome
   if (launch.loading) {
@@ -578,17 +608,15 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
-  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
-  // Packs were stored: Try again is the way on, so no one is left on a screen with nothing to do but
+  // Error Loading Data: Try again is the way on, so no one is left on a screen with nothing to do but
   // close it, nor on a Library that lacks its Categories and says nothing (CR26 of PR #607)
-  const loadError = promptsError ?? categoriesError;
-  if (loadError) {
+  if (shownLoadError) {
     return (
       <ThemeProvider>
         <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
-            <p className="text-secondary">{loadError.message}</p>
+            <p className="text-secondary">{shownLoadError.message}</p>
             {/* The Primary Button of docs/DESIGN_GUIDELINES.md */}
             <button
               type="button"
@@ -693,7 +721,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
       </div>
 
-      <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
+      <TabBar
+        activeSection={currentView}
+        onSelect={handleSelectSection}
+        inert={categorySheetOpen}
+        focusActive={focusSectionTab}
+        onFocusActiveDone={handleSectionTabFocused}
+      />
       </div>
 
       {editorSheet.shown && (

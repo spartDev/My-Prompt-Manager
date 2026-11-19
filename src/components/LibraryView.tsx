@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { DEFAULT_SETTINGS } from '../constants';
 import {
@@ -69,9 +69,10 @@ const LibraryView: FC<LibraryViewProps> = ({
   }, [libraryEmpty, query, clearSearch, libraryFilter, onLibraryFilterChange]);
 
   // The Library filter takes the keyboard when the Prompt that had it is gone. With the last Prompt
-  // there is no filter left: the main action of the empty state takes it instead
+  // there is no filter left: the main action of the empty state takes it instead. In the commit that
+  // shows it, as the Library filter's pill, so the keyboard is never on the document in between
   const writeFirstRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (libraryEmpty && focusLibraryFilter) {
       writeFirstRef.current?.focus();
       onLibraryFilterFocused?.();
@@ -90,9 +91,10 @@ const LibraryView: FC<LibraryViewProps> = ({
 
   // After the Welcome's exit with Packs, the keyboard goes to the first card's Copy as the cards are
   // listed, so one Enter copies that Prompt; its name says which. Only when the keyboard is on no
-  // element: one the user has already reached keeps it. Asked once, whatever happens
+  // element: one the user has already reached keeps it. Asked once, whatever happens. In the commit
+  // that lists the cards, so the keyboard is never on the document in between
   const firstCopyRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!focusFirstPrompt || loading) { return; }
     const active = document.activeElement;
     if (active === null || active === document.body) {

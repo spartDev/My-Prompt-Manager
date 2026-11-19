@@ -1,5 +1,5 @@
 import type { FC, KeyboardEvent } from 'react';
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import { AnalyticsTabIcon, CategoriesTabIcon, LibraryTabIcon, SettingsTabIcon } from './icons/TabBarIcons';
 
@@ -22,14 +22,28 @@ export interface TabBarProps {
   onSelect: (section: Section) => void;
   /** Behind a modal sheet: out of reach, assistive technology included, until it closes */
   inert?: boolean;
+  /**
+   * Asks the active tab to take the keyboard, then says it is done (onFocusActiveDone): App asks it
+   * when a Section other than the Library comes back after Error Loading Data (My-Prompt-Manager-ou48)
+   */
+  focusActive?: boolean;
+  onFocusActiveDone?: () => void;
 }
 
 /**
  * iOS-style bottom tab bar switching between the four Sections.
  * Implements the WAI-ARIA tabs pattern: roving tabindex and arrow-key navigation.
  */
-const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false }) => {
+const TabBar: FC<TabBarProps> = ({ activeSection, onSelect, inert = false, focusActive = false, onFocusActiveDone }) => {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeIndex = TABS.findIndex(({ section }) => section === activeSection);
+
+  // In the commit that shows the tab bar, so the keyboard is never on the document in between
+  useLayoutEffect(() => {
+    if (!focusActive) { return; }
+    tabRefs.current[activeIndex]?.focus();
+    onFocusActiveDone?.();
+  }, [focusActive, activeIndex, onFocusActiveDone]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex: number | null = null;

@@ -9,6 +9,7 @@
  * stored.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
@@ -274,6 +275,47 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
       expect(errors).not.toHaveBeenCalled();
+    });
+  });
+
+  // My-Prompt-Manager-ou48, AC4: Start empty at a first opening whose read of the Categories failed.
+  // The Welcome hides the failure, so Start empty leaves it for Error Loading Data, and the editor it
+  // opens 250ms later waits behind that screen. Try again leads where Start empty leads: the empty
+  // Library with the editor on a new Prompt, the keyboard in its title field. No dead end
+  describe('Start empty at a first opening whose Categories read failed (My-Prompt-Manager-ou48, AC4)', () => {
+    it('Error Loading Data with Try again, the Welcome done; Try again: the empty Library, the editor on a new Prompt, the keyboard in its title field', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2, packs: [] } });
+      getMockStorageManager().getCategories.mockRejectedValueOnce(new Error('Storage could not be read'));
+      await openWelcome(2);
+      expect(primary()).toHaveTextContent('Start empty');
+      const user = userEvent.setup();
+      primary().focus();
+
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findByRole('heading', { name: 'Error Loading Data' })).toBeInTheDocument();
+      expect(screen.getByText('Storage could not be read')).toBeInTheDocument();
+      await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
+      // The editor's 250ms go by: it waits behind the screen, which stays
+      await settle(MOTION.welcomeEditorDelay + 50);
+      expect(screen.getByRole('heading', { name: 'Error Loading Data' })).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
+      const tryAgain = screen.getByRole('button', { name: 'Try again' });
+      await user.tab();
+      expect(tryAgain).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+
+      const editor = await screen.findByTestId('editor-sheet');
+      expect(screen.queryByRole('heading', { name: 'Error Loading Data' })).not.toBeInTheDocument();
+      expect(screen.getByText('Your library is empty')).toBeInTheDocument();
+      const title = within(editor).getByLabelText(/title/i);
+      expect(title).toHaveValue('');
+      await waitFor(() => { expect(title).toHaveFocus(); });
+      await settle();
+      expect(title).toHaveFocus();
+      expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+      expect(getMockStorageManager().addPacks).not.toHaveBeenCalled();
     });
   });
 
@@ -601,6 +643,43 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
+    });
+
+    // My-Prompt-Manager-ou48, AC1: the exit of the Welcome asked the keyboard for the first Prompt's
+    // Copy, and the Library has not shown since: Try again from the keyboard gives it there
+    it('Try again from the keyboard, the Library read: the keyboard on the first Prompt\'s Copy, where the Welcome\'s exit puts it', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      readsFailOnceAfterTheAdd(['getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      act(() => { tryAgain.focus(); });
+
+      await user.keyboard('{Enter}');
+
+      const cards = await screen.findAllByTestId('prompt-card');
+      const title = within(cards[0]).getByRole('heading').textContent ?? '';
+      await waitFor(() => { expect(within(cards[0]).getByRole('button', { name: `Copy content of ${title} to clipboard` })).toHaveFocus(); });
+    });
+
+    it('Try again from the keyboard, the read failing again: the keyboard stays on Try again', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      readsFailOnceAfterTheAdd(['getPrompts', 'getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      act(() => { tryAgain.focus(); });
+      const getPrompts = vi.mocked(getMockStorageManager().getPrompts);
+      const readsBefore = getPrompts.mock.calls.length;
+
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
+      await settle();
+      expect(screen.getByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
     });
 
     // CR26 of PR #607: the Categories are part of the Library's read
