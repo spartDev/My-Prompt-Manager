@@ -9,7 +9,6 @@ import SettingsView from './components/SettingsView';
 import StorageWarning from './components/StorageWarning';
 import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
-import { WELCOME_CLOSE_ROOM } from './components/welcome/WelcomeFrame';
 import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -21,7 +20,7 @@ import { useLaunchScreen } from './hooks/useLaunchScreen';
 import { usePrompts } from './hooks/usePrompts';
 import { useSearchWithDebounce } from './hooks/useSearchWithDebounce';
 import { useToast } from './hooks/useToast';
-import { useWelcomeExit } from './hooks/useWelcomeExit';
+import { isAddFailure, useWelcomeExit } from './hooks/useWelcomeExit';
 import { ALL_PROMPTS } from './services/libraryFilter';
 import { onLibraryReviewRequested, takePendingLibraryReview } from './services/libraryReview';
 import { MOTION } from './theme/motion';
@@ -464,6 +463,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     showToast,
     hideNotification: hideShownToast
   });
+  // A Pack toggled after a refused add: the failure Notification goes, its Try again being about the
+  // Packs refused; the primary button, which follows the selection, is the way on. Only that
+  // Notification: a toggle hides no other (My-Prompt-Manager-5lf)
+  const hideAddFailure = useCallback(() => {
+    if (isAddFailure(toast)) {
+      hideToast(toast.id);
+    }
+  }, [toast, hideToast]);
 
   // A review asked from the full-page Analytics view opens the side panel and waits in session
   // storage: the side panel takes it, on opening or while it is already open
@@ -536,9 +543,11 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   }
 
   // The Welcome fills the popup or side panel, without the tab bar: nothing of the Library is rendered
-  // behind it. Its Notification shows over it: a refused add of the Packs keeps the Welcome on screen.
-  // That one is read whole (wrapped where the room is short) and clear of the close button, at 320px
-  // wide too; it belongs to the last step, so a step change hides it (My-Prompt-Manager-ojz.20)
+  // behind it. Its Notification shows in it: a refused add of the Packs keeps the Welcome on screen.
+  // That one is read whole (wrapped where the room is short) and takes room under the header, so it
+  // covers neither the brand, the close button nor the step's title, at 320px wide too
+  // (My-Prompt-Manager-5lf); it belongs to the last step, so a step change hides it
+  // (My-Prompt-Manager-ojz.20), and so does a Pack toggled
   if (launch.screen.kind === 'welcome') {
     return (
       <ThemeProvider>
@@ -549,9 +558,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           finishWelcome={launch.finishWelcome}
           onFinish={leaveWelcome}
           onStepChange={hideShownToast}
+          onPacksChange={hideAddFailure}
+          notification={<ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} wrap inFlow />}
           context={context}
         />
-        <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} wrap clearRight={WELCOME_CLOSE_ROOM} />
       </ThemeProvider>
     );
   }

@@ -23,18 +23,18 @@ export interface WelcomeFrameProps {
   /** The round close button: closes the popup or the side panel, the Welcome left unfinished */
   onClose: () => void;
   context?: 'popup' | 'sidepanel';
+  /**
+   * The Notification over the Welcome (App's ToastContainer, in the flow): it takes room under the
+   * header, 8px below it, and the step gives way below it, so it covers neither the brand, the close
+   * button nor the step's title, at 320px wide too (My-Prompt-Manager-5lf). With no Notification on
+   * screen it takes no room
+   */
+  notification?: ReactNode;
   /** The step's content, in the step slot; its title is a WelcomeTitle, which takes the keyboard after a step change */
   children: ReactNode;
 }
 
 const STEPS: readonly WelcomeStep[] = [0, 1, 2];
-
-/**
- * The pixels at the right of the screen that the round close button and the room around it take: the
- * frame's side padding (18), the button (32) and a gap of 8. A Notification over the Welcome leaves
- * them free (ToastContainer's clearRight), so it never covers the close button, at 320px wide too
- */
-export const WELCOME_CLOSE_ROOM = 18 + 32 + 8;
 
 /** "Step 2 of 3": a dot's name, and what a step change announces */
 const stepName = (step: WelcomeStep): string => `Step ${String(step + 1)} of ${String(STEP_COUNT)}`;
@@ -120,7 +120,8 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
 /**
  * The frame of the Welcome (Atelier 1C 'Premier lancement'): it fills the popup or the side panel,
  * with no tab bar. A header (the logo in its violet square and the name; Skip and the round close
- * button), the step's content centered in the room left (it scrolls there when it is taller, so the
+ * button), under it the Notification while one shows (a refused add of the Packs), the step's
+ * content centered in the room left (it scrolls there when it is taller, so the
  * dots and the buttons always stay in view), three progress dots, each a button to its step, then
  * Back from the second step and the primary button in ink (the accent in dark) over the rest of the
  * width.
@@ -135,7 +136,7 @@ const StepSlot: FC<{ direction: WelcomeDirection; animated: boolean; children: R
  *
  * Presentation and keyboard only: the state, its recording and the finish are WelcomeHost's.
  */
-const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, onAction, onClose, context = 'popup', children }) => {
+const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, onAction, onClose, context = 'popup', notification, children }) => {
   // Read once: a setting changed while the Welcome is open never starts the opening fade late
   const [animated] = useState(() => !prefersReducedMotion());
   const closeName = context === 'sidepanel' ? 'Close side panel' : 'Close';
@@ -213,6 +214,10 @@ const WelcomeFrame: FC<WelcomeFrameProps> = ({ step, direction, primaryLabel, on
             </button>
           </div>
         </header>
+
+        {/* The Notification, under the header: the room it takes comes from the step, whose own 12px
+            (py-3) stand between it and the title. Empty, the slot takes none */}
+        {notification !== undefined && <div className="flex-none pt-2 empty:hidden">{notification}</div>}
 
         {/* The step slot: centered in the room left, scrolling there when taller. Clipped sideways for
             the slide, at the screen's edge rather than the content's (-mx/px), so a card's shadow fades

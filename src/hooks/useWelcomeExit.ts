@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import type { AddPacksResult } from '../services/storage';
 import { MOTION } from '../theme/motion';
-import type { ShowToast } from '../types/hooks';
+import type { ShowToast, Toast } from '../types/hooks';
 import { Logger, toError } from '../utils';
 import { PACKS } from '../welcome/packs';
 import type { PromptPack } from '../welcome/types';
@@ -60,6 +60,14 @@ const ADD_FAILED = "Couldn't add the prompts";
 const TRY_AGAIN = 'Try again';
 
 /**
+ * Whether the Notification on screen is the failure Notification of a refused add, the only one a
+ * Pack toggled hides (App's onPacksChange): once the selection changes, its Try again would add the
+ * Packs refused, no longer the ones on screen (My-Prompt-Manager-5lf). No other Notification is
+ * hidden by a toggle
+ */
+export const isAddFailure = (toast: Toast | null): toast is Toast => toast?.type === 'error' && toast.message === ADD_FAILED;
+
+/**
  * The way out of the Welcome: what the primary button of its last step does with the ids of the Packs
  * selected (architecture A8 of My-Prompt-Manager-ojz). With Packs that hold Prompts, the Packs are
  * added and the Library read again first; only then is the Welcome finished (so it is recorded done
@@ -74,7 +82,10 @@ const TRY_AGAIN = 'Try again';
  * calls this same exit with the same Packs, as the primary button does; the primary button tries
  * again too, and with every Pack unselected it reads Start empty. Each exit hides the Notification on
  * screen as it starts, so a failure Notification never stays over an add tried again, nor outlives
- * the Welcome with a Try again that would do nothing any more (My-Prompt-Manager-ojz.20). A press
+ * the Welcome with a Try again that would do nothing any more (My-Prompt-Manager-ojz.20). A Pack
+ * toggled hides it too (`isAddFailure`, which App's onPacksChange checks), its Try again being about
+ * the Packs refused; and a Try again refused again gives the keyboard to the new Notification's Try
+ * again, its own having left with the old one (My-Prompt-Manager-5lf). A press
  * while an exit is under way (a double click, Enter then a click) does nothing, so the Packs are
  * added once and the Welcome finished once. An add that lands after the unmount (the popup closed)
  * does nothing more: the next opening finds the Welcome pending over a Library with Prompts, which
@@ -127,10 +138,11 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     return true;
   }, []);
 
-  // The exit the primary button calls, for the Try again of a failure Notification to call it the same way
-  const exitRef = useRef<(packIds: readonly string[]) => void>(() => undefined);
+  // The exit the primary button calls, for the Try again of a failure Notification to call it the same
+  // way, saying so: its button leaves with the Notification, so a refusal hands the keyboard back
+  const exitRef = useRef<(packIds: readonly string[], fromTryAgain?: boolean) => void>(() => undefined);
 
-  const addThenLeave = useCallback(async (packIds: readonly string[], packs: readonly PromptPack[]): Promise<void> => {
+  const addThenLeave = useCallback(async (packIds: readonly string[], packs: readonly PromptPack[], fromTryAgain: boolean): Promise<void> => {
     let result: AddPacksResult;
     try {
       result = await latest.current.addPacks(packs);
@@ -144,15 +156,18 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
       }
       leaving.current = false;
       // No time of its own (duration 0): it stays until the user acts, so it is read whole and the
-      // retry stays within reach. Try again is the primary button's exit, with the same Packs
+      // retry stays within reach. Try again is the primary button's exit, with the same Packs. After a
+      // Try again, whose button left with its Notification, the new Try again takes the keyboard the
+      // pressed one had, rather than leave it on the body (My-Prompt-Manager-5lf)
       latest.current.showToast(ADD_FAILED, 'error', {
         duration: 0,
         action: {
           label: TRY_AGAIN,
           onClick: () => {
-            exitRef.current(packIds);
+            exitRef.current(packIds, true);
           }
-        }
+        },
+        ...(fromTryAgain ? { focusAction: true } : {})
       });
       return;
     }
@@ -168,7 +183,7 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     showToast(message, 'success', { sub, whole: true });
   }, []);
 
-  const exit = useCallback((packIds: readonly string[]): void => {
+  const exit = useCallback((packIds: readonly string[], fromTryAgain = false): void => {
     if (!begin()) {
       return;
     }
@@ -178,12 +193,15 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
       startEmpty();
       return;
     }
-    void addThenLeave(packIds, packs);
+    void addThenLeave(packIds, packs, fromTryAgain);
   }, [begin, startEmpty, addThenLeave]);
 
   useEffect(() => {
     exitRef.current = exit;
   }, [exit]);
 
-  return exit;
+  // The primary button's exit: never a Try again
+  return useCallback((packIds: readonly string[]): void => {
+    exit(packIds);
+  }, [exit]);
 };

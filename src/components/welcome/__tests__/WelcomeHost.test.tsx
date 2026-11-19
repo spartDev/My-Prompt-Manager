@@ -362,6 +362,53 @@ describe('Welcome frame', () => {
 
       expect(onStepChange.mock.calls).toEqual([[1], [0], [1]]);
     });
+
+    // App hides the failure Notification of a refused add there: its Try again was about the Packs before (My-Prompt-Manager-5lf)
+    it('says each Pack toggled to onPacksChange, the new selection with it; not a step change, the finish or the opening', async () => {
+      const onPacksChange = vi.fn<NonNullable<WelcomeHostProps['onPacksChange']>>();
+      const onFinish = vi.fn();
+      const { user } = renderWelcome({ step: 2, onPacksChange, onFinish });
+      expect(onPacksChange).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: /^Engineering / }));
+      await user.click(screen.getByRole('button', { name: /^Product / }));
+
+      expect(onPacksChange.mock.calls).toEqual([[[...DEFAULTS, 'engineering']], [[...DEFAULTS.filter((id) => id !== 'product'), 'engineering']]]);
+
+      await user.click(primary());
+      await user.click(back() as HTMLElement);
+      await user.click(dot(3));
+      fireEvent.keyDown(document, { key: 'ArrowLeft' });
+
+      expect(onFinish).toHaveBeenCalledTimes(1);
+      expect(onPacksChange).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // My-Prompt-Manager-5lf: the failure Notification of a refused add takes room under the header, so it
+  // covers neither the brand nor the step's title, 320px wide too
+  describe('the Notification slot', () => {
+    it('shows the Notification given under the header, before the step, in the frame\'s flow', () => {
+      renderWelcome({ step: 2, notification: <div data-testid="slot-notification">Couldn&apos;t add the prompts</div> });
+
+      const notification = screen.getByTestId('slot-notification');
+      const header = welcome().querySelector('header');
+      if (header === null) {
+        throw new Error('No header in the Welcome');
+      }
+      expect(welcome()).toContainElement(notification);
+      expect(header).not.toContainElement(notification);
+      expect(header.compareDocumentPosition(notification) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(notification.compareDocumentPosition(screen.getByTestId('welcome-step')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // 8px under the header; the step's own 12px stand between it and the title
+      expect(notification.parentElement).toHaveClass('flex-none', 'pt-2', 'empty:hidden');
+    });
+
+    it('takes no room with no Notification', () => {
+      renderWelcome({ step: 2 });
+
+      expect(welcome().querySelector('.empty\\:hidden')).toBeNull();
+    });
   });
 
   describe('AC3: no animation ever holds the primary button', () => {
