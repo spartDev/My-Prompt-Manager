@@ -19,20 +19,33 @@ import { TOAST_DURATION } from '../../hooks/useToast';
  *
  * Every Notification of src/ is shown through a ShowToast, under one of the names of SHOW_TOAST_NAMES:
  * the calls of those names are read, bare (`showToast(...)`) or read from a property
- * (`latest.current.showToast(...)`). Any other name a ShowToast is given is reported: a declaration
- * typed ShowToast, or a prop, a property, a renamed binding or an alias set to a ShowToast named bare
- * or read from a property (`const notify = latest.current.showToast`). The options are looked into,
- * through spreads of object literals (in parentheses, a conditional, `&&`, `||` or `??`): only a
- * `duration` they hold is recorded.
+ * (`latest.current.showToast(...)`, `latest.current?.showToast(...)`). A ShowToast given another name
+ * is reported in these forms, and only these:
+ * - a declaration whose type is written `ShowToast`: a property of an interface or a type, a class
+ *   field, a parameter or a variable (`notify: ShowToast`);
+ * - a variable under a plain name (`const`, `let` or `var`), an object literal's property or a JSX
+ *   prop, set to a ShowToast named bare or read from a property (`const notify =
+ *   latest.current.showToast`, `{ notify: showToast }`, `<Section notify={showToast} />`);
+ * - `showToast` or `onShowToast` destructured under another name (`const { showToast: notify } = props`).
+ * The options are looked into, through spreads of object literals (in parentheses, a conditional,
+ * `&&`, `||` or `??`): only a `duration` they hold is recorded.
  *
  * Known limits (a convention made executable, read from the syntax alone):
  * - A duration held in a name is read when the name is a module-level `const` set to a number and the
  *   module binds it nowhere else. Any other name (a shadow, a parameter, a const of a function, an
  *   import) is recorded by its name, and what it cannot see into (options or a spread held in a
  *   variable, a computed property name) is recorded as such: to be read by hand, never let through.
- * - Not seen: a ShowToast passed by position (`run(showToast)`) to a parameter that is not typed
- *   ShowToast, and one reached otherwise than by its name (`api['showToast']`, `showToast.bind(api)`,
- *   a cast or parentheses around it).
+ * - Not seen, among others:
+ *   - a ShowToast passed by position (`run(showToast)`) to a parameter not typed `ShowToast`;
+ *   - one given another name by an assignment (`notify = showToast`, `ref.current.notify =
+ *     showToast`), a default (`const { notify = showToast } = props`, a component's props included,
+ *     or a parameter's), a class field not typed `ShowToast`, an array destructuring
+ *     (`const [notify] = [showToast]`), or an import or export under another name
+ *     (`import { showToast as notify }`, `export { showToast as notify }`);
+ *   - one wrapped in an expression: parentheses, a cast, `!`, a conditional, `??` or `||`;
+ *   - one typed otherwise than `ShowToast` as written (`ShowToast | undefined`);
+ *   - one reached otherwise than by its name (`api['showToast']`, `showToast.bind(api)`);
+ *   - a call through `.call` or `.apply`, which is not read.
  */
 
 interface OwnDuration {
@@ -192,9 +205,10 @@ const isShowToastType = (type: ts.TypeNode | undefined): boolean =>
 const holdsShowToast = (expression: ts.Expression | undefined): boolean => expression !== undefined && isShowToast(expression);
 
 /**
- * Every name other than SHOW_TOAST_NAMES that a module gives a ShowToast, whose calls the scan would
- * not read: a declaration typed ShowToast, a prop or a property set to one, a renamed binding, an
- * alias; set to a ShowToast named bare or read from a property
+ * The names other than SHOW_TOAST_NAMES that a module gives a ShowToast, whose calls the scan would not
+ * read, in the forms the header lists as reported: a declaration typed `ShowToast`; a variable, an
+ * object literal's property or a JSX prop set to a ShowToast named bare or read from a property;
+ * `showToast` or `onShowToast` destructured under another name
  */
 function findOtherNames(filePath: string, contents: string): string[] {
   if (isTestPath(filePath)) {
