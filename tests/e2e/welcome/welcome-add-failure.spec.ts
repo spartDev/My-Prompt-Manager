@@ -16,6 +16,15 @@
  *
  * AC2 (the first add refused, Try again adds the same Packs once each) and Start empty from the step:
  * the last describe of scenarios.spec.ts, "Every way out of the Welcome".
+ *
+ * My-Prompt-Manager-5lf, no stale Try again:
+ * - AC1: a Pack toggled after a refused add hides the failure Notification, the keyboard stays on that
+ *   Pack, and the primary button adds exactly the Packs on screen.
+ * - AC2: in AC1's geometry above, the pill stands 8px or more from the step's title and covers no part
+ *   of the brand (the logo and the name), at 320 x 500 and 400 x 500 too, light and dark.
+ * - AC3: Enter on Try again, the add refused again: the keyboard is on the Try again of the failure
+ *   Notification now on screen, its ring drawn whole, never on the body. A seventh screenshot,
+ *   error-try-again-refused-again-focus-popup-400x500-light.png, in WELCOME_FAILURE_SCREENSHOTS.
  */
 import fs from 'node:fs/promises';
 
@@ -24,7 +33,9 @@ import type { Page } from '@playwright/test';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { PACKS } from '../../../src/welcome/packs';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
+import type { PromptPack } from '../../../src/welcome/types';
 import { expect, test } from '../fixtures/extension';
+import { type FocusRing, RING_TOLERANCE, ringSides } from '../utils/focusRing';
 import { backgroundWorker, emptyFiller, fillStorage } from '../utils/storageFiller';
 
 const SCREENSHOTS_DIR = process.env.WELCOME_FAILURE_SCREENSHOTS ?? 'test-results/welcome-add-failure';
@@ -43,6 +54,20 @@ type Theme = 'light' | 'dark';
 const welcome = (page: Page) => page.getByTestId('welcome');
 const primary = (page: Page) => page.getByTestId('welcome-primary');
 const notification = (page: Page) => page.getByTestId('toast');
+const tryAgain = (page: Page) => page.getByRole('alert').getByRole('button', { name: 'Try again' });
+/** A Pack's toggle, named "Product 5 prompts" */
+const packToggle = (page: Page, pack: PromptPack) => page.getByTestId('welcome-packs').getByRole('button', { name: new RegExp(`^${pack.name} `) });
+
+const packNamed = (name: string): PromptPack => {
+  const pack = PACKS.find((candidate) => candidate.name === name);
+  if (!pack) {
+    throw new Error(`No Pack named ${name}`);
+  }
+  return pack;
+};
+
+/** The pixels a pill and the step's title must keep between them (the guidelines' mb-2, "between related elements") */
+const TITLE_GAP_PX = 8;
 
 /** Resolves once every finite animation of the page has ended */
 const animationsDone = (page: Page): Promise<void> =>
@@ -74,8 +99,25 @@ const geometryOf = (page: Page, closeName: string) =>
     const pill = document.querySelector('[data-testid="toast"]');
     const message = document.querySelector('[data-testid="toast-message"]');
     const close = document.querySelector(`[data-testid="welcome"] header button[aria-label="${name}"]`);
+    // The brand: the logo in its violet square and the name, the header's first part
+    const brand = document.querySelector('[data-testid="welcome"] header > span');
+    const title = document.querySelector('[data-testid="welcome"] [data-welcome-title]');
     if (!(pill instanceof HTMLElement) || !(message instanceof HTMLElement) || !(close instanceof HTMLElement)) {
       throw new Error('No Notification, message or close button on the page');
+    }
+    if (!(brand instanceof HTMLElement) || !(title instanceof HTMLElement)) {
+      throw new Error('No brand or step title on the page');
+    }
+    // Every point of the brand drawn, about every 4px: each must be the brand's own, nothing over it
+    const brandBox = box(brand);
+    const brandCovered: string[] = [];
+    for (let x = brandBox.left + 1; x < brandBox.right; x += 4) {
+      for (let y = brandBox.top + 1; y < brandBox.bottom; y += 4) {
+        const at = document.elementFromPoint(x, y);
+        if (at === null || !brand.contains(at)) {
+          brandCovered.push(`${x.toFixed(0)},${y.toFixed(0)}`);
+        }
+      }
     }
     const range = document.createRange();
     range.selectNodeContents(message);
@@ -98,9 +140,12 @@ const geometryOf = (page: Page, closeName: string) =>
         lines
       },
       close: { ...closeBox, topmost: hit !== null && close.contains(hit), visibility: getComputedStyle(close).visibility },
-      // Every control of the step: the Packs, the dots, Back and the primary button
+      brand: { ...brandBox, text: brand.textContent, covered: brandCovered },
+      title: box(title),
+      // Every control of the step: the Packs, the dots, Back and the primary button; not the
+      // Notification's own Try again, the pill being in the Welcome's flow (My-Prompt-Manager-5lf)
       controls: [...document.querySelectorAll('[data-testid="welcome"] button')]
-        .filter((button) => !button.closest('header'))
+        .filter((button) => !button.closest('header') && !pill.contains(button))
         .map((button) => ({ name: button.getAttribute('aria-label') ?? button.textContent?.trim() ?? '', ...box(button) })),
       focused: document.activeElement?.getAttribute('data-testid') ?? document.activeElement?.tagName ?? null
     };
@@ -113,12 +158,54 @@ const atLastStepWithStoreFull = async (page: Page, extensionId: string, file: st
   await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
   await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
   await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+  // The font in (Schibsted Grotesk swaps in), so a late swap does not move what is measured
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+};
+
+interface StepLayout {
+  title: Box;
+  text: Box;
+  packs: (Box & { name: string })[];
+}
+
+/** Where the last step's title, its text and every Pack are, in viewport pixels */
+const stepLayoutOf = (page: Page): Promise<StepLayout> =>
+  page.evaluate(() => {
+    const box = (element: Element) => {
+      const { left, top, right, bottom } = element.getBoundingClientRect();
+      return { left, top, right, bottom };
+    };
+    const title = document.querySelector('[data-testid="welcome"] [data-welcome-title]');
+    const text = title?.nextElementSibling;
+    if (!title || !text) {
+      throw new Error('No step title or text on the page');
+    }
+    return {
+      title: box(title),
+      text: box(text),
+      packs: [...document.querySelectorAll('[data-testid="welcome-packs"] button')].map((pack) => ({ name: pack.textContent?.trim() ?? '', ...box(pack) }))
+    };
+  });
+
+/** Every box of `now` within 0.5px of the same box in `then`, side by side */
+const expectStill = (now: StepLayout, then: StepLayout, what: string): void => {
+  const boxes = (layout: StepLayout): [string, Box][] => [['the title', layout.title], ['the text', layout.text], ...layout.packs.map((pack): [string, Box] => [pack.name, pack])];
+  const was = new Map(boxes(then));
+  expect(boxes(now).map(([name]) => name)).toEqual(boxes(then).map(([name]) => name));
+  for (const [name, box] of boxes(now)) {
+    for (const side of ['left', 'top', 'right', 'bottom'] as const) {
+      const moved = box[side] - (was.get(name)?.[side] ?? Number.NaN);
+      expect(Math.abs(moved), `${what}: ${name}'s ${side} moved by ${moved.toFixed(1)}px`).toBeLessThanOrEqual(0.5);
+    }
+  }
 };
 
 test.describe('The failure Notification of a refused add', () => {
   for (const { surface, file, width, height, close } of SURFACES) {
     for (const theme of ['light', 'dark'] as const satisfies readonly Theme[]) {
-      test(`AC1: its whole text shows, clear of the close button and of the step's controls, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ context, page, storage, extensionId }) => {
+      test(`AC1: its whole text shows, clear of the brand, the close button, the step's title and its controls, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ context, page, storage, extensionId }) => {
         await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
         await atLastStepWithStoreFull(page, extensionId, file, width, height);
         if (theme === 'dark') {
@@ -136,10 +223,12 @@ test.describe('The failure Notification of a refused add', () => {
         await animationsDone(page);
         const geometry = await geometryOf(page, close);
         const combination = `${theme}, ${surface} ${String(width)}x${String(height)}`;
-        console.log(`[welcome add failure] ${combination}: ${JSON.stringify({ pill: geometry.pill, message: geometry.message, close: geometry.close })}`);
+        // From the pill to the step's title, whichever is above the other; negative where they overlap
+        const titleGap = Math.max(geometry.title.top - geometry.pill.bottom, geometry.pill.top - geometry.title.bottom);
+        console.log(`[welcome add failure] ${combination}: ${JSON.stringify({ pill: geometry.pill, message: geometry.message, close: geometry.close, brand: geometry.brand, title: geometry.title, titleGap })}`);
         test.info().annotations.push({
           type: 'geometry',
-          description: `${combination}: pill ${geometry.pill.left.toFixed(1)}-${geometry.pill.right.toFixed(1)} x ${geometry.pill.top.toFixed(1)}-${geometry.pill.bottom.toFixed(1)}, message ${String(geometry.message.scrollWidth)}/${String(geometry.message.clientWidth)}px on ${String(geometry.message.lines)} line(s); close ${geometry.close.left.toFixed(1)}-${geometry.close.right.toFixed(1)}`
+          description: `${combination}: pill ${geometry.pill.left.toFixed(1)}-${geometry.pill.right.toFixed(1)} x ${geometry.pill.top.toFixed(1)}-${geometry.pill.bottom.toFixed(1)}, message ${String(geometry.message.scrollWidth)}/${String(geometry.message.clientWidth)}px on ${String(geometry.message.lines)} line(s); close ${geometry.close.left.toFixed(1)}-${geometry.close.right.toFixed(1)}; brand ${geometry.brand.left.toFixed(1)}-${geometry.brand.right.toFixed(1)} x ${geometry.brand.top.toFixed(1)}-${geometry.brand.bottom.toFixed(1)}, ${String(geometry.brand.covered.length)} point(s) covered; title from ${geometry.title.top.toFixed(1)}, ${titleGap.toFixed(1)}px from the pill`
         });
 
         // Whole: the text as written, nothing of it past its box, no ellipsis
@@ -159,6 +248,12 @@ test.describe('The failure Notification of a refused add', () => {
         await expect(closeButton).toBeVisible();
         await closeButton.click({ trial: true, timeout: 5_000 });
 
+        // My-Prompt-Manager-5lf AC2: the brand whole, every point of it its own; the title 8px away or more
+        expect(geometry.brand.text).toBe('My Prompt Manager');
+        expect(overlaps(geometry.pill, geometry.brand), 'the Notification covers the brand').toBe(false);
+        expect(geometry.brand.covered, 'points of the brand under another element').toEqual([]);
+        expect(titleGap, `the Notification stands ${titleGap.toFixed(1)}px from the step's title`).toBeGreaterThanOrEqual(TITLE_GAP_PX);
+
         // No control of the step under it
         expect(geometry.controls.length).toBeGreaterThan(0);
         for (const control of geometry.controls) {
@@ -171,7 +266,62 @@ test.describe('The failure Notification of a refused add', () => {
         await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
         // The pointer off the controls, so none shows its hover
         await page.mouse.move(2, height - 2);
-        await page.screenshot({ path: `${SCREENSHOTS_DIR}/error-${surface}-${String(width)}x${String(height)}-${theme}.png`, animations: 'disabled' });
+        // Not animations: 'disabled', which would cancel the scroll-driven fade and line of the Packs
+        await page.screenshot({ path: `${SCREENSHOTS_DIR}/error-${surface}-${String(width)}x${String(height)}-${theme}.png` });
+      });
+    }
+  }
+
+  // Review round 1 of My-Prompt-Manager-5lf, fix 2: once the failure has made room under the header, the
+  // room stays while the step does, so the toggle that hides it moves nothing the pointer is on
+  for (const { surface, file, width, height } of SURFACES.filter((candidate) => candidate.height === 500)) {
+    for (const theme of ['light', 'dark'] as const satisfies readonly Theme[]) {
+      test(`5lf round 2: a Pack toggled after a refused add moves nothing: the title, the text and every Pack stay put, and a double-click on Product's lower half leaves Writing selected, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ context, page, storage, extensionId }) => {
+        const product = packNamed('Product');
+        const writing = packNamed('Writing');
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await atLastStepWithStoreFull(page, extensionId, file, width, height);
+        const opening = await stepLayoutOf(page);
+        await fillStorage(await backgroundWorker(context));
+        await primary(page).click();
+        await expect(page.getByRole('alert')).toContainText(MESSAGE);
+        await animationsDone(page);
+        const withFailure = await stepLayoutOf(page);
+
+        // The double-click of the review, 12px above Product's bottom: both clicks must land on Product
+        const aimed = withFailure.packs.find((pack) => pack.name.startsWith(`${product.name} `));
+        if (!aimed) {
+          throw new Error('No Product on the step');
+        }
+        const x = (aimed.left + aimed.right) / 2;
+        const y = aimed.bottom - 12;
+        expect(await page.evaluate(([pointX, pointY]) => document.elementFromPoint(pointX, pointY)?.closest('button')?.textContent?.trim() ?? null, [x, y])).toMatch(/^Product /);
+        await page.mouse.dblclick(x, y);
+
+        await expect(notification(page)).toHaveCount(0);
+        // Toggled twice, Product is selected again; Writing, under it, untouched
+        await expect(packToggle(page, product)).toHaveAttribute('aria-pressed', 'true');
+        await expect(packToggle(page, writing)).toHaveAttribute('aria-pressed', 'true');
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_COUNT)} prompts`);
+        await animationsDone(page);
+        const toggled = await stepLayoutOf(page);
+        const combination = `${theme}, ${surface} ${String(width)}x${String(height)}`;
+        console.log(`[welcome add failure] 5lf round 2, ${combination}: title top ${opening.title.top.toFixed(1)} at the opening, ${withFailure.title.top.toFixed(1)} with the failure, ${toggled.title.top.toFixed(1)} after the double-click; Product ${withFailure.packs[0]?.top.toFixed(1) ?? '?'}-${withFailure.packs[0]?.bottom.toFixed(1) ?? '?'} then ${toggled.packs[0]?.top.toFixed(1) ?? '?'}-${toggled.packs[0]?.bottom.toFixed(1) ?? '?'}`);
+        test.info().annotations.push({ type: 'round 2', description: `${combination}: title ${opening.title.top.toFixed(1)} / ${withFailure.title.top.toFixed(1)} / ${toggled.title.top.toFixed(1)}` });
+        expectStill(toggled, withFailure, 'after the double-click that hid the failure');
+
+        await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+        await page.mouse.move(2, height - 2);
+        await animationsDone(page);
+        await page.screenshot({ path: `${SCREENSHOTS_DIR}/toggled-${surface}-${String(width)}x${String(height)}-${theme}.png` });
+
+        // The room goes with the step: Back, then Next to the Packs again, and the step is where it was at the opening
+        await page.getByRole('button', { name: 'Back' }).click();
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
+        await primary(page).click();
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
+        await animationsDone(page);
+        expectStill(await stepLayoutOf(page), opening, 'back on the Packs after a step change');
       });
     }
   }
@@ -217,5 +367,113 @@ test.describe('The failure Notification of a refused add', () => {
     await expect(page.getByRole('alert')).toHaveCount(0);
     await expect(notification(page)).toContainText(`${String(DEFAULT_COUNT)} prompts added`);
     await expect.poll(async () => (await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+  });
+
+  test('5lf AC1: a Pack toggled after a refused add hides the failure Notification, the keyboard stays on that Pack, and the primary button adds exactly the Packs on screen', async ({ context, page, storage, extensionId }) => {
+    const product = packNamed('Product');
+    const writing = packNamed('Writing');
+    const hiring = packNamed('Hiring');
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+    await atLastStepWithStoreFull(page, extensionId, 'popup', 400, 500);
+    const titleTop = () => page.locator('[data-welcome-title]').evaluate((title) => title.getBoundingClientRect().top);
+    const worker = await backgroundWorker(context);
+    await fillStorage(worker);
+    await primary(page).click();
+    await expect(page.getByRole('alert')).toContainText(MESSAGE);
+    await expect(tryAgain(page)).toBeVisible();
+    await animationsDone(page);
+    const withFailure = await titleTop();
+
+    // Product, selected by default, unselected from the keyboard: its Try again was about Product and Writing
+    await packToggle(page, product).focus();
+    await page.keyboard.press('Space');
+
+    await expect(packToggle(page, product)).toHaveAttribute('aria-pressed', 'false');
+    await expect(notification(page)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
+    await expect(packToggle(page, product)).toBeFocused();
+    // The Notification's room stays while the step does: the title has not moved (round 2 below has every box)
+    expect(Math.abs((await titleTop()) - withFailure)).toBeLessThanOrEqual(0.5);
+
+    // Writing unselected and Hiring selected: the screen offers Hiring alone
+    await packToggle(page, writing).click();
+    await packToggle(page, hiring).click();
+    await expect(primary(page)).toHaveText(`Add ${String(hiring.prompts.length)} prompts`);
+    await expect(notification(page)).toHaveCount(0);
+    expect(await storage.getPrompts()).toEqual([]);
+
+    // Room again: the primary button adds Hiring's Prompts, none of the refused selection's
+    await emptyFiller(worker);
+    await primary(page).click();
+    await expect(welcome(page)).toHaveCount(0);
+    await expect(page.getByTestId('prompt-card')).toHaveCount(hiring.prompts.length);
+    await expect(notification(page)).toContainText(`${String(hiring.prompts.length)} prompts added`);
+    const contents = (await storage.getPrompts()).map((prompt) => prompt.content).sort();
+    expect(contents).toEqual(hiring.prompts.map((prompt) => prompt.content).sort());
+    await expect.poll(async () => (await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+  });
+
+  test("5lf AC3: Enter on Try again, the add refused again: the keyboard is on the new failure Notification's Try again, its ring drawn whole", async ({ context, page, storage, extensionId }) => {
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+    await atLastStepWithStoreFull(page, extensionId, 'popup', 400, 500);
+    await fillStorage(await backgroundWorker(context));
+    await primary(page).click();
+    await expect(page.getByRole('alert')).toContainText(MESSAGE);
+    // Marked, so the Notification after the second refusal is known to be another one
+    await notification(page).evaluate((pill) => { pill.setAttribute('data-e2e-first', 'true'); });
+
+    // The keyboard alone to Try again
+    for (let presses = 0; presses < 30; presses++) {
+      if (await tryAgain(page).evaluate((button) => button === document.activeElement)) {
+        break;
+      }
+      await page.keyboard.press('Tab');
+    }
+    await expect(tryAgain(page)).toBeFocused();
+
+    await page.keyboard.press('Enter');
+
+    // Refused again, the store still full: another failure Notification, and the keyboard on its Try again
+    await expect(page.locator('[data-testid="toast"][data-e2e-first]')).toHaveCount(0);
+    await expect(page.getByRole('alert')).toContainText(MESSAGE);
+    await expect(tryAgain(page)).toBeFocused();
+    expect(await page.evaluate(() => document.activeElement === document.body), 'the keyboard fell to the body').toBe(false);
+    expect(await storage.getPrompts()).toEqual([]);
+    await expect(welcome(page)).toHaveAttribute('data-welcome-step', '2');
+
+    // Its ring, as drawn: 2px of the button's own color all around it (ring-2 ring-current on
+    // :focus-visible). A box-shadow, which Chrome antialiases where the button starts between two
+    // pixels (the pill is centered by half its width): at the sides only one of its 2px is then pure,
+    // so each side is read for 1px of the ring's color within its 2px band
+    await animationsDone(page);
+    const drawn = await tryAgain(page).evaluate((button) => {
+      const style = getComputedStyle(button);
+      const rect = button.getBoundingClientRect();
+      const reach = 2;
+      return {
+        focusVisible: button.matches(':focus-visible'),
+        boxShadow: style.boxShadow,
+        ring: {
+          color: style.color,
+          style: 'solid',
+          width: 1,
+          reach,
+          radius: Math.min(parseFloat(style.borderTopLeftRadius) || 0, rect.width / 2, rect.height / 2) + reach,
+          left: rect.left - reach,
+          top: rect.top - reach,
+          right: rect.right + reach,
+          bottom: rect.bottom + reach
+        } satisfies FocusRing
+      };
+    });
+    const sides = await ringSides(page, drawn.ring);
+    console.log(`[welcome add failure] 5lf AC3: Try again focused after the second refusal, :focus-visible ${String(drawn.focusVisible)}, box-shadow ${drawn.boxShadow}, ring sides ${JSON.stringify(sides)}`);
+    expect(drawn.focusVisible, 'Try again matches :focus-visible').toBe(true);
+    expect(drawn.boxShadow).toMatch(/0px 0px 0px 2px/);
+    for (const side of sides) {
+      expect(side.worst, `the ring's ${side.side} side`).toBeLessThanOrEqual(RING_TOLERANCE);
+    }
+    await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+    await page.screenshot({ path: `${SCREENSHOTS_DIR}/error-try-again-refused-again-focus-popup-400x500-light.png` });
   });
 });

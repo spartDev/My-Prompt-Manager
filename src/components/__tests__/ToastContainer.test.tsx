@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Toast } from '../../types/hooks';
@@ -128,8 +129,8 @@ describe('ToastContainer', () => {
     expect(screen.getAllByTestId('toast')).toHaveLength(1);
   });
 
-  // The Welcome's opt-ins (My-Prompt-Manager-ojz.20): every other screen leaves them out and keeps the pill above
-  describe('opt-ins for a Notification read whole beside a control at the top right', () => {
+  // The Welcome's opt-ins (My-Prompt-Manager-ojz.20, 5lf): every other screen leaves them out and keeps the pill above
+  describe('opt-ins for a Notification read whole in the flow of a screen', () => {
     const failure = createToast({ type: 'error', message: "Couldn't add the prompts", duration: 0, action: { label: 'Try again', onClick: vi.fn() } });
 
     it('left out, nothing changes: one line high, centered on the screen, a long message cut', () => {
@@ -155,14 +156,16 @@ describe('ToastContainer', () => {
       expect(message).toHaveClass('min-w-0');
     });
 
-    it('clearRight: centered in the room left of that many pixels at the right edge, never wider than it', () => {
-      render(<ToastContainer toast={failure} onDismiss={onDismiss} wrap clearRight={58} />);
+    // My-Prompt-Manager-5lf: under the Welcome's header, it covers neither the brand nor the step's title
+    it('inFlow: the pill takes its place in its parent, centered there and never wider, instead of floating at the top of the screen', () => {
+      render(<ToastContainer toast={failure} onDismiss={onDismiss} wrap inFlow />);
 
       const pill = screen.getByTestId('toast');
-      expect(pill).not.toHaveClass('left-1/2');
-      // From 16px at the left to 58px from the right: its center 21px left of the screen's
-      expect(pill.style.left).toBe('calc(50% + -21px)');
-      expect(pill.style.maxWidth).toBe('calc(100% - 74px)');
+      expect(pill).toHaveClass('relative', 'left-1/2', 'max-w-full', '[transform:translateX(-50%)]', 'animate-toast-in', 'w-max');
+      expect(pill).not.toHaveClass('fixed');
+      expect(pill).not.toHaveClass('top-3');
+      expect(pill).not.toHaveClass('max-w-[calc(100%-32px)]');
+      expect(pill.getAttribute('style')).toBeNull();
     });
 
     // My-Prompt-Manager-ojz.19: the exit of the Welcome, shown on the Library, which passes neither opt-in
@@ -196,12 +199,94 @@ describe('ToastContainer', () => {
 
     it('keeps a failure an alert, announced at once, its action a button that runs then leaves', () => {
       const onClick = vi.fn();
-      render(<ToastContainer toast={{ ...failure, action: { label: 'Try again', onClick } }} onDismiss={onDismiss} wrap clearRight={58} />);
+      render(<ToastContainer toast={{ ...failure, action: { label: 'Try again', onClick } }} onDismiss={onDismiss} wrap inFlow />);
 
       expect(screen.getByRole('alert')).toHaveAttribute('aria-live', 'assertive');
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
       expect(onClick).toHaveBeenCalledTimes(1);
       expect(onDismiss).toHaveBeenCalledWith('toast-1');
+    });
+  });
+
+  // My-Prompt-Manager-5lf: the Welcome's Try again refused again, whose pressed button left with its Notification
+  describe('focusAction: the action takes the keyboard as the Notification shows', () => {
+    const failure = createToast({ type: 'error', message: "Couldn't add the prompts", duration: 0, action: { label: 'Try again', onClick: vi.fn() } });
+
+    it('with the keyboard on no element, the action takes it', () => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      expect(document.activeElement).toBe(document.body);
+
+      render(<ToastContainer toast={{ ...failure, id: 'again', focusAction: true }} onDismiss={onDismiss} wrap />);
+
+      expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
+    });
+
+    it('the keyboard on an element already stays there', () => {
+      render(
+        <>
+          <button type="button">Product</button>
+          <ToastContainer toast={null} onDismiss={onDismiss} />
+        </>
+      );
+      screen.getByRole('button', { name: 'Product' }).focus();
+
+      render(<ToastContainer toast={{ ...failure, id: 'again', focusAction: true }} onDismiss={onDismiss} wrap />);
+
+      expect(screen.getByRole('button', { name: 'Product' })).toHaveFocus();
+    });
+
+    it('left out, a Notification never takes the keyboard, even from the body', () => {
+      (document.activeElement as HTMLElement | null)?.blur();
+
+      render(<ToastContainer toast={failure} onDismiss={onDismiss} wrap />);
+
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('each new Notification that asks takes it, even one straight after another that did (a Try again refused twice in a row)', () => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      const { rerender } = render(<ToastContainer toast={{ ...failure, id: 'again', focusAction: true }} onDismiss={onDismiss} wrap />);
+      const second = screen.getByRole('button', { name: 'Try again' });
+      expect(second).toHaveFocus();
+
+      // Pressed, it leaves with its pill, the next one in the same render
+      rerender(<ToastContainer toast={{ ...failure, id: 'third', focusAction: true }} onDismiss={onDismiss} wrap />);
+
+      const third = screen.getByRole('button', { name: 'Try again' });
+      expect(third).not.toBe(second);
+      expect(third).toHaveFocus();
+    });
+
+    // A timed one: the Welcome's own has none (duration 0), where a pause changes nothing. Under
+    // StrictMode, as the side panel runs in development, the effects run twice, and the action has the
+    // keyboard before the hold listeners are put on the pill both times
+    it.each([
+      ['alone', false],
+      ['under StrictMode, whose effects run twice', true]
+    ] as const)('holds its time from that focus on, as from any other (%s): paused as its action takes the keyboard, resumed when the focus leaves', (_mode, strict) => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      const onPause = vi.fn();
+      const onResume = vi.fn();
+      const pill = <ToastContainer toast={{ ...failure, id: 'timed', duration: 6000, focusAction: true }} onDismiss={onDismiss} onPause={onPause} onResume={onResume} wrap />;
+      render(strict ? <StrictMode>{pill}</StrictMode> : pill);
+      const action = screen.getByRole('button', { name: 'Try again' });
+      expect(action).toHaveFocus();
+
+      expect(onPause).toHaveBeenCalledWith('timed');
+      expect(onResume).not.toHaveBeenCalled();
+      action.blur();
+      expect(onResume.mock.calls).toEqual([['timed']]);
+    });
+
+    it('takes it once, as the Notification shows: a render of the same Notification moves nothing', () => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      const toast = { ...failure, id: 'again', focusAction: true };
+      const { rerender } = render(<ToastContainer toast={toast} onDismiss={onDismiss} wrap />);
+      screen.getByRole('button', { name: 'Try again' }).blur();
+
+      rerender(<ToastContainer toast={{ ...toast }} onDismiss={onDismiss} wrap />);
+
+      expect(document.activeElement).toBe(document.body);
     });
   });
 });

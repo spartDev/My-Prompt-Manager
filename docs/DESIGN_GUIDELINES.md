@@ -914,8 +914,9 @@ A choice among two or three options (the theme, popup or side panel): `src/compo
 A Notification (Atelier 1C) is a 40px pill at the top center of the popup or side panel, on
 `bg-inverse` in both modes (`#1D1530` in light, `#4A3D6B` in dark). Only one shows at a time: a new
 one replaces it. A confirmation (success, info) has a violet check round (`bg-inverse-mark`) and
-leaves after 2.7s; a failure (error, warning) has a red ! round (`bg-inverse-alert`), is a
-`role="alert"`, and leaves after 6s. There is no close button and no progress bar: Escape closes it.
+leaves after 2.7s (the exit of the Welcome, below, after 6s); a failure (error, warning) has a red !
+round (`bg-inverse-alert`), is a `role="alert"`, and leaves after 6s. There is no close button and no
+progress bar: Escape closes it.
 Its time stops while the pointer or the focus is on it, so its action (the 6s Undo of a deleted
 Category) can be reached and read; it runs out the rest once neither is.
 Settings has one switch for all of them.
@@ -924,15 +925,25 @@ The bold message stays whole; the optional sub (the object's name, or the reason
 ellipsis when the pill runs out of room. Write the message short (`Prompt saved`, `Couldn't delete
 Prompt`) and put the name in the sub.
 
-On the Welcome (My-Prompt-Manager-ojz.20), the Notification passes two opt-in props of
-`ToastContainer` that nothing else passes. `wrap`: the message wraps onto a second line instead of
-being cut, in a pill as wide as its text, `min-h-10`, `rounded-[20px]`. `clearRight`: the room on the
-right kept free for the Welcome's close button (`WELCOME_CLOSE_ROOM`, the frame's 18px padding, the
-32px button and 8px), the pill centered in what is left, never under 16px from the left edge. At 320px
-"Couldn't add the prompts" takes two lines, from 16px to 262px, and the close button starts at 270px.
-The failure of the Packs' add has no timer: it stays until the user acts (Try again, the primary
-button, Start empty, Back, a dot, or close), and a step change hides it, so it never covers the
-controls of another step.
+On the Welcome (My-Prompt-Manager-ojz.20, My-Prompt-Manager-5lf), the Notification passes two opt-in
+props of `ToastContainer` that nothing else passes. `wrap`: the message wraps onto a second line
+instead of being cut, in a pill as wide as its text, `min-h-10`, `rounded-[20px]`. `inFlow`: the pill
+does not float over the screen but takes its place in the Welcome's layout (`relative`, centered in its
+parent by `left-1/2` and the same half-width shift as the floating pill, `max-w-full`), in the frame's
+`notification` slot under the header: 8px below it (`pt-2`), and the step gives way below it, its own
+12px (`py-3`) standing between the pill and the title. It covers neither the brand, the close button
+nor the title: at 320 x 500 "Couldn't add the prompts" takes two lines, 284px wide from 18px, from 56px
+to 104px, with the title 12px below; at 400 x 500 one line, from 56px to 96px, the title 12px below.
+The step gives way once, by the pill's room, so the Packs' grid scrolls sooner (one row and part of the
+next at 320 x 500), and the slot keeps that room while the step stays: the pill that goes moves no Pack,
+title or text, and the next one shows in the same room; a step change gives it back (deviations 1 and 2
+under Welcome exit). The failure of the Packs' add has no timer: it stays until the user acts (Try again,
+the primary button, Start empty, Back, a dot, a Pack toggled, or close). A step change hides it, so it
+never covers the controls of another step, and so does a Pack toggled, since its Try again was about
+the Packs refused: the primary button, whose label follows the selection, is the way on. The keyboard
+stays on the toggled Pack. A Try again refused again shows the Notification anew with its Try again
+holding the keyboard (`focusAction`, its `focus-visible` ring drawn after a key press), where the
+pressed button, gone with the old pill, would have left it on the body.
 
 One Notification is read whole wherever it shows: the exit of the Welcome on the Library, "9 prompts
 added" then "Open your AI chat and type //" (My-Prompt-Manager-ojz.19), whose `//` is the next step.
@@ -942,6 +953,13 @@ py-1.5 rounded-[20px]`), and the sub takes a line of its own under the message (
 items-start`), never cut: 238px wide and 48px high, whole from the 320px side panel to the popup. It
 ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel); in a
 320px side panel it reaches the side panel's close button, as the one-line pill does.
+
+It stays 6s, not a confirmation's 2.7s (My-Prompt-Manager-syj): its 9 words take about 2.3s to read
+and `//` comes last. `useWelcomeExit` passes `duration: 6000`, for "Your library is ready" (a Debug
+replay) too, and no other Notification changes (`src/test/guardrails/notificationDurations.test.ts`).
+Its time runs from the add's end, about 60ms after the click, and stops while it is hovered or
+focused, as any Notification's. All that time it stays off the first card, whose Copy has the
+keyboard: 167px above it in the popup, 195px in a 320 x 600 side panel.
 
 ```tsx
 <div role="status" className="
@@ -1313,7 +1331,22 @@ the editor opens.
 A refused add keeps the Welcome at its last step with the failure Notification "Couldn't add the
 prompts" (see Notification, On the Welcome). Its action is Try again, the same add with the same Packs;
 the primary button also tries again, and with every Pack unselected it reads Start empty. The keyboard
-stays on the primary button, so Enter tries again.
+stays on the primary button, so Enter tries again. A Pack toggled hides the Notification, the keyboard
+staying on that Pack, and moves nothing: the Notification's room stays while the step does. While the
+Packs are being added, a Pack toggle does nothing, so the selection on screen is the one a refusal's Try
+again adds. A Try again refused again gives the keyboard to the new Notification's Try again.
+
+The Welcome exit departs from a still step in two known ways (review of My-Prompt-Manager-5lf):
+
+1. The step gives way once when a refused add shows its Notification: 46.2px in the popup (400 x 500),
+   56.4px in a 320 x 500 side panel, 24px at 360 x 600. It never moves back while the user is on step 3:
+   the room stays when the Notification goes (a Pack toggled), so nothing moves under the pointer, and a
+   failure that shows again takes the same room; a step change gives it back. Accepted because the
+   pointer is then on the primary button, which does not move, and only 14px separate the header from
+   the title at 400 x 500, too little for the pill without the step giving way.
+2. Known limit: in a 320 x 420 side panel the Packs' grid shrinks from 98px to 42px high once the failure
+   has shown, and stays so while the user is on step 3. The primary button, which tries again, and the
+   grid's own scroll, with its edges and lines, keep the way on.
 
 #### Modal Fade In
 

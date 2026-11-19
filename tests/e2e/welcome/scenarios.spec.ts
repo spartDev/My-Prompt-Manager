@@ -93,7 +93,7 @@ const SURFACES = {
 type Surface = keyof typeof SURFACES;
 
 /** The title of each step, as the user reads it */
-const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+const STEP_TITLES = ['Your best prompts, one tap away', 'Add Variables, fill them in later', 'Start with a pack'] as const;
 /** Step 1's text: "here", on the popup and the side panel alike (My-Prompt-Manager-ojz.19) */
 const STEP_1_TEXT = 'Save the prompts you reuse and find them in a second, here or right inside your AI chat.';
 
@@ -1199,8 +1199,8 @@ test.describe('Every way out of the Welcome ends on a Library with Prompts or an
 
     // Storage still full: the end of the Welcome is a few bytes, and fits
     await unselectEveryPack(page);
-    // Toggling the Packs is no answer to the failure: it stays until the exit starts
-    await expect(notification(page).getByText("Couldn't add the prompts", { exact: true })).toBeVisible();
+    // A Pack toggled hides the failure: its Try again was about the Packs refused (My-Prompt-Manager-5lf)
+    await expect(notification(page)).toHaveCount(0);
     await primary(page).click();
     await expectLibraryThenEditor(page, 'a refused add, then Start empty');
     await expect(welcome(page)).toHaveCount(0);

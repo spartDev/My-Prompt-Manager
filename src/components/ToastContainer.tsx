@@ -1,4 +1,4 @@
-import type { CSSProperties, FC } from 'react';
+import type { FC } from 'react';
 import { memo, useEffect, useRef } from 'react';
 
 import type { Toast } from '../types/hooks';
@@ -33,41 +33,53 @@ interface ToastContainerProps {
    */
   wrap?: boolean;
   /**
-   * Opt-in, for a screen with a control at its top right (the Welcome's close button): the pixels
-   * from the right edge the pill leaves free, instead of 16. It sits centered in the room left of
-   * them, so it never covers that control. Left out, the pill is centered on the screen
+   * Opt-in, for a screen that makes room for the Notification in its own layout (the Welcome, under
+   * its header, My-Prompt-Manager-5lf): the pill takes its place in the flow of its parent, centered
+   * in it and never wider, instead of floating at the top of the screen, so it covers nothing of the
+   * screen. Left out, the pill floats at the top center
    */
-  clearRight?: number;
+  inFlow?: boolean;
 }
-
-/** The room the pill leaves on each side of the screen */
-const EDGE_PX = 16;
-
-/** Centered between EDGE_PX on the left and `clearRight` on the right, no wider than that room */
-const placementBeside = (clearRight: number): CSSProperties => ({
-  left: `calc(50% + ${String((EDGE_PX - clearRight) / 2)}px)`,
-  maxWidth: `calc(100% - ${String(EDGE_PX + clearRight)}px)`
-});
 
 /**
  * The Notification pill of the Atelier 1C design: always at the top center, one at a time. A new
  * Notification has a new key, so it mounts again and replays its entrance; it leaves at once.
- * `wrap` and `clearRight` are opt-ins for one screen (the Welcome); without them nothing changes.
+ * `wrap` and `inFlow` are opt-ins for one screen (the Welcome); without them nothing changes.
  * One Notification can ask to be read whole wherever it shows (`Toast.whole`, the exit of the Welcome
  * on the Library): the pill grows as with `wrap`, and the sub takes a line of its own, never cut.
+ * One can ask its action to take the keyboard as it shows (`Toast.focusAction`, the Welcome's Try
+ * again refused again): it does when the keyboard is on no element, the pressed action having left
+ * with the Notification before; otherwise no Notification ever moves the keyboard.
  */
-const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume, wrap = false, clearRight }) => {
+const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, onResume, wrap = false, inFlow = false }) => {
   const pillRef = useRef<HTMLDivElement>(null);
+  const actionRef = useRef<HTMLButtonElement>(null);
   const toastId = toast?.id;
+  const focusAction = toast?.focusAction === true;
+
+  // Once, as each Notification shows (a Try again refused twice in a row shows two that ask it): its
+  // action takes the keyboard, unless the user has put it on an element
+  useEffect(() => {
+    if (toastId === undefined || !focusAction) {return;}
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      actionRef.current?.focus();
+    }
+  }, [toastId, focusAction]);
 
   // Hovered or focused, the Notification keeps its time, so its action (Undo) can be reached and
-  // read; it runs on once neither is true. Each Notification starts unheld. Listened to on the
-  // element, as hovering or focusing the status region is no interaction with it.
+  // read; it runs on once neither is true. Each Notification starts unheld, unless the keyboard is in
+  // it already: its action took it as it showed (focusAction, above), before these listeners were
+  // put on, so the hold starts from where the keyboard is, whatever order the effects run in.
+  // Listened to on the element, as hovering or focusing the status region is no interaction with it.
   useEffect(() => {
     const pill = pillRef.current;
     if (!pill || toastId === undefined) {return;}
     let hovered = false;
-    let focused = false;
+    let focused = pill.contains(document.activeElement);
+    if (focused) {
+      onPause?.(toastId);
+    }
     const update = (change: () => void) => {
       const wasHeld = hovered || focused;
       change();
@@ -130,13 +142,14 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
       data-testid="toast"
       data-type={toast.type}
       className={cn(
-        'animate-toast-in fixed top-3 [transform:translateX(-50%)] z-50 flex items-center gap-[9px] pl-3.5 pr-1.5',
+        'animate-toast-in left-1/2 [transform:translateX(-50%)] z-50 flex items-center gap-[9px] pl-3.5 pr-1.5',
         'bg-inverse text-on-inverse-strong shadow-toast leading-[1.4] antialiased',
-        clearRight === undefined && 'left-1/2 max-w-[calc(100%-32px)]',
+        // In the flow, it is centered in its parent as toast-in centers it on the screen: half its room
+        // to the right, then half its own width back
+        inFlow ? 'relative max-w-full' : 'fixed top-3 max-w-[calc(100%-32px)]',
         // Wrapped, the pill grows a line at a time: 40px for one line, as the default one, rounded the same
         grows ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full'
       )}
-      style={clearRight === undefined ? undefined : placementBeside(clearRight)}
     >
       <span
         data-testid="toast-mark"
@@ -159,6 +172,7 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
       </span>
       {toast.action ? (
         <button
+          ref={actionRef}
           type="button"
           onClick={() => {
             toast.action?.onClick();

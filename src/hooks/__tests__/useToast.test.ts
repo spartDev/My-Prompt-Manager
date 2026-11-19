@@ -72,6 +72,27 @@ describe('useToast', () => {
     expect(result.current.toast).not.toHaveProperty('whole');
   });
 
+  // My-Prompt-Manager-5lf: the Welcome's Try again refused again
+  it('asks the action to take the keyboard only when told (the Welcome\'s Try again refused again), and for no other', () => {
+    const { result } = renderHook(() => useToast());
+    const action = { label: 'Try again', onClick: vi.fn() };
+
+    act(() => {
+      result.current.showToast("Couldn't add the prompts", 'error', { duration: 0, action, focusAction: true });
+    });
+    expect(result.current.toast).toMatchObject({ message: "Couldn't add the prompts", action, focusAction: true });
+
+    act(() => {
+      result.current.showToast("Couldn't add the prompts", 'error', { duration: 0, action });
+    });
+    expect(result.current.toast).not.toHaveProperty('focusAction');
+
+    act(() => {
+      result.current.showToast('Category deleted', 'success', { action: { label: 'Undo', onClick: vi.fn() }, focusAction: false });
+    });
+    expect(result.current.toast).not.toHaveProperty('focusAction');
+  });
+
   it('keeps the whole message, however long', () => {
     const { result } = renderHook(() => useToast());
     const message = 'x'.repeat(200);
