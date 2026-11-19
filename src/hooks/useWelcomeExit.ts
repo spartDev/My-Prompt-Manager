@@ -164,8 +164,10 @@ export const useWelcomeExit = (options: WelcomeExitOptions): ((packIds: readonly
     showLibrary();
     focusFirstPrompt();
     const { message, sub } = packsAddedNotice(result);
-    // Read whole on the Library, the "//" of its second line included, even in a 320px side panel
-    showToast(message, 'success', { sub, whole: true });
+    // Read whole on the Library, the "//" of its second line included, even in a 320px side panel. It
+    // stays 6 s, not a confirmation's 2.7 s: its 9 words take about 2.3 s to read and "//", the next
+    // step, comes last (My-Prompt-Manager-syj). Its time runs from here; hovered or focused, it stops
+    showToast(message, 'success', { sub, whole: true, duration: 6000 });
   }, []);
 
   const exit = useCallback((packIds: readonly string[]): void => {

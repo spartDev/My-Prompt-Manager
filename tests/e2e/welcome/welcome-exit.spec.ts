@@ -11,6 +11,12 @@
  *   header, above the search field, off the first card's Copy, which has the keyboard; "Your library
  *   is ready" (a Debug replay over Packs already in) as well. Screenshots in WELCOME_EXIT_SCREENSHOTS
  *   (test-results/welcome-exit when unset).
+ * - The exit Notification stays 6 s (My-Prompt-Manager-syj): its 9 words take about 2.3 s to read and
+ *   its `//` comes last. In the popup 400 x 500 and the side panel 320 x 600, light and dark, it is
+ *   still drawn 5.5 s after the click on "Add 9 prompts" (visible, opaque, within the viewport, read on
+ *   every frame) and removed by 7 s, by the page's own clock (the click's event time), never hovered nor
+ *   focused on the way; in every frame it shows, it is off the first card, whose Copy keeps the keyboard. "Your library is ready" (the
+ *   Debug replay) stays as long. Screenshots and measures in WELCOME_EXIT_SCREENSHOTS too.
  * - S3, AC2: no Pack, "Start empty": the empty Library, then the editor on a new Prompt about 250ms
  *   later, both times read in the page as they are first seen. The exact 250ms is proven with fake
  *   timers in src/hooks/__tests__/useWelcomeExit.test.ts.
@@ -258,6 +264,202 @@ const expectWhole = (layout: ExitNotificationLayout, width: number): void => {
   expect(pill.right, 'the pill, in its room').toBeLessThanOrEqual(width - NOTIFICATION_EDGE + 0.5);
 };
 
+/**
+ * How long the exit Notification stays on screen (My-Prompt-Manager-syj), from the click: still there
+ * at STILL_THERE_MS, gone by GONE_BY_MS. Its own time is 6 s from when it shows (useWelcomeExit), about
+ * 60 ms after the click; the second of room covers an add that takes longer and a timer that a loaded
+ * machine runs late. A confirmation's 2.7 s would fail the first bound, a timer that never ends the second
+ */
+const STILL_THERE_MS = 5_500;
+const GONE_BY_MS = 7_000;
+
+/** Where the exit Notification's time and place are checked: the popup, and the side panel at its narrowest */
+const TIME_SURFACES = [
+  { file: 'popup', width: 400, height: 500 },
+  { file: 'sidepanel', width: 320, height: 600 }
+] as const;
+
+/**
+ * What the page notes about the exit Notification, on its own clock (performance.now): when the click
+ * on the primary button happened (its event time), when the pill with `message` was put in the document
+ * and when it left it, anything that stopped its time, and where it stood against the first card in
+ * every frame it showed
+ */
+interface ExitTimeline {
+  clickAt?: number;
+  shownAt?: number;
+  goneAt?: number;
+  /** Pills with the message put in the document: one, from the add to its end, never replaced */
+  shown: number;
+  /** The pointer or the focus on the pill (mouseenter, focusin): either stops its time (ToastContainer) */
+  held: string[];
+  /** Frames sampled while it showed */
+  frames: number;
+  /**
+   * The first and the last frame where the pill was drawn: visible (checkVisibility, opacity and
+   * visibility included), fully opaque through its ancestors (its entrance ended), and a box of its own
+   * inside the viewport. In the document is not enough: a pill made transparent or moved away still is
+   */
+  firstDrawnAt?: number;
+  lastDrawnAt?: number;
+  /** Frames, after the first drawn one, where the pill was in the document but not drawn */
+  undrawn: number;
+  /** Frames where the pill met the first card, or that card's Copy */
+  overCard: number;
+  overCopy: number;
+  /** Frames where the first card's Copy had the keyboard, and frames it had lost it after having it */
+  copyFocused: number;
+  copyLost: number;
+  /** The least room, over every frame, between the pill's bottom and the first card's top */
+  minGapToCard: number | null;
+  /** The pill, the first card and its Copy, as the last frame saw them */
+  last?: { pill: Box; card: Box | null; copy: Box | null };
+}
+
+type TimelineWindow = typeof globalThis & { exitTimeline: ExitTimeline };
+
+/**
+ * Starts noting the exit Notification's ExitTimeline, before the click: the click on the primary
+ * button, the pill with `message` as it is put in the document and as it leaves, any hover or focus on
+ * it, and on each animation frame while it shows, its box against the first card's and that card's Copy
+ */
+const watchTheExitNotification = (page: Page, message: string): Promise<void> =>
+  page.evaluate((watched) => {
+    const timeline: ExitTimeline = { shown: 0, held: [], frames: 0, undrawn: 0, overCard: 0, overCopy: 0, copyFocused: 0, copyLost: 0, minGapToCard: null };
+    (globalThis as TimelineWindow).exitTimeline = timeline;
+    const box = (element: Element): Box => {
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      return { left, top, right, bottom, width, height };
+    };
+    const meet = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    // Drawn: visible as Chrome sees it, opaque through every ancestor, a box of its own within the viewport
+    const drawn = (element: HTMLElement, at: Box): boolean => {
+      if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) {
+        return false;
+      }
+      for (let node: Element | null = element; node !== null; node = node.parentElement) {
+        if (Number.parseFloat(getComputedStyle(node).opacity) < 1) {
+          return false;
+        }
+      }
+      return at.width > 0 && at.height > 0 && at.left >= 0 && at.top >= 0 && at.right <= innerWidth && at.bottom <= innerHeight;
+    };
+
+    document.addEventListener('click', (event) => {
+      const primaryButton = document.querySelector('[data-testid="welcome-primary"]');
+      if (timeline.clickAt === undefined && event.target instanceof Node && primaryButton?.contains(event.target)) {
+        timeline.clickAt = event.timeStamp;
+      }
+    }, { capture: true });
+
+    let pill: HTMLElement | null = null;
+    const sample = (): void => {
+      if (!pill?.isConnected) {
+        return;
+      }
+      const pillBox = box(pill);
+      const card = document.querySelector('[data-testid="prompt-card"]');
+      const copy = card?.querySelector('button[aria-label^="Copy content of "]') ?? null;
+      const cardBox = card ? box(card) : null;
+      const copyBox = copy ? box(copy) : null;
+      timeline.frames++;
+      if (drawn(pill, pillBox)) {
+        const now = performance.now();
+        timeline.firstDrawnAt ??= now;
+        timeline.lastDrawnAt = now;
+      } else if (timeline.firstDrawnAt !== undefined) {
+        timeline.undrawn++;
+      }
+      if (cardBox) {
+        timeline.overCard += meet(pillBox, cardBox) ? 1 : 0;
+        const gap = cardBox.top - pillBox.bottom;
+        timeline.minGapToCard = timeline.minGapToCard === null ? gap : Math.min(timeline.minGapToCard, gap);
+      }
+      if (copyBox) {
+        timeline.overCopy += meet(pillBox, copyBox) ? 1 : 0;
+      }
+      if (copy !== null && document.activeElement === copy) {
+        timeline.copyFocused++;
+      } else if (timeline.copyFocused > 0) {
+        timeline.copyLost++;
+      }
+      timeline.last = { pill: pillBox, card: cardBox, copy: copyBox };
+      requestAnimationFrame(sample);
+    };
+
+    new MutationObserver(() => {
+      const now = performance.now();
+      if (pill?.isConnected === false && timeline.goneAt === undefined) {
+        timeline.goneAt = now;
+      }
+      const found = document.querySelector<HTMLElement>('[data-testid="toast"]');
+      if (found && found !== pill && (found.textContent ?? '').includes(watched)) {
+        timeline.shown++;
+        if (pill === null) {
+          timeline.shownAt = now;
+          found.addEventListener('mouseenter', () => { timeline.held.push(`mouseenter at ${(performance.now() - (timeline.clickAt ?? 0)).toFixed(0)}ms`); });
+          found.addEventListener('focusin', () => { timeline.held.push(`focusin at ${(performance.now() - (timeline.clickAt ?? 0)).toFixed(0)}ms`); });
+          pill = found;
+          requestAnimationFrame(sample);
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }, message);
+
+const timelineOf = (page: Page): Promise<ExitTimeline> => page.evaluate(() => (globalThis as TimelineWindow).exitTimeline);
+
+/** Waits until `ms` have passed since the click, by the page's clock */
+const untilAfterClick = (page: Page, ms: number): Promise<unknown> =>
+  page.waitForFunction((after) => {
+    const { clickAt } = (globalThis as TimelineWindow).exitTimeline;
+    return clickAt !== undefined && performance.now() >= clickAt + after;
+  }, ms);
+
+/**
+ * Clicks the primary button of the last step and follows the exit Notification `message` to its end:
+ * a screenshot once it rests (its entrance and the cards' rise ended), another 5.5 s after the click,
+ * then the timeline once the pill has left the document, kept with the screenshots before it is judged
+ */
+const followTheExitNotification = async (page: Page, message: string, name: string): Promise<ExitTimeline> => {
+  await watchTheExitNotification(page, message);
+  await primary(page).click();
+  await expect(page.getByTestId('toast').getByText(message, { exact: true })).toBeVisible();
+  await animationsDone(page);
+  await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
+  await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `${name}-at-rest.png`) });
+  await untilAfterClick(page, STILL_THERE_MS);
+  const lateShotAt = await page.evaluate(() => performance.now() - ((globalThis as TimelineWindow).exitTimeline.clickAt ?? 0));
+  await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `${name}-at-5.5s.png`) });
+  await expect.poll(async () => (await timelineOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
+  const timeline = await timelineOf(page);
+  const report = {
+    ...timeline,
+    shownAfterClickMs: (timeline.shownAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
+    goneAfterClickMs: (timeline.goneAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
+    onScreenMs: (timeline.goneAt ?? Number.NaN) - (timeline.shownAt ?? Number.NaN),
+    firstDrawnAfterClickMs: (timeline.firstDrawnAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
+    lastDrawnAfterClickMs: (timeline.lastDrawnAt ?? Number.NaN) - (timeline.clickAt ?? Number.NaN),
+    lateShotAfterClickMs: lateShotAt
+  };
+  test.info().annotations.push({ type: 'exit Notification time (ms) and place (px)', description: JSON.stringify(report) });
+  await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `${name}.json`), `${JSON.stringify(report, null, 2)}\n`);
+  return timeline;
+};
+
+/**
+ * Drawn STILL_THERE_MS after the click, and without a break from the end of its entrance on; removed
+ * from the document by GONE_BY_MS; one pill all along, its time never stopped
+ */
+const expectSixSeconds = async (page: Page, timeline: ExitTimeline): Promise<void> => {
+  expect(timeline.held, 'nothing hovered or focused the Notification, which would stop its time').toEqual([]);
+  expect(timeline.shown, 'one Notification, from the add to its end').toBe(1);
+  const { clickAt = Number.NaN, lastDrawnAt = Number.NaN, goneAt = Number.NaN } = timeline;
+  expect(lastDrawnAt - clickAt, `still drawn on screen ${String(STILL_THERE_MS)}ms after the click`).toBeGreaterThanOrEqual(STILL_THERE_MS);
+  expect(timeline.undrawn, 'frames where it was in the document but not drawn, once drawn').toBe(0);
+  expect(goneAt - clickAt, `gone by ${String(GONE_BY_MS)}ms after the click`).toBeLessThanOrEqual(GONE_BY_MS);
+  await expect(page.getByTestId('toast')).toHaveCount(0);
+};
+
 const recordOf = async (storage: ExtensionStorage, key: string): Promise<unknown> => (await storage.get<Record<string, unknown>>(key))[key];
 
 const median = (values: readonly number[]): number => {
@@ -349,6 +551,52 @@ test.describe('Leaving the Welcome in the real extension', () => {
       expect(await storage.getPrompts()).toHaveLength(DEFAULT_PROMPTS.length);
     });
   }
+
+  // My-Prompt-Manager-syj: the exit Notification says what to do next, "//" last; 2.7 s, a
+  // confirmation's time, was gone before it was read. It stays 6 s, and as long as it shows it must
+  // stay off the first card, whose Copy has the keyboard so that one Enter copies
+  for (const { file, width, height } of TIME_SURFACES) {
+    for (const theme of ['light', 'dark'] as const) {
+      test(`the exit Notification stays 6 s: on screen ${String(STILL_THERE_MS / 1000)} s after the click, gone by ${String(GONE_BY_MS / 1000)} s, never over the first card, whose Copy has the keyboard (${file} ${String(width)} x ${String(height)}, ${theme})`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/${file}.html`);
+        await expectTheme(page, theme);
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+
+        const timeline = await followTheExitNotification(page, ADDED, `exit-notification-6s-${file}-${String(width)}x${String(height)}-${theme}`);
+
+        await expectSixSeconds(page, timeline);
+        // In every frame it showed: off the first card and its Copy, which had the keyboard and kept it
+        expect(timeline.frames, 'frames sampled while it showed').toBeGreaterThan(0);
+        expect(timeline.overCard, 'frames where the Notification met the first card').toBe(0);
+        expect(timeline.overCopy, 'frames where the Notification met the first Copy').toBe(0);
+        expect(timeline.copyFocused, 'frames where the first Copy had the keyboard').toBeGreaterThan(0);
+        expect(timeline.copyLost, 'frames where the first Copy had lost the keyboard').toBe(0);
+        expect(timeline.minGapToCard ?? Number.NaN, 'room between the Notification and the first card').toBeGreaterThan(0);
+        await expect(firstCardCopy(page)).toBeFocused();
+      });
+    }
+  }
+
+  test('the exit Notification of a Debug replay, "Your library is ready", stays 6 s as well (popup 400 x 500)', async ({ page, storage, extensionId }) => {
+    await storage.seed({
+      [WELCOME_KEY]: { status: 'pending', step: 2 },
+      [SITE_SETTINGS_KEY]: { ...defaultSiteSettings(), debugMode: true }
+    });
+    await openPopup(page, extensionId);
+    await toAddPrompts(page);
+    await primary(page).click();
+    await expect(page.getByTestId('toast').getByText(ADDED, { exact: true })).toBeVisible();
+
+    // Debug mode replays the Welcome at each opening: the same Packs again, all in already
+    await page.reload();
+    await toAddPrompts(page);
+    const timeline = await followTheExitNotification(page, 'Your library is ready', 'exit-notification-6s-ready-popup-400x500-light');
+
+    await expectSixSeconds(page, timeline);
+    expect(await storage.getPrompts()).toHaveLength(DEFAULT_PROMPTS.length);
+  });
 
   test('S3, AC2: no Pack, Start empty: the empty Library, then the editor on a new Prompt about 250ms later', async ({ page, storage, extensionId }) => {
     await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: [] } });
