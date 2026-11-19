@@ -6,7 +6,7 @@
  * worker, headless, no retries, on a machine as idle as can be; every timed sample records the load
  * average next to it:
  *
- *   MEASURE=1 CI=1 npx playwright test tests/e2e/welcome/measures.spec.ts --workers=1 --retries=0
+ *   MEASURE=1 CI=1 MEASURE_OUT=<file outside test-results/> npx playwright test tests/e2e/welcome/measures.spec.ts --workers=1 --retries=0
  *
  * A MEASURE run exits 1 by design, so do not take it for a failure: the real action popup with its
  * action not pinned misses 200 ms from the open request, because Chrome spends about 280 ms before
@@ -14,8 +14,10 @@
  * fails ("the real popup, its action not pinned"), and its test still writes its section. Any other
  * failed expect is a real one.
  *
- * - MEASURE_OUT: the JSON report (default test-results/welcome/measures.json). Each test writes its
- *   own section and keeps the others, so one section can be measured again alone (--grep).
+ * - MEASURE_OUT: the JSON report. Each test writes its own section and keeps the others, so one
+ *   section can be measured again alone (--grep), as long as the file is outside test-results/:
+ *   Playwright empties that folder at each run, so the default, test-results/welcome/measures.json,
+ *   keeps nothing of an earlier run.
  * - MEASURE_BASE_DIST: a build of main at this branch's merge base, for the existing user's "before";
  *   without it, that test measures this build alone.
  *
@@ -501,13 +503,22 @@ const timeRealSurface = async (surface: Surface, pinned = false): Promise<RealSa
       }, windowId);
       await observer.locator('#measures-open-side-panel').click();
     }
-    const handle = await observer.waitForFunction(() => {
-      const { surfaceView, surfaceRequestedAt, surfaceOpenError } = globalThis as ObserverWindow;
-      const done = surfaceOpenError !== null || (surfaceView !== null && surfaceView.times.opaque !== null);
-      return done ? { surfaceView, surfaceRequestedAt, surfaceOpenError } : null;
+    await observer.waitForFunction(() => {
+      const { surfaceView, surfaceOpenError } = globalThis as ObserverWindow;
+      return surfaceOpenError !== null || (surfaceView !== null && surfaceView.times.opaque !== null);
     });
-    const { surfaceView, surfaceRequestedAt, surfaceOpenError } = (await handle.jsonValue()) as Pick<ObserverWindow, 'surfaceView' | 'surfaceRequestedAt' | 'surfaceOpenError'>;
-    expect(surfaceOpenError, `the ${surface} opened`).toBeNull();
+    const read = () => observer.evaluate(() => {
+      const { surfaceView, surfaceRequestedAt, surfaceOpenError } = globalThis as ObserverWindow;
+      return { surfaceView, surfaceRequestedAt, surfaceOpenError };
+    });
+    expect((await read()).surfaceOpenError, `the ${surface} opened`).toBeNull();
+    // The primary can turn hit-testable after the Welcome is opaque: wait for every time, so none reaches the report as null
+    const missing = async (): Promise<string[]> =>
+      Object.entries((await read()).surfaceView?.times ?? { surfaceView: null })
+        .filter(([, value]) => value === null)
+        .map(([key]) => key);
+    await expect.poll(missing, { message: `${surface}: display times never noted`, timeout: 10_000 }).toEqual([]);
+    const { surfaceView, surfaceRequestedAt } = await read();
     if (surfaceView === null || surfaceRequestedAt === null) {
       throw new Error(`No ${surface} to time`);
     }
@@ -853,23 +864,32 @@ const versionOf = async (context: BrowserContext): Promise<string> => {
 
 /**
  * A browser of its own on `extensionPath`, once its install wrote the Release of install. The merge
- * base has no Welcome record to wait for, and that write is its only one at install
+ * base has no Welcome record to wait for, and that write is its only one at install. A setup that
+ * fails closes the browser and removes its profile before it throws
  */
 const ownBrowser = async (extensionPath: string) => {
   const profile = await fs.mkdtemp(path.join(os.tmpdir(), 'playwright-measures-profile-'));
-  const context = await launchExtensionContext(profile, extensionPath);
-  const worker = await waitForBackgroundTarget(context);
-  const storage = createStorageController(worker);
-  await expect.poll(async () => Object.keys(await storage.get([WHATS_NEW_KEY])).length, { timeout: 30_000 }).toBe(1);
-  return {
-    context,
-    storage,
-    extensionId: new URL(worker.url()).host,
-    dispose: async (): Promise<void> => {
+  const removeProfile = () => fs.rm(profile, { recursive: true, force: true });
+  const context = await launchExtensionContext(profile, extensionPath).catch(async (error: unknown) => {
+    await removeProfile();
+    throw error;
+  });
+  const dispose = async (): Promise<void> => {
+    try {
       await context.close();
-      await fs.rm(profile, { recursive: true, force: true });
+    } finally {
+      await removeProfile();
     }
   };
+  try {
+    const worker = await waitForBackgroundTarget(context);
+    const storage = createStorageController(worker);
+    await expect.poll(async () => Object.keys(await storage.get([WHATS_NEW_KEY])).length, { timeout: 30_000 }).toBe(1);
+    return { context, storage, extensionId: new URL(worker.url()).host, dispose };
+  } catch (error) {
+    await dispose();
+    throw error;
+  }
 };
 
 /** One opening of the popup on the existing user's Library, timed by the Library probe; the Library alone checked after the timing */
@@ -923,16 +943,19 @@ const drawnOver = (page: Page, css: string, backdrop?: string): Promise<string> 
     { color: css, under: backdrop ?? null }
   );
 
+/** `ratio` is for display, to two decimals; its threshold `min` and the lowest pair are judged on `rawRatio` */
 type ColorPair = { pair: string; kind: 'text' | 'non-text'; min: number; fg: string; bg: string; ratio: number };
 
-const pairOf = (pair: string, kind: ColorPair['kind'], fg: string, bg: string): ColorPair => ({
-  pair,
-  kind,
-  min: kind === 'text' ? 4.5 : 3,
-  fg,
-  bg,
-  ratio: Math.round(getContrastRatio(fg, bg) * 100) / 100
-});
+/** The ratio of `pair` unrounded, by the app's getContrastRatio: 4.499997:1 is under 4.5:1 */
+const rawRatio = (pair: Pick<ColorPair, 'fg' | 'bg'>): number => getContrastRatio(pair.fg, pair.bg);
+
+const pairOf = (pair: string, kind: ColorPair['kind'], fg: string, bg: string): ColorPair => {
+  const min = kind === 'text' ? 4.5 : 3;
+  const raw = rawRatio({ fg, bg });
+  const shown = Math.round(raw * 100) / 100;
+  // A ratio under its threshold is never shown at it: 4.499997 reads 4.49, not 4.5
+  return { pair, kind, min, fg, bg, ratio: raw < min && shown >= min ? Math.floor(raw * 100) / 100 : shown };
+};
 
 /** Computed style properties of the first element `selector` matches */
 const styleOf = (page: Page, selector: string, properties: readonly string[]): Promise<Record<string, string>> =>
@@ -1142,6 +1165,11 @@ test.describe('Measures of the Welcome on the built extension (MEASURE=1)', () =
     expect.soft(series.popup.opaque.median, 'the real popup, its action not pinned: the Welcome fully opaque from the open request, median').toBeLessThan(TARGETS.displayMs);
     expect.soft(series.popupPinned.opaque.median, 'the real popup, its action pinned: the Welcome fully opaque from the open request, median').toBeLessThan(TARGETS.displayMs);
     expect.soft(series.sidepanel.opaque.median, 'the real side panel: the Welcome fully opaque from the click, median').toBeLessThan(TARGETS.displayMs);
+    for (const { name } of variants) {
+      for (const [index, run] of series[name].runs.entries()) {
+        expect(run.primaryHitTestable, `${name}, opening ${String(index + 1)}: the primary hit-testable by the time the Welcome is fully opaque`).toBeLessThanOrEqual(run.opaque);
+      }
+    }
   });
 
   test(`journey, targets 1 and 3: every screen read, ${String(JOURNEY_RUNS)} runs, by the reading model`, async ({ context, extensionId }) => {
@@ -1290,8 +1318,8 @@ test.describe('Measures of the Welcome on the built extension (MEASURE=1)', () =
       await atStep(page, 0);
       const pairs = await welcomeColorPairs(page);
       const required = pairs.filter((pair) => !pair.pair.includes('(transient)'));
-      const lowest = required.reduce<ColorPair | null>((low, pair) => (low === null || pair.ratio < low.ratio ? pair : low), null);
-      themes[theme] = { pairs, lowest, under: pairs.filter((pair) => pair.ratio < pair.min) };
+      const lowest = required.reduce<ColorPair | null>((low, pair) => (low === null || rawRatio(pair) < rawRatio(low) ? pair : low), null);
+      themes[theme] = { pairs, lowest, under: pairs.filter((pair) => rawRatio(pair) < pair.min) };
       note(`colors ${theme}`, `lowest ${lowest === null ? '?' : `${lowest.pair} ${lowest.fg} on ${lowest.bg} ${String(lowest.ratio)}:1`}; under threshold: ${themes[theme].under.map((pair) => `${pair.pair} ${String(pair.ratio)}:1`).join(', ') || 'none'}`);
     }
     await writeSection('colors', {

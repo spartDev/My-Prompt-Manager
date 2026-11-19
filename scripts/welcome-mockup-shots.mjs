@@ -140,9 +140,11 @@ const shootWholeBlank = async (page, file, size) => {
   throw new Error(`${file}: no screenshot with the whole name in ${String(BLANK_ATTEMPTS)} cycles`);
 };
 
-fs.mkdirSync(outDir, { recursive: true });
-const browser = await chromium.launch();
+// From here on, a failure (the browser that cannot launch included) still closes the server and removes the temporary folder
+let browser;
 try {
+  fs.mkdirSync(outDir, { recursive: true });
+  browser = await chromium.launch();
   for (const theme of Object.keys(COMPONENTS)) {
     for (const [surface, size] of Object.entries(SIZES)) {
       const page = await browser.newPage({ viewport: { width: size.width, height: size.height } });
@@ -181,7 +183,7 @@ try {
     }
   }
 } finally {
-  await browser.close();
+  await browser?.close();
   server.close();
   fs.rmSync(site, { recursive: true, force: true });
 }
