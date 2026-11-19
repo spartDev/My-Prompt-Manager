@@ -46,7 +46,7 @@ const SURFACES = {
 type Surface = keyof typeof SURFACES;
 type Theme = 'light' | 'dark';
 
-const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+const STEP_TITLES = ['Your best prompts, one tap away', 'Add Variables, fill them in later', 'Start with a pack'] as const;
 
 /** The name step 2 types into its blank */
 const BLANK_NAME = 'Claire, Head of Sales';

@@ -346,7 +346,7 @@ test.describe('The Welcome steps in the real extension', () => {
       });
 
       const blank = page.getByTestId('welcome-blank');
-      const title = page.getByRole('heading', { level: 1, name: 'Leave blanks, fill them later' });
+      const title = page.getByRole('heading', { level: 1, name: 'Add Variables, fill them in later' });
       // Where the card's sentence and the title are, and when, at each change of the blank, over a whole cycle
       const samples = await page.evaluate(
         () =>

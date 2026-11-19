@@ -9,8 +9,8 @@ import { WelcomeText, WelcomeTitle } from './WelcomeFrame';
 
 /**
  * What fills the frame's step slot for each step of the Welcome (Atelier 1C 'Premier lancement',
- * ob0 to ob2), with the texts of the spec word for word but step 1's "here", and the label of the
- * primary button.
+ * ob0 to ob2), with the texts of the spec word for word but step 1's "here" and step 2's, and the
+ * label of the primary button.
  */
 export interface WelcomeStepProps {
   /** The step shown and the Packs selected */
@@ -31,13 +31,17 @@ const WhatItDoes: FC = () => (
   </div>
 );
 
-/** Step 2, what a blank is: a Prompt whose blank fills itself, over the title and the text */
+/** Step 2, what a Variable is: a Prompt whose Variable fills itself, over the title and the text */
 const Blanks: FC = () => (
   <div className="flex flex-col gap-[22px]">
     <BlankDemo />
     <div className="flex flex-col gap-2">
-      <WelcomeTitle>Leave blanks, fill them later</WelcomeTitle>
-      <WelcomeText>{'Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text.'}</WelcomeText>
+      {/* Not the spec's words (the owner's decisions A2 and A3, My-Prompt-Manager-j2tu.1): the product's
+          word, Variable, and the fill promised where it happens, at an Insertion through // (the
+          selector's fill step), never for Copy, which copies the content as saved. "the prompt" left
+          out after "insert": with it the text takes a third line in the popup and moves the step */}
+      <WelcomeTitle>Add Variables, fill them in later</WelcomeTitle>
+      <WelcomeText>{'Put {{name}} where the details change. When you insert with //, you fill in each Variable right in the text.'}</WelcomeText>
     </div>
   </div>
 );
