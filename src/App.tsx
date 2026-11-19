@@ -516,6 +516,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const loading = promptsLoading || categoriesLoading;
 
+  // Try again on Error Loading Data: the Prompts and the Categories read again. refreshPrompts clears
+  // the error as it starts, so a read that works brings the Library back. Nothing else is redone: after
+  // the Welcome's Packs, the add has resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
+  const retryLoad = useCallback(() => {
+    void refreshPrompts();
+    void refreshCategories();
+  }, [refreshPrompts, refreshCategories]);
+
   // Until the opening knows what it shows, only the background: the Library never flashes before the Welcome
   if (launch.loading) {
     return (
@@ -546,6 +554,8 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
+  // A read of the Library that failed, even right after the Welcome's Packs were stored: Try again is
+  // the way on, so no one is left on a screen with nothing to do but close it
   if (promptsError) {
     return (
       <ThemeProvider>
@@ -553,6 +563,14 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
             <p className="text-secondary">{promptsError.message}</p>
+            {/* The Primary Button of docs/DESIGN_GUIDELINES.md */}
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="mt-5 px-6 py-3 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl focus-primary"
+            >
+              Try again
+            </button>
           </div>
         </div>
         {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}

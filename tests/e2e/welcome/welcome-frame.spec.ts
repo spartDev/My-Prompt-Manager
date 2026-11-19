@@ -349,13 +349,16 @@ test.describe('The Welcome frame in the real extension', () => {
   // record, then writes it (writeWelcomeRecord of src/welcome/storage.ts, through writeLaunchState),
   // and a popup closed before the write is issued loses it: a page.close() in the instant of the
   // click lost it 5 times out of 5. The lock and the read stay: they keep a done record final when
-  // the popup and the side panel are open together. The time depends on the machine's load: on a
-  // developer laptop, 3 to 10ms read in the page itself; seen from the service worker, which adds
-  // the change's delivery to it, medians of 15 to 31ms, 44ms at the slowest run seen. Under a close a
-  // person can make, which takes a move out of the popup, a focus change or a key press. The median
-  // is held under 50ms, which a real regression crosses, and every run under the 100ms of the S6
-  // close, so a slow runner does not fail it for nothing. Routing the step writes through the service
-  // worker, which outlives the popup, would remove the window.
+  // the popup and the side panel are open together (decision D24 of the epic My-Prompt-Manager-ojz).
+  // The time depends on the machine's load: on a developer laptop, 3 to 25ms read in the page itself;
+  // seen from the service worker, which adds the change's delivery to it, over 570 runs logged in
+  // earlier sessions (57 series of ten), medians of 14 to 31ms, 564 runs at 44ms or less, five at 55
+  // to 72ms and one at 142ms, during a full e2e run on 2 workers, which failed the every-run bound.
+  // Under a close a person can make, which takes a move out of the popup, a focus change or a key
+  // press. The median is held under 50ms, which a real regression crosses, and every run under the
+  // 100ms of the S6 close; a run over it under load is rerun alone, with the `uptime` load, before it
+  // is read as a regression. Routing the step writes through the service worker, which outlives the
+  // popup, would remove the window.
   test(`AC5 (S6): the step is stored a median under ${String(STEP_WRITE_BUDGET_MS)}ms after the click on the primary button and always under ${String(S6_CLOSE_AFTER_MS)}ms, timed from the service worker, so no close at human speed loses it`, async ({ context, storage, extensionId }) => {
     // The same cast as the storage fixture's: the background of a Manifest V3 extension is its service worker
     const worker = (await waitForBackgroundTarget(context)) as Worker;

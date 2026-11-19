@@ -45,9 +45,11 @@ const both = async (writes: readonly [Promise<unknown>, Promise<unknown>]): Prom
 
 /**
  * Writes one change of the launch state, or nothing in Debug mode: the one Debug check of every
- * write of the launch state, since the low-level writers it calls have no other caller. The writes
- * start before this returns, so a caller that does not wait still has them under way when the popup
- * closes. Rejects when storage cannot be read or written.
+ * write of the launch state, since the low-level writers it calls have no other caller. When this
+ * returns, only the lock requests have started: each write is issued once its lock (Welcome, What's
+ * new) is granted and the record it writes over is read, a few milliseconds later. A popup closed
+ * before then loses the write, even for a caller that does not wait: the window the epic accepted
+ * (D24, docs/TESTING.md, S6). Rejects when storage cannot be read or written.
  */
 export const writeLaunchState = async (change: LaunchStateChange, { debugMode }: { readonly debugMode: boolean }): Promise<void> => {
   if (debugMode) {
