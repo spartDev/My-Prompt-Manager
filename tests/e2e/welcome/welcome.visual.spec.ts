@@ -13,8 +13,7 @@
  *   the caret's blink, which all end within 5s, My-Prompt-Manager-ojz.20) has ended, so the cards
  *   stand at rest and the caret shows;
  * - step 2 is taken while its blank holds the whole name, "Claire, Head of Sales", as the mockup
- *   shows it: once the demo holds it for good, at once; before, the test waits for the letter that
- *   completes it, shoots, and shoots again if the blank changed meanwhile;
+ *   shows it: once the demo holds it for good, its caret still;
  * - the pointer rests where it lights nothing up; on the Library it rests on the Notification's text,
  *   which has no hover look and keeps the Notification on screen until the screenshot is taken;
  * - no focus ring is shown: every move is a pointer click. At the exit the first Prompt's Copy has the
@@ -52,9 +51,6 @@ const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them
 /** The name step 2 types into its blank */
 const BLANK_NAME = 'Claire, Head of Sales';
 
-/** How many typings of the demo the test waits for a screenshot the blank did not change during */
-const BLANK_ATTEMPTS = 5;
-
 const DEFAULT_PACKS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_PROMPTS = DEFAULT_PACKS.reduce((count, pack) => count + pack.prompts.length, 0);
 
@@ -88,53 +84,14 @@ const restPointer = async (page: Page, surface: Surface): Promise<void> => {
 const shoot = (page: Page, file: string): Promise<Buffer> => page.screenshot({ path: file, animations: 'disabled' });
 
 /**
- * Takes step 2 while its blank holds the whole name. Once the demo holds it for good (it types it
- * twice, then stays), at once; before that, waits for the letter that completes it (the name then
- * stays about 1.2 s, or for good), shoots, and checks the blank did not change during the screenshot.
- * Tries again at the next typing if it did.
+ * Takes step 2 once its blank holds the whole name for good: the demo types it twice, then stays
+ * (`data-welcome-demo="done"`, within 5s of the step, My-Prompt-Manager-ojz.20), so nothing changes
+ * the blank during the one screenshot, and no wait can start after the last change it waits for
  */
 const shootWholeBlank = async (page: Page, file: string): Promise<void> => {
-  if ((await page.locator('[data-welcome-demo]').getAttribute('data-welcome-demo')) === 'done') {
-    await expect(page.getByTestId('welcome-blank')).toHaveText(BLANK_NAME);
-    await shoot(page, file);
-    return;
-  }
-  for (let attempt = 1; attempt <= BLANK_ATTEMPTS; attempt++) {
-    await page.evaluate(
-      (name) =>
-        new Promise<void>((resolve) => {
-          const blank = document.querySelector('[data-testid="welcome-blank"]');
-          const flags = window as unknown as { blankChanged?: boolean };
-          if (!blank) {
-            flags.blankChanged = true;
-            resolve();
-            return;
-          }
-          let complete = false;
-          const observer = new MutationObserver(() => {
-            if (!complete && blank.textContent === name) {
-              // The name just completed: from now on, any change of the blank spoils the screenshot
-              complete = true;
-              flags.blankChanged = false;
-              resolve();
-            } else if (complete) {
-              flags.blankChanged = true;
-              observer.disconnect();
-            }
-          });
-          observer.observe(blank, { childList: true, characterData: true, subtree: true });
-        }),
-      BLANK_NAME
-    );
-    await shoot(page, file);
-    const changed = await page.evaluate(() => (window as unknown as { blankChanged?: boolean }).blankChanged);
-    if (changed === false) {
-      await expect(page.getByTestId('welcome-blank')).toHaveText(BLANK_NAME);
-      return;
-    }
-    test.info().annotations.push({ type: 'step 2', description: `attempt ${String(attempt)}: the blank changed during the screenshot, taken again` });
-  }
-  throw new Error(`Step 2: no screenshot with the whole name in ${String(BLANK_ATTEMPTS)} typings of the demo`);
+  await expect(page.locator('[data-welcome-demo]')).toHaveAttribute('data-welcome-demo', 'done');
+  await expect(page.getByTestId('welcome-blank')).toHaveText(BLANK_NAME);
+  await shoot(page, file);
 };
 
 const open = async (page: Page, extensionId: string, surface: Surface, theme: Theme): Promise<void> => {

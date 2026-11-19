@@ -11,12 +11,14 @@
  * - More Packs than fit scroll inside the Packs' grid: the pills, the dots and the primary button stay
  *   in view, and a mouse wheel over the grid brings the last Pack into view with the primary button
  *   unmoved. Packs are compiled in, so the test adds copies of the Pack toggles to the grid's DOM.
- * - Step 2: the blank fills letter by letter in real time, and the card keeps its height while it
- *   does, so the title and the text under it never move.
+ * - Step 2: the blank fills letter by letter in real time, each change no more letters than the time
+ *   since the one before allows, and the card keeps its height while it does, so the title and the
+ *   text under it never move.
  * - Step 2's card casts its shadow whole: the step's area clips sideways at the screen's edge, past
  *   the reach of the shadow. Step 3's Packs line up with the title and the pills, and a focused
  *   Pack's outline is drawn whole, clipped neither by the grid nor by the step's area
- *   (My-Prompt-Manager-ojz.11).
+ *   (My-Prompt-Manager-ojz.11), in a color that shows on its four sides, read from the pixels
+ *   (tests/e2e/utils/focusRing.ts).
  * - AC6, and AC3 of My-Prompt-Manager-ojz.11: light and dark screenshots of the three steps in the
  *   popup (400 x 500), the side panel (360 x 720) and the narrowest side panel (320 x 600), and of
  *   step 3's Packs with the first one focused, in WELCOME_STEPS_SCREENSHOTS (test-results/welcome-steps
@@ -28,12 +30,26 @@ import fs from 'node:fs/promises';
 
 import type { Locator, Page } from '@playwright/test';
 
+import { MOTION } from '../../../src/theme/motion';
 import { DEFAULT_SETTINGS } from '../../../src/types';
 import { WELCOME_KEY } from '../../../src/welcome/storage';
 import { expect, test } from '../fixtures/extension';
+import { focusRingOf, RING_TOLERANCE, ringSides } from '../utils/focusRing';
 import { PLATFORMS_CAPTION as CAPTION, expectPlatformsRowWhole } from '../utils/welcomePlatforms';
 
 const SCREENSHOTS_DIR = process.env.WELCOME_STEPS_SCREENSHOTS ?? 'test-results/welcome-steps';
+
+/** The name step 2 types into its blank */
+const NAME = 'Claire, Head of Sales';
+
+/** The alpha of a computed color, "rgb(r, g, b)" or "rgba(r, g, b, a)": 0 for transparent, NaN for any other form */
+const alphaOf = (color: string): number => {
+  const parts = /^rgba?\(([^)]*)\)$/.exec(color)?.[1].split(/[\s,/]+/).filter(Boolean) ?? [];
+  if (parts.length === 3) {
+    return 1;
+  }
+  return parts.length === 4 ? Number(parts[3]) : Number.NaN;
+};
 
 const SURFACES = {
   popup: { file: 'popup', width: 400, height: 500 },
@@ -116,10 +132,15 @@ test.describe('The Welcome steps in the real extension', () => {
       await expectInView(page, page.getByRole('heading', { level: 1, name: 'Start with a pack' }), 'the title');
       expect(await scrollRoom(page)).toEqual({ page: 0, step: 0, packs: 0 });
 
-      // Two columns: the first two Packs side by side
-      const [first, second] = await Promise.all([packs.nth(0).boundingBox(), packs.nth(1).boundingBox()]);
-      expect(first?.y).toBe(second?.y);
-      expect((first?.x ?? 0) + (first?.width ?? 0)).toBeLessThan(second?.x ?? 0);
+      // Two columns: Packs 1 and 2 side by side on one row, 3 and 4 on the next, 1 over 3 and 2 over 4
+      const [first, second, third, fourth] = await Promise.all([0, 1, 2, 3].map((index) => packs.nth(index).boundingBox()));
+      expect(first?.y, 'Packs 1 and 2 on one row').toBe(second?.y);
+      expect((first?.x ?? 0) + (first?.width ?? 0), 'Pack 1 left of Pack 2').toBeLessThan(second?.x ?? 0);
+      expect(third?.y, 'Packs 3 and 4 on one row').toBe(fourth?.y);
+      expect((third?.x ?? 0) + (third?.width ?? 0), 'Pack 3 left of Pack 4').toBeLessThan(fourth?.x ?? 0);
+      expect(third?.y ?? 0, 'Packs 3 and 4 on the row under Packs 1 and 2').toBeGreaterThanOrEqual((first?.y ?? Infinity) + (first?.height ?? 0));
+      expect(third?.x, 'Pack 1 over Pack 3').toBe(first?.x);
+      expect(fourth?.x, 'Pack 2 over Pack 4').toBe(second?.x);
     });
 
     test(`steps 1 and 2 fit ${String(width)} x ${String(height)} too, nothing to scroll (${surface})`, async ({ page, storage, extensionId }) => {
@@ -261,6 +282,23 @@ test.describe('The Welcome steps in the real extension', () => {
           expect(outline.bottom, `${what}: bottom, inside ${name}`).toBeLessThanOrEqual(clip.bottom);
         }
       }
+
+      // Each ring as drawn, not only as computed: the Pack has the focus, its outline has a style and a
+      // color that shows, and its four sides show that color in the pixels, the ring's full width
+      const toggles = page.getByRole('group', { name: 'Packs' }).getByRole('button');
+      await expect(toggles).toHaveCount(4);
+      for (const [index, toggle] of (await toggles.all()).entries()) {
+        const what = `Pack ${String(index + 1)} focused`;
+        await toggle.focus();
+        await expect(toggle, `${what}: it is document.activeElement`).toBeFocused();
+        const ring = await focusRingOf(toggle);
+        expect(ring.style, `${what}: its outline style`).not.toBe('none');
+        expect(ring.width, `${what}: a 2px ring`).toBe(2);
+        expect(alphaOf(ring.color), `${what}: its outline color, ${ring.color}, not transparent`).toBeGreaterThan(0);
+        for (const side of await ringSides(page, ring)) {
+          expect(side.worst, `${what}: the ring's ${side.side} side, drawn in ${ring.color}`).toBeLessThanOrEqual(RING_TOLERANCE);
+        }
+      }
     });
   }
 
@@ -309,19 +347,20 @@ test.describe('The Welcome steps in the real extension', () => {
 
       const blank = page.getByTestId('welcome-blank');
       const title = page.getByRole('heading', { level: 1, name: 'Leave blanks, fill them later' });
-      // Where the card's sentence and the title are, at each change of the blank, over a whole cycle
+      // Where the card's sentence and the title are, and when, at each change of the blank, over a whole cycle
       const samples = await page.evaluate(
         () =>
-          new Promise<Array<{ text: string; cardHeight: number; titleTop: number }>>((resolve) => {
+          new Promise<Array<{ text: string; cardHeight: number; titleTop: number; at: number }>>((resolve) => {
             const blankElement = document.querySelector('[data-testid="welcome-blank"]');
             const titleElement = document.querySelector('[data-welcome-title]');
             const card = blankElement?.closest('p')?.parentElement;
-            const seen: Array<{ text: string; cardHeight: number; titleTop: number }> = [];
+            const seen: Array<{ text: string; cardHeight: number; titleTop: number; at: number }> = [];
             const sample = (): void => {
               seen.push({
                 text: blankElement?.textContent ?? '',
                 cardHeight: card?.getBoundingClientRect().height ?? -1,
-                titleTop: titleElement?.getBoundingClientRect().top ?? -1
+                titleTop: titleElement?.getBoundingClientRect().top ?? -1,
+                at: performance.now()
               });
             };
             sample();
@@ -338,8 +377,31 @@ test.describe('The Welcome steps in the real extension', () => {
       );
 
       const texts = samples.map((sample) => sample.text);
-      expect(texts).toContain('Claire, Head of Sales');
+      expect(texts).toContain(NAME);
       expect(texts).toContain('Claire');
+      // Letter by letter, in real time: each change of the blank adds at least one letter of the name,
+      // and at most the letters due since the change before it, one every welcomeTypeLetter, plus one.
+      // Not one letter exactly: a timer that fires late shows every letter due by then (BlankDemo). The
+      // only change that takes letters away starts the next typing, once the name is whole. The first
+      // change has no upper bound: the blank's change before it came before the observer started
+      const changes = samples.filter((sample, index) => index === 0 || sample.text !== samples[index - 1].text);
+      for (const { text } of changes) {
+        expect(NAME.startsWith(text), `"${text}": a start of the name`).toBe(true);
+      }
+      for (let index = 1; index < changes.length; index++) {
+        const [before, after] = [changes[index - 1], changes[index]];
+        const waitMs = after.at - before.at;
+        const what = `"${before.text}" to "${after.text}", ${waitMs.toFixed(1)}ms after the change before it`;
+        if (after.text.length < before.text.length) {
+          expect(before.text, `${what}: a new typing starts only once the name is whole`).toBe(NAME);
+          continue;
+        }
+        const gained = after.text.length - before.text.length;
+        expect(gained, `${what}: at least one letter`).toBeGreaterThanOrEqual(1);
+        if (index > 1) {
+          expect(gained, `${what}: at most the letters due since, plus one`).toBeLessThanOrEqual(Math.ceil(waitMs / MOTION.welcomeTypeLetter) + 1);
+        }
+      }
       expect(new Set(samples.map((sample) => sample.cardHeight)).size, `card heights ${JSON.stringify(samples.map((sample) => sample.cardHeight))}`).toBe(1);
       expect(new Set(samples.map((sample) => sample.titleTop)).size, 'title positions').toBe(1);
       await expect(title).toBeVisible();
