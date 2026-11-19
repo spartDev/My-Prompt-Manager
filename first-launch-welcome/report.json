@@ -1,0 +1,3198 @@
+{
+  "machine": {
+    "cpu": "Apple M1 Pro",
+    "cores": 10,
+    "memoryGiB": 32,
+    "os": "Darwin 25.5.0",
+    "node": "v25.3.0",
+    "headless": true,
+    "commit": "327ea6c5922e773dfbbdc098544d37c76b162460"
+  },
+  "display": {
+    "measuredAt": "2026-11-18T23:59:42.643Z",
+    "tool": "Playwright on the built extension; an init script notes performance.now() (from navigation start) in each requestAnimationFrame; elementFromPoint for hit-testable; getComputedStyle opacity",
+    "fadeMs": 100,
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/158.0.0.0 Safari/537.36",
+    "viewport": {
+      "popup": {
+        "file": "popup",
+        "width": 400,
+        "height": 500
+      },
+      "sidepanel": {
+        "file": "sidepanel",
+        "width": 360,
+        "height": 720
+      }
+    },
+    "popup": {
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 28.9,
+        "min": 24.4,
+        "max": 65.7
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 46.1,
+        "min": 40.6,
+        "max": 108.9
+      },
+      "opaque": {
+        "n": 10,
+        "median": 129.4,
+        "min": 123.6,
+        "max": 191.2
+      },
+      "primaryOpaque": {
+        "n": 10,
+        "median": 129.4,
+        "min": 123.6,
+        "max": 191.2
+      },
+      "welcomeAttached": {
+        "n": 10,
+        "median": 28.9,
+        "min": 24.4,
+        "max": 65.7
+      },
+      "firstContentfulPaint": {
+        "n": 7,
+        "median": 48,
+        "min": 48,
+        "max": 68
+      },
+      "load1m": {
+        "n": 10,
+        "median": 6.9,
+        "min": 6.9,
+        "max": 7.1
+      },
+      "firstOpening": {
+        "welcomeAttached": 65.7,
+        "primaryHitTestable": 65.7,
+        "opacityAtHitTestable": 0,
+        "firstVisible": 108.9,
+        "opaque": 191.2,
+        "primaryOpaque": 191.2,
+        "firstContentfulPaint": null,
+        "load": [
+          7.1,
+          14.74,
+          20.81
+        ]
+      },
+      "runs": [
+        {
+          "welcomeAttached": 65.7,
+          "primaryHitTestable": 65.7,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 108.9,
+          "opaque": 191.2,
+          "primaryOpaque": 191.2,
+          "firstContentfulPaint": null,
+          "load": [
+            7.1,
+            14.74,
+            20.81
+          ]
+        },
+        {
+          "welcomeAttached": 25.5,
+          "primaryHitTestable": 25.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 41.7,
+          "opaque": 124.9,
+          "primaryOpaque": 124.9,
+          "firstContentfulPaint": 48,
+          "load": [
+            7.1,
+            14.74,
+            20.81
+          ]
+        },
+        {
+          "welcomeAttached": 25.6,
+          "primaryHitTestable": 25.6,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 42.4,
+          "opaque": 125.8,
+          "primaryOpaque": 125.8,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 24.9,
+          "primaryHitTestable": 24.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 41.5,
+          "opaque": 125.1,
+          "primaryOpaque": 125.1,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 25.8,
+          "primaryHitTestable": 25.8,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 43,
+          "opaque": 126.3,
+          "primaryOpaque": 126.3,
+          "firstContentfulPaint": 64,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 33,
+          "primaryHitTestable": 33,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 67.1,
+          "opaque": 149.9,
+          "primaryOpaque": 149.9,
+          "firstContentfulPaint": null,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 36.6,
+          "primaryHitTestable": 36.6,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 70.2,
+          "opaque": 152.5,
+          "primaryOpaque": 152.5,
+          "firstContentfulPaint": null,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 32.1,
+          "primaryHitTestable": 32.1,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 49.3,
+          "opaque": 132.5,
+          "primaryOpaque": 132.5,
+          "firstContentfulPaint": 68,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 37.1,
+          "primaryHitTestable": 37.1,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 53.8,
+          "opaque": 137.1,
+          "primaryOpaque": 137.1,
+          "firstContentfulPaint": 60,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 24.4,
+          "primaryHitTestable": 24.4,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 40.6,
+          "opaque": 123.6,
+          "primaryOpaque": 123.6,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        }
+      ]
+    },
+    "sidepanel": {
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 25.8,
+        "min": 22.9,
+        "max": 41.1
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 43.1,
+        "min": 37,
+        "max": 62.4
+      },
+      "opaque": {
+        "n": 10,
+        "median": 126.1,
+        "min": 119.2,
+        "max": 145.6
+      },
+      "primaryOpaque": {
+        "n": 10,
+        "median": 126.1,
+        "min": 119.2,
+        "max": 145.6
+      },
+      "welcomeAttached": {
+        "n": 10,
+        "median": 25.8,
+        "min": 22.9,
+        "max": 41.1
+      },
+      "firstContentfulPaint": {
+        "n": 8,
+        "median": 48,
+        "min": 44,
+        "max": 64
+      },
+      "load1m": {
+        "n": 10,
+        "median": 6.9,
+        "min": 6.9,
+        "max": 6.9
+      },
+      "firstOpening": {
+        "welcomeAttached": 25,
+        "primaryHitTestable": 25,
+        "opacityAtHitTestable": 0,
+        "firstVisible": 42.2,
+        "opaque": 125.6,
+        "primaryOpaque": 125.6,
+        "firstContentfulPaint": 64,
+        "load": [
+          6.93,
+          14.58,
+          20.72
+        ]
+      },
+      "runs": [
+        {
+          "welcomeAttached": 25,
+          "primaryHitTestable": 25,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 42.2,
+          "opaque": 125.6,
+          "primaryOpaque": 125.6,
+          "firstContentfulPaint": 64,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 25.9,
+          "primaryHitTestable": 25.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 42.5,
+          "opaque": 126,
+          "primaryOpaque": 126,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 29.1,
+          "primaryHitTestable": 29.1,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 62.4,
+          "opaque": 145.6,
+          "primaryOpaque": 145.6,
+          "firstContentfulPaint": null,
+          "load": [
+            6.93,
+            14.58,
+            20.72
+          ]
+        },
+        {
+          "welcomeAttached": 37.5,
+          "primaryHitTestable": 37.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 53.8,
+          "opaque": 137.3,
+          "primaryOpaque": 137.3,
+          "firstContentfulPaint": null,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 25.7,
+          "primaryHitTestable": 25.7,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 43,
+          "opaque": 124.5,
+          "primaryOpaque": 124.5,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 24.5,
+          "primaryHitTestable": 24.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 37,
+          "opaque": 119.2,
+          "primaryOpaque": 119.2,
+          "firstContentfulPaint": 44,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 24.9,
+          "primaryHitTestable": 24.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 43.1,
+          "opaque": 126.3,
+          "primaryOpaque": 126.3,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 22.9,
+          "primaryHitTestable": 22.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 39.7,
+          "opaque": 122.9,
+          "primaryOpaque": 122.9,
+          "firstContentfulPaint": 48,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 41.1,
+          "primaryHitTestable": 41.1,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 57.9,
+          "opaque": 141.1,
+          "primaryOpaque": 141.1,
+          "firstContentfulPaint": 64,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        },
+        {
+          "welcomeAttached": 26.9,
+          "primaryHitTestable": 26.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 43.8,
+          "opaque": 126.9,
+          "primaryOpaque": 126.9,
+          "firstContentfulPaint": 52,
+          "load": [
+            6.86,
+            14.44,
+            20.63
+          ]
+        }
+      ]
+    }
+  },
+  "displayFirstOpening": {
+    "measuredAt": "2026-11-19T00:01:03.587Z",
+    "tool": "the display probe, each opening the first of a fresh browser and profile, after the install records",
+    "popup": {
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 55.9,
+        "min": 43.3,
+        "max": 138.2
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 82.2,
+        "min": 74.1,
+        "max": 151.8
+      },
+      "opaque": {
+        "n": 10,
+        "median": 164.7,
+        "min": 157.1,
+        "max": 234.8
+      },
+      "primaryOpaque": {
+        "n": 10,
+        "median": 164.7,
+        "min": 157.1,
+        "max": 234.8
+      },
+      "welcomeAttached": {
+        "n": 10,
+        "median": 55.9,
+        "min": 43.3,
+        "max": 138.2
+      },
+      "firstContentfulPaint": null,
+      "load1m": {
+        "n": 10,
+        "median": 6.3,
+        "min": 5.5,
+        "max": 7
+      },
+      "firstOpening": {
+        "welcomeAttached": 43.6,
+        "primaryHitTestable": 43.6,
+        "opacityAtHitTestable": 0,
+        "firstVisible": 76.3,
+        "opaque": 159.1,
+        "primaryOpaque": 159.1,
+        "firstContentfulPaint": null,
+        "load": [
+          7.03,
+          14.35,
+          20.56
+        ]
+      },
+      "runs": [
+        {
+          "welcomeAttached": 43.6,
+          "primaryHitTestable": 43.6,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76.3,
+          "opaque": 159.1,
+          "primaryOpaque": 159.1,
+          "firstContentfulPaint": null,
+          "load": [
+            7.03,
+            14.35,
+            20.56
+          ]
+        },
+        {
+          "welcomeAttached": 43.3,
+          "primaryHitTestable": 43.3,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76.4,
+          "opaque": 159.1,
+          "primaryOpaque": 159.1,
+          "firstContentfulPaint": null,
+          "load": [
+            6.55,
+            14.13,
+            20.45
+          ]
+        },
+        {
+          "welcomeAttached": 46.5,
+          "primaryHitTestable": 46.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 75.9,
+          "opaque": 158.7,
+          "primaryOpaque": 158.7,
+          "firstContentfulPaint": null,
+          "load": [
+            6.55,
+            14.13,
+            20.45
+          ]
+        },
+        {
+          "welcomeAttached": 64.5,
+          "primaryHitTestable": 64.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76,
+          "opaque": 159,
+          "primaryOpaque": 159,
+          "firstContentfulPaint": null,
+          "load": [
+            6.58,
+            14.01,
+            20.37
+          ]
+        },
+        {
+          "welcomeAttached": 56.4,
+          "primaryHitTestable": 56.4,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 90.5,
+          "opaque": 173.1,
+          "primaryOpaque": 173.1,
+          "firstContentfulPaint": null,
+          "load": [
+            6.38,
+            13.84,
+            20.27
+          ]
+        },
+        {
+          "welcomeAttached": 138.2,
+          "primaryHitTestable": 138.2,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 151.8,
+          "opaque": 234.8,
+          "primaryOpaque": 234.8,
+          "firstContentfulPaint": null,
+          "load": [
+            6.27,
+            13.69,
+            20.18
+          ]
+        },
+        {
+          "welcomeAttached": 55.5,
+          "primaryHitTestable": 55.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 89.6,
+          "opaque": 172.2,
+          "primaryOpaque": 172.2,
+          "firstContentfulPaint": null,
+          "load": [
+            5.92,
+            13.5,
+            20.08
+          ]
+        },
+        {
+          "welcomeAttached": 56.5,
+          "primaryHitTestable": 56.5,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 90.8,
+          "opaque": 173.6,
+          "primaryOpaque": 173.6,
+          "firstContentfulPaint": null,
+          "load": [
+            5.92,
+            13.5,
+            20.08
+          ]
+        },
+        {
+          "welcomeAttached": 53.7,
+          "primaryHitTestable": 53.7,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 87.9,
+          "opaque": 170.3,
+          "primaryOpaque": 170.3,
+          "firstContentfulPaint": null,
+          "load": [
+            5.85,
+            13.36,
+            19.99
+          ]
+        },
+        {
+          "welcomeAttached": 59.3,
+          "primaryHitTestable": 59.3,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 74.1,
+          "opaque": 157.1,
+          "primaryOpaque": 157.1,
+          "firstContentfulPaint": null,
+          "load": [
+            5.54,
+            13.17,
+            19.88
+          ]
+        }
+      ]
+    },
+    "sidepanel": {
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 58.9,
+        "min": 53,
+        "max": 63.4
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 88.8,
+        "min": 76,
+        "max": 97.5
+      },
+      "opaque": {
+        "n": 10,
+        "median": 171.5,
+        "min": 159.1,
+        "max": 180.4
+      },
+      "primaryOpaque": {
+        "n": 10,
+        "median": 171.5,
+        "min": 159.1,
+        "max": 180.4
+      },
+      "welcomeAttached": {
+        "n": 10,
+        "median": 58.9,
+        "min": 53,
+        "max": 63.4
+      },
+      "firstContentfulPaint": null,
+      "load1m": {
+        "n": 10,
+        "median": 5,
+        "min": 4.7,
+        "max": 5.5
+      },
+      "firstOpening": {
+        "welcomeAttached": 63.4,
+        "primaryHitTestable": 63.4,
+        "opacityAtHitTestable": 0,
+        "firstVisible": 97.5,
+        "opaque": 180.4,
+        "primaryOpaque": 180.4,
+        "firstContentfulPaint": null,
+        "load": [
+          5.5,
+          13.03,
+          19.79
+        ]
+      },
+      "runs": [
+        {
+          "welcomeAttached": 63.4,
+          "primaryHitTestable": 63.4,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 97.5,
+          "opaque": 180.4,
+          "primaryOpaque": 180.4,
+          "firstContentfulPaint": null,
+          "load": [
+            5.5,
+            13.03,
+            19.79
+          ]
+        },
+        {
+          "welcomeAttached": 60,
+          "primaryHitTestable": 60,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 94.2,
+          "opaque": 176.3,
+          "primaryOpaque": 176.3,
+          "firstContentfulPaint": null,
+          "load": [
+            5.22,
+            12.85,
+            19.69
+          ]
+        },
+        {
+          "welcomeAttached": 60.3,
+          "primaryHitTestable": 60.3,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76,
+          "opaque": 159.5,
+          "primaryOpaque": 159.5,
+          "firstContentfulPaint": null,
+          "load": [
+            5.22,
+            12.85,
+            19.69
+          ]
+        },
+        {
+          "welcomeAttached": 57.9,
+          "primaryHitTestable": 57.9,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 92,
+          "opaque": 174.6,
+          "primaryOpaque": 174.6,
+          "firstContentfulPaint": null,
+          "load": [
+            5.04,
+            12.69,
+            19.59
+          ]
+        },
+        {
+          "welcomeAttached": 59.8,
+          "primaryHitTestable": 59.8,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76.3,
+          "opaque": 159.1,
+          "primaryOpaque": 159.1,
+          "firstContentfulPaint": null,
+          "load": [
+            4.72,
+            12.49,
+            19.48
+          ]
+        },
+        {
+          "welcomeAttached": 63.4,
+          "primaryHitTestable": 63.4,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 76.8,
+          "opaque": 160.6,
+          "primaryOpaque": 160.6,
+          "firstContentfulPaint": null,
+          "load": [
+            4.82,
+            12.38,
+            19.4
+          ]
+        },
+        {
+          "welcomeAttached": 55.2,
+          "primaryHitTestable": 55.2,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 89.4,
+          "opaque": 172.3,
+          "primaryOpaque": 172.3,
+          "firstContentfulPaint": null,
+          "load": [
+            4.67,
+            12.23,
+            19.31
+          ]
+        },
+        {
+          "welcomeAttached": 57.3,
+          "primaryHitTestable": 57.3,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 90.3,
+          "opaque": 174,
+          "primaryOpaque": 174,
+          "firstContentfulPaint": null,
+          "load": [
+            4.67,
+            12.23,
+            19.31
+          ]
+        },
+        {
+          "welcomeAttached": 54.4,
+          "primaryHitTestable": 54.4,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 87.6,
+          "opaque": 169.6,
+          "primaryOpaque": 169.6,
+          "firstContentfulPaint": null,
+          "load": [
+            4.86,
+            12.14,
+            19.23
+          ]
+        },
+        {
+          "welcomeAttached": 53,
+          "primaryHitTestable": 53,
+          "opacityAtHitTestable": 0,
+          "firstVisible": 88.1,
+          "opaque": 170.7,
+          "primaryOpaque": 170.7,
+          "firstContentfulPaint": null,
+          "load": [
+            5.19,
+            12.09,
+            19.17
+          ]
+        }
+      ]
+    }
+  },
+  "displayRealSurfaces": {
+    "measuredAt": "2026-11-19T00:55:16.799Z",
+    "tool": "Playwright; the real popup opened by chrome.action.openPopup(), its action not pinned (popup) and pinned on the toolbar (popupPinned), and the real side panel by chrome.sidePanel.open() on a click; an extension page reaches each with chrome.extension.getViews and runs the display probe in it; times from the open request, on the extension process clock",
+    "popup": {
+      "navigationStart": {
+        "n": 10,
+        "median": 279.9,
+        "min": 270.8,
+        "max": 284.1
+      },
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 327.7,
+        "min": 315.9,
+        "max": 356.5
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 348,
+        "min": 332,
+        "max": 373.3
+      },
+      "opaque": {
+        "n": 10,
+        "median": 432.1,
+        "min": 414.2,
+        "max": 456.6
+      },
+      "opaqueFromNavigationStart": {
+        "n": 10,
+        "median": 155.2,
+        "min": 137.2,
+        "max": 172.5
+      },
+      "load1m": {
+        "n": 10,
+        "median": 5.4,
+        "min": 5.1,
+        "max": 6
+      },
+      "runs": [
+        {
+          "navigationStart": 279.8,
+          "welcomeAttached": 317.4,
+          "primaryHitTestable": 317.4,
+          "firstVisible": 333,
+          "opaque": 417.4,
+          "opaqueFromNavigationStart": 137.6,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.6,
+            6.43,
+            10.45
+          ]
+        },
+        {
+          "navigationStart": 270.8,
+          "welcomeAttached": 325.6,
+          "primaryHitTestable": 325.6,
+          "firstVisible": 342.8,
+          "opaque": 425.8,
+          "opaqueFromNavigationStart": 155,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.95,
+            6.49,
+            10.45
+          ]
+        },
+        {
+          "navigationStart": 275.2,
+          "welcomeAttached": 329.8,
+          "primaryHitTestable": 329.8,
+          "firstVisible": 345,
+          "opaque": 429.9,
+          "opaqueFromNavigationStart": 154.7,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            6.03,
+            6.5,
+            10.43
+          ]
+        },
+        {
+          "navigationStart": 284.1,
+          "welcomeAttached": 356.5,
+          "primaryHitTestable": 356.5,
+          "firstVisible": 373.3,
+          "opaque": 456.6,
+          "opaqueFromNavigationStart": 172.5,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.71,
+            6.42,
+            10.38
+          ]
+        },
+        {
+          "navigationStart": 281.4,
+          "welcomeAttached": 337.2,
+          "primaryHitTestable": 337.2,
+          "firstVisible": 354.3,
+          "opaque": 436.9,
+          "opaqueFromNavigationStart": 155.5,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.41,
+            6.35,
+            10.33
+          ]
+        },
+        {
+          "navigationStart": 282.6,
+          "welcomeAttached": 323.5,
+          "primaryHitTestable": 323.5,
+          "firstVisible": 356.2,
+          "opaque": 439.1,
+          "opaqueFromNavigationStart": 156.5,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.06,
+            6.26,
+            10.27
+          ]
+        },
+        {
+          "navigationStart": 280.2,
+          "welcomeAttached": 320.5,
+          "primaryHitTestable": 320.5,
+          "firstVisible": 335.8,
+          "opaque": 417.4,
+          "opaqueFromNavigationStart": 137.2,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.06,
+            6.26,
+            10.27
+          ]
+        },
+        {
+          "navigationStart": 278.9,
+          "welcomeAttached": 334.2,
+          "primaryHitTestable": 334.2,
+          "firstVisible": 351,
+          "opaque": 434.3,
+          "opaqueFromNavigationStart": 155.4,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.46,
+            6.32,
+            10.27
+          ]
+        },
+        {
+          "navigationStart": 273.9,
+          "welcomeAttached": 315.9,
+          "primaryHitTestable": 315.9,
+          "firstVisible": 332,
+          "opaque": 414.2,
+          "opaqueFromNavigationStart": 140.3,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.42,
+            6.3,
+            10.24
+          ]
+        },
+        {
+          "navigationStart": 280,
+          "welcomeAttached": 335.4,
+          "primaryHitTestable": 335.4,
+          "firstVisible": 352.4,
+          "opaque": 435.3,
+          "opaqueFromNavigationStart": 155.3,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.14,
+            6.23,
+            10.19
+          ]
+        }
+      ]
+    },
+    "popupPinned": {
+      "navigationStart": {
+        "n": 10,
+        "median": 14.4,
+        "min": 8.8,
+        "max": 20.5
+      },
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 63.5,
+        "min": 61.6,
+        "max": 78.5
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 80.3,
+        "min": 78.7,
+        "max": 96.3
+      },
+      "opaque": {
+        "n": 10,
+        "median": 164.1,
+        "min": 162.2,
+        "max": 179.5
+      },
+      "opaqueFromNavigationStart": {
+        "n": 10,
+        "median": 154.1,
+        "min": 141.7,
+        "max": 159.6
+      },
+      "load1m": {
+        "n": 10,
+        "median": 4.3,
+        "min": 3.9,
+        "max": 5.1
+      },
+      "runs": [
+        {
+          "navigationStart": 15.7,
+          "welcomeAttached": 69,
+          "primaryHitTestable": 69,
+          "firstVisible": 85.9,
+          "opaque": 169,
+          "opaqueFromNavigationStart": 153.3,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.05,
+            6.19,
+            10.15
+          ]
+        },
+        {
+          "navigationStart": 8.8,
+          "welcomeAttached": 64,
+          "primaryHitTestable": 64,
+          "firstVisible": 80.4,
+          "opaque": 163.9,
+          "opaqueFromNavigationStart": 155.1,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            5.05,
+            6.19,
+            10.15
+          ]
+        },
+        {
+          "navigationStart": 9,
+          "welcomeAttached": 61.6,
+          "primaryHitTestable": 61.6,
+          "firstVisible": 78.7,
+          "opaque": 163.9,
+          "opaqueFromNavigationStart": 154.9,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.65,
+            6.09,
+            10.1
+          ]
+        },
+        {
+          "navigationStart": 20.5,
+          "welcomeAttached": 63,
+          "primaryHitTestable": 63,
+          "firstVisible": 80,
+          "opaque": 162.2,
+          "opaqueFromNavigationStart": 141.7,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.44,
+            6.02,
+            10.05
+          ]
+        },
+        {
+          "navigationStart": 8.9,
+          "welcomeAttached": 62.2,
+          "primaryHitTestable": 62.2,
+          "firstVisible": 79.1,
+          "opaque": 162.6,
+          "opaqueFromNavigationStart": 153.7,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.08,
+            5.92,
+            9.99
+          ]
+        },
+        {
+          "navigationStart": 19.9,
+          "welcomeAttached": 78.5,
+          "primaryHitTestable": 78.5,
+          "firstVisible": 96.3,
+          "opaque": 179.5,
+          "opaqueFromNavigationStart": 159.6,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.08,
+            5.92,
+            9.99
+          ]
+        },
+        {
+          "navigationStart": 13.1,
+          "welcomeAttached": 62.9,
+          "primaryHitTestable": 62.9,
+          "firstVisible": 78.8,
+          "opaque": 162.8,
+          "opaqueFromNavigationStart": 149.7,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.07,
+            5.89,
+            9.95
+          ]
+        },
+        {
+          "navigationStart": 9,
+          "welcomeAttached": 62.7,
+          "primaryHitTestable": 62.7,
+          "firstVisible": 80.3,
+          "opaque": 164.3,
+          "opaqueFromNavigationStart": 155.3,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            3.99,
+            5.84,
+            9.91
+          ]
+        },
+        {
+          "navigationStart": 16.3,
+          "welcomeAttached": 68.3,
+          "primaryHitTestable": 68.3,
+          "firstVisible": 85.4,
+          "opaque": 168.4,
+          "opaqueFromNavigationStart": 152.1,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            3.91,
+            5.79,
+            9.87
+          ]
+        },
+        {
+          "navigationStart": 18.1,
+          "welcomeAttached": 72.8,
+          "primaryHitTestable": 72.8,
+          "firstVisible": 88.2,
+          "opaque": 172.6,
+          "opaqueFromNavigationStart": 154.5,
+          "viewport": [
+            400,
+            500
+          ],
+          "load": [
+            4.72,
+            5.93,
+            9.9
+          ]
+        }
+      ]
+    },
+    "sidepanel": {
+      "navigationStart": {
+        "n": 10,
+        "median": 12.6,
+        "min": 6.3,
+        "max": 14.6
+      },
+      "primaryHitTestable": {
+        "n": 10,
+        "median": 71.4,
+        "min": 57.7,
+        "max": 73.1
+      },
+      "firstVisible": {
+        "n": 10,
+        "median": 71.4,
+        "min": 57.7,
+        "max": 73.1
+      },
+      "opaque": {
+        "n": 10,
+        "median": 117.1,
+        "min": 113.8,
+        "max": 130.4
+      },
+      "opaqueFromNavigationStart": {
+        "n": 10,
+        "median": 104.8,
+        "min": 103.1,
+        "max": 117.1
+      },
+      "load1m": {
+        "n": 10,
+        "median": 4.4,
+        "min": 3.6,
+        "max": 4.9
+      },
+      "runs": [
+        {
+          "navigationStart": 14.6,
+          "welcomeAttached": 70.6,
+          "primaryHitTestable": 70.6,
+          "firstVisible": 70.6,
+          "opaque": 129.7,
+          "opaqueFromNavigationStart": 115.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.72,
+            5.93,
+            9.9
+          ]
+        },
+        {
+          "navigationStart": 13.3,
+          "welcomeAttached": 68.9,
+          "primaryHitTestable": 68.9,
+          "firstVisible": 68.9,
+          "opaque": 130.4,
+          "opaqueFromNavigationStart": 117.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.34,
+            5.83,
+            9.84
+          ]
+        },
+        {
+          "navigationStart": 12.7,
+          "welcomeAttached": 72.1,
+          "primaryHitTestable": 72.1,
+          "firstVisible": 72.1,
+          "opaque": 115.8,
+          "opaqueFromNavigationStart": 103.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.07,
+            5.75,
+            9.79
+          ]
+        },
+        {
+          "navigationStart": 12.4,
+          "welcomeAttached": 71.1,
+          "primaryHitTestable": 71.1,
+          "firstVisible": 71.1,
+          "opaque": 116.5,
+          "opaqueFromNavigationStart": 104.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            3.9,
+            5.69,
+            9.74
+          ]
+        },
+        {
+          "navigationStart": 7.5,
+          "welcomeAttached": 57.7,
+          "primaryHitTestable": 57.7,
+          "firstVisible": 57.7,
+          "opaque": 113.8,
+          "opaqueFromNavigationStart": 106.3,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            3.9,
+            5.69,
+            9.74
+          ]
+        },
+        {
+          "navigationStart": 12.7,
+          "welcomeAttached": 72.4,
+          "primaryHitTestable": 72.4,
+          "firstVisible": 72.4,
+          "opaque": 117.2,
+          "opaqueFromNavigationStart": 104.5,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            3.59,
+            5.59,
+            9.68
+          ]
+        },
+        {
+          "navigationStart": 12.5,
+          "welcomeAttached": 71.4,
+          "primaryHitTestable": 71.4,
+          "firstVisible": 71.4,
+          "opaque": 117,
+          "opaqueFromNavigationStart": 104.5,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.91,
+            5.83,
+            9.74
+          ]
+        },
+        {
+          "navigationStart": 12.2,
+          "welcomeAttached": 73.1,
+          "primaryHitTestable": 73.1,
+          "firstVisible": 73.1,
+          "opaque": 117.3,
+          "opaqueFromNavigationStart": 105.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.51,
+            5.73,
+            9.69
+          ]
+        },
+        {
+          "navigationStart": 13,
+          "welcomeAttached": 71.4,
+          "primaryHitTestable": 71.4,
+          "firstVisible": 71.4,
+          "opaque": 116.7,
+          "opaqueFromNavigationStart": 103.7,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.51,
+            5.73,
+            9.69
+          ]
+        },
+        {
+          "navigationStart": 6.3,
+          "welcomeAttached": 72.6,
+          "primaryHitTestable": 72.6,
+          "firstVisible": 72.6,
+          "opaque": 117.4,
+          "opaqueFromNavigationStart": 111.1,
+          "viewport": [
+            360,
+            585
+          ],
+          "load": [
+            4.47,
+            5.7,
+            9.65
+          ]
+        }
+      ]
+    }
+  },
+  "journey": {
+    "measuredAt": "2026-11-19T00:52:32.522Z",
+    "tool": "Playwright on the built extension, the reading model: rendered words at 238 wpm, the typing demo watched to its end, KLM 1.3 s per action, machine time by the test clock",
+    "model": {
+      "wpm": 238,
+      "klmPointMs": 1100,
+      "klmClickMs": 200
+    },
+    "targetMs": 45000,
+    "totalMs": {
+      "n": 5,
+      "median": 40594,
+      "min": 40579.6,
+      "max": 40635.3
+    },
+    "machineMs": {
+      "n": 5,
+      "median": 169.7,
+      "min": 153.9,
+      "max": 211.9
+    },
+    "typingDemoMs": {
+      "n": 5,
+      "median": 4760.1,
+      "min": 4758.8,
+      "max": 4762.5
+    },
+    "words": [
+      {
+        "screen": "step 1",
+        "words": 29,
+        "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next"
+      },
+      {
+        "screen": "step 2",
+        "words": 46,
+        "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next"
+      },
+      {
+        "screen": "step 3",
+        "words": 42,
+        "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts"
+      },
+      {
+        "screen": "the Library: the Notification",
+        "words": 9,
+        "text": "9 prompts added Open your AI chat and type"
+      }
+    ],
+    "readingMs": 31764.6,
+    "klmMs": 3900,
+    "actionNames": [
+      "Next",
+      "Next",
+      "Add 9 prompts"
+    ],
+    "load1m": {
+      "n": 5,
+      "median": 8.1,
+      "min": 7.2,
+      "max": 9.2
+    },
+    "copyAfterEveryScreen": {
+      "totalMs": {
+        "n": 5,
+        "median": 55426.8,
+        "min": 55410.7,
+        "max": 55474.1
+      },
+      "machineMs": {
+        "n": 5,
+        "median": 1097.1,
+        "min": 1080,
+        "max": 1145.7
+      },
+      "actionNames": [
+        "Next",
+        "Next",
+        "Add 9 prompts",
+        "Copy"
+      ]
+    },
+    "runs": [
+      {
+        "load": [
+          9.16,
+          7.13,
+          11.05
+        ],
+        "typingDemoMs": 4758.8,
+        "actionNames": [
+          "Next",
+          "Next",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 3,
+        "journey": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 54.9
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4758.8,
+              "action": "Next",
+              "machineMs": 46
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 36.9
+            },
+            {
+              "screen": "the Library: the Notification",
+              "text": "9 prompts added Open your AI chat and type",
+              "words": 9,
+              "readingMs": 2268.9,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 74.1
+            }
+          ],
+          "words": 126,
+          "readingMs": 31764.6,
+          "watchingMs": 4758.8,
+          "actions": 3,
+          "klmMs": 3900,
+          "machineMs": 211.9,
+          "totalMs": 40635.3
+        },
+        "copyAfterEveryScreen": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 54.9
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4758.8,
+              "action": "Next",
+              "machineMs": 46
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 36.9
+            },
+            {
+              "screen": "the Library: the Notification and the first card",
+              "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+              "words": 59,
+              "readingMs": 14873.9,
+              "watchingMs": 0,
+              "action": "Copy",
+              "machineMs": 74.1
+            },
+            {
+              "screen": "the clipboard holds the Prompt",
+              "text": "",
+              "words": 0,
+              "readingMs": 0,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 933.8
+            }
+          ],
+          "words": 176,
+          "readingMs": 44369.6,
+          "watchingMs": 4758.8,
+          "actions": 4,
+          "klmMs": 5200,
+          "machineMs": 1145.7,
+          "totalMs": 55474.1,
+          "copied": "PRD from a rough idea",
+          "copy": {
+            "testClockMs": 933.8,
+            "clickCallMs": 922.1,
+            "inPageMs": 9.4
+          }
+        }
+      },
+      {
+        "load": [
+          8.9,
+          7.11,
+          11.02
+        ],
+        "typingDemoMs": 4759.7,
+        "actionNames": [
+          "Next",
+          "Next",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 3,
+        "journey": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 37.3
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4759.7,
+              "action": "Next",
+              "machineMs": 37.7
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 27.8
+            },
+            {
+              "screen": "the Library: the Notification",
+              "text": "9 prompts added Open your AI chat and type",
+              "words": 9,
+              "readingMs": 2268.9,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 66.9
+            }
+          ],
+          "words": 126,
+          "readingMs": 31764.6,
+          "watchingMs": 4759.7,
+          "actions": 3,
+          "klmMs": 3900,
+          "machineMs": 169.7,
+          "totalMs": 40594
+        },
+        "copyAfterEveryScreen": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 37.3
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4759.7,
+              "action": "Next",
+              "machineMs": 37.7
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 27.8
+            },
+            {
+              "screen": "the Library: the Notification and the first card",
+              "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+              "words": 59,
+              "readingMs": 14873.9,
+              "watchingMs": 0,
+              "action": "Copy",
+              "machineMs": 66.9
+            },
+            {
+              "screen": "the clipboard holds the Prompt",
+              "text": "",
+              "words": 0,
+              "readingMs": 0,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 929.6
+            }
+          ],
+          "words": 176,
+          "readingMs": 44369.6,
+          "watchingMs": 4759.7,
+          "actions": 4,
+          "klmMs": 5200,
+          "machineMs": 1099.3,
+          "totalMs": 55428.6,
+          "copied": "PRD from a rough idea",
+          "copy": {
+            "testClockMs": 929.6,
+            "clickCallMs": 920.8,
+            "inPageMs": 7.4
+          }
+        }
+      },
+      {
+        "load": [
+          8.08,
+          6.99,
+          10.94
+        ],
+        "typingDemoMs": 4762.5,
+        "actionNames": [
+          "Next",
+          "Next",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 3,
+        "journey": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 33.2
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4762.5,
+              "action": "Next",
+              "machineMs": 28.5
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 28.3
+            },
+            {
+              "screen": "the Library: the Notification",
+              "text": "9 prompts added Open your AI chat and type",
+              "words": 9,
+              "readingMs": 2268.9,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 64.2
+            }
+          ],
+          "words": 126,
+          "readingMs": 31764.6,
+          "watchingMs": 4762.5,
+          "actions": 3,
+          "klmMs": 3900,
+          "machineMs": 154.2,
+          "totalMs": 40581.3
+        },
+        "copyAfterEveryScreen": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 33.2
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4762.5,
+              "action": "Next",
+              "machineMs": 28.5
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 28.3
+            },
+            {
+              "screen": "the Library: the Notification and the first card",
+              "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+              "words": 59,
+              "readingMs": 14873.9,
+              "watchingMs": 0,
+              "action": "Copy",
+              "machineMs": 64.2
+            },
+            {
+              "screen": "the clipboard holds the Prompt",
+              "text": "",
+              "words": 0,
+              "readingMs": 0,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 929.5
+            }
+          ],
+          "words": 176,
+          "readingMs": 44369.6,
+          "watchingMs": 4762.5,
+          "actions": 4,
+          "klmMs": 5200,
+          "machineMs": 1083.7,
+          "totalMs": 55415.8,
+          "copied": "PRD from a rough idea",
+          "copy": {
+            "testClockMs": 929.5,
+            "clickCallMs": 919.5,
+            "inPageMs": 8.6
+          }
+        }
+      },
+      {
+        "load": [
+          7.59,
+          6.91,
+          10.88
+        ],
+        "typingDemoMs": 4761.1,
+        "actionNames": [
+          "Next",
+          "Next",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 3,
+        "journey": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 31.4
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4761.1,
+              "action": "Next",
+              "machineMs": 32.4
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 33.5
+            },
+            {
+              "screen": "the Library: the Notification",
+              "text": "9 prompts added Open your AI chat and type",
+              "words": 9,
+              "readingMs": 2268.9,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 56.6
+            }
+          ],
+          "words": 126,
+          "readingMs": 31764.6,
+          "watchingMs": 4761.1,
+          "actions": 3,
+          "klmMs": 3900,
+          "machineMs": 153.9,
+          "totalMs": 40579.6
+        },
+        "copyAfterEveryScreen": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 31.4
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4761.1,
+              "action": "Next",
+              "machineMs": 32.4
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 33.5
+            },
+            {
+              "screen": "the Library: the Notification and the first card",
+              "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+              "words": 59,
+              "readingMs": 14873.9,
+              "watchingMs": 0,
+              "action": "Copy",
+              "machineMs": 56.6
+            },
+            {
+              "screen": "the clipboard holds the Prompt",
+              "text": "",
+              "words": 0,
+              "readingMs": 0,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 926.1
+            }
+          ],
+          "words": 176,
+          "readingMs": 44369.6,
+          "watchingMs": 4761.1,
+          "actions": 4,
+          "klmMs": 5200,
+          "machineMs": 1080,
+          "totalMs": 55410.7,
+          "copied": "PRD from a rough idea",
+          "copy": {
+            "testClockMs": 926.1,
+            "clickCallMs": 910.2,
+            "inPageMs": 13.9
+          }
+        }
+      },
+      {
+        "load": [
+          7.23,
+          6.84,
+          10.84
+        ],
+        "typingDemoMs": 4760.1,
+        "actionNames": [
+          "Next",
+          "Next",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 3,
+        "journey": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 33.1
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4760.1,
+              "action": "Next",
+              "machineMs": 33.6
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 43.8
+            },
+            {
+              "screen": "the Library: the Notification",
+              "text": "9 prompts added Open your AI chat and type",
+              "words": 9,
+              "readingMs": 2268.9,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 61
+            }
+          ],
+          "words": 126,
+          "readingMs": 31764.6,
+          "watchingMs": 4760.1,
+          "actions": 3,
+          "klmMs": 3900,
+          "machineMs": 171.5,
+          "totalMs": 40596.2
+        },
+        "copyAfterEveryScreen": {
+          "screens": [
+            {
+              "screen": "step 1",
+              "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+              "words": 29,
+              "readingMs": 7310.9,
+              "watchingMs": 0,
+              "action": "Next",
+              "machineMs": 33.1
+            },
+            {
+              "screen": "step 2",
+              "text": "My Prompt Manager Skip Write a follow-up email to Claire, Head of Sales and end with one clear next step. Leave blanks, fill them later Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text. Back Next",
+              "words": 46,
+              "readingMs": 11596.6,
+              "watchingMs": 4760.1,
+              "action": "Next",
+              "machineMs": 33.6
+            },
+            {
+              "screen": "step 3",
+              "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+              "words": 42,
+              "readingMs": 10588.2,
+              "watchingMs": 0,
+              "action": "Add 9 prompts",
+              "machineMs": 43.8
+            },
+            {
+              "screen": "the Library: the Notification and the first card",
+              "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+              "words": 59,
+              "readingMs": 14873.9,
+              "watchingMs": 0,
+              "action": "Copy",
+              "machineMs": 61
+            },
+            {
+              "screen": "the clipboard holds the Prompt",
+              "text": "",
+              "words": 0,
+              "readingMs": 0,
+              "watchingMs": 0,
+              "action": null,
+              "machineMs": 925.6
+            }
+          ],
+          "words": 176,
+          "readingMs": 44369.6,
+          "watchingMs": 4760.1,
+          "actions": 4,
+          "klmMs": 5200,
+          "machineMs": 1097.1,
+          "totalMs": 55426.8,
+          "copied": "PRD from a rough idea",
+          "copy": {
+            "testClockMs": 925.6,
+            "clickCallMs": 919.1,
+            "inPageMs": 7.4
+          }
+        }
+      }
+    ]
+  },
+  "firstCopy": {
+    "measuredAt": "2026-11-19T00:52:45.726Z",
+    "tool": "Playwright on the built extension, the reading model; actions counted by the test helper act; the copy read back from the clipboard",
+    "model": {
+      "wpm": 238,
+      "klmPointMs": 1100,
+      "klmClickMs": 200
+    },
+    "targets": {
+      "firstCopyMs": 60000,
+      "actionsToReadyLibrary": 2,
+      "clicksToCopyAfterWelcome": 2
+    },
+    "totalMs": {
+      "n": 5,
+      "median": 37729.3,
+      "min": 37724.1,
+      "max": 37762
+    },
+    "machineMs": {
+      "n": 5,
+      "median": 1056.3,
+      "min": 1051.1,
+      "max": 1089
+    },
+    "wallMs": {
+      "n": 5,
+      "median": 1077.9,
+      "min": 1071.5,
+      "max": 1117.5
+    },
+    "words": [
+      {
+        "screen": "step 1",
+        "words": 29,
+        "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next"
+      },
+      {
+        "screen": "step 3",
+        "words": 42,
+        "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts"
+      },
+      {
+        "screen": "the Library: the Notification and the first card",
+        "words": 59,
+        "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used"
+      },
+      {
+        "screen": "the clipboard holds the Prompt",
+        "words": 0,
+        "text": ""
+      }
+    ],
+    "readingMs": 32773,
+    "klmMs": 3900,
+    "copyTestClockMs": {
+      "n": 5,
+      "median": 934.9,
+      "min": 930.3,
+      "max": 941.3
+    },
+    "copyClickCallMs": {
+      "n": 5,
+      "median": 931.8,
+      "min": 920.2,
+      "max": 937.3
+    },
+    "copyInPageMs": {
+      "n": 5,
+      "median": 6.5,
+      "min": 5.7,
+      "max": 10.9
+    },
+    "actionNames": [
+      "Skip",
+      "Add 9 prompts",
+      "Copy"
+    ],
+    "actionsToReadyLibrary": 2,
+    "clicksAfterWelcome": 1,
+    "load1m": {
+      "n": 5,
+      "median": 6.1,
+      "min": 5.6,
+      "max": 6.1
+    },
+    "runs": [
+      {
+        "load": [
+          6.08,
+          6.61,
+          10.68
+        ],
+        "actionNames": [
+          "Skip",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 2,
+        "clicksAfterWelcome": 1,
+        "copied": "PRD from a rough idea",
+        "copy": {
+          "testClockMs": 933.8,
+          "clickCallMs": 926.8,
+          "inPageMs": 10.1
+        },
+        "wallMs": 1117.5,
+        "screens": [
+          {
+            "screen": "step 1",
+            "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+            "words": 29,
+            "readingMs": 7310.9,
+            "watchingMs": 0,
+            "action": "Skip",
+            "machineMs": 46.4
+          },
+          {
+            "screen": "step 3",
+            "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+            "words": 42,
+            "readingMs": 10588.2,
+            "watchingMs": 0,
+            "action": "Add 9 prompts",
+            "machineMs": 48.1
+          },
+          {
+            "screen": "the Library: the Notification and the first card",
+            "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+            "words": 59,
+            "readingMs": 14873.9,
+            "watchingMs": 0,
+            "action": "Copy",
+            "machineMs": 60.7
+          },
+          {
+            "screen": "the clipboard holds the Prompt",
+            "text": "",
+            "words": 0,
+            "readingMs": 0,
+            "watchingMs": 0,
+            "action": null,
+            "machineMs": 933.8
+          }
+        ],
+        "words": 130,
+        "readingMs": 32773,
+        "watchingMs": 0,
+        "actions": 3,
+        "klmMs": 3900,
+        "machineMs": 1089,
+        "totalMs": 37762
+      },
+      {
+        "load": [
+          6.08,
+          6.61,
+          10.68
+        ],
+        "actionNames": [
+          "Skip",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 2,
+        "clicksAfterWelcome": 1,
+        "copied": "PRD from a rough idea",
+        "copy": {
+          "testClockMs": 936.5,
+          "clickCallMs": 933.6,
+          "inPageMs": 5.9
+        },
+        "wallMs": 1077.4,
+        "screens": [
+          {
+            "screen": "step 1",
+            "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+            "words": 29,
+            "readingMs": 7310.9,
+            "watchingMs": 0,
+            "action": "Skip",
+            "machineMs": 31.9
+          },
+          {
+            "screen": "step 3",
+            "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+            "words": 42,
+            "readingMs": 10588.2,
+            "watchingMs": 0,
+            "action": "Add 9 prompts",
+            "machineMs": 35.5
+          },
+          {
+            "screen": "the Library: the Notification and the first card",
+            "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+            "words": 59,
+            "readingMs": 14873.9,
+            "watchingMs": 0,
+            "action": "Copy",
+            "machineMs": 52.4
+          },
+          {
+            "screen": "the clipboard holds the Prompt",
+            "text": "",
+            "words": 0,
+            "readingMs": 0,
+            "watchingMs": 0,
+            "action": null,
+            "machineMs": 936.5
+          }
+        ],
+        "words": 130,
+        "readingMs": 32773,
+        "watchingMs": 0,
+        "actions": 3,
+        "klmMs": 3900,
+        "machineMs": 1056.3,
+        "totalMs": 37729.3
+      },
+      {
+        "load": [
+          6.08,
+          6.61,
+          10.68
+        ],
+        "actionNames": [
+          "Skip",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 2,
+        "clicksAfterWelcome": 1,
+        "copied": "PRD from a rough idea",
+        "copy": {
+          "testClockMs": 930.3,
+          "clickCallMs": 920.2,
+          "inPageMs": 10.9
+        },
+        "wallMs": 1071.5,
+        "screens": [
+          {
+            "screen": "step 1",
+            "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+            "words": 29,
+            "readingMs": 7310.9,
+            "watchingMs": 0,
+            "action": "Skip",
+            "machineMs": 36.1
+          },
+          {
+            "screen": "step 3",
+            "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+            "words": 42,
+            "readingMs": 10588.2,
+            "watchingMs": 0,
+            "action": "Add 9 prompts",
+            "machineMs": 32
+          },
+          {
+            "screen": "the Library: the Notification and the first card",
+            "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+            "words": 59,
+            "readingMs": 14873.9,
+            "watchingMs": 0,
+            "action": "Copy",
+            "machineMs": 52.7
+          },
+          {
+            "screen": "the clipboard holds the Prompt",
+            "text": "",
+            "words": 0,
+            "readingMs": 0,
+            "watchingMs": 0,
+            "action": null,
+            "machineMs": 930.3
+          }
+        ],
+        "words": 130,
+        "readingMs": 32773,
+        "watchingMs": 0,
+        "actions": 3,
+        "klmMs": 3900,
+        "machineMs": 1051.1,
+        "totalMs": 37724.1
+      },
+      {
+        "load": [
+          6.08,
+          6.61,
+          10.68
+        ],
+        "actionNames": [
+          "Skip",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 2,
+        "clicksAfterWelcome": 1,
+        "copied": "PRD from a rough idea",
+        "copy": {
+          "testClockMs": 941.3,
+          "clickCallMs": 937.3,
+          "inPageMs": 5.7
+        },
+        "wallMs": 1077.9,
+        "screens": [
+          {
+            "screen": "step 1",
+            "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+            "words": 29,
+            "readingMs": 7310.9,
+            "watchingMs": 0,
+            "action": "Skip",
+            "machineMs": 27.8
+          },
+          {
+            "screen": "step 3",
+            "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+            "words": 42,
+            "readingMs": 10588.2,
+            "watchingMs": 0,
+            "action": "Add 9 prompts",
+            "machineMs": 35.1
+          },
+          {
+            "screen": "the Library: the Notification and the first card",
+            "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+            "words": 59,
+            "readingMs": 14873.9,
+            "watchingMs": 0,
+            "action": "Copy",
+            "machineMs": 50.1
+          },
+          {
+            "screen": "the clipboard holds the Prompt",
+            "text": "",
+            "words": 0,
+            "readingMs": 0,
+            "watchingMs": 0,
+            "action": null,
+            "machineMs": 941.3
+          }
+        ],
+        "words": 130,
+        "readingMs": 32773,
+        "watchingMs": 0,
+        "actions": 3,
+        "klmMs": 3900,
+        "machineMs": 1054.3,
+        "totalMs": 37727.3
+      },
+      {
+        "load": [
+          5.59,
+          6.5,
+          10.62
+        ],
+        "actionNames": [
+          "Skip",
+          "Add 9 prompts",
+          "Copy"
+        ],
+        "actionsToReadyLibrary": 2,
+        "clicksAfterWelcome": 1,
+        "copied": "PRD from a rough idea",
+        "copy": {
+          "testClockMs": 934.9,
+          "clickCallMs": 931.8,
+          "inPageMs": 6.5
+        },
+        "wallMs": 1086,
+        "screens": [
+          {
+            "screen": "step 1",
+            "text": "My Prompt Manager Skip Your best prompts, one tap away Save the prompts you reuse and find them in a second, here or right inside your AI chat. Next",
+            "words": 29,
+            "readingMs": 7310.9,
+            "watchingMs": 0,
+            "action": "Skip",
+            "machineMs": 37
+          },
+          {
+            "screen": "step 3",
+            "text": "My Prompt Manager Start with a pack Pick what fits your work. Everything stays editable. Product 5 prompts Engineering 6 prompts Writing 4 prompts Hiring 3 prompts Type in the chat on Claude ChatGPT Mistral Gemini Perplexity Copilot Back Add 9 prompts",
+            "words": 42,
+            "readingMs": 10588.2,
+            "watchingMs": 0,
+            "action": "Add 9 prompts",
+            "machineMs": 45
+          },
+          {
+            "screen": "the Library: the Notification and the first card",
+            "text": "9 prompts added Open your AI chat and type PRD from a rough idea Act as a senior product manager. Turn this rough idea into a one-page product requirements document. Idea: {{idea}} Target users: {{target_users}} Cover the problem, goals and non-goals, user stories with acceptance criteria, success metrics and open questions. Use short headings. Product 2 variables Never used",
+            "words": 59,
+            "readingMs": 14873.9,
+            "watchingMs": 0,
+            "action": "Copy",
+            "machineMs": 50.4
+          },
+          {
+            "screen": "the clipboard holds the Prompt",
+            "text": "",
+            "words": 0,
+            "readingMs": 0,
+            "watchingMs": 0,
+            "action": null,
+            "machineMs": 934.9
+          }
+        ],
+        "words": 130,
+        "readingMs": 32773,
+        "watchingMs": 0,
+        "actions": 3,
+        "klmMs": 3900,
+        "machineMs": 1067.3,
+        "totalMs": 37740.3
+      }
+    ]
+  },
+  "existingUser": {
+    "measuredAt": "2026-11-19T00:53:08.731Z",
+    "tool": "Playwright, an init script notes performance.now() (from navigation start) in each requestAnimationFrame: the first card in the page, its copy button hit-testable (elementFromPoint) and opaque",
+    "store": "20 Prompts, the Welcome done, this Release's notes seen; the same store for both builds",
+    "beforeDist": "/private/tmp/claude-501/-Users-e0538224-Developer-My-Prompt-Manager/687d704e-e725-4781-aeb0-2925e8347b63/scratchpad/ojz16/main-dist",
+    "afterDist": "/Users/e0538224/Developer/My-Prompt-Manager/.claude/worktrees/agent-a1138b31136ca9d23/dist",
+    "before": {
+      "copyHitTestable": {
+        "n": 10,
+        "median": 28.8,
+        "min": 26.3,
+        "max": 94.4
+      },
+      "copyOpaque": {
+        "n": 10,
+        "median": 226.3,
+        "min": 221.7,
+        "max": 303.7
+      },
+      "cardAttached": {
+        "n": 10,
+        "median": 28.8,
+        "min": 26.3,
+        "max": 94.4
+      },
+      "firstContentfulPaint": {
+        "n": 10,
+        "median": 40,
+        "min": 32,
+        "max": 88
+      },
+      "load1m": {
+        "n": 10,
+        "median": 5.8,
+        "min": 5.5,
+        "max": 5.8
+      },
+      "firstOpening": {
+        "cardAttached": 94.4,
+        "copyHitTestable": 94.4,
+        "copyOpaque": 303.7,
+        "firstContentfulPaint": 88,
+        "load": [
+          5.52,
+          6.45,
+          10.53
+        ]
+      },
+      "runs": [
+        {
+          "cardAttached": 94.4,
+          "copyHitTestable": 94.4,
+          "copyOpaque": 303.7,
+          "firstContentfulPaint": 88,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 43.5,
+          "copyHitTestable": 43.5,
+          "copyOpaque": 241.7,
+          "firstContentfulPaint": 32,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 28.4,
+          "copyHitTestable": 28.4,
+          "copyOpaque": 236.4,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 26.5,
+          "copyHitTestable": 26.5,
+          "copyOpaque": 223.1,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 28.8,
+          "copyHitTestable": 28.8,
+          "copyOpaque": 227.3,
+          "firstContentfulPaint": 48,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 26.3,
+          "copyHitTestable": 26.3,
+          "copyOpaque": 221.7,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 28.7,
+          "copyHitTestable": 28.7,
+          "copyOpaque": 224.5,
+          "firstContentfulPaint": 36,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 32.6,
+          "copyHitTestable": 32.6,
+          "copyOpaque": 225.8,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 31.1,
+          "copyHitTestable": 31.1,
+          "copyOpaque": 225.4,
+          "firstContentfulPaint": 44,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 28.5,
+          "copyHitTestable": 28.5,
+          "copyOpaque": 226.9,
+          "firstContentfulPaint": 44,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        }
+      ]
+    },
+    "after": {
+      "copyHitTestable": {
+        "n": 10,
+        "median": 30.8,
+        "min": 26.1,
+        "max": 58
+      },
+      "copyOpaque": {
+        "n": 10,
+        "median": 229.7,
+        "min": 225.3,
+        "max": 284.1
+      },
+      "cardAttached": {
+        "n": 10,
+        "median": 30.8,
+        "min": 26.1,
+        "max": 58
+      },
+      "firstContentfulPaint": {
+        "n": 10,
+        "median": 46,
+        "min": 40,
+        "max": 92
+      },
+      "load1m": {
+        "n": 10,
+        "median": 5.8,
+        "min": 5.5,
+        "max": 5.8
+      },
+      "firstOpening": {
+        "cardAttached": 58,
+        "copyHitTestable": 58,
+        "copyOpaque": 284.1,
+        "firstContentfulPaint": 92,
+        "load": [
+          5.52,
+          6.45,
+          10.53
+        ]
+      },
+      "runs": [
+        {
+          "cardAttached": 58,
+          "copyHitTestable": 58,
+          "copyOpaque": 284.1,
+          "firstContentfulPaint": 92,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 26.1,
+          "copyHitTestable": 26.1,
+          "copyOpaque": 226.7,
+          "firstContentfulPaint": 48,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 29,
+          "copyHitTestable": 29,
+          "copyOpaque": 227.6,
+          "firstContentfulPaint": 48,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 31.2,
+          "copyHitTestable": 31.2,
+          "copyOpaque": 231.7,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.52,
+            6.45,
+            10.53
+          ]
+        },
+        {
+          "cardAttached": 32.9,
+          "copyHitTestable": 32.9,
+          "copyOpaque": 232.9,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 27.5,
+          "copyHitTestable": 27.5,
+          "copyOpaque": 225.7,
+          "firstContentfulPaint": 44,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 30.4,
+          "copyHitTestable": 30.4,
+          "copyOpaque": 227.7,
+          "firstContentfulPaint": 48,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 28.9,
+          "copyHitTestable": 28.9,
+          "copyOpaque": 225.3,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 47.4,
+          "copyHitTestable": 47.4,
+          "copyOpaque": 240.5,
+          "firstContentfulPaint": 56,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        },
+        {
+          "cardAttached": 39.1,
+          "copyHitTestable": 39.1,
+          "copyOpaque": 239.2,
+          "firstContentfulPaint": 40,
+          "load": [
+            5.8,
+            6.49,
+            10.52
+          ]
+        }
+      ]
+    },
+    "versions": {
+      "before": "1.9.0",
+      "after": "1.9.0"
+    },
+    "differenceOfMediansMs": 2
+  },
+  "colors": {
+    "measuredAt": "2026-11-19T00:05:11.643Z",
+    "tool": "Playwright getComputedStyle on the built extension (popup 400 x 500), each color as drawn over what is behind it; ratio by getContrastRatio of src/constants/colors.ts, the function scripts/contrast.ts prints",
+    "light": {
+      "pairs": [
+        {
+          "pair": "step title on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#1D1530",
+          "bg": "#F4F1FA",
+          "ratio": 15.65
+        },
+        {
+          "pair": "step text on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#5C5370",
+          "bg": "#F4F1FA",
+          "ratio": 6.43
+        },
+        {
+          "pair": "primary label on the primary",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#FFFFFF",
+          "bg": "#1D1530",
+          "ratio": 17.47
+        },
+        {
+          "pair": "primary on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#1D1530",
+          "bg": "#F4F1FA",
+          "ratio": 15.65
+        },
+        {
+          "pair": "active dot on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#6D28D9",
+          "bg": "#F4F1FA",
+          "ratio": 6.36
+        },
+        {
+          "pair": "inactive dot on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#8F87A5",
+          "bg": "#F4F1FA",
+          "ratio": 3.05
+        },
+        {
+          "pair": "focus outline on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#6D28D9",
+          "bg": "#F4F1FA",
+          "ratio": 6.36
+        },
+        {
+          "pair": "primary hovered on the frame (transient)",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#322B44",
+          "bg": "#F4F1FA",
+          "ratio": 12.02
+        },
+        {
+          "pair": "Back border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#8F87A5",
+          "bg": "#F4F1FA",
+          "ratio": 3.05
+        },
+        {
+          "pair": "Back label on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#1D1530",
+          "bg": "#F4F1FA",
+          "ratio": 15.65
+        },
+        {
+          "pair": "unselected Pack border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#8F87A5",
+          "bg": "#F4F1FA",
+          "ratio": 3.05
+        },
+        {
+          "pair": "unselected Pack border on its card",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#8F87A5",
+          "bg": "#FFFFFF",
+          "ratio": 3.4
+        },
+        {
+          "pair": "selected Product: border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#2563EB",
+          "bg": "#F4F1FA",
+          "ratio": 4.63
+        },
+        {
+          "pair": "selected Product: text on its tint",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#1B47A9",
+          "bg": "#E3EBFC",
+          "ratio": 6.96
+        },
+        {
+          "pair": "selected Writing: border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#9333EA",
+          "bg": "#F4F1FA",
+          "ratio": 4.82
+        },
+        {
+          "pair": "selected Writing: text on its tint",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#6A25A8",
+          "bg": "#F1E4FC",
+          "ratio": 7.06
+        }
+      ],
+      "lowest": {
+        "pair": "inactive dot on the frame",
+        "kind": "non-text",
+        "min": 3,
+        "fg": "#8F87A5",
+        "bg": "#F4F1FA",
+        "ratio": 3.05
+      },
+      "under": []
+    },
+    "dark": {
+      "pairs": [
+        {
+          "pair": "step title on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#F1EDF9",
+          "bg": "#2B2340",
+          "ratio": 12.86
+        },
+        {
+          "pair": "step text on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#BCB3D0",
+          "bg": "#2B2340",
+          "ratio": 7.41
+        },
+        {
+          "pair": "primary label on the primary",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#FFFFFF",
+          "bg": "#844BF2",
+          "ratio": 4.92
+        },
+        {
+          "pair": "primary on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#844BF2",
+          "bg": "#2B2340",
+          "ratio": 3.01
+        },
+        {
+          "pair": "active dot on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#844BF2",
+          "bg": "#2B2340",
+          "ratio": 3.01
+        },
+        {
+          "pair": "inactive dot on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#766C8E",
+          "bg": "#2B2340",
+          "ratio": 3.04
+        },
+        {
+          "pair": "focus outline on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#844BF2",
+          "bg": "#2B2340",
+          "ratio": 3.01
+        },
+        {
+          "pair": "primary hovered on the frame (transient)",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#7B47E0",
+          "bg": "#2B2340",
+          "ratio": 2.7
+        },
+        {
+          "pair": "Back border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#766C8E",
+          "bg": "#2B2340",
+          "ratio": 3.04
+        },
+        {
+          "pair": "Back label on the frame",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#F1EDF9",
+          "bg": "#2B2340",
+          "ratio": 12.86
+        },
+        {
+          "pair": "unselected Pack border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#766C8E",
+          "bg": "#2B2340",
+          "ratio": 3.04
+        },
+        {
+          "pair": "unselected Pack border on its card",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#766C8E",
+          "bg": "#231C34",
+          "ratio": 3.35
+        },
+        {
+          "pair": "selected Product: border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#789EF3",
+          "bg": "#2B2340",
+          "ratio": 5.63
+        },
+        {
+          "pair": "selected Product: text on its tint",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#789EF3",
+          "bg": "#23254C",
+          "ratio": 5.54
+        },
+        {
+          "pair": "selected Writing: border on the frame",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#BC81F2",
+          "bg": "#2B2340",
+          "ratio": 5.33
+        },
+        {
+          "pair": "selected Writing: text on its tint",
+          "kind": "text",
+          "min": 4.5,
+          "fg": "#BC81F2",
+          "bg": "#321F4C",
+          "ratio": 5.27
+        }
+      ],
+      "lowest": {
+        "pair": "primary on the frame",
+        "kind": "non-text",
+        "min": 3,
+        "fg": "#844BF2",
+        "bg": "#2B2340",
+        "ratio": 3.01
+      },
+      "under": [
+        {
+          "pair": "primary hovered on the frame (transient)",
+          "kind": "non-text",
+          "min": 3,
+          "fg": "#7B47E0",
+          "bg": "#2B2340",
+          "ratio": 2.7
+        }
+      ]
+    }
+  }
+}
