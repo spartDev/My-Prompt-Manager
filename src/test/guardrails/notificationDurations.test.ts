@@ -18,14 +18,21 @@ import { TOAST_DURATION } from '../../hooks/useToast';
  * changed on one of them, fails here, and so does a change to the defaults.
  *
  * Every Notification of src/ is shown through a ShowToast, under one of the names of SHOW_TOAST_NAMES:
- * the calls of those names are read, and any other name a ShowToast is given (a declaration typed
- * ShowToast, a prop, a property, a renamed binding or an alias) is reported, so a new route is read,
- * not missed. The options are looked into, through spreads of object literals (in parentheses, a
- * conditional, `&&`, `||` or `??`): only a `duration` they hold is recorded.
+ * the calls of those names are read, bare (`showToast(...)`) or read from a property
+ * (`latest.current.showToast(...)`). Any other name a ShowToast is given is reported: a declaration
+ * typed ShowToast, or a prop, a property, a renamed binding or an alias set to a ShowToast named bare
+ * or read from a property (`const notify = latest.current.showToast`). The options are looked into,
+ * through spreads of object literals (in parentheses, a conditional, `&&`, `||` or `??`): only a
+ * `duration` they hold is recorded.
  *
- * Known limits (a convention made executable): a duration held in a variable is read when it is a
- * `const` of the same module set to a number. What it cannot see into (options or a spread held in a
- * variable, a computed property name) is recorded as such, to be read by hand, never let through.
+ * Known limits (a convention made executable, read from the syntax alone):
+ * - A duration held in a name is read when the name is a module-level `const` set to a number and the
+ *   module binds it nowhere else. Any other name (a shadow, a parameter, a const of a function, an
+ *   import) is recorded by its name, and what it cannot see into (options or a spread held in a
+ *   variable, a computed property name) is recorded as such: to be read by hand, never let through.
+ * - Not seen: a ShowToast passed by position (`run(showToast)`) to a parameter that is not typed
+ *   ShowToast, and one reached otherwise than by its name (`api['showToast']`, `showToast.bind(api)`,
+ *   a cast or parentheses around it).
  */
 
 interface OwnDuration {
@@ -61,25 +68,29 @@ const isShowToast = (callee: ts.Expression): boolean =>
   (ts.isIdentifier(callee) && SHOW_TOAST_NAMES.has(callee.text)) ||
   (ts.isPropertyAccessExpression(callee) && SHOW_TOAST_NAMES.has(callee.name.text));
 
-/** The number a `const name = <number>` of the module holds, if it has one */
+/**
+ * The number a module-level `const name = <number>` holds, when the module binds that name once. A
+ * second binding at any depth (a variable, a parameter, a destructured name) may be the one a call
+ * reads, a shadow: the name is then not resolved, and neither is a const of a function
+ */
 const constantOf = (sourceFile: ts.SourceFile, name: string): number | undefined => {
-  let value: number | undefined;
+  const values: (number | undefined)[] = [];
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === name &&
-      node.initializer !== undefined &&
-      ts.isNumericLiteral(node.initializer) &&
-      ts.isVariableDeclarationList(node.parent) &&
-      (node.parent.flags & ts.NodeFlags.Const) !== 0
-    ) {
-      value = Number(node.initializer.text.replaceAll('_', ''));
+    if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isBindingElement(node)) && ts.isIdentifier(node.name) && node.name.text === name) {
+      const ofTheModule =
+        ts.isVariableDeclaration(node) &&
+        node.initializer !== undefined &&
+        ts.isNumericLiteral(node.initializer) &&
+        ts.isVariableDeclarationList(node.parent) &&
+        (node.parent.flags & ts.NodeFlags.Const) !== 0 &&
+        ts.isVariableStatement(node.parent.parent) &&
+        node.parent.parent.parent === sourceFile;
+      values.push(ofTheModule ? Number(node.initializer.text.replaceAll('_', '')) : undefined);
     }
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
-  return value;
+  return values.length === 1 ? values[0] : undefined;
 };
 
 const durationOf = (sourceFile: ts.SourceFile, expression: ts.Expression): number | string => {
@@ -177,12 +188,13 @@ function readNotifications(filePath: string, contents: string): { calls: number;
 const isShowToastType = (type: ts.TypeNode | undefined): boolean =>
   type !== undefined && ts.isTypeReferenceNode(type) && ts.isIdentifier(type.typeName) && type.typeName.text === 'ShowToast';
 
-const holdsShowToast = (expression: ts.Expression | undefined): boolean =>
-  expression !== undefined && ts.isIdentifier(expression) && SHOW_TOAST_NAMES.has(expression.text);
+/** A ShowToast by one of its names, bare or read from a property (`latest.current.showToast`) */
+const holdsShowToast = (expression: ts.Expression | undefined): boolean => expression !== undefined && isShowToast(expression);
 
 /**
  * Every name other than SHOW_TOAST_NAMES that a module gives a ShowToast, whose calls the scan would
- * not read: a declaration typed ShowToast, a prop or a property set to one, a renamed binding, an alias
+ * not read: a declaration typed ShowToast, a prop or a property set to one, a renamed binding, an
+ * alias; set to a ShowToast named bare or read from a property
  */
 function findOtherNames(filePath: string, contents: string): string[] {
   if (isTestPath(filePath)) {
@@ -252,6 +264,10 @@ describe('How long each Notification stays', () => {
       ['a number', "showToast('Saved', 'success', { duration: 6000 });", [6000]],
       ['a number with separators', "showToast('Saved', 'success', { duration: 6_000 });", [6000]],
       ['a const of the module', "const LONG = 4000;\nshowToast('Saved', 'success', { sub, duration: LONG });", [4000]],
+      ['a const of the module whose name a function binds again further down: by its name', "const LONG = 100;\nshowToast('Saved', 'success', { duration: LONG });\nfunction other() { const LONG = 6000; return LONG; }", ['LONG']],
+      ['a const of the module shadowed where the call is: by its name', "function show() { const LONG = 100; showToast('Saved', 'success', { duration: LONG }); }\nconst LONG = 6000;", ['LONG']],
+      ['a parameter under the name of a const of the module: by its name', "const LONG = 6000;\nconst show = (LONG: number) => { showToast('Saved', 'success', { duration: LONG }); };", ['LONG']],
+      ['a const of a function, not of the module: by its name', "function show() { const LONG = 4000; showToast('Saved', 'success', { duration: LONG }); }", ['LONG']],
       ['through a property', "latest.current.showToast('Saved', 'success', { duration: 0 });", [0]],
       ['a call of onShowToast, the prop of the Settings sections', "onShowToast('Saved', 'error', { duration: 6000 });", [6000]],
       ['an expression, as written', "showToast('Saved', 'success', { duration: base * 2 });", ['base * 2']],
@@ -282,13 +298,18 @@ describe('How long each Notification stays', () => {
       ['a prop set to it', '<Section notify={showToast} />', 'notify'],
       ['a property set to it', 'const options = { notify: onShowToast };', 'notify'],
       ['a renamed binding', 'const { showToast: notify } = props;', 'notify'],
-      ['an alias', 'const notify = showToast;', 'notify']
+      ['an alias', 'const notify = showToast;', 'notify'],
+      ['an alias of one read from a property', 'const notify = latest.current.showToast;', 'notify'],
+      ['an alias of one read from an object that holds it', 'const notify = toastApi.showToast;', 'notify'],
+      ['a prop set to one read from a property', '<Section notify={toastApi.showToast} />', 'notify'],
+      ['a property set to one read from a property', 'const options = { notify: props.onShowToast };', 'notify']
     ])('%s', (_name, source, name) => {
       expect(find(source)).toEqual([`src/components/Example.tsx:1 ${name}`]);
     });
 
     it('but not the names whose calls are read', () => {
       expect(find('interface Props { showToast: ShowToast; onShowToast?: ShowToast }\n<SettingsSection onShowToast={showToast} />\nconst { showToast } = useToast();')).toEqual([]);
+      expect(find('<SettingsSection onShowToast={latest.current.showToast} />\nconst showToast = latest.current.showToast;')).toEqual([]);
     });
   });
 

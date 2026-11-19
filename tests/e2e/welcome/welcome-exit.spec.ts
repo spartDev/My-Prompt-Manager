@@ -13,10 +13,11 @@
  *   (test-results/welcome-exit when unset).
  * - The exit Notification stays 6 s (My-Prompt-Manager-syj): its 9 words take about 2.3 s to read and
  *   its `//` comes last. In the popup 400 x 500 and the side panel 320 x 600, light and dark, it is
- *   still drawn 5.5 s after the click on "Add 9 prompts" (visible, opaque, within the viewport, read on
- *   every frame) and removed by 7 s, by the page's own clock (the click's event time), never hovered nor
- *   focused on the way; in every frame it shows, it is off the first card, whose Copy keeps the keyboard. "Your library is ready" (the
- *   Debug replay) stays as long. Screenshots and measures in WELCOME_EXIT_SCREENSHOTS too.
+ *   first drawn within 1 s of the click on "Add 9 prompts", still drawn 5.5 s after it, without a break
+ *   in between (visible, opaque, within the viewport, read on every frame), and removed by 7 s, by the
+ *   page's own clock (the click's event time), never hovered nor focused on the way; in every frame it
+ *   shows, it is off the first card, whose Copy keeps the keyboard. "Your library is ready" (the Debug
+ *   replay) stays as long. Screenshots and measures in WELCOME_EXIT_SCREENSHOTS too.
  * - S3, AC2: no Pack, "Start empty": the empty Library, then the editor on a new Prompt about 250ms
  *   later, both times read in the page as they are first seen. The exact 250ms is proven with fake
  *   timers in src/hooks/__tests__/useWelcomeExit.test.ts.
@@ -273,6 +274,14 @@ const expectWhole = (layout: ExitNotificationLayout, width: number): void => {
 const STILL_THERE_MS = 5_500;
 const GONE_BY_MS = 7_000;
 
+/**
+ * The exit Notification is first drawn within this of the click: it shows within about 60 ms of it and
+ * is opaque 170 ms into its entrance. The rest is room for a loaded machine, the same second as
+ * GONE_BY_MS gives. With STILL_THERE_MS and no break in between, it is drawn for 4.5 s at least: one
+ * first drawn in the last second of its six would pass the bounds above alone
+ */
+const DRAWN_BY_MS = 1_000;
+
 /** Where the exit Notification's time and place are checked: the popup, and the side panel at its narrowest */
 const TIME_SURFACES = [
   { file: 'popup', width: 400, height: 500 },
@@ -447,13 +456,15 @@ const followTheExitNotification = async (page: Page, message: string, name: stri
 };
 
 /**
- * Drawn STILL_THERE_MS after the click, and without a break from the end of its entrance on; removed
- * from the document by GONE_BY_MS; one pill all along, its time never stopped
+ * First drawn by DRAWN_BY_MS after the click, still drawn STILL_THERE_MS after it, and without a break
+ * from the end of its entrance on; removed from the document by GONE_BY_MS; one pill all along, its
+ * time never stopped
  */
 const expectSixSeconds = async (page: Page, timeline: ExitTimeline): Promise<void> => {
   expect(timeline.held, 'nothing hovered or focused the Notification, which would stop its time').toEqual([]);
   expect(timeline.shown, 'one Notification, from the add to its end').toBe(1);
-  const { clickAt = Number.NaN, lastDrawnAt = Number.NaN, goneAt = Number.NaN } = timeline;
+  const { clickAt = Number.NaN, firstDrawnAt = Number.NaN, lastDrawnAt = Number.NaN, goneAt = Number.NaN } = timeline;
+  expect(firstDrawnAt - clickAt, `first drawn on screen within ${String(DRAWN_BY_MS)}ms of the click`).toBeLessThanOrEqual(DRAWN_BY_MS);
   expect(lastDrawnAt - clickAt, `still drawn on screen ${String(STILL_THERE_MS)}ms after the click`).toBeGreaterThanOrEqual(STILL_THERE_MS);
   expect(timeline.undrawn, 'frames where it was in the document but not drawn, once drawn').toBe(0);
   expect(goneAt - clickAt, `gone by ${String(GONE_BY_MS)}ms after the click`).toBeLessThanOrEqual(GONE_BY_MS);
