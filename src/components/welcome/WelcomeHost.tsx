@@ -35,10 +35,12 @@ export interface WelcomeHostProps {
  * useLaunchScreen.ts). It holds the Welcome's state, moved only by the pure reducer of
  * src/welcome/reducer.ts, and renders the frame with the step's content.
  *
- * Each step change is recorded at once, in the click or key handler, without waiting for storage,
- * so a popup closed right after it reopens on that step; a Pack toggled records the step with the
- * new selection. The primary button of the last step finishes, with the Packs selected. The close
- * button records nothing: the step shown is already recorded.
+ * Each step change is recorded from the click or key handler, without waiting for storage: the
+ * handler requests the Welcome lock, and the step is written once the lock is granted and the record
+ * read, a few milliseconds later. A popup closed after that write reopens on the step; one closed
+ * before it reopens one step earlier, the window the epic accepted (D24). A Pack toggled records
+ * the step with the new selection. The primary button of the last step finishes, with the Packs
+ * selected. The close button records nothing: the step shown is already recorded, or being recorded.
  */
 const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, onStepChange, context = 'popup' }) => {
   const [state, setState] = useState<WelcomeState>(() => initialWelcomeState(step, packs));

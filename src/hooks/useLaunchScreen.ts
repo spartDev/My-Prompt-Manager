@@ -19,9 +19,11 @@ export interface LaunchScreenState {
   readonly loading: boolean;
   /**
    * Records the step the Welcome is at, and the Packs selected (left out, those already recorded
-   * are kept), so a Welcome closed by accident resumes there. The write starts at once and is not
-   * waited for, so a popup closed right after the click keeps it. Leaves `screen` as it is: the
-   * Welcome holds its own step. Only while the Welcome shows
+   * are kept), so a Welcome closed by accident resumes there. Not waited for: the click only
+   * requests the Welcome lock, and the step is written once the lock is granted and the record read,
+   * a few milliseconds later. A popup closed before that write is issued loses the step and resumes
+   * one step earlier, the window the epic accepted (D24, docs/TESTING.md, S6). Leaves `screen` as it
+   * is: the Welcome holds its own step. Only while the Welcome shows
    */
   readonly saveStep: (step: WelcomeStep, packs?: readonly string[]) => void;
   /**

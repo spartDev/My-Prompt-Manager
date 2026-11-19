@@ -425,6 +425,85 @@ describe('App: leaving the Welcome for a ready Library', () => {
     });
   });
 
+  describe('the Packs added, then the Library cannot be read again: Error Loading Data offers Try again (My-Prompt-Manager-ojz.22)', () => {
+    const ERROR_TITLE = 'Error Loading Data';
+
+    /** The add stores the Packs as it does for real; then the Library's next reads, named here, fail once each */
+    const readsFailOnceAfterTheAdd = (reads: readonly ('getPrompts' | 'getCategories')[]) => {
+      const storageManager = getMockStorageManager();
+      const addPacks = vi.mocked(storageManager.addPacks);
+      const add = addPacks.getMockImplementation() as typeof addPacks;
+      addPacks.mockImplementationOnce(async (packs) => {
+        const result = await add(packs);
+        for (const read of reads) {
+          vi.mocked(storageManager[read]).mockRejectedValueOnce(new Error('Storage could not be read'));
+        }
+        return result;
+      });
+      return addPacks;
+    };
+
+    it('AC1: shows Error Loading Data with Try again under "9 prompts added", never "Couldn\'t add the prompts"; Try again lists the 9 Prompts, the add not tried again and the Welcome still finished', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      const addPacks = readsFailOnceAfterTheAdd(['getPrompts']);
+
+      fireEvent.click(primary());
+
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      const tryAgain = screen.getByRole('button', { name: 'Try again' });
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
+      expect(screen.queryByText("Couldn't add the prompts")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+      // The Packs are in, and the Welcome is finished: the failed read lost nothing
+      expect(await stored<Prompt[]>('prompts')).toHaveLength(DEFAULT_PROMPTS.length);
+      await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
+
+      fireEvent.click(tryAgain);
+
+      await waitFor(() => { expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument(); });
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(DEFAULT_PROMPTS.length);
+      expect(cardTitles().sort()).toEqual(DEFAULT_PROMPTS.map((prompt) => prompt.title).sort());
+      expect(screen.queryByText("Couldn't add the prompts")).not.toBeInTheDocument();
+      expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+      expect(addPacks).toHaveBeenCalledTimes(1);
+      expect(welcomeDoneWrites()).toHaveLength(1);
+      expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' });
+    });
+
+    it('Try again reads the Categories again too: with both reads failed, the Library filter offers the Packs\' Categories after it', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      readsFailOnceAfterTheAdd(['getPrompts', 'getCategories']);
+      fireEvent.click(primary());
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(DEFAULT_PROMPTS.length);
+      for (const pack of DEFAULTS) {
+        expect(await screen.findByRole('radio', { name: pack.name })).toBeInTheDocument();
+      }
+    });
+
+    it('Try again whose read fails again: Error Loading Data again, with Try again', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      readsFailOnceAfterTheAdd(['getPrompts', 'getPrompts']);
+      fireEvent.click(primary());
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      const getPrompts = vi.mocked(getMockStorageManager().getPrompts);
+      const readsBefore = getPrompts.mock.calls.length;
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
+    });
+  });
+
   describe('AC4: no What\'s new right after the Welcome out of Debug mode, though its Release has notes not seen', () => {
     // A user who installed 1.9.0, left the Welcome pending, then got 2.0.0: What's new would show without the Welcome
     it.each([
