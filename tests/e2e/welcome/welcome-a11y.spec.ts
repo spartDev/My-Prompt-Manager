@@ -17,6 +17,9 @@
  *   Chrome's own accessibility tree (what a screen reader is given), as is the typing demo, hidden with
  *   its whole sentence given instead, and the Platforms' list, named by its visible caption "Type //
  *   in the chat on" (My-Prompt-Manager-ojz.19).
+ * - Step 2 says Variable, the product's word: its title and text as the owner decided them (A2, A3,
+ *   My-Prompt-Manager-j2tu.1), and "blank" or "blanks" in neither its innerText nor any accessible
+ *   name of Chrome's tree, light and dark, in the popup and the side panel.
  * - The Library behind is inert: while the Welcome shows, nothing of the Library is in the document,
  *   even over a Library that holds Prompts (Debug mode), and the keyboard never leaves the Welcome.
  * - In a short side panel (320 x 500, 320 x 420) the Packs' grid scrolls: while Packs remain below
@@ -66,7 +69,13 @@ const SURFACES = {
 type Surface = keyof typeof SURFACES;
 type Theme = 'light' | 'dark';
 
-const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+const STEP_TITLES = ['Your best prompts, one tap away', 'Add Variables, fill them in later', 'Start with a pack'] as const;
+
+/** Step 2's text: the fill promised at an Insertion through //, never for Copy (My-Prompt-Manager-j2tu.1) */
+const STEP_2_TEXT = 'Put {{name}} where the details change. When you insert with //, you fill in each Variable right in the text.';
+
+/** "blank" or "blanks", the word step 2 no longer says */
+const BLANK_WORD = /\bblanks?\b/i;
 
 const DEFAULTS = PACKS.filter((pack) => pack.defaultSelected);
 const promptsOf = (ids: readonly string[]): number =>
@@ -518,6 +527,39 @@ test.describe('The Welcome for keyboard and screen-reader users', () => {
       await page.getByRole('button', { name: 'Step 1 of 3' }).click();
       await expectStepChanged(page, 0);
     });
+  }
+
+  for (const surface of ['popup', 'sidepanel'] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      const { width, height } = SURFACES[surface];
+
+      test(`step 2 says Variable: its title and text verbatim, and no "blank" in its innerText nor in any accessible name, ${theme}, ${surface} ${String(width)} x ${String(height)}`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 1 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await openSurface(page, extensionId, surface);
+        await expectTheme(page, theme);
+        await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
+        // The demo's name typed whole, so the step is read as it finally stands
+        await expect(page.locator('[data-welcome-demo]')).toHaveAttribute('data-welcome-demo', 'done', { timeout: 15_000 });
+
+        // Soft: a failure reports every check, the word "blank" found as well as the text missing
+        const innerText = await welcome(page).innerText();
+        test.info().annotations.push({ type: 'step 2 innerText', description: innerText });
+        expect.soft(innerText.match(new RegExp(BLANK_WORD.source, 'gi')) ?? [], 'innerText: "blank" or "blanks"').toEqual([]);
+        expect.soft(innerText, 'innerText: the title').toContain(STEP_TITLES[1]);
+        expect.soft(innerText, 'innerText: the text').toContain(STEP_2_TEXT);
+
+        // What a screen reader is given: every name of Chrome's tree, the sr-only sentence of the demo included
+        const names = (await accessibilityTree(page)).map((node) => node.name).filter((name) => name !== '');
+        test.info().annotations.push({ type: 'step 2 accessible names', description: JSON.stringify(names) });
+        expect.soft(names.filter((name) => BLANK_WORD.test(name)), 'accessible names: "blank" or "blanks"').toEqual([]);
+        expect.soft(names, 'accessible names: the title').toContain(STEP_TITLES[1]);
+        expect.soft(names, 'accessible names: the text').toContain(STEP_2_TEXT);
+        expect.soft(names, "accessible names: the demo's whole sentence").toContain('Write a follow-up email to Claire, Head of Sales and end with one clear next step.');
+
+        await expect(page.getByRole('heading', { level: 1, name: STEP_TITLES[1] })).toBeVisible();
+        await expect(welcome(page).getByText(STEP_2_TEXT, { exact: true })).toBeVisible();
+      });
+    }
   }
 
   test('the Library behind is inert: nothing of it is in the document while the Welcome shows, over a Library with Prompts (Debug mode), and the keyboard never leaves the Welcome', async ({ page, storage, extensionId }) => {

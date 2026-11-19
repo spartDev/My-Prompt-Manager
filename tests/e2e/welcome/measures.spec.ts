@@ -104,7 +104,7 @@ const SURFACES = {
 
 type Surface = keyof typeof SURFACES;
 
-const STEP_TITLES = ['Your best prompts, one tap away', 'Leave blanks, fill them later', 'Start with a pack'] as const;
+const STEP_TITLES = ['Your best prompts, one tap away', 'Add Variables, fill them in later', 'Start with a pack'] as const;
 
 const DEFAULT_PACKS = PACKS.filter((pack) => pack.defaultSelected);
 const DEFAULT_COUNT = DEFAULT_PACKS.reduce((count, pack) => count + pack.prompts.length, 0);

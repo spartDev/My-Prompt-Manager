@@ -17,7 +17,9 @@ import WelcomeHost, { type WelcomeHostProps } from '../WelcomeHost';
 /**
  * The texts of the spec of record (epic My-Prompt-Manager-ojz, DESIGN, "Étape 1" to "Étape 3"), word for
  * word, but for step 1's "in this popup", now "here": the side panel is the default surface (decision D1,
- * My-Prompt-Manager-ojz.19)
+ * My-Prompt-Manager-ojz.19); and for step 2, which says Variable, the product's word, where the spec said
+ * "blanks", and promises the fill at an Insertion through //, which Copy never does (the owner's decisions
+ * A2 and A3, My-Prompt-Manager-j2tu.1)
  */
 const SPEC: Record<WelcomeStep, { title: string; text: string }> = {
   0: {
@@ -25,8 +27,8 @@ const SPEC: Record<WelcomeStep, { title: string; text: string }> = {
     text: 'Save the prompts you reuse and find them in a second, here or right inside your AI chat.'
   },
   1: {
-    title: 'Leave blanks, fill them later',
-    text: 'Put {{name}} where the details change. When you use the prompt, you fill the blanks right in the text.'
+    title: 'Add Variables, fill them in later',
+    text: 'Put {{name}} where the details change. When you insert with //, you fill in each Variable right in the text.'
   },
   2: {
     title: 'Start with a pack',
@@ -85,6 +87,23 @@ describe('Welcome steps', () => {
       renderWelcome({ step: 1 });
 
       expect(screen.getByText(SPEC[1].text).textContent).toContain('{{name}}');
+    });
+
+    it('step 2 says Variable, never blank, and promises the fill at an Insertion through //, nothing for Copy', () => {
+      const { container } = renderWelcome({ step: 1 });
+
+      const heading = screen.getByRole('heading', { level: 1 });
+      expect(heading).toHaveAccessibleName(SPEC[1].title);
+      // "blank" and "blanks" nowhere in what the step renders, assistive text included, nor in a name
+      expect(container.textContent).not.toMatch(/\bblanks?\b/i);
+      for (const element of container.querySelectorAll('[aria-label], [title]')) {
+        expect(`${element.getAttribute('aria-label') ?? ''} ${element.getAttribute('title') ?? ''}`).not.toMatch(/\bblanks?\b/i);
+      }
+      // The fill is the selector's (src/content/selector/PickerFill.tsx), reached with //; Copy copies the content as saved
+      const text = screen.getByText(SPEC[1].text, { exact: true }).textContent ?? '';
+      expect(text).toContain('with //');
+      expect(text).toContain('each Variable');
+      expect(text).not.toMatch(/\bcop(y|ies)\b/i);
     });
 
     it('keeps each title the one the step change gives the keyboard to', () => {

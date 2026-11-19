@@ -188,7 +188,7 @@ Automated: `S5 I restart Chrome, then update the extension: …`.
 
 #### S6 I close the popup at step 2, then reopen it
 
-Do: on a first install, open the extension and click Next: step 2 ("Leave blanks, fill them later"). Close the extension (click outside the popup, or close the side panel). Open it again. Then click Back, Next, and close with the Welcome's own round close button (top right). Open it again.
+Do: on a first install, open the extension and click Next: step 2 ("Add Variables, fill them in later"). Close the extension (click outside the popup, or close the side panel). Open it again. Then click Back, Next, and close with the Welcome's own round close button (top right). Open it again.
 
 You must see, each time you open it: the Welcome at step 2, the second dot long, with a Back button. The other surface (popup's page or side panel) opens at step 2 too.
 
@@ -230,7 +230,7 @@ Automated: `S10 I turn Debug mode off: …`.
 
 #### S11 I time the whole journey reading each screen
 
-Do: on a first install, start a stopwatch as you click the toolbar icon. Read every word of step 1, click Next. Read step 2 and watch the name type itself into the blank until it stops (twice, within 5 seconds), click Next. Read step 3, click Add 9 prompts. Stop when the Library shows with its Notification, once you have read it.
+Do: on a first install, start a stopwatch as you click the toolbar icon. Read every word of step 1, click Next. Read step 2 and watch the name type itself into the Variable until it stops (twice, within 5 seconds), click Next. Read step 3, click Add 9 prompts. Stop when the Library shows with its Notification, once you have read it.
 
 You must see: under 45 seconds.
 
@@ -248,7 +248,7 @@ Automated: `S12 I leave the Welcome with a Pack and copy a Prompt: …`.
 
 #### A Welcome left pending through an update
 
-Do: make a test install at version `1.9.1` (step 2 of "A test install"). Open the extension; click Next (step 2, "Leave blanks, fill them later"); close. Update by hand to `2.0.0` (copy the build over the test folder again, set the version, Reload). Open the extension; click Next. Click Add 9 prompts. Close; open the side panel, then the popup's page.
+Do: make a test install at version `1.9.1` (step 2 of "A test install"). Open the extension; click Next (step 2, "Add Variables, fill them in later"); close. Update by hand to `2.0.0` (copy the build over the test folder again, set the version, Reload). Open the extension; click Next. Click Add 9 prompts. Close; open the side panel, then the popup's page.
 
 You must see: at the first opening, the Welcome at step 1 and no What's new; after the update, the Welcome at step 2, alone, no What's new, though 2.0.0 has Release notes; step 3 with no What's new; after Add 9 prompts, the Library of 9 with "9 prompts added", and no What's new in that opening; at the next openings, the Library alone.
 
