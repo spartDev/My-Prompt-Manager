@@ -10,7 +10,7 @@
  *   page's animations are slowed a hundredfold as they start, so the clicks fall inside them on any
  *   machine; what each click met is read at its pointerdown.
  * - AC4: under prefers-reduced-motion a step change runs no animation longer than 10ms, and nothing
- *   loops: sampled once the new step shows, the dots' transitions among them.
+ *   loops: sampled as the new step commits, the dots' transitions among them.
  * - AC5 (S6): the popup closed 100ms after the click that brings step 2, sooner than a person closes
  *   a popup, then opened again: the Welcome at step 2. And the window in which a close would lose the
  *   step: the time from the click to the stored record holding it, seen from the service worker, a
@@ -266,23 +266,39 @@ test.describe('The Welcome frame in the real extension', () => {
     await open(page, extensionId, 'popup', 'reduce');
     await expect(primary(page)).toBeVisible();
 
-    // The click's update commits after this callback returns: the sample waits for step 2 to show
-    await page.evaluate(() => {
-      document.querySelector<HTMLButtonElement>('[data-testid="welcome-primary"]')?.click();
-    });
-    await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
-    // getAnimations() takes the new styles: the step change's animations and transitions. A transition
-    // stays pending until a frame starts it, so even the dots' 1ms ones are in the sample
-    const afterClick = await page.evaluate(() =>
-      document.getAnimations().map((animation) => {
-        const timing = animation.effect?.getComputedTiming();
-        return {
-          name: animation instanceof CSSAnimation ? animation.animationName : animation instanceof CSSTransition ? animation.transitionProperty : animation.id,
-          endTime: Number(timing?.endTime ?? 0),
-          iterations: timing?.iterations ?? 1
-        };
-      })
+    // The click's update commits after the click returns, so the sample is taken where step 2 commits:
+    // the observer's callback runs as a microtask right after the commit, in the same task, before any
+    // frame. There getAnimations() takes the new styles: the step change's animations and transitions,
+    // still pending, so even the dots' 1ms ones are in the sample (a frame or two later they are gone)
+    const afterClick = await page.evaluate(
+      () =>
+        new Promise<Array<{ name: string; endTime: number; iterations: number }>>((resolve, reject) => {
+          const screen = document.querySelector('[data-testid="welcome"]');
+          if (!screen) {
+            reject(new Error('no Welcome'));
+            return;
+          }
+          const observer = new MutationObserver(() => {
+            if (screen.getAttribute('data-welcome-step') !== '1') {
+              return;
+            }
+            observer.disconnect();
+            resolve(
+              document.getAnimations().map((animation) => {
+                const timing = animation.effect?.getComputedTiming();
+                return {
+                  name: animation instanceof CSSAnimation ? animation.animationName : animation instanceof CSSTransition ? animation.transitionProperty : animation.id,
+                  endTime: Number(timing?.endTime ?? 0),
+                  iterations: timing?.iterations ?? 1
+                };
+              })
+            );
+          });
+          observer.observe(screen, { attributes: true, attributeFilter: ['data-welcome-step'] });
+          document.querySelector<HTMLButtonElement>('[data-testid="welcome-primary"]')?.click();
+        })
     );
+    await expect(welcome(page)).toHaveAttribute('data-welcome-step', '1');
 
     // The dots change on every step: the sample holds at least their transitions
     expect(afterClick.length, 'the animations of the step change').toBeGreaterThan(0);
