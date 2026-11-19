@@ -1,5 +1,7 @@
 import type { Locator } from '@playwright/test';
 
+import { clickToClose } from '../utils/closingClick';
+
 import { BasePage } from './BasePage';
 
 /**
@@ -139,10 +141,10 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Navigate back from the full dashboard
+   * Navigate back from the full dashboard: Go back closes its page, and this resolves once it has closed
    */
   async navigateBack(): Promise<void> {
-    await this.getBackButton().click();
+    await clickToClose(this.page, this.getBackButton());
   }
 
   /**
