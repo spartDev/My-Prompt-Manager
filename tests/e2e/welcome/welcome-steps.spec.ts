@@ -9,7 +9,8 @@
  *   360 x 600, light and dark, with a screenshot of each in WELCOME_STEPS_SCREENSHOTS (the short side
  *   panels, with the Packs' scroll cue, are in welcome-a11y.spec.ts).
  * - More Packs than fit scroll inside the Packs' grid: the pills, the dots and the primary button stay
- *   in view. Packs are compiled in, so the test adds copies of the Pack toggles to the grid's DOM.
+ *   in view, and a mouse wheel over the grid brings the last Pack into view with the primary button
+ *   unmoved. Packs are compiled in, so the test adds copies of the Pack toggles to the grid's DOM.
  * - Step 2: the blank fills letter by letter in real time, and the card keeps its height while it
  *   does, so the title and the text under it never move.
  * - Step 2's card casts its shadow whole: the step's area clips sideways at the screen's edge, past
@@ -167,7 +168,7 @@ test.describe('The Welcome steps in the real extension', () => {
       await expect(page.getByRole('group', { name: 'Packs' }).getByRole('button')).toHaveCount(16);
 
       const room = await scrollRoom(page);
-      expect(room.packs, 'the grid scrolls').toBeGreaterThan(0);
+      expect(room.packs, 'the grid holds more than it shows').toBeGreaterThan(0);
       expect(room.step, 'the step itself does not').toBe(0);
       expect(room.page, 'nor the page').toBe(0);
       await expectInView(page, primary(page), 'the primary button');
@@ -175,6 +176,17 @@ test.describe('The Welcome steps in the real extension', () => {
       await expectInView(page, page.getByTestId('welcome-platforms'), 'the caption and the pills');
       await expectInView(page, page.getByRole('group', { name: 'Steps' }), 'the dots');
       await expectInView(page, page.getByRole('heading', { level: 1, name: 'Start with a pack' }), 'the title');
+
+      // A mouse wheel over the grid, as far down as the grid holds, scrolls it to the last Pack; the
+      // primary button stays where it was
+      const grid = page.getByTestId('welcome-packs');
+      const primaryBefore = await primary(page).boundingBox();
+      await grid.hover();
+      await page.mouse.wheel(0, room.packs);
+      await expect.poll(() => grid.evaluate((element) => element.scrollTop), { message: 'the grid scrolled under the wheel' }).toBeGreaterThan(0);
+      // Wholly shown: inside the viewport and inside the grid's scroll box, which clips the Packs past it
+      await expect(page.getByRole('group', { name: 'Packs' }).getByRole('button').last(), 'the last Pack').toBeInViewport({ ratio: 1 });
+      expect(await primary(page).boundingBox(), 'the primary button has not moved').toEqual(primaryBefore);
     });
 
     test(`step 2's card shadow fades out before the step's clip; step 3's Packs line up with the title and the pills, their focus outline whole (${surface})`, async ({ page, storage, extensionId }) => {
