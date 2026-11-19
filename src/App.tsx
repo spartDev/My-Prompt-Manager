@@ -112,6 +112,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   const {
     categories,
     loading: categoriesLoading,
+    error: categoriesError,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -516,9 +517,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const loading = promptsLoading || categoriesLoading;
 
-  // Try again on Error Loading Data: the Prompts and the Categories read again. refreshPrompts clears
-  // the error as it starts, so a read that works brings the Library back. Nothing else is redone: after
-  // the Welcome's Packs, the add has resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
+  // Try again on Error Loading Data: the Prompts and the Categories read again. Each read clears its
+  // error as it starts, so the Library comes back once both work, and the screen with its Try again
+  // once more while one still fails. Nothing else is redone: after the Welcome's Packs, the add has
+  // resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
   const retryLoad = useCallback(() => {
     void refreshPrompts();
     void refreshCategories();
@@ -554,15 +556,17 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
-  // A read of the Library that failed, even right after the Welcome's Packs were stored: Try again is
-  // the way on, so no one is left on a screen with nothing to do but close it
-  if (promptsError) {
+  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
+  // Packs were stored: Try again is the way on, so no one is left on a screen with nothing to do but
+  // close it, nor on a Library that lacks its Categories and says nothing (CR26 of PR #607)
+  const loadError = promptsError ?? categoriesError;
+  if (loadError) {
     return (
       <ThemeProvider>
         <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
-            <p className="text-secondary">{promptsError.message}</p>
+            <p className="text-secondary">{loadError.message}</p>
             {/* The Primary Button of docs/DESIGN_GUIDELINES.md */}
             <button
               type="button"

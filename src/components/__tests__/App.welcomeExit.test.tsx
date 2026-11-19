@@ -93,6 +93,28 @@ const watchForFlash = (texts: readonly string[]): (() => string[]) => {
 };
 
 /**
+ * Counts the Prompt cards added to the document, even ones gone again before the test looks: the
+ * Library shown, for a moment, before both its Prompts and its Categories are read
+ */
+const watchForCards = (): (() => number) => {
+  let added = 0;
+  const note = (records: readonly MutationRecord[]): void => {
+    for (const node of records.flatMap((record) => [...record.addedNodes])) {
+      if (node instanceof Element && (node.matches('[data-testid="prompt-card"]') || node.querySelector('[data-testid="prompt-card"]'))) {
+        added += 1;
+      }
+    }
+  };
+  const observer = new MutationObserver(note);
+  observer.observe(document.body, { childList: true, subtree: true });
+  return () => {
+    note(observer.takeRecords());
+    observer.disconnect();
+    return added;
+  };
+};
+
+/**
  * Makes each read of chrome.storage.local answer in a later task, as the real one does (it crosses
  * to the browser process): a render can then land between a read and its answer, so a Library
  * shown while it is read again would show its loading state
@@ -501,6 +523,61 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
+    });
+
+    // CR26 of PR #607: the Categories are part of the Library's read
+    it('only the Categories read fails after the add: Error Loading Data with Try again under "9 prompts added", never the Library without its Category filters; Try again lists the 9 Prompts and the Packs\' Categories', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      const addPacks = readsFailOnceAfterTheAdd(['getCategories']);
+      const cardsShown = watchForCards();
+
+      fireEvent.click(primary());
+
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
+      expect(screen.queryByText("Couldn't add the prompts")).not.toBeInTheDocument();
+      expect(cardsShown()).toBe(0);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(DEFAULT_PROMPTS.length);
+      for (const pack of DEFAULTS) {
+        expect(await screen.findByRole('radio', { name: pack.name })).toBeInTheDocument();
+        expect(screen.getAllByTitle(`Category: ${pack.name}`)).toHaveLength(pack.prompts.length);
+      }
+      expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
+      expect(addPacks).toHaveBeenCalledTimes(1);
+      expect(welcomeDoneWrites()).toHaveLength(1);
+    });
+
+    it('Try again that reads the Prompts but not the Categories: Error Loading Data again, with Try again, never the Library without its Category filters; the next Try again lists the Packs\' Categories', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      // Both reads fail after the add; at the first Try again the Prompts are read and the Categories are not
+      readsFailOnceAfterTheAdd(['getPrompts', 'getCategories', 'getCategories']);
+      fireEvent.click(primary());
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      const getCategories = vi.mocked(getMockStorageManager().getCategories);
+      const readsBefore = getCategories.mock.calls.length;
+      const cardsShown = watchForCards();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      await waitFor(() => { expect(getCategories.mock.calls.length).toBeGreaterThan(readsBefore); });
+      expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(cardsShown()).toBe(0);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(DEFAULT_PROMPTS.length);
+      for (const pack of DEFAULTS) {
+        expect(await screen.findByRole('radio', { name: pack.name })).toBeInTheDocument();
+        expect(screen.getAllByTitle(`Category: ${pack.name}`)).toHaveLength(pack.prompts.length);
+      }
+      expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
     });
   });
 

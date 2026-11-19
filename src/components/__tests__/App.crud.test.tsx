@@ -410,6 +410,25 @@ describe('App prompt workflows', () => {
     expect(await screen.findByRole('button', { name: 'Edit category Work' })).toBeInTheDocument();
   });
 
+  // CR26 of PR #607: a failed read of the Categories is a failed read of the Library
+  it('shows Error Loading Data with Try again when the Categories cannot be read at the opening, and the Library with its Category filters once they can', async () => {
+    const storageMock = getMockStorageManager();
+    storageMock.getPrompts.mockResolvedValue([basePrompt]);
+    storageMock.getCategories.mockRejectedValueOnce(new Error('Storage unavailable'));
+
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: 'Error Loading Data' })).toBeInTheDocument();
+    expect(screen.getByText('Storage unavailable')).toBeInTheDocument();
+    expect(screen.queryByText(basePrompt.title)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText(basePrompt.title)).toBeInTheDocument();
+    expect(await screen.findByRole('radio', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Error Loading Data' })).not.toBeInTheDocument();
+  });
+
   it('puts the tab bar out of reach while the Category sheet is open', async () => {
     await renderApp();
     await userEvent.click(screen.getByRole('tab', { name: 'Categories' }));
