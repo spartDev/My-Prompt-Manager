@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Toast } from '../../types/hooks';
@@ -254,6 +255,27 @@ describe('ToastContainer', () => {
       const third = screen.getByRole('button', { name: 'Try again' });
       expect(third).not.toBe(second);
       expect(third).toHaveFocus();
+    });
+
+    // A timed one: the Welcome's own has none (duration 0), where a pause changes nothing. Under
+    // StrictMode, as the side panel runs in development, the effects run twice, and the action has the
+    // keyboard before the hold listeners are put on the pill both times
+    it.each([
+      ['alone', false],
+      ['under StrictMode, whose effects run twice', true]
+    ] as const)('holds its time from that focus on, as from any other (%s): paused as its action takes the keyboard, resumed when the focus leaves', (_mode, strict) => {
+      (document.activeElement as HTMLElement | null)?.blur();
+      const onPause = vi.fn();
+      const onResume = vi.fn();
+      const pill = <ToastContainer toast={{ ...failure, id: 'timed', duration: 6000, focusAction: true }} onDismiss={onDismiss} onPause={onPause} onResume={onResume} wrap />;
+      render(strict ? <StrictMode>{pill}</StrictMode> : pill);
+      const action = screen.getByRole('button', { name: 'Try again' });
+      expect(action).toHaveFocus();
+
+      expect(onPause).toHaveBeenCalledWith('timed');
+      expect(onResume).not.toHaveBeenCalled();
+      action.blur();
+      expect(onResume.mock.calls).toEqual([['timed']]);
     });
 
     it('takes it once, as the Notification shows: a render of the same Notification moves nothing', () => {

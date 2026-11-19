@@ -68,13 +68,18 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
   }, [toastId, focusAction]);
 
   // Hovered or focused, the Notification keeps its time, so its action (Undo) can be reached and
-  // read; it runs on once neither is true. Each Notification starts unheld. Listened to on the
-  // element, as hovering or focusing the status region is no interaction with it.
+  // read; it runs on once neither is true. Each Notification starts unheld, unless the keyboard is in
+  // it already: its action took it as it showed (focusAction, above), before these listeners were
+  // put on, so the hold starts from where the keyboard is, whatever order the effects run in.
+  // Listened to on the element, as hovering or focusing the status region is no interaction with it.
   useEffect(() => {
     const pill = pillRef.current;
     if (!pill || toastId === undefined) {return;}
     let hovered = false;
-    let focused = false;
+    let focused = pill.contains(document.activeElement);
+    if (focused) {
+      onPause?.(toastId);
+    }
     const update = (change: () => void) => {
       const wasHeld = hovered || focused;
       change();
