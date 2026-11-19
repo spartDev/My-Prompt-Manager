@@ -142,7 +142,8 @@ describe('useCategories', () => {
       // Verify storage unchanged
       const data = await chrome.storage.local.get('categories');
       expect(data.categories).toEqual(mockCategories);
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should validate category name is unique', async () => {
@@ -166,7 +167,8 @@ describe('useCategories', () => {
       // Verify storage unchanged
       const data = await chrome.storage.local.get('categories');
       expect(data.categories).toEqual(mockCategories);
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should handle creation errors', async () => {
@@ -191,7 +193,8 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
       expect(result.current.loading).toBe(false);
 
       setSpy.mockRestore();
@@ -299,7 +302,8 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should handle validation errors on update', async () => {
@@ -323,7 +327,8 @@ describe('useCategories', () => {
       // Verify storage unchanged
       const data = await chrome.storage.local.get('categories');
       expect(data.categories).toEqual(mockCategories);
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should handle update errors', async () => {
@@ -344,7 +349,8 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should maintain other categories when updating one', async () => {
@@ -424,7 +430,8 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
 
       setSpy.mockRestore();
     });
@@ -447,7 +454,8 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
+      // A refused or failed change is not a failed read: App would replace the Library with an error screen
+      expect(result.current.error).toBeNull();
     });
 
     it('should maintain remaining categories after deletion', async () => {
@@ -560,7 +568,7 @@ describe('useCategories', () => {
   });
 
   describe('Error State Management', () => {
-    it('should clear error state on successful operation after error', async () => {
+    it('should keep the loaded Categories and no error after a refused creation', async () => {
       // Arrange
       await chrome.storage.local.set({ categories: mockCategories });
 
@@ -578,18 +586,12 @@ describe('useCategories', () => {
         ).rejects.toThrow();
       });
 
-      expect(result.current.error).toBeTruthy();
-
-      // Act - Create successfully
-      await act(async () => {
-        await result.current.createCategory({ name: 'Valid Category' });
-      });
-
-      // Assert - Error should be cleared
+      // Assert - The refusal reached the caller; nothing says the Categories could not be read
       expect(result.current.error).toBeNull();
+      expect(result.current.categories).toEqual(mockCategories);
     });
 
-    it('should clear error state at the start of operations', async () => {
+    it('should keep the error of a failed read until the Categories are read again', async () => {
       // Arrange - Simulate initial load error
       const getSpy = vi.spyOn(chrome.storage.local, 'get');
       getSpy.mockRejectedValueOnce(new Error('Initial load error'));
@@ -605,13 +607,22 @@ describe('useCategories', () => {
       getSpy.mockRestore();
       await chrome.storage.local.set({ categories: mockCategories });
 
-      // Act - Attempt create (will clear error state)
+      // Act - A creation that works does not read the Categories
       await act(async () => {
         await result.current.createCategory({ name: 'New Category' });
       });
 
-      // Assert - Error cleared
+      // Assert - Still not read
+      expect(result.current.error).toBeTruthy();
+
+      // Act - Read again
+      await act(async () => {
+        await result.current.refreshCategories();
+      });
+
+      // Assert - Read, with the Category created meanwhile
       expect(result.current.error).toBeNull();
+      expect(result.current.categories.map(category => category.name)).toEqual([...mockCategories.map(category => category.name), 'New Category']);
     });
   });
 });

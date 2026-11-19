@@ -10,6 +10,13 @@
  * the Library again and lists the Packs' Prompts. Two screenshots per theme, load-error-<theme>.png
  * (at rest) and load-error-focused-<theme>.png (Try again with the keyboard), in
  * WELCOME_LOAD_ERROR_SCREENSHOTS (test-results/welcome-load-error when unset).
+ *
+ * CR26 of PR #607, light and dark: the Categories are part of that read. Both reads fail after the
+ * Packs are stored, then the first Try again reads the Prompts and fails on the Categories: Error
+ * Loading Data stays, with Try again, and no Prompt card shows on the way, so the Library never shows
+ * without its Categories; the next Try again lists the Packs' Prompts, with their Categories in the
+ * Library filter and on each card. One screenshot per theme, load-error-categories-<theme>.png (the
+ * screen after the failed read of the Categories, at rest), in the same folder.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -42,11 +49,19 @@ interface ReadFailure {
   rejected: string[];
 }
 
+/** The reads to fail once the Packs are stored: how many of the Prompts, how many of the Categories */
+interface ReadsToFail {
+  message: string;
+  prompts: number;
+  categories: number;
+}
+
 /**
  * In the page, before its own scripts: once a set that carries the Prompts has resolved (the Packs
- * stored), the next read of the Prompts rejects, once. Every other read and write goes through
+ * stored), the next reads of the Prompts and of the Categories reject, as many times as asked. Every
+ * other read and write goes through
  */
-const failTheNextLibraryRead = (message: string): void => {
+const failTheNextLibraryReads = ({ message, ...left }: ReadsToFail): void => {
   const state: ReadFailure = { packsStored: false, rejected: [] };
   (window as Window & { __loadError?: ReadFailure }).__loadError = state;
   const local = chrome.storage.local;
@@ -65,7 +80,9 @@ const failTheNextLibraryRead = (message: string): void => {
   };
   patched.get = (keys) => {
     const names = keys === null || keys === undefined ? [] : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
-    if (state.packsStored && state.rejected.length === 0 && names.includes('prompts')) {
+    const key = (['prompts', 'categories'] as const).find((name) => names.includes(name) && left[name] > 0);
+    if (state.packsStored && key) {
+      left[key] -= 1;
       state.rejected.push(names.join(','));
       return Promise.reject(new Error(message));
     }
@@ -75,6 +92,26 @@ const failTheNextLibraryRead = (message: string): void => {
 
 const readFailure = (page: Page): Promise<ReadFailure | undefined> =>
   page.evaluate(() => (window as Window & { __loadError?: ReadFailure }).__loadError);
+
+/**
+ * In the page: from now on, counts the Prompt cards added to the document, even ones gone again
+ * before the test looks (the Library shown, for a moment, before its Categories are read)
+ */
+const watchForCards = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    const state = { added: 0 };
+    (window as Window & { __cardsAdded?: { added: number } }).__cardsAdded = state;
+    new MutationObserver((records) => {
+      for (const node of records.flatMap((record) => [...record.addedNodes])) {
+        if (node instanceof Element && (node.matches('[data-testid="prompt-card"]') || node.querySelector('[data-testid="prompt-card"]'))) {
+          state.added += 1;
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+
+const cardsAdded = (page: Page): Promise<number | undefined> =>
+  page.evaluate(() => (window as Window & { __cardsAdded?: { added: number } }).__cardsAdded?.added);
 
 /** Resolves once every finite animation of the page has ended */
 const animationsDone = (page: Page): Promise<void> =>
@@ -91,7 +128,7 @@ test.describe('Error Loading Data after the Welcome\'s Packs', () => {
   for (const theme of ['light', 'dark'] as const) {
     test(`AC2 (${theme}): the Library's read fails once after the Packs are stored; Error Loading Data offers Try again, with its focus ring, and Try again lists the ${String(DEFAULT_COUNT)} Prompts`, async ({ page, storage, extensionId }) => {
       await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
-      await page.addInitScript(failTheNextLibraryRead, READ_FAILURE);
+      await page.addInitScript(failTheNextLibraryReads, { message: READ_FAILURE, prompts: 1, categories: 0 });
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await page.setViewportSize({ width: WIDTH, height: HEIGHT });
       await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
@@ -153,6 +190,61 @@ test.describe('Error Loading Data after the Welcome\'s Packs', () => {
       await expect(page.getByText("Couldn't add the prompts")).toHaveCount(0);
       await expect(page.getByTestId('welcome')).toHaveCount(0);
       expect(await readFailure(page)).toEqual({ packsStored: true, rejected: ['prompts'] });
+      expect(await storage.getPrompts()).toHaveLength(DEFAULT_COUNT);
+      expect((await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+    });
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`CR26 (${theme}): Try again reads the Prompts but not the Categories; Error Loading Data stays with Try again, the Library never shown in between, and the next Try again lists the ${String(DEFAULT_COUNT)} Prompts with the Packs' Categories`, async ({ page, storage, extensionId }) => {
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
+      // Both reads fail after the add; at the first Try again the Prompts are read and the Categories are not
+      await page.addInitScript(failTheNextLibraryReads, { message: READ_FAILURE, prompts: 1, categories: 2 });
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+      await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+      if (theme === 'dark') {
+        await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+      } else {
+        await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+      }
+      await page.getByRole('button', { name: 'Skip' }).click();
+      await page.getByTestId('welcome-primary').click();
+
+      const title = page.getByRole('heading', { name: ERROR_TITLE });
+      const tryAgain = page.getByRole('button', { name: 'Try again' });
+      await expect(title).toBeVisible();
+      await expect.poll(async () => (await readFailure(page))?.rejected).toEqual(['prompts', 'categories']);
+      await watchForCards(page);
+
+      await tryAgain.click();
+
+      // The Prompts read, the Categories not: the screen is back, with its way on, and no Prompt card
+      // was shown on the way
+      await expect.poll(async () => (await readFailure(page))?.rejected).toEqual(['prompts', 'categories', 'categories']);
+      await expect(title).toBeVisible();
+      await expect(page.getByText(READ_FAILURE)).toBeVisible();
+      await expect(tryAgain).toBeVisible();
+      expect(await cardsAdded(page)).toBe(0);
+
+      // At rest, the pointer off the button so it shows no hover
+      await animationsDone(page);
+      await page.mouse.move(2, HEIGHT - 2);
+      await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `load-error-categories-${theme}.png`) });
+
+      await tryAgain.click();
+
+      // The whole Library: the Prompts, the Packs' Categories in the Library filter and on each card
+      const cards = page.getByTestId('prompt-card');
+      await expect(cards).toHaveCount(DEFAULT_COUNT);
+      for (const pack of DEFAULTS) {
+        await expect(page.getByRole('radio', { name: pack.name })).toBeVisible();
+        await expect(cards.getByTitle(`Category: ${pack.name}`, { exact: true })).toHaveCount(pack.prompts.length);
+      }
+      await expect(title).toHaveCount(0);
+      await expect(page.getByText("Couldn't add the prompts")).toHaveCount(0);
+      expect((await readFailure(page))?.rejected).toEqual(['prompts', 'categories', 'categories']);
       expect(await storage.getPrompts()).toHaveLength(DEFAULT_COUNT);
       expect((await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
     });
