@@ -1,15 +1,20 @@
 /**
- * Microsoft 365 Copilot where a work account lands: copilot.cloud.microsoft.
+ * Microsoft 365 Copilot's composer where a work account lands: copilot.cloud.microsoft.
  *
  * On 2026-11-15 copilot.microsoft.com and m365.cloud.microsoft/chat both redirected a work account
- * to copilot.cloud.microsoft/chat, where the extension did not run (My-Prompt-Manager-axv). These
- * run the real content script, on a page served at that host, so they fail if the manifest leaves
- * the host out. Its composer is a Lexical editor: the stand-in mounts a real one, as Perplexity's
- * does, so a Prompt written twice shows, with Copilot's own slash menu written by hand
- * (fixtures/platform-pages.ts, lexicalEditor and COPILOT_SLASH_MENU).
+ * to copilot.cloud.microsoft/chat, where the extension did not run (My-Prompt-Manager-axv). 2.0.0
+ * does not run there either: a host the manifest of 1.9.0 did not have disables the extension on
+ * update (ticket My-Prompt-Manager-totf), and ticket My-Prompt-Manager-j74b brings it back through
+ * the optional host permission. These run the real content script on that composer, served at
+ * m365.cloud.microsoft, whose M365 Copilot selectors and anchor chain take it; the last one proves
+ * nothing runs at copilot.cloud.microsoft. Its composer is a Lexical editor: the stand-in mounts a
+ * real one, as Perplexity's does, so a Prompt written twice shows, with Copilot's own slash menu
+ * written by hand (fixtures/platform-pages.ts, lexicalEditor and COPILOT_SLASH_MENU).
  */
+import type { Worker } from '@playwright/test';
+
 import { DEFAULT_CATEGORY } from '../../../src/types';
-import { expect, test } from '../fixtures/extension';
+import { expect, test, waitForBackgroundTarget } from '../fixtures/extension';
 import { undoButton } from '../fixtures/insertion-flow';
 import { choosePrompt, enterKeys, expectSelectorOpen, openPlatform, PLATFORM_FIELD, promptRow, promptSelector, promptsButton } from '../fixtures/platform-pages';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
@@ -35,7 +40,7 @@ const readEditor = () => {
   return lines.join('\n');
 };
 
-test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
+test.describe('Microsoft 365 Copilot, in the composer of copilot.cloud.microsoft', () => {
   test.beforeEach(async ({ storage }) => {
     await seedLibrary(storage, {
       prompts: [createPromptSeed({ category: DEFAULT_CATEGORY, ...REVIEW })],
@@ -173,5 +178,30 @@ test.describe('Microsoft 365 Copilot at copilot.cloud.microsoft', () => {
 
     await undoButton(page).click();
     await expect.poll(() => page.evaluate(readEditor), { message: 'empty again' }).toBe('');
+  });
+});
+
+test.describe('copilot.cloud.microsoft, where 2.0.0 does not run (ticket My-Prompt-Manager-totf)', () => {
+  test('the extension holds no permission there, adds no Prompts button, and leaves a // typed there alone', async ({ context, storage }) => {
+    await seedLibrary(storage, { prompts: [createPromptSeed({ category: DEFAULT_CATEGORY, ...REVIEW })] });
+    const background = (await waitForBackgroundTarget(context)) as Worker;
+    const permissions = await background.evaluate(() => chrome.permissions.getAll());
+    expect(permissions.origins).not.toContain('https://copilot.cloud.microsoft/*');
+    expect(await background.evaluate(() => chrome.permissions.contains({ origins: ['https://copilot.cloud.microsoft/*'] }))).toBe(false);
+
+    const atWork = await openPlatform(context, 'm365copilot-editor', { url: 'https://copilot.cloud.microsoft/' });
+    await atWork.waitForLoadState('load');
+    // The same page opened after it at m365.cloud.microsoft gets its Prompts button: by then the
+    // content script would have run in the page opened first too
+    const atM365 = await openPlatform(context, 'm365copilot-editor');
+    await expect(promptsButton(atM365)).toHaveAttribute('data-mpm-placement', 'toolbar');
+
+    await expect(promptsButton(atWork)).toHaveCount(0);
+    await atWork.locator(PLATFORM_FIELD['m365copilot-editor']).click();
+    await atWork.keyboard.type('//');
+    const typed = () => atWork.locator('[data-lexical-editor] [data-lexical-text]:not([aria-hidden])').allTextContents().then((parts) => parts.join(''));
+    await expect.poll(typed, { message: 'the // stays where it was typed' }).toBe('//');
+    await expect(atWork.locator('#mpm-prompt-selector')).toHaveCount(0);
+    await expect(promptsButton(atWork)).toHaveCount(0);
   });
 });

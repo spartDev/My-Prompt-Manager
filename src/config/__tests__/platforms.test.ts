@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { withTheWorkAccountHost } from '../../test/helpers/work-account-host';
 import {
   getAllHostnamePatterns,
   getAllSupportedHostnames,
@@ -12,6 +13,7 @@ import {
   getPlatformById,
   getPlatformsByPriority,
   isHostnameSupported,
+  M365_WORK_ACCOUNT_HOSTNAME,
   platformHostnames,
   SUPPORTED_PLATFORMS
 } from '../platforms';
@@ -155,17 +157,26 @@ describe('Platform Linking Configuration', () => {
 describe('getLinkedPlatformHostnames', () => {
   it('should return every Copilot host when given copilot.microsoft.com', () => {
     expect(getLinkedPlatformHostnames('copilot.microsoft.com'))
-      .toEqual(['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']);
+      .toEqual(['copilot.microsoft.com', 'm365.cloud.microsoft']);
   });
 
   it('should return every Copilot host when given m365.cloud.microsoft', () => {
     expect(getLinkedPlatformHostnames('m365.cloud.microsoft'))
-      .toEqual(['m365.cloud.microsoft', 'copilot.cloud.microsoft', 'copilot.microsoft.com']);
+      .toEqual(['m365.cloud.microsoft', 'copilot.microsoft.com']);
   });
 
-  it('should return the host first, then the other hosts of its Platform, then the linked ones, given copilot.cloud.microsoft', () => {
-    expect(getLinkedPlatformHostnames('copilot.cloud.microsoft'))
-      .toEqual(['copilot.cloud.microsoft', 'm365.cloud.microsoft', 'copilot.microsoft.com']);
+  describe('with M365 Copilot at copilot.cloud.microsoft too, as ticket My-Prompt-Manager-j74b brings it back', () => {
+    withTheWorkAccountHost();
+
+    it('should return every Copilot host when given copilot.microsoft.com', () => {
+      expect(getLinkedPlatformHostnames('copilot.microsoft.com'))
+        .toEqual(['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']);
+    });
+
+    it('should return the host first, then the other hosts of its Platform, then the linked ones, given copilot.cloud.microsoft', () => {
+      expect(getLinkedPlatformHostnames('copilot.cloud.microsoft'))
+        .toEqual(['copilot.cloud.microsoft', 'm365.cloud.microsoft', 'copilot.microsoft.com']);
+    });
   });
 
   it('should return just the hostname for non-linked platforms', () => {
@@ -235,11 +246,26 @@ describe('Icon placement selectors', () => {
 });
 
 describe('the other hosts of a Platform', () => {
-  it('finds Microsoft 365 Copilot at copilot.cloud.microsoft, where a work account is redirected', () => {
-    expect(getPlatformByHostname('copilot.cloud.microsoft')?.id).toBe('m365copilot');
+  it('finds no Platform at copilot.cloud.microsoft in 2.0.0, where a work account is redirected: the extension neither runs nor claims to work there (ticket My-Prompt-Manager-totf)', () => {
+    expect(M365_WORK_ACCOUNT_HOSTNAME).toBe('copilot.cloud.microsoft');
+    expect(SUPPORTED_PLATFORMS.m365copilot.otherHostnames).toEqual([]);
+    expect(getPlatformByHostname('copilot.cloud.microsoft')).toBeUndefined();
     expect(getPlatformByHostname('m365.cloud.microsoft')?.id).toBe('m365copilot');
-    expect(isHostnameSupported('copilot.cloud.microsoft')).toBe(true);
-    expect(getAllSupportedHostnames()).toContain('copilot.cloud.microsoft');
+    expect(isHostnameSupported('copilot.cloud.microsoft')).toBe(false);
+    expect(getAllSupportedHostnames()).not.toContain('copilot.cloud.microsoft');
+    expect(getDefaultEnabledPlatforms()).not.toContain('copilot.cloud.microsoft');
+    expect(getLinkedPlatformHostnames('copilot.cloud.microsoft')).toEqual(['copilot.cloud.microsoft']);
+  });
+
+  describe('once ticket My-Prompt-Manager-j74b gives copilot.cloud.microsoft back to M365 Copilot', () => {
+    withTheWorkAccountHost();
+
+    it('finds Microsoft 365 Copilot at copilot.cloud.microsoft, where a work account is redirected', () => {
+      expect(getPlatformByHostname('copilot.cloud.microsoft')?.id).toBe('m365copilot');
+      expect(getPlatformByHostname('m365.cloud.microsoft')?.id).toBe('m365copilot');
+      expect(isHostnameSupported('copilot.cloud.microsoft')).toBe(true);
+      expect(getAllSupportedHostnames()).toContain('copilot.cloud.microsoft');
+    });
   });
 
   it('keeps copilot.microsoft.com on Copilot, for an account that stays there', () => {

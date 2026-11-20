@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
+import { withTheWorkAccountHost } from '../../test/helpers/work-account-host';
 import type { CustomSitePositioning, ElementFingerprint } from '../../types';
 import {
   applyIconPlacementRepairChange,
@@ -493,7 +494,9 @@ describe('overrideFromPick', () => {
   });
 });
 
-describe('the hosts of one Platform (M365 Copilot at m365.cloud.microsoft and copilot.cloud.microsoft)', () => {
+describe('the hosts of one Platform (M365 Copilot at m365.cloud.microsoft and copilot.cloud.microsoft, which ticket My-Prompt-Manager-j74b gives back to it)', () => {
+  withTheWorkAccountHost();
+
   const COPILOT_ROW = ['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft'];
   /** An overlay recorded at m365.cloud.microsoft before it redirected a work account, then one at copilot.cloud.microsoft */
   const storeBoth = async () => {

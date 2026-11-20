@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../services/iconPlacementRepairs';
 import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
+import { giveTheWorkAccountHostBack } from '../../test/helpers/work-account-host';
 import { getChromeMock } from '../../test/mocks';
 
 vi.mock('../../utils/logger', () => ({
@@ -277,12 +278,12 @@ describe('background: the icon placement of each tab of a Platform', () => {
     const M365_PICK = { mode: 'custom', placement: 'before', selector: SEND_BUTTON };
 
     /** The browser starts again with the tabs restored: the service worker starts, then Chrome tells it of the startup */
-    const restart = async (tabs: chrome.tabs.Tab[]) => {
+    const restart = async (tabs: chrome.tabs.Tab[], start = startServiceWorker) => {
       await chrome.storage.session.clear();
       vi.mocked(chrome.tabs.query).mockResolvedValue(tabs as never);
       // The restored tabs are still open as the service worker read them
       vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
-      const listener = await startServiceWorker();
+      const listener = await start();
       for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
         (onStartup as () => void)();
       }
@@ -290,36 +291,57 @@ describe('background: the icon placement of each tab of a Platform', () => {
       return listener;
     };
 
-    it('keeps the pick of a restored M365 Copilot tab when a tab at its other host reports first', async () => {
-      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+    describe('with a tab at copilot.cloud.microsoft, once ticket My-Prompt-Manager-j74b gives it back to M365 Copilot', () => {
+      /** Takes the host away again from the Platform list the test's service worker loaded */
+      let takeBack: (() => void) | undefined;
+      afterEach(() => {
+        takeBack?.();
+        takeBack = undefined;
+      });
 
-      const listener = await restart([M365_TAB, REDIRECTED_TAB]);
-      await report(listener, REDIRECTED_TAB, 'overlay');
+      /**
+       * The service worker started on a Platform list where M365 Copilot has copilot.cloud.microsoft
+       * back, as ticket My-Prompt-Manager-j74b brings it: it loads a list of its own (vi.resetModules),
+       * so the host is given back on that list, and taken away after the test
+       */
+      const startWithTheWorkAccountHost = async (): Promise<MessageListener> => {
+        const listener = await startServiceWorker();
+        takeBack = giveTheWorkAccountHostBack((await import('../../config/platforms')).SUPPORTED_PLATFORMS);
+        return listener;
+      };
 
-      expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
-    });
+      it('keeps the pick of a restored M365 Copilot tab when a tab at its other host reports first', async () => {
+        await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
 
-    it('keeps the pick of a restored M365 Copilot tab when the tab at its other host reports while the open tabs are read', async () => {
-      await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
-      await chrome.storage.session.clear();
-      const tabs = [M365_TAB, REDIRECTED_TAB];
-      vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
-      const listener = await startServiceWorker();
-      // The restored tab at copilot.cloud.microsoft reports while the service worker reads the open tabs
-      let reported: Promise<unknown> = Promise.resolve();
-      vi.mocked(chrome.tabs.query).mockImplementation((async () => {
-        reported = report(listener, REDIRECTED_TAB, 'overlay');
-        await new Promise((resolve) => { setTimeout(resolve, 10); });
-        return tabs;
-      }) as never);
+        const listener = await restart([M365_TAB, REDIRECTED_TAB], startWithTheWorkAccountHost);
+        expect(await report(listener, REDIRECTED_TAB, 'overlay')).toEqual({ success: true });
 
-      for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
-        (onStartup as () => void)();
-      }
-      await vi.waitFor(() => { expect(chrome.tabs.query).toHaveBeenCalled(); });
-      expect(await reported).toEqual({ success: true });
+        expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+      });
 
-      expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+      it('keeps the pick of a restored M365 Copilot tab when the tab at its other host reports while the open tabs are read', async () => {
+        await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
+        await chrome.storage.session.clear();
+        const tabs = [M365_TAB, REDIRECTED_TAB];
+        vi.mocked(chrome.tabs.get).mockImplementation((async (tabId: number) => tabs.find((tab) => tab.id === tabId)) as never);
+        const listener = await startWithTheWorkAccountHost();
+        // The restored tab at copilot.cloud.microsoft reports while the service worker reads the open tabs
+        let reported: Promise<unknown> = Promise.resolve();
+        vi.mocked(chrome.tabs.query).mockImplementation((async () => {
+          reported = report(listener, REDIRECTED_TAB, 'overlay');
+          await new Promise((resolve) => { setTimeout(resolve, 10); });
+          return tabs;
+        }) as never);
+
+        for (const [onStartup] of vi.mocked(getChromeMock().runtime.onStartup.addListener).mock.calls) {
+          (onStartup as () => void)();
+        }
+        await vi.waitFor(() => { expect(chrome.tabs.query).toHaveBeenCalled(); });
+        expect(await reported).toEqual({ success: true });
+
+        expect(await storedRepairs()).toMatchObject({ 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } });
+      });
+
     });
 
     it('drops it once the restored tab reports its Toolbar, as before the restart', async () => {

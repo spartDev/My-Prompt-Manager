@@ -10,15 +10,20 @@
  * Debug mode once it is finished in that opening: proven by the hook and App tests until the
  * Welcome has the controls that finish it (My-Prompt-Manager-ojz.7, .9; e2e My-Prompt-Manager-ojz.12).
  *
- * Two builds. dist/ is at the repository's manifest version (1.9.0), which has no Release notes:
- * there an update to it shows nothing. The registry has Release notes for 2.0.0 only, so the update
- * that shows What's new runs on dist-e2e-whats-new/, the same build with its manifest version set to
- * 2.0.0 (fixtures/whats-new-build.ts): the sheet shows, a close writes the Last seen Release, and the
- * next opening shows nothing; a first install of 2.0.0 shows the Welcome, not What's new.
+ * Three builds. dist/ is at the repository's manifest version: there a first install opens on the
+ * Welcome, and a Last seen Release equal to that version, or Debug mode switched off again, leaves the
+ * Library alone. The registry has Release notes for some Releases only, so the cases that need one or
+ * the other run on copies of the build at a fixed version (fixtures/whats-new-build.ts), whatever the
+ * manifest's version:
  *
- * On 1.9.0 the "nothing shows" checks hold for any record, since that Release has no notes: there they
- * only prove the record is left as it was. The rules themselves are proven on 2.0.0 and by the hook
- * and App tests (src/launch/__tests__/decide.test.ts, src/hooks/__tests__/useLaunchScreen.test.ts,
+ * - dist-e2e-whats-new/ at 2.0.0, which has Release notes: the sheet shows, a close writes the Last
+ *   seen Release, and the next opening shows nothing; a first install of 2.0.0 shows the Welcome, not
+ *   What's new;
+ * - dist-e2e-without-notes/ at 1.9.0, which has none: an update to it shows nothing. That check holds
+ *   for any record, since the Release has no notes: there it only proves the record is left as it was.
+ *
+ * The rules themselves are proven on 2.0.0 and by the hook and App tests
+ * (src/launch/__tests__/decide.test.ts, src/hooks/__tests__/useLaunchScreen.test.ts,
  * src/components/__tests__/App.whatsNew.test.tsx).
  */
 
@@ -31,12 +36,17 @@ import { SITE_SETTINGS_KEY } from '../../src/services/siteSettings';
 import { WELCOME_KEY } from '../../src/welcome/storage';
 import { WHATS_NEW_KEY } from '../../src/whatsNew/storage';
 import { createStorageController, type ExtensionStorage, expect, test, waitForFirstInstallRecords } from './fixtures/extension';
-import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from './fixtures/whats-new-build';
+import {
+  RELEASE_WITHOUT_NOTES,
+  RELEASE_WITHOUT_NOTES_EXTENSION_PATH,
+  WHATS_NEW_UPDATE_EXTENSION_PATH,
+  WHATS_NEW_UPDATE_VERSION
+} from './fixtures/whats-new-build';
 import { createPromptSeed, seedLibrary } from './utils/storage';
 
 const WHATS_NEW = /what.s new/i;
 
-/** The installed Release of dist/: the repository's manifest version, 1.9.0 */
+/** The installed Release of dist/: the repository's manifest version */
 const INSTALLED = (JSON.parse(readFileSync(path.resolve(process.cwd(), 'manifest.json'), 'utf-8')) as { version: string }).version;
 
 /** Time for the popup to read storage and decide, once the Library shows, before "not shown" is asserted */
@@ -110,9 +120,11 @@ const storageAfterInstall = async (context: BrowserContext, extensionId: string,
   return storage;
 };
 
-test.describe("What's new in the real extension", () => {
-  test(`update case: an update from 1.8.0 to ${INSTALLED}, a Release without notes, shows nothing and writes no Last seen Release`, async ({ context, extensionId }) => {
-    const storage = await storageAfterInstall(context, extensionId, INSTALLED);
+test.describe(`What's new after an update to ${RELEASE_WITHOUT_NOTES}, a Release without notes`, () => {
+  test.use({ extensionPath: RELEASE_WITHOUT_NOTES_EXTENSION_PATH });
+
+  test(`update case: an update from 1.8.0 to ${RELEASE_WITHOUT_NOTES} shows nothing and writes no Last seen Release`, async ({ context, extensionId }) => {
+    const storage = await storageAfterInstall(context, extensionId, RELEASE_WITHOUT_NOTES);
     await seedPopup(storage, { [WHATS_NEW_KEY]: { installedVersion: '1.8.0' } });
 
     for (let opening = 0; opening < 2; opening++) {
@@ -123,7 +135,9 @@ test.describe("What's new in the real extension", () => {
 
     expect(await storedRecord(storage)).toEqual({ installedVersion: '1.8.0' });
   });
+});
 
+test.describe("What's new in the real extension", () => {
   test('reopen after a close: with the installed Release as the Last seen Release, nothing shows and the record stays', async ({ context, extensionId }) => {
     const storage = await storageAfterInstall(context, extensionId, INSTALLED);
     const record = { installedVersion: '1.8.0', lastSeenVersion: INSTALLED };

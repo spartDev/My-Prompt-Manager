@@ -215,7 +215,8 @@ const CASES: ComposerCase[] = [
   },
   {
     platform: 'm365copilot',
-    url: 'https://copilot.cloud.microsoft/chat',
+    // The composer of copilot.cloud.microsoft, where 2.0.0 does not run (ticket My-Prompt-Manager-totf)
+    url: 'https://m365.cloud.microsoft/chat',
     html: m365copilotComposer,
     composer: '.fai-BebopLiteChatInput__inputWrapper',
     neighbour: 'button[aria-label="Start dictation"]',

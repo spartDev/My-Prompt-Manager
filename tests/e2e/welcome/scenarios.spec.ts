@@ -23,13 +23,13 @@
  * their pages, src/popup.html at 400 x 500 and src/sidepanel.html at 360 x 720, each opening a new
  * page in a tab, as the e2e suite opens them everywhere.
  *
- * Builds: a new user installs the Release that brings the Welcome, 2.0.0, which has Release notes,
- * so What's new could show there and must not (dist-e2e-whats-new, fixtures/whats-new-build.ts). The
- * Debug scenarios run on dist/ at 1.9.0, a Release without notes, for an existing user updated from
- * 1.8.0 who never closed a What's new: a Debug session that wrote the Last seen Release would show
- * there. The tests of updates, S5, S7 and the two beside them (S7 with no Prompt, and a Welcome left
- * pending through an update, My-Prompt-Manager-ojz.18), run on copies of the build of their own
- * (`ownInstall`).
+ * Builds (fixtures/whats-new-build.ts), each a copy of dist/ at a fixed version, whatever the
+ * manifest's: a new user installs the Release that brings the Welcome, 2.0.0, which has Release notes,
+ * so What's new could show there and must not (dist-e2e-whats-new). The Debug scenarios run on
+ * dist-e2e-without-notes at 1.9.0, a Release without notes, for an existing user updated from 1.8.0
+ * who never closed a What's new: a Debug session that wrote the Last seen Release would show there.
+ * The tests of updates, S5, S7 and the two beside them (S7 with no Prompt, and a Welcome left pending
+ * through an update, My-Prompt-Manager-ojz.18), run on copies of the build of their own (`ownInstall`).
  *
  * S11 and S12 time the journey with the reading model of the epic's measurement plan, the words on
  * each screen read at 238 words a minute (Brysbaert 2019) plus 1.1 s of pointing and 0.2 s of click
@@ -63,7 +63,12 @@ import {
 } from '../fixtures/extension';
 import { copyBuildAt, updateExtensionInPlace } from '../fixtures/extension-update';
 import { type OnInstalledEvent, onInstalledEvents } from '../fixtures/oninstalled-probe';
-import { WHATS_NEW_UPDATE_EXTENSION_PATH, WHATS_NEW_UPDATE_VERSION } from '../fixtures/whats-new-build';
+import {
+  RELEASE_WITHOUT_NOTES,
+  RELEASE_WITHOUT_NOTES_EXTENSION_PATH,
+  WHATS_NEW_UPDATE_EXTENSION_PATH,
+  WHATS_NEW_UPDATE_VERSION
+} from '../fixtures/whats-new-build';
 import { clickToClose } from '../utils/closingClick';
 import { createPromptSeed, seedLibrary } from '../utils/storage';
 import { emptyFiller, fillStorage } from '../utils/storageFiller';
@@ -76,8 +81,8 @@ const OUTPUT_DIR = 'test-results/welcome';
 /** The Release that brings the Welcome; the Release notes registry has notes for it */
 const NEW_RELEASE = WHATS_NEW_UPDATE_VERSION;
 
-/** The Release of dist/, the repository's manifest version: no Release notes */
-const BUILT_RELEASE = '1.9.0';
+/** The Release before the one that brings the Welcome: what an existing user of S7 updates from */
+const EARLIER_RELEASE = '1.9.0';
 
 /** Time for a screen that should not come to show up, once what shows instead is in view */
 const SETTLE_MS = 750;
@@ -632,7 +637,7 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
 
   test('S7 I start from an earlier Release with Prompts, and update: I see my Library, never the Welcome', async () => {
     test.slow();
-    const install = await ownInstall(BUILT_RELEASE);
+    const install = await ownInstall(EARLIER_RELEASE);
     try {
       const before = await storageOf(install.context);
       await waitForFirstInstallRecords(before.storage);
@@ -643,10 +648,10 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
       expect(Object.keys(await before.storage.get()).sort()).toEqual(['categories', 'interfaceMode', 'prompts', 'settings']);
 
       const worker = await install.update(before.extensionId, NEW_RELEASE);
-      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}`)).toEqual({ reason: 'update', previousVersion: BUILT_RELEASE, version: NEW_RELEASE });
+      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}`)).toEqual({ reason: 'update', previousVersion: EARLIER_RELEASE, version: NEW_RELEASE });
       const storage = createStorageController(worker);
       // Written by 'update' only: the Release it came from (an 'install' writes the new one), the Welcome done
-      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: BUILT_RELEASE });
+      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: EARLIER_RELEASE });
       await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
       expect(await storage.getPrompts()).toEqual(library);
 
@@ -690,7 +695,7 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
   // pending record written by the update would show the Welcome at the first opening
   test('S7 I start from an earlier Release with no Prompt, and update: I see my empty Library, never the Welcome', async () => {
     test.slow();
-    const install = await ownInstall(BUILT_RELEASE);
+    const install = await ownInstall(EARLIER_RELEASE);
     try {
       const before = await storageOf(install.context);
       await waitForFirstInstallRecords(before.storage);
@@ -701,9 +706,9 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
       expect(await before.storage.getPrompts()).toEqual([]);
 
       const worker = await install.update(before.extensionId, NEW_RELEASE);
-      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}, no Prompt`)).toEqual({ reason: 'update', previousVersion: BUILT_RELEASE, version: NEW_RELEASE });
+      expect(await lastOnInstalled(worker, `update to ${NEW_RELEASE}, no Prompt`)).toEqual({ reason: 'update', previousVersion: EARLIER_RELEASE, version: NEW_RELEASE });
       const storage = createStorageController(worker);
-      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: BUILT_RELEASE });
+      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: EARLIER_RELEASE });
       await expect.poll(async () => recordOf(storage, WELCOME_KEY)).toEqual({ status: 'done' });
 
       // The first opening: What's new of the Release, as for every user who updates to it (S5), over
@@ -716,7 +721,7 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
       await sheet.getByRole('button', { name: 'Got it' }).click();
       await expect(sheet).toHaveCount(0);
       await expectLibraryAlone(popup, 0);
-      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: BUILT_RELEASE, lastSeenVersion: NEW_RELEASE });
+      await expect.poll(async () => recordOf(storage, WHATS_NEW_KEY)).toEqual({ installedVersion: EARLIER_RELEASE, lastSeenVersion: NEW_RELEASE });
       await popup.close();
 
       for (const surface of ['sidepanel', 'popup'] as const) {
@@ -816,13 +821,16 @@ test.describe('A restart of Chrome and updates, each a real event of Chromium', 
 // =====================================================================================================
 
 test.describe('Debug mode, switched in Settings', () => {
+  // A Release without notes: the existing user of S9 and S10 sees the Library alone before Debug mode
+  test.use({ extensionPath: RELEASE_WITHOUT_NOTES_EXTENSION_PATH });
+
   test('S8 I turn Debug mode on and open the extension three times: I see the Welcome each time, from step 1', async ({ context, extensionId }) => {
     const storage = await firstInstallStorage(context);
     // A new user finishes the Welcome, then turns Debug mode on in Settings
     const popup = await openExtension(context, extensionId);
     await finishWithDefaultPacks(popup);
     await expect(cards(popup)).toHaveCount(DEFAULT_COUNT);
-    const records = { [WELCOME_KEY]: { status: 'done' }, [WHATS_NEW_KEY]: { installedVersion: BUILT_RELEASE, lastSeenVersion: BUILT_RELEASE } };
+    const records = { [WELCOME_KEY]: { status: 'done' }, [WHATS_NEW_KEY]: { installedVersion: RELEASE_WITHOUT_NOTES, lastSeenVersion: RELEASE_WITHOUT_NOTES } };
     await expect.poll(async () => storage.get([WELCOME_KEY, WHATS_NEW_KEY])).toEqual(records);
     await switchDebugMode(popup, storage, true);
     await popup.close();

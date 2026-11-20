@@ -131,7 +131,8 @@ describe('the input fields of a built-in Platform', () => {
     ['chat.mistral.ai', '/work', composer('mistral'), '[contenteditable="true"]'],
     ['www.perplexity.ai', '/', composer('perplexity'), '[contenteditable="true"]'],
     ['copilot.microsoft.com', '/', composer('copilot'), 'textarea'],
-    ['copilot.cloud.microsoft', '/chat', composer('m365copilot'), '[data-lexical-editor]']
+    // The composer read at copilot.cloud.microsoft, where 2.0.0 does not run (ticket My-Prompt-Manager-totf)
+    ['m365.cloud.microsoft', '/chat', composer('m365copilot'), '[data-lexical-editor]']
   ])('on %s%s the composer is the first field matched', async (hostname, pathname, page, editorSelector) => {
     document.body.innerHTML = page;
     const editor = document.querySelector(editorSelector);

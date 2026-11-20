@@ -367,13 +367,13 @@ describe("useTheme", () => {
           theme: "dark",
         });
       });
-      // Every host of every Platform, copilot.cloud.microsoft where M365 Copilot sends a work account included
+      // Every host of every Platform; not copilot.cloud.microsoft, where 2.0.0 runs no content script (ticket My-Prompt-Manager-totf)
       const queried = vi.mocked(chrome.tabs.query).mock.calls.map(([query]) => query.url).find(Array.isArray) as string[];
       expect(queried).toEqual(expect.arrayContaining([
         "https://claude.ai/*",
         "https://m365.cloud.microsoft/*",
-        "https://copilot.cloud.microsoft/*",
       ]));
+      expect(queried).not.toContain("https://copilot.cloud.microsoft/*");
     });
 
     it("should handle tabs without content script gracefully", async () => {

@@ -1,8 +1,9 @@
 /**
  * Microsoft 365 Copilot Platform Strategy module
  *
- * Microsoft 365 Copilot, at m365.cloud.microsoft and at copilot.cloud.microsoft where a work account
- * lands. Its composer is a Lexical editor: the Insertion and Undo of LexicalStrategy, a paste that
+ * Microsoft 365 Copilot, at m365.cloud.microsoft; at copilot.cloud.microsoft, where a work account
+ * lands, once ticket My-Prompt-Manager-j74b brings it back (M365_WORK_ACCOUNT_HOSTNAME). Its
+ * composer is a Lexical editor: the Insertion and Undo of LexicalStrategy, a paste that
  * is never written a second time. A textarea, if the composer ever has one, takes the text through
  * its native value setter.
  */

@@ -44,8 +44,10 @@ export class PlacementRepair {
   private atLaterAnchor = false;
   /**
    * Whether storage holds a repair for this Platform, at this host or at a host that redirects here:
-   * until it does, a Toolbar needs no report. A repair at a host that redirects here
-   * (m365.cloud.microsoft to copilot.cloud.microsoft) is cleared only by a report of this one
+   * until it does, a Toolbar needs no report. A repair at a host that redirects here is cleared only
+   * by a report of this one. None in 2.0.0, where no Platform has another hostname:
+   * m365.cloud.microsoft, which sends a work account to copilot.cloud.microsoft, counts as one once
+   * ticket My-Prompt-Manager-j74b gives that host back to M365 Copilot
    */
   private hasRepair = false;
   /** This host, then the hosts that redirect here (redirectSourcesOf) */

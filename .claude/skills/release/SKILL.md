@@ -66,7 +66,7 @@ Branch off `$BASE` as `release/vX.Y.Z`, then:
   [X.Y.Z]: https://github.com/spartDev/My-Prompt-Manager/compare/$LAST...vX.Y.Z
   ```
 
-  The last line defines the heading's link and closes the section, as in every earlier release, so the extracted notes carry it too. Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…), one per user-visible change; leave out `test`, `ci` and `chore` commits unless the user would notice them.
+  The last line defines the heading's link and closes the section, as in every earlier release, so the extracted notes carry it too. Keep only the subsections that have entries. Write each entry in the user's terms and the domain terms of `CONTEXT.md` (Prompt, Library, Category…). The changelog lists every change, technical ones included (`CONTEXT.md`, section Releases), `test`, `ci` and `chore` commits among them; dependency bumps may share one line, and CI-only changes another. The Release notes the user reads are What's new's (`src/whatsNew/releaseNotes.ts`), not this section.
 - **`README.md`**: the version badge, the `prompt-library-extension-vX.Y.Z.zip` name, and the `### Version X.Y (Current)` heading of the Roadmap when the minor changes.
 
 Done when: `node -p "[require('./package.json').version, require('./package-lock.json').version, require('./manifest.json').version].join(' ')"` prints `X.Y.Z` three times, and `grep -nF "${LAST#v}" README.md` (`$LAST` from step 1) finds only lines unrelated to the release, such as a dependency that happens to share the number.

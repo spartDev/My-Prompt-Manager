@@ -387,9 +387,11 @@ export function moveIconPlacementTab(fromTabId: number, toTabId: number, hostnam
 }
 
 /**
- * The hosts that redirect to this one: the Platform's main hostname, for one of its other hostnames
- * (m365.cloud.microsoft sends a work account to copilot.cloud.microsoft). None for the main hostname,
- * nor for a host of no Platform. The redirect goes one way only.
+ * The hosts that redirect to this one: the Platform's main hostname, for one of its other hostnames.
+ * None for the main hostname, nor for a host of no Platform. The redirect goes one way only. None for
+ * any host in 2.0.0, where no Platform has another hostname: m365.cloud.microsoft, which sends a work
+ * account to copilot.cloud.microsoft, counts as one once ticket My-Prompt-Manager-j74b gives that
+ * host back to M365 Copilot.
  */
 export function redirectSourcesOf(hostname: string): string[] {
   const platform = getPlatformByHostname(hostname);

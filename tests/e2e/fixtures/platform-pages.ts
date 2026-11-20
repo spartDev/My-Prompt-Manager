@@ -20,7 +20,7 @@ import { expect } from './extension';
  * - claude.ai: a contenteditable editor without an editor library, so Insertion goes
  *   through the Claude strategy's execCommand('insertText'). It is styled
  *   `white-space: pre-wrap`, as ProseMirror is, so spaces stay as typed.
- * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, copilot.cloud.microsoft: a contenteditable
+ * - chat.mistral.ai, gemini.google.com, www.perplexity.ai, m365.cloud.microsoft: a contenteditable
  *   without an editor library, with the attributes each strategy selects on, so Insertion goes
  *   through that strategy's execCommand path.
  * - copilot.microsoft.com: a plain <textarea>, filled through the native value setter.
@@ -30,9 +30,13 @@ import { expect } from './extension';
  * break written straight into its DOM as a space. See PARAGRAPH_EDITOR.
  *
  * One more stands in for Perplexity's live composer, a Lexical editor: a real one, from the lexical
- * package at the version perplexity.ai serves. See lexicalEditor. Another runs the same editor at
- * copilot.cloud.microsoft, whose composer is a Lexical editor too, with Copilot's own slash menu
+ * package at the version perplexity.ai serves. See lexicalEditor. Another runs the same editor in
+ * the composer of copilot.cloud.microsoft, a Lexical editor too, with Copilot's own slash menu
  * written by hand (COPILOT_SLASH_MENU).
+ *
+ * The two pages of that composer are served at m365.cloud.microsoft: 2.0.0 does not run at
+ * copilot.cloud.microsoft (ticket My-Prompt-Manager-totf), and M365 Copilot's selectors and anchor
+ * chain take its composer on either host. Ticket My-Prompt-Manager-j74b serves them there again.
  *
  * And one keeps the Fluent composer m365.cloud.microsoft served before it redirected a work account
  * to copilot.cloud.microsoft, so the content script is proven to run on that host still.
@@ -443,7 +447,7 @@ const PERPLEXITY_EDITOR_HTML = plainPage(
  * Microsoft 365 Copilot where a work account lands, copilot.cloud.microsoft: its composer
  * (M365COPILOT_FIELD), its toolbar rendered after the editor and the Prompts button
  * (LATE_TOOLBAR), the same Lexical editor as Perplexity's (lexicalEditor), and Copilot's own slash
- * menu (COPILOT_SLASH_MENU).
+ * menu (COPILOT_SLASH_MENU). Served at m365.cloud.microsoft (see the header).
  */
 const M365COPILOT_EDITOR_HTML = plainPage('Microsoft 365 Copilot', M365COPILOT_FIELD, M365COPILOT_BAR, 'div')
   .replace('</body>', `${lexicalEditor('[data-lexical-editor]', COPILOT_SLASH_MENU)}${LATE_TOOLBAR}\n  </body>`);
@@ -479,7 +483,8 @@ const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: str
   'chatgpt-editor': { url: 'https://chatgpt.com/', html: CHATGPT_EDITOR_HTML },
   'mistral-editor': { url: 'https://chat.mistral.ai/', html: MISTRAL_EDITOR_HTML },
   'perplexity-editor': { url: 'https://www.perplexity.ai/', html: PERPLEXITY_EDITOR_HTML },
-  'm365copilot-editor': { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_EDITOR_HTML },
+  // The composer of copilot.cloud.microsoft, where 2.0.0 does not run (see the header)
+  'm365copilot-editor': { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_EDITOR_HTML },
   'm365copilot-fluent': { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_FLUENT_HTML },
   chatgpt: { url: 'https://chatgpt.com/', html: CHATGPT_REACT_HTML },
   claude: { url: 'https://claude.ai/', html: CLAUDE_EDITOR_HTML },
@@ -487,7 +492,7 @@ const FIXTURES: Record<PlatformFixture | EditorFixture, { url: string; html: str
   gemini: { url: 'https://gemini.google.com/', html: GEMINI_HTML },
   perplexity: { url: 'https://www.perplexity.ai/', html: PERPLEXITY_HTML },
   copilot: { url: 'https://copilot.microsoft.com/', html: COPILOT_HTML },
-  m365copilot: { url: 'https://copilot.cloud.microsoft/', html: M365COPILOT_HTML },
+  m365copilot: { url: 'https://m365.cloud.microsoft/', html: M365COPILOT_HTML },
 };
 
 const readModuleScript = ({ module, file }: ModuleScript): string => {
@@ -496,15 +501,16 @@ const readModuleScript = ({ module, file }: ModuleScript): string => {
 };
 
 /**
- * Serves the Platform's stand-in page (and nothing else: other requests are aborted).
- * Returns the URL to open.
+ * Serves the Platform's stand-in page (and nothing else: other requests are aborted), at its
+ * Platform's host or at `options.url`. Returns the URL to open.
  */
 export async function routePlatform(
   context: BrowserContext,
   platform: PlatformFixture | EditorFixture,
-  options: { headers?: Record<string, string> } = {}
+  options: { headers?: Record<string, string>; url?: string } = {}
 ): Promise<string> {
-  const { url, html } = FIXTURES[platform];
+  const { html } = FIXTURES[platform];
+  const url = options.url ?? FIXTURES[platform].url;
 
   await context.route(`${url}**`, async (route) => {
     const request = route.request();
@@ -529,7 +535,7 @@ export async function routePlatform(
 export async function openPlatform(
   context: BrowserContext,
   platform: PlatformFixture | EditorFixture,
-  options: { headers?: Record<string, string> } = {}
+  options: { headers?: Record<string, string>; url?: string } = {}
 ): Promise<Page> {
   const url = await routePlatform(context, platform, options);
   const page = await context.newPage();

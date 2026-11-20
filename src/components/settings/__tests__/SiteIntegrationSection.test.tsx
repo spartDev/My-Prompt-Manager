@@ -56,9 +56,10 @@ describe('SiteIntegrationSection - AI sites group', () => {
     const siteConfigs = { 'copilot.microsoft.com': { name: 'Microsoft Copilot', icon: () => <span>C</span> } };
     render(<SiteIntegrationSection {...defaultProps} siteConfigs={siteConfigs} />);
 
-    const domains = screen.getByText('copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
+    // Not copilot.cloud.microsoft, where 2.0.0 does not run (ticket My-Prompt-Manager-totf)
+    const domains = screen.getByText('copilot.microsoft.com · m365.cloud.microsoft');
     // Cut to the row's width in the popup: whole on hover
-    expect(domains).toHaveAttribute('title', 'copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft');
+    expect(domains).toHaveAttribute('title', 'copilot.microsoft.com · m365.cloud.microsoft');
     expect(screen.getAllByRole('switch')).toHaveLength(1);
   });
 
@@ -251,11 +252,11 @@ describe('SiteIntegrationSection - importing a configuration', () => {
     (chrome.tabs.query as unknown as Mock).mockResolvedValue([]);
   });
 
-  it('refuses a configuration for a host of a Platform that has no row of its own, such as copilot.cloud.microsoft', async () => {
+  it('refuses a configuration for a host of a Platform that has no row of its own, such as m365.cloud.microsoft', async () => {
     const user = userEvent.setup();
     const onShowToast = vi.fn();
     const code = await ConfigurationEncoder.encode({
-      hostname: 'copilot.cloud.microsoft',
+      hostname: 'm365.cloud.microsoft',
       displayName: 'Copilot at work',
       enabled: true,
       dateAdded: Date.now()

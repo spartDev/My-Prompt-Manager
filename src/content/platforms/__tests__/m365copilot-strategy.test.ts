@@ -1,8 +1,10 @@
 /**
  * Unit tests for M365CopilotStrategy
  *
- * Microsoft 365 Copilot is served at m365.cloud.microsoft and at copilot.cloud.microsoft, where a
- * work account is redirected. Its composer is a Lexical editor: an Insertion goes in as one paste,
+ * Microsoft 365 Copilot is served at m365.cloud.microsoft, and at copilot.cloud.microsoft, where a
+ * work account is redirected. 2.0.0 runs at m365.cloud.microsoft only (ticket
+ * My-Prompt-Manager-totf): these tests run there, on the editor read at copilot.cloud.microsoft,
+ * which ticket My-Prompt-Manager-j74b brings back. Its composer is a Lexical editor: an Insertion goes in as one paste,
  * and is never written a second time (the double write of ticket My-Prompt-Manager-e66 on
  * Perplexity's Lexical editor). The paste itself is tested at length in perplexity-strategy.test.ts,
  * which runs the same LexicalStrategy.
@@ -14,6 +16,7 @@ import { SUPPORTED_PLATFORMS } from '../../../config/platforms';
 import { editorCommand, MULTILINE_PROMPT } from '../../../test/helpers/editor-command';
 import { expectNoMarkupIn, HOSTILE_TEXTS } from '../../../test/helpers/hostile-text';
 import { actAsLexicalEditor } from '../../../test/helpers/lexical-editor';
+import { withTheWorkAccountHost } from '../../../test/helpers/work-account-host';
 import { readInputText } from '../../selector/inputText';
 import { M365CopilotStrategy } from '../m365copilot-strategy';
 
@@ -28,7 +31,7 @@ vi.mock('../../utils/logger', () => ({
   showDebugNotification: vi.fn()
 }));
 
-setMockHostname('copilot.cloud.microsoft');
+setMockHostname('m365.cloud.microsoft');
 
 /** The editor read on copilot.cloud.microsoft/chat, signed in, on 2026-11-15 */
 function liveEditor(): HTMLElement {
@@ -44,7 +47,7 @@ describe('M365CopilotStrategy', () => {
   let strategy: M365CopilotStrategy;
 
   beforeEach(() => {
-    strategy = new M365CopilotStrategy('copilot.cloud.microsoft');
+    strategy = new M365CopilotStrategy('m365.cloud.microsoft');
   });
 
   afterEach(() => {
@@ -77,16 +80,29 @@ describe('M365CopilotStrategy', () => {
   });
 
   describe('canHandle', () => {
-    it.each(['copilot.cloud.microsoft', 'm365.cloud.microsoft'])('handles the editor and a textarea on %s', (hostname) => {
-      const onHost = new M365CopilotStrategy(hostname);
+    it('handles the editor and a textarea on m365.cloud.microsoft', () => {
+      const onHost = new M365CopilotStrategy('m365.cloud.microsoft');
 
       expect(onHost.canHandle(liveEditor())).toBe(true);
       expect(onHost.canHandle(document.createElement('textarea'))).toBe(true);
       expect(onHost.canHandle(document.createElement('div'))).toBe(false);
     });
 
-    it.each(['copilot.microsoft.com', 'claude.ai', 'cloud.microsoft'])('does not handle %s', (hostname) => {
+    // copilot.cloud.microsoft is no host of M365 Copilot in 2.0.0 (ticket My-Prompt-Manager-totf)
+    it.each(['copilot.microsoft.com', 'claude.ai', 'cloud.microsoft', 'copilot.cloud.microsoft'])('does not handle %s', (hostname) => {
       expect(new M365CopilotStrategy(hostname).canHandle(liveEditor())).toBe(false);
+    });
+
+    describe('once ticket My-Prompt-Manager-j74b gives copilot.cloud.microsoft back to M365 Copilot', () => {
+      withTheWorkAccountHost();
+
+      it('handles the editor and a textarea on copilot.cloud.microsoft', () => {
+        const onHost = new M365CopilotStrategy('copilot.cloud.microsoft');
+
+        expect(onHost.canHandle(liveEditor())).toBe(true);
+        expect(onHost.canHandle(document.createElement('textarea'))).toBe(true);
+        expect(onHost.canHandle(document.createElement('div'))).toBe(false);
+      });
     });
   });
 

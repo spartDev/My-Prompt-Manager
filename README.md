@@ -1,6 +1,6 @@
 # My Prompt Manager - Chrome Extension
 
-[![Version](https://img.shields.io/badge/version-1.9.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/spartDev/My-Prompt-Manager)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-yellow.svg)](https://www.google.com/chrome/)
 
@@ -37,7 +37,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Category Insights:** See which prompt categories you use most
 ✅ **Platform Stats:** Understand which AI platforms you prefer
 ✅ **Tidy Up:** Review never-used prompts and duplicate pairs, straight from Analytics
-✅ **Floating Dashboard:** Quick access via floating action button
+✅ **Full Dashboard:** The full-page Analytics view, opened from the Analytics tab: Full Dashboard in the side panel's header, or View all under Most used
 
 ## 🎯 Supported Platforms
 
@@ -49,7 +49,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
 | Microsoft Copilot | ✅ Fully Supported | copilot.microsoft.com | 80 |
-| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft, copilot.cloud.microsoft | 80 |
+| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
 See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.
@@ -304,7 +304,7 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```bash
    npm run package
    ```
-   This creates `prompt-library-extension-v1.9.0.zip`
+   This creates `prompt-library-extension-v2.0.0.zip`
 
 4. **Upload to Chrome Web Store:**
    - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
@@ -471,7 +471,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 
 ## 📈 Roadmap
 
-### Version 1.9 (Current)
+### Version 2.0 (Current)
 - [x] Core prompt management
 - [x] Multi-platform AI integration (8 platforms)
 - [x] Dark mode support
@@ -483,10 +483,13 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 - [x] Programmatic Content Script Injection
 - [x] Analytics Dashboard with usage tracking and visual charts
 - [x] Element Fingerprinting for custom sites
-- [x] Floating Action Button for quick access
+- [x] Prompt Variables, filled in when a Prompt is inserted
+- [x] Pinned Prompts and Library filters
+- [x] `//` opens the Prompt selector on a Platform
+- [x] Atelier 1C redesign and a bottom tab bar
+- [x] A Welcome for new users, and What's new after an update
 
 ### Future Enhancements (Planned)
-- [ ] Prompt templates with variables
 - [ ] Keyboard shortcuts customization
 - [ ] Enhanced CSV export options
 - [ ] Prompt sharing and synchronization

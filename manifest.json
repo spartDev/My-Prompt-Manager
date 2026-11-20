@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "My Prompt Manager",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "description": "Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click.",
   "homepage_url": "https://github.com/spartDev/My-Prompt-Manager",
   "background": {
@@ -22,8 +22,7 @@
     "https://www.perplexity.ai/*",
     "https://chat.mistral.ai/*",
     "https://copilot.microsoft.com/*",
-    "https://m365.cloud.microsoft/*",
-    "https://copilot.cloud.microsoft/*"
+    "https://m365.cloud.microsoft/*"
   ],
   "content_scripts": [
     {
@@ -34,8 +33,7 @@
         "https://www.perplexity.ai/*",
         "https://chat.mistral.ai/*",
         "https://copilot.microsoft.com/*",
-        "https://m365.cloud.microsoft/*",
-        "https://copilot.cloud.microsoft/*"
+        "https://m365.cloud.microsoft/*"
       ],
       "js": ["src/content/index.ts"],
       "run_at": "document_idle",
