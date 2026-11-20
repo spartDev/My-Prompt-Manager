@@ -284,9 +284,9 @@ A refused Release is never submitted again:
 
 ### Version Updates
 1. Bump the version and write its CHANGELOG section in a bump PR (the `release` skill, `.claude/skills/release/SKILL.md`)
-2. Tag the bump's merge commit `vX.Y.Z` and push the tag
-3. `release.yml` validates, builds and attests the zip, creates the GitHub Release, then, once the owner approves the `chrome-webstore` environment, uploads the zip and submits it for Store review through the Chrome Web Store API V2 ([`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md); setup in [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md))
-4. Update the store listing in the Developer Dashboard if needed: the API changes the package, not the listing
+2. If the store listing changes with this Release, edit it in the Developer Dashboard first, and save it without submitting it: the API changes the package, not the listing, and the Submission sends the item's draft, listing included, to Store review. Once the Submission is in Store review its draft cannot change unless the Submission is cancelled, and `release.yml` never submits a cancelled version again
+3. Tag the bump's merge commit `vX.Y.Z` and push the tag
+4. `release.yml` validates, builds and attests the zip, creates the GitHub Release, then, once the owner approves the `chrome-webstore` environment, uploads the zip and submits it for Store review through the Chrome Web Store API V2 ([`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md); setup in [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md))
 
 ### Monitoring
 - Check Chrome Web Store reviews regularly

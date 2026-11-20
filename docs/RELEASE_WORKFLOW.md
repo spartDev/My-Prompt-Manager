@@ -16,7 +16,7 @@ Terms (`CONTEXT.md`, section Releases): a **Submission** is a Release sent to th
 
 A tag with `-alpha`, `-beta` or `-rc` makes a pre-release GitHub Release and no Submission. In practice it cannot pass validation: Chrome's manifest version takes integers only, and the build must carry the tag's version.
 
-Runs go one at a time (concurrency group `release-process`): a run waiting for the owner's approval holds the next one, and GitHub keeps only the latest of the runs waiting behind it.
+Tag runs go one at a time (concurrency group `release-process`): a run waiting for the owner's approval holds the next one, and GitHub keeps only the latest of the tag runs waiting behind it. A rehearsal runs in its own group, `release-rehearsal`, so it never holds or replaces a tag run.
 
 ## The jobs
 
@@ -77,7 +77,7 @@ What the check decides, from the store's answer:
 | a published version higher than the zip's | fails, uploads nothing |
 | a refused or cancelled Submission of this version or a higher one | fails, uploads nothing |
 | an earlier upload still in progress, or a last upload in a state other than `SUCCEEDED`, `FAILED` or `NOT_FOUND` | fails, uploads nothing |
-| no published version, or anything else the API reference does not describe | fails, uploads nothing |
+| no published version, a published revision in a state other than `PUBLISHED` or `PUBLISHED_TO_TESTERS`, or anything else the API reference does not describe | fails, uploads nothing |
 | a published version lower than the zip's, nothing pending | uploads and submits |
 
 Every failure is red, with Google's message verbatim in the job summary. The access token never appears in a log line or the summary.
@@ -98,7 +98,8 @@ On another branch the status job is skipped (the environment admits `main` and t
 
 On a tag run, only **Re-run failed jobs**, never **Re-run all jobs**. Re-run all jobs builds a new zip (zip stores the files' times) and attests it, while the GitHub Release and the store may already hold the first one. The GitHub Release job's first step, **🔒 Check the Release holds no other zip**, lists the Releases, drafts included, and fails before anything changes when the Release of the tag holds a zip of that name whose digest (the SHA-256 GitHub computed at its upload) is not this run's, or has none, or when the listing fails.
 
-- **A failed run**: fix the cause, then **Re-run failed jobs**. A rerun of the Submission for a version already submitted or published sends nothing and ends green; a rerun of the GitHub Release updates the Release of the tag.
+- **A failed run from a cause outside the tagged commit** (a GitHub or Google outage, a rate limit, a Google Cloud setting or the Developer Dashboard link fixed since, another version's Store review): fix the cause, then **Re-run failed jobs**. A rerun of the Submission for a version already submitted or published sends nothing and ends green; a rerun of the GitHub Release updates the Release of the tag and keeps the zip it already holds.
+- **A failed run caused by the tagged commit** (lint, the tests or the audit in Release Validation, or `release.yml` itself): a rerun runs the same commit and fails again, since GitHub reruns use the original event's `GITHUB_SHA` and `GITHUB_REF`; a fix merged to `main` never reaches it. Fix it on `main`, then release the fix as the next version, with a new tag (the `release` skill from step 1), and carry over this version's notes as for [a refused Release](#a-release-refused-at-store-review).
 - **The publish call failed after the upload succeeded**: the upload is a draft in the Developer Dashboard. A rerun uploads the zip again; if the store refuses that, submit the draft from the Dashboard's **Package** tab.
 - **Another version is in Store review**: wait for its result, or cancel it in the Developer Dashboard, then rerun. The workflow never cancels a Submission.
 
@@ -111,7 +112,7 @@ It is never submitted again. Fix it, then release the fix as the next version, w
 | Failure | Fix |
 | --- | --- |
 | `Version mismatch between package.json (A) and release (B)` | the tag and `package.json` differ: tag the bump's merge commit, as the `release` skill does |
-| lint or tests fail in Release Validation | run `npm run lint` and `npm test` locally on the tagged commit |
+| lint or tests fail in Release Validation | run `npm run lint` and `npm test` locally on the tagged commit; a rerun runs that same commit, so a fix ships as the next version (Rerunning) |
 | `Manifest version (A) doesn't match release (B)` | `manifest.json` was not bumped with `package.json` |
 | `... has no manifest.json at its root` | the zip step changed: it must zip the contents of `dist/`, not the folder |
 | `Repository variables not set: ...` | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), step 9 |

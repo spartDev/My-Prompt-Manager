@@ -16,9 +16,10 @@ on:
       - "v*.*.*"
   workflow_dispatch:
 
-# Ensure only one release process runs at a time
+# Tag runs go one at a time. A rehearsal has its own group: GitHub keeps one pending run per group and cancels
+# the one it replaces, so a rehearsal in the tag runs' group could cancel a tag run waiting there.
 concurrency:
-  group: release-process
+  group: ${{ github.event_name == 'workflow_dispatch' && 'release-rehearsal' || 'release-process' }}
   cancel-in-progress: false
 
 env:
@@ -454,6 +455,8 @@ jobs:
           # The attested zip under its real name; a name that matches no file fails the step
           files: ./release-assets/${{ needs.build-release.outputs.zip }}
           fail_on_unmatched_files: true
+          # A rerun keeps the zip the first step checked; the default (true) deletes it, then uploads it again
+          overwrite_files: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
   # The rehearsal's read-only call to the store. On main only: the chrome-webstore environment admits main and
@@ -507,8 +510,9 @@ jobs:
             exit 1
           fi
 
-      # Workload Identity Federation: no store secret in GitHub. The read-only scope is enough for fetchStatus, and
-      # it makes the rehearsal unable to change anything in the store.
+      # Workload Identity Federation: no store secret in GitHub. This step asks for the read-only scope, enough for
+      # fetchStatus. It limits this token, not the identity: code run by this job could mint a token with the
+      # publishing scope from the same service account, so approving this job trusts main's code as a Submission does.
       - name: 🔑 Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0

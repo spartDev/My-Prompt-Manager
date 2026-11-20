@@ -173,6 +173,9 @@ export function planSubmission(status, version) {
   const live = [];
   const published = status?.publishedItemRevisionStatus;
   if (published) {
+    if (!LIVE.has(published.state)) {
+      return refuse(`The published revision is in a state this job does not know: ${JSON.stringify(published.state)}.`);
+    }
     const versions = versionsOf(published);
     if (!versions) {
       return refuse('The published revision reports no readable version (distributionChannels[].crxVersion).');

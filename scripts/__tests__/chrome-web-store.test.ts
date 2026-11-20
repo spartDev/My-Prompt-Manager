@@ -308,6 +308,18 @@ describe('submitRelease', () => {
     });
   });
 
+  describe('when the published revision is not in a live state', () => {
+    it.each(['ITEM_STATE_UNSPECIFIED', 'REJECTED', undefined])('uploads nothing (%s)', async (state) => {
+      const store = fakeStore({ fetchStatus: [{ body: storeState({ publishedItemRevisionStatus: { ...revision('PUBLISHED', '1.9.0'), state } }) }] });
+
+      const { result, summary } = await submit(store, '2.0.0');
+
+      expect(result).toEqual({ ok: false, outcome: 'refused' });
+      expect(store.requests()).toEqual(['GET fetchStatus']);
+      expect(summary).toContain('The published revision is in a state this job does not know');
+    });
+  });
+
   describe("when the zip's version is not higher than the published one", () => {
     it('uploads nothing and fails when the zip is older', async () => {
       const store = fakeStore({ fetchStatus: [{ body: storeState({ publishedItemRevisionStatus: revision('PUBLISHED', '2.0.0') }) }] });
@@ -436,6 +448,11 @@ describe('planSubmission', () => {
     }
   });
 
+  it.each(['PUBLISHED', 'PUBLISHED_TO_TESTERS'])('counts a published revision in %s as published', (state) => {
+    expect(planSubmission(storeState({ publishedItemRevisionStatus: revision(state, '1.9.0') }), '2.0.0')).toEqual({ action: 'upload' });
+    expect(planSubmission(storeState({ publishedItemRevisionStatus: revision(state, '2.0.0') }), '2.0.0')).toMatchObject({ action: 'none' });
+  });
+
   it('counts a submitted revision already published as published', () => {
     const status = storeState({ submittedItemRevisionStatus: revision('PUBLISHED', '2.0.0') });
     expect(planSubmission(status, '2.0.0')).toMatchObject({ action: 'none' });
@@ -450,6 +467,8 @@ describe('planSubmission', () => {
     ['a submitted revision without a version', { submittedItemRevisionStatus: { state: 'PENDING_REVIEW' } }, 'The submitted revision reports no readable version'],
     ['a submitted revision with a malformed version', { submittedItemRevisionStatus: revision('PENDING_REVIEW', 'v2.0.0') }, 'The submitted revision reports no readable version'],
     ['an unknown Submission state', { submittedItemRevisionStatus: revision('ITEM_STATE_UNSPECIFIED', '2.0.0') }, 'does not know'],
+    ['an unknown published state', { publishedItemRevisionStatus: revision('ITEM_STATE_UNSPECIFIED', '1.9.0') }, 'The published revision is in a state this job does not know'],
+    ['a published revision without a state', { publishedItemRevisionStatus: { distributionChannels: [{ crxVersion: '1.9.0' }] } }, 'The published revision is in a state this job does not know'],
     ['an upload still processed', { lastAsyncUploadState: 'IN_PROGRESS' }, 'still processing'],
     ['an upload still processed, in the other spelling', { lastAsyncUploadState: 'UPLOAD_IN_PROGRESS' }, 'still processing'],
     ['an unknown upload state', { lastAsyncUploadState: 'UPLOAD_STATE_UNSPECIFIED' }, 'The last upload is in a state this job does not know']
