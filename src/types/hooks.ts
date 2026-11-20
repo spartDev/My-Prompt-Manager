@@ -34,7 +34,8 @@ export interface UsePromptsReturn {
   togglePin: (id: string) => Promise<void>;
   searchPrompts: (query: string) => Prompt[];
   filterByCategory: (category: string | null) => Prompt[];
-  refreshPrompts: () => Promise<void>;
+  /** Never rejects: true once the Prompts are read, false when the read failed (its error in `error`) */
+  refreshPrompts: () => Promise<boolean>;
 }
 
 export interface UseCategoriesReturn {
@@ -45,7 +46,8 @@ export interface UseCategoriesReturn {
   updateCategory: (id: string, updates: Partial<Category>) => Promise<Category>;
   deleteCategory: (id: string) => Promise<DeletedCategory>;
   restoreCategory: (deleted: DeletedCategory) => Promise<Category>;
-  refreshCategories: () => Promise<void>;
+  /** Never rejects: true once the Categories are read, false when the read failed (its error in `error`) */
+  refreshCategories: () => Promise<boolean>;
 }
 
 export interface UseClipboardReturn {

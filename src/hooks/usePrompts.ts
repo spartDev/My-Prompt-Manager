@@ -5,26 +5,28 @@ import { StorageManager } from '../services/storage';
 import type { AppError, Prompt } from '../types';
 import type { UsePromptsReturn } from '../types/hooks';
 
+// The services are singletons, read where they are used, so no callback depends on them
 export const usePrompts = (): UsePromptsReturn => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<AppError | null>(null);
 
-  const storageManager = StorageManager.getInstance();
-  const promptManager = PromptManager.getInstance();
-
-  const refreshPrompts = useCallback(async () => {
+  // Never rejects: resolves to true once the Prompts are read, to false when the read failed, its
+  // error then in `error` (Try again says which, My-Prompt-Manager-p4y9)
+  const refreshPrompts = useCallback(async (): Promise<boolean> => {
     try {
       setLoading(true);
       setError(null);
-      const allPrompts = await storageManager.getPrompts();
+      const allPrompts = await StorageManager.getInstance().getPrompts();
       setPrompts(allPrompts);
+      return true;
     } catch (err) {
       setError(err as AppError);
+      return false;
     } finally {
       setLoading(false);
     }
-  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
+  }, []);
 
   // A failed create, update or delete is not stored as `error`: App treats that as a load
   // failure and replaces the Library. The rejection reaches the caller, which shows it.
@@ -32,7 +34,7 @@ export const usePrompts = (): UsePromptsReturn => {
     try {
       setLoading(true);
 
-      const newPrompt = await promptManager.createPrompt(
+      const newPrompt = await PromptManager.getInstance().createPrompt(
         prompt.title,
         prompt.content,
         prompt.category
@@ -42,13 +44,13 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-  }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
+  }, []);
 
   const updatePrompt = useCallback(async (id: string, updates: Partial<Prompt>) => {
     try {
       setLoading(true);
 
-      const updatedPrompt = await promptManager.updatePrompt(id, updates);
+      const updatedPrompt = await PromptManager.getInstance().updatePrompt(id, updates);
 
       setPrompts(prev =>
         prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
@@ -56,30 +58,30 @@ export const usePrompts = (): UsePromptsReturn => {
     } finally {
       setLoading(false);
     }
-  }, []); // Singleton promptManager never changes, omitted to prevent infinite loop
+  }, []);
 
   const deletePrompt = useCallback(async (id: string) => {
     try {
       setLoading(true);
 
-      await storageManager.deletePrompt(id);
+      await StorageManager.getInstance().deletePrompt(id);
 
       setPrompts(prev => prev.filter(prompt => prompt.id !== id));
     } finally {
       setLoading(false);
     }
-  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
+  }, []);
 
   // No loading state: pinning is instant and must not flash the Library
   // Errors are not stored as `error`: App treats that as a load failure and
   // replaces the Library. The rejection reaches the caller, which shows a toast.
   const togglePin = useCallback(async (id: string) => {
-    const updatedPrompt = await storageManager.togglePinned(id);
+    const updatedPrompt = await StorageManager.getInstance().togglePinned(id);
 
     setPrompts(prev =>
       prev.map(prompt => prompt.id === id ? updatedPrompt : prompt)
     );
-  }, []); // Singleton storageManager never changes, omitted to prevent infinite loop
+  }, []);
 
   const searchPrompts = useCallback((query: string): Prompt[] => {
     if (!query.trim()) {

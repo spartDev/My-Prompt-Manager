@@ -540,6 +540,19 @@ The spinner takes the text color of its button, so it works on any button:
 </button>
 ```
 
+A button that keeps the keyboard while it is busy (Error Loading Data's Try again, My-Prompt-Manager-p4y9) takes `aria-disabled`, never `disabled`: Chrome takes the keyboard from a disabled button. It keeps its fill, label and focus ring at full strength, without `opacity-50`: on a focused button that would take the ring of `focus-primary` to 2.39:1 in light and 1.83:1 in dark, under the 3:1 of a focus indicator. The spinner and the label say it is busy, with `aria-disabled:cursor-wait` and no hover change; a press does nothing. The busy state shows at the press: a read that ends within a frame or two shows it for that long, never delayed and never held. Its outcome is said in a `role="status"` that stays in the document while the screen changes.
+
+```tsx
+<button type="button" aria-disabled={busy ? true : undefined} className="... focus-primary aria-disabled:cursor-wait aria-disabled:hover:bg-accent aria-disabled:hover:shadow-lg">
+  {busy ? (
+    <span className="flex items-center justify-center space-x-2">
+      <span aria-hidden="true" className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+      <span>Trying again...</span>
+    </span>
+  ) : 'Try again'}
+</button>
+```
+
 ### Input Fields
 
 A field on a card takes `bg-subtle`; a field placed directly on `bg-app` takes `bg-card`. Both take `border-input` (3:1 on every surface), `focus-input` and `placeholder:text-tertiary`. The Library search is the one exception: see Search Input below.

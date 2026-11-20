@@ -20,9 +20,14 @@
  *   moves in the commit that shows its control (layout effects of LibraryFilterBar, LibraryView and
  *   TabBar); moved by a passive effect, it is on the document in between, and the probe sees it.
  *
+ * - Try again busy (My-Prompt-Manager-p4y9): the read it makes held until the test lets it go, the
+ *   button shows the Loading State's spinner and "Trying again...", aria-disabled, the keyboard on it
+ *   and its focus ring whole; the read let go, the Library on All, the role=status saying it is back.
+ *
  * Light and dark, popup 400 x 500. Screenshots in LOAD_ERROR_FOCUS_SCREENSHOTS
  * (test-results/load-error-focus when unset): try-again-failed-again-<theme>.png (the keyboard on Try
- * again after a Try again that failed) and library-back-<theme>.png (the keyboard on All).
+ * again after a Try again that failed), library-back-<theme>.png (the keyboard on All) and
+ * try-again-busy-<theme>.png (Try again while it reads).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -56,17 +61,26 @@ const CATEGORIES = [
   createCategorySeed({ id: 'cat-writing', name: 'Writing', color: '#10B981' })
 ];
 
-/** What the patch of the page records: whether its reads fail yet, and how many reads of the Prompts it made fail */
+/**
+ * What the patch of the page records: whether its reads fail yet, how many reads of the Prompts it made
+ * fail, and the read it holds, if any, with the way to let it go
+ */
 interface ReadFailure {
   failing: boolean;
   rejected: number;
+  held: boolean;
+  release?: () => void;
 }
 
-/** The reads of the Prompts to fail: how many, and from when, the opening or a resolved write carrying `afterWriteOf` */
+/**
+ * The reads of the Prompts to fail: how many, and from when, the opening or a resolved write carrying
+ * `afterWriteOf`; with `holdNext`, the read after them waits until the test lets it go
+ */
 interface ReadsToFail {
   message: string;
   count: number;
   afterWriteOf?: 'prompts' | 'categories';
+  holdNext?: boolean;
 }
 
 /**
@@ -74,8 +88,8 @@ interface ReadsToFail {
  * or once a set carrying `afterWriteOf` has resolved (the Packs added, a Category deleted). Every other
  * read and write goes through
  */
-const failThePromptsReads = ({ message, count, afterWriteOf }: ReadsToFail): void => {
-  const state: ReadFailure = { failing: afterWriteOf === undefined, rejected: 0 };
+const failThePromptsReads = ({ message, count, afterWriteOf, holdNext = false }: ReadsToFail): void => {
+  const state: ReadFailure = { failing: afterWriteOf === undefined, rejected: 0, held: false };
   (window as Window & { __promptsReads?: ReadFailure }).__promptsReads = state;
   const local = chrome.storage.local;
   const get = local.get.bind(local) as (keys?: unknown) => Promise<Record<string, unknown>>;
@@ -97,9 +111,19 @@ const failThePromptsReads = ({ message, count, afterWriteOf }: ReadsToFail): voi
       state.rejected += 1;
       return Promise.reject(new Error(message));
     }
+    if (state.failing && names.includes('prompts') && holdNext && !state.held) {
+      state.held = true;
+      return new Promise((resolve, reject) => {
+        state.release = () => { get(keys).then(resolve, reject); };
+      });
+    }
     return get(keys);
   };
 };
+
+/** Lets go the read of the Prompts the patch holds */
+const releaseTheHeldRead = (page: Page): Promise<void> =>
+  page.evaluate(() => { (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.release?.(); });
 
 const rejectedReads = (page: Page): Promise<number | undefined> =>
   page.evaluate(() => (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.rejected);
@@ -311,6 +335,71 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
       expect(await copy.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
       expect(await rejectedReads(page)).toBe(1);
       await expectNeverOnTheDocument(page, `the first card's Copy (${theme})`);
+    });
+
+    // CodeRabbit on PR #610 (src/App.tsx:568): the Copy asked by the Welcome's exit is still pending at
+    // the press, and there is no card left to take the keyboard
+    test(`the Welcome's exit with Packs, the Prompts read after the add failing, every Prompt deleted meanwhile from another surface (${theme}): Enter on Try again brings the empty Library, the keyboard on "Write your first prompt"; never on the document`, async ({ page, storage, extensionId }) => {
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 0 }, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1, afterWriteOf: 'prompts' });
+      await page.getByRole('button', { name: 'Skip' }).click();
+      await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+      await page.getByTestId('welcome-primary').press('Enter');
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      expect(await rejectedReads(page)).toBe(1);
+      expect(await storage.getPrompts()).not.toHaveLength(0);
+
+      // What another surface's deletions leave in the store: this page is not told
+      await storage.seedPrompts([]);
+      await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+
+      await page.keyboard.press('Enter');
+
+      const writeFirst = page.getByTestId('library-empty').getByRole('button', { name: /write your first prompt/i });
+      await expect(writeFirst).toBeFocused();
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toHaveCount(0);
+      expect(await writeFirst.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      expect(await rejectedReads(page)).toBe(1);
+      await expectNeverOnTheDocument(page, `Write your first prompt, the Copy asked (${theme})`);
+    });
+
+    test(`Try again busy, its read held (${theme}): the spinner and "Trying again...", aria-disabled, the keyboard on it with its ring whole; the read let go, the Library on All and the role=status says it is back; never on the document`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1, holdNext: true });
+      await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+
+      await page.keyboard.press('Enter');
+
+      // Busy while its read is held: the Loading State, the keyboard kept, its focus ring drawn whole
+      const busy = page.getByRole('button', { name: 'Trying again...' });
+      await expect(busy).toBeFocused();
+      await expect(busy).toHaveAttribute('aria-disabled', 'true');
+      // aria-disabled, never the disabled attribute: Chrome takes the keyboard from a disabled button
+      expect(await busy.evaluate((element) => (element as HTMLButtonElement).disabled)).toBe(false);
+      await expect(busy.locator('.animate-spin')).toBeVisible();
+      expect(await busy.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      await expect(page.getByTestId('load-status')).toHaveText('');
+      await animationsDone(page);
+      await page.mouse.move(2, HEIGHT - 2);
+      const ring = await focusRingOf(busy);
+      expect({ style: ring.style, width: ring.width, reach: ring.reach }).toEqual({ style: 'solid', width: PRIMARY_RING.width, reach: PRIMARY_RING.width + PRIMARY_RING.offset });
+      const sides = await ringSides(page, ring);
+      test.info().annotations.push({ type: 'ring', description: JSON.stringify({ theme, busy: true, color: ring.color, sides }) });
+      for (const side of sides) {
+        expect(side.worst, `the busy Try again ring's ${side.side} side, drawn in ${ring.color}`).toBeLessThanOrEqual(RING_TOLERANCE);
+      }
+      await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `try-again-busy-${theme}.png`) });
+
+      await releaseTheHeldRead(page);
+
+      await expect(page.getByTestId('prompt-card')).toHaveCount(PROMPTS.length);
+      await expect(page.getByRole('radio', { name: 'All' })).toBeFocused();
+      await expect(page.getByTestId('load-status')).toHaveText('Your library is back');
+      await expectNeverOnTheDocument(page, `All, after a busy Try again (${theme})`);
     });
   }
 });

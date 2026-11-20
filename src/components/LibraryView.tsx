@@ -92,13 +92,15 @@ const LibraryView: FC<LibraryViewProps> = ({
   // After the Welcome's exit with Packs, the keyboard goes to the first card's Copy as the cards are
   // listed, so one Enter copies that Prompt; its name says which. Only when the keyboard is on no
   // element: one the user has already reached keeps it. Asked once, whatever happens. In the commit
-  // that lists the cards, so the keyboard is never on the document in between
+  // that lists the cards, so the keyboard is never on the document in between. With no card to list
+  // (every Prompt deleted from another surface before Try again read the Library again), the main
+  // action of the empty Library takes it, as when the last Prompt is deleted
   const firstCopyRef = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     if (!focusFirstPrompt || loading) { return; }
     const active = document.activeElement;
     if (active === null || active === document.body) {
-      firstCopyRef.current?.focus();
+      (firstCopyRef.current ?? writeFirstRef.current)?.focus();
     }
     onFirstPromptFocused?.();
   }, [focusFirstPrompt, loading, onFirstPromptFocused]);

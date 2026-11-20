@@ -671,6 +671,35 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(keyboard.onDocument()).toEqual([]);
     });
 
+    // CodeRabbit on PR #610 (src/App.tsx:568): the Copy the Welcome's exit asked for is still pending
+    // at the press of Try again. Every Prompt deleted meanwhile from another surface, there is no Copy
+    // to take the keyboard: the main action of the empty Library takes it
+    it('Try again from the keyboard, every Prompt deleted meanwhile from another surface: the keyboard on "Write your first prompt", never on the document on the way', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      const keyboard = keyboardAtCommits();
+      await openWelcome(2, keyboard.wrap);
+      readsFailOnceAfterTheAdd(['getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      // What the other surface's Delete writes, Prompt after Prompt: this surface is not told
+      const storageManager = getMockStorageManager();
+      for (const { id } of await stored<Prompt[]>('prompts')) {
+        await storageManager.deletePrompt(id);
+      }
+      expect(await stored<Prompt[]>('prompts')).toEqual([]);
+      act(() => { tryAgain.focus(); });
+      keyboard.start();
+
+      await user.keyboard('{Enter}');
+
+      const empty = await screen.findByTestId('library-empty');
+      await waitFor(() => { expect(within(empty).getByRole('button', { name: /write your first prompt/i })).toHaveFocus(); });
+      expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
+      expect(keyboard.commits()).toBeGreaterThan(0);
+      expect(keyboard.onDocument()).toEqual([]);
+    });
+
     it('Try again from the keyboard, the read failing again: the keyboard stays on Try again', async () => {
       await openingOver({ welcome: { status: 'pending', step: 2 } });
       await openWelcome(2);

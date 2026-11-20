@@ -686,5 +686,37 @@ describe('LibraryView', () => {
 
       expect(document.body).toHaveFocus();
     });
+
+    // CodeRabbit on PR #610 (src/App.tsx:568): no card to list, every Prompt deleted from another
+    // surface before Try again read the Library
+    describe('with no Prompt to list', () => {
+      const emptied = { ...defaultProps, prompts: [], searchWithDebounce: createMockSearchWithDebounce([]) };
+      const writeFirst = (): HTMLElement => screen.getByRole('button', { name: /write your first prompt/i });
+
+      it('with the keyboard nowhere, gives it to the main action of the empty Library, then says it is done', () => {
+        const onFirstPromptFocused = vi.fn();
+
+        render(<LibraryView {...emptied} focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+        expect(writeFirst()).toHaveFocus();
+        expect(onFirstPromptFocused).toHaveBeenCalledTimes(1);
+      });
+
+      it('leaves the keyboard where the user put it, and is done all the same', () => {
+        const onFirstPromptFocused = vi.fn();
+        const elsewhere = document.createElement('button');
+        document.body.append(elsewhere);
+        elsewhere.focus();
+
+        try {
+          render(<LibraryView {...emptied} focusFirstPrompt onFirstPromptFocused={onFirstPromptFocused} />);
+
+          expect(elsewhere).toHaveFocus();
+          expect(onFirstPromptFocused).toHaveBeenCalledTimes(1);
+        } finally {
+          elsewhere.remove();
+        }
+      });
+    });
   });
 });

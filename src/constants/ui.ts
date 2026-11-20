@@ -4,6 +4,16 @@
  */
 
 /**
+ * How long Try again on Error Loading Data waits for the Library's reads before it can be pressed
+ * again (My-Prompt-Manager-p4y9). A chrome.storage read of a 4 MB Library (2,000 Prompts) took about
+ * 33 ms when measured, so no read that settles is cut short; a read still pending after 10 s is taken
+ * as stuck, and 10 s is about as long as a person keeps their attention on a wait (Nielsen's limit).
+ * Only the reads count: drawing a large Library after them does not. The reads go on past it, and
+ * their outcome applies if they settle
+ */
+export const RETRY_READ_BOUND_MS = 10_000;
+
+/**
  * Z-Index scale for proper stacking contexts
  * Based on industry best practices and inspired by Tailwind CSS scale
  */

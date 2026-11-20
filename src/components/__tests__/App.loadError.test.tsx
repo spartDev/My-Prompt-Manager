@@ -181,6 +181,123 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
     });
   });
 
+  describe('Try again shows that it reads, and says how it went (My-Prompt-Manager-p4y9)', () => {
+    /** How long Try again waits for a read before it can be pressed again (RETRY_READ_BOUND_MS) */
+    const BOUND_MS = 10_000;
+
+    /** The read of the Prompts made by the press of Try again, held until the test settles it */
+    const heldRetry = (): { succeed: () => void; fail: (message: string) => void } => {
+      let resolve: (prompts: Prompt[]) => void = () => undefined;
+      let reject: (error: Error) => void = () => undefined;
+      getMockStorageManager().getPrompts.mockImplementationOnce(() => new Promise<Prompt[]>((resolveRead, rejectRead) => { resolve = resolveRead; reject = rejectRead; }));
+      return {
+        succeed: () => { act(() => { resolve(LIBRARY); }); },
+        fail: (message) => { act(() => { reject(new Error(message)); }); }
+      };
+    };
+
+    /** The live region that says how Try again went: in the document before the press, and after it */
+    const loadStatus = (): HTMLElement => screen.getByTestId('load-status');
+
+    /** Opens the popup on Error Loading Data, the opening's read of the Prompts refused, the keyboard on Try again */
+    const openOnTheError = async (user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> => {
+      await seed();
+      getMockStorageManager().getPrompts.mockRejectedValueOnce(new Error('Storage unavailable'));
+      render(<App />);
+      return tabToTryAgain(user);
+    };
+
+    it('AC1: while it reads, Try again shows the busy state of the Loading State and keeps the keyboard, aria-disabled and never disabled; a press meanwhile reads nothing more', async () => {
+      const user = userEvent.setup();
+      const tryAgain = await openOnTheError(user);
+      const retry = heldRetry();
+
+      await user.keyboard('{Enter}');
+
+      // The same button, busy: its spinner and its label, the keyboard on it
+      expect(tryAgain).toHaveAccessibleName('Trying again...');
+      expect(tryAgain).toHaveAttribute('aria-disabled', 'true');
+      expect(tryAgain).not.toBeDisabled();
+      expect(tryAgain).toHaveFocus();
+      expect(tryAgain.querySelector('[aria-hidden="true"].animate-spin')).not.toBeNull();
+      const reads = getMockStorageManager().getPrompts.mock.calls.length;
+      await user.keyboard('{Enter}');
+      await user.click(tryAgain);
+      expect(getMockStorageManager().getPrompts.mock.calls.length).toBe(reads);
+
+      retry.succeed();
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+    });
+
+    it('AC2: the Library back, the role=status says so, the same live region as before the press, silent while it read', async () => {
+      const user = userEvent.setup();
+      await openOnTheError(user);
+      const status = loadStatus();
+      expect(status).toHaveAttribute('role', 'status');
+      expect(status).toBeEmptyDOMElement();
+      const retry = heldRetry();
+
+      await user.keyboard('{Enter}');
+      expect(status).toBeEmptyDOMElement();
+      retry.succeed();
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+      expect(loadStatus()).toBe(status);
+      expect(status).toHaveTextContent('Your library is back');
+    });
+
+    it('AC2: the read failing again, the role=status says so; Try again leaves its busy state, the keyboard on it', async () => {
+      const user = userEvent.setup();
+      const tryAgain = await openOnTheError(user);
+      const status = loadStatus();
+      const retry = heldRetry();
+
+      await user.keyboard('{Enter}');
+      retry.fail('Still unavailable');
+
+      await waitFor(() => { expect(status).toHaveTextContent("Still couldn't read your library"); });
+      expect(screen.getByText('Still unavailable')).toBeInTheDocument();
+      expect(tryAgain).toHaveAccessibleName('Try again');
+      expect(tryAgain).not.toHaveAttribute('aria-disabled');
+      expect(tryAgain).toHaveFocus();
+    });
+
+    it('AC3: a read that never settles: Try again stays busy for 10 s, then can be pressed again and the role=status says so; a read that works then brings the Library', async () => {
+      const user = userEvent.setup();
+      const tryAgain = await openOnTheError(user);
+      const status = loadStatus();
+      getMockStorageManager().getPrompts.mockImplementationOnce(() => new Promise<Prompt[]>(() => undefined));
+      // Faked from here, still running with the real clock, so the reads and user-event's waits go on
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        await user.keyboard('{Enter}');
+        expect(tryAgain).toHaveAttribute('aria-disabled', 'true');
+
+        // 100ms short of the bound (the clock also moves with real time while the test runs): still busy
+        act(() => { vi.advanceTimersByTime(BOUND_MS - 100); });
+        expect(tryAgain).toHaveAttribute('aria-disabled', 'true');
+        expect(status).toBeEmptyDOMElement();
+
+        act(() => { vi.advanceTimersByTime(100); });
+        expect(tryAgain).not.toHaveAttribute('aria-disabled');
+        expect(tryAgain).toHaveAccessibleName('Try again');
+        expect(tryAgain).toHaveFocus();
+        expect(status).toHaveTextContent('Still reading your library. You can try again.');
+        expect(screen.getByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+
+      // Pressed again: a new read, which works
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+      expect(status).toHaveTextContent('Your library is back');
+      await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
+    });
+  });
+
   describe('AC2: Categories stored malformed', () => {
     it.each<{ stored: string; categories: unknown }>([
       { stored: '[null, Uncategorized, Work]', categories: [null, uncategorized, work] },
