@@ -406,7 +406,8 @@ jobs:
       # would put in place of the one the store may already hold; only "Re-run failed jobs" keeps the first.
       # It decides from one REST listing of the Releases, drafts included (softprops creates the Release as a
       # draft, attaches the zip, then publishes it), and compares the digest GitHub computed at the upload. A
-      # failed call fails the step: an error is never read as "no Release yet". An asset without a digest fails.
+      # failed call fails the step: an error is never read as "no Release yet". An asset without a digest, or with
+      # an empty one, fails.
       - name: 🔒 Check the Release holds no other zip
         env:
           GH_TOKEN: ${{ github.token }}
@@ -414,7 +415,7 @@ jobs:
           ZIP: ${{ needs.build-release.outputs.zip }}
           SHA256: ${{ needs.build-release.outputs.sha256 }}
         run: |
-          if ! digests=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name == env.TAG) | .assets[] | select(.name == env.ZIP) | .digest // "none"'); then
+          if ! digests=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name == env.TAG) | .assets[] | select(.name == env.ZIP) | .digest | if (. // "") == "" then "none" else . end'); then
             echo "::error::Could not list the GitHub Releases, so whether $TAG already holds a $ZIP is unknown. Nothing was changed: Re-run failed jobs."
             exit 1
           fi
@@ -423,7 +424,7 @@ jobs:
             exit 0
           fi
           if [ "$digests" != "sha256:$SHA256" ]; then
-            echo "::error::The GitHub Release of $TAG already holds another $ZIP (${digests//$'\n'/, }), not this run's (sha256:$SHA256). Rerun a tag run with Re-run failed jobs only, never Re-run all jobs (docs/RELEASE_WORKFLOW.md, Rerunning)."
+            echo "::error::The GitHub Release of $TAG already holds another $ZIP (${digests//$'\n'/, }), not this run's (sha256:$SHA256). Either a Re-run all jobs built a new zip: rerun a tag run with Re-run failed jobs only; or an earlier upload was cut off, leaving an empty $ZIP: delete it, then Re-run failed jobs; or $TAG has a second Release, such as a leftover draft: delete the leftover, then Re-run failed jobs (docs/RELEASE_WORKFLOW.md, Troubleshooting)."
             exit 1
           fi
           echo "The GitHub Release of $TAG already holds this run's $ZIP."
