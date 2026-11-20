@@ -66,18 +66,19 @@ GH_TOKEN=$(gh auth token) uvx zizmor .github/workflows  # plus the online audits
 
 ### 3. 🚀 Release & Chrome Web Store (`release.yml`)
 
-**Triggers**: 
-- Release creation/publication
-- Version tags (`v*.*.*`)
-- Manual workflow dispatch
+**Triggers**: a version tag (`v*.*.*`), or a manual run (`workflow_dispatch`, no inputs), which is the rehearsal.
 
-**Release Process**:
-- 🔍 Release validation and version consistency
-- 🔐 Job-level permissions, and no read of the Actions cache (a release never restores what another run wrote)
-- 🏗️ Optimized production builds
-- 🏷️ GitHub release creation with assets
-- 🌐 Chrome Web Store package preparation
-- 📊 Release summary and documentation
+**A tag push**:
+- 🔍 Validation: the tag equals `package.json`'s version, lint, tests with coverage, `node scripts/audit.mjs`
+- 🏗️ Build: `npm run build`, then one zip of the contents of `dist/` (`manifest.json` at its root), `prompt-library-extension-vX.Y.Z.zip`, attested with `actions/attest-build-provenance`
+- 📝 Release notes: the version's section of `CHANGELOG.md`
+- 🏷️ GitHub Release with that zip attached under its own name (a name that matches no file fails the step). It fails first, before anything changes, unless, across the tag's Releases (drafts included), no asset is named or labelled as the zip, or exactly one is, under the zip's own name, with this run's SHA-256 as its digest; it fails too when the Releases cannot be listed. A "Re-run all jobs" builds a new zip: on a tag run, use "Re-run failed jobs" only. An asset of another name labelled as the zip, which the Release page shows as the zip, stops it too: delete that asset, then "Re-run failed jobs"
+- 🚀 Chrome Web Store Submission, for a tag without `-alpha`, `-beta` or `-rc`: once the owner approves the `chrome-webstore` environment, `google-github-actions/auth` trades the job's OIDC token for a Google access token (Workload Identity Federation), and `node scripts/chrome-web-store.mjs submit` uploads the same zip and submits it for Store review through the Chrome Web Store API V2. A rerun for a version already submitted or published sends nothing; a Submission of another version in Store review fails the job and is never cancelled
+- 📊 Release summary: one row per job; a failed or cancelled job fails it
+
+**A manual run** takes its version from `package.json` and runs the validation, the build and the attested zip, the Release notes and, on `main` only, one read-only status call to the store in the `chrome-webstore` environment (`node scripts/chrome-web-store.mjs status`). It creates no GitHub Release and submits nothing. On another branch the status job is skipped and the rest runs.
+
+Job-level permissions throughout, and no read of the Actions cache (a release never restores what another run wrote). Only the build (for its attestation) and the two store jobs hold `id-token: write`. The path, the rules of the Submission and reruns: `docs/RELEASE_WORKFLOW.md`.
 
 ### 4. 📊 Coverage Report Comment (`pr-coverage-comment.yml`)
 
@@ -98,10 +99,12 @@ It is not part of the Quality Gate and is not a required check.
 
 ### For Releases
 
-1. **Update Version**: Ensure `package.json` version matches release tag
-2. **Create Release**: Use GitHub releases or push version tag
-3. **Automated Process**: Workflow handles building and packaging
-4. **Download Assets**: Get Chrome Web Store package from artifacts
+1. **Bump**: the `release` skill's bump PR sets the version in `package.json`, `package-lock.json` and `manifest.json`, and the CHANGELOG section
+2. **Tag**: push `vX.Y.Z` on the bump's merge commit
+3. **Approve**: the Submission job waits for the owner's approval of `chrome-webstore`
+4. **Store review**: Google's e-mail to the publisher account gives the result; an approved Release is published at once
+
+To try a change to `release.yml`: `gh workflow run release.yml --ref <branch>` (the rehearsal; see above).
 
 ### Manual Testing
 
@@ -132,10 +135,9 @@ gh api repos/spartDev/My-Prompt-Manager/branches/main/protection \
   --jq '{checks: .required_status_checks.contexts, conversations: .required_conversation_resolution.enabled}'
 ```
 
-### GitHub Secrets (if needed)
+### Chrome Web Store
 
-- `GITHUB_TOKEN`: Automatically provided
-- Additional secrets for Chrome Web Store publishing (if desired)
+`release.yml` reads no store secret. The store jobs run in the environment `chrome-webstore` (the owner is its only required reviewer; only `main` and tags `v*` may deploy to it) and read four repository variables: `CWS_WORKLOAD_IDENTITY_PROVIDER`, `CWS_SERVICE_ACCOUNT`, `CWS_PUBLISHER_ID` and `CWS_EXTENSION_ID`. Setting them up, on Google Cloud, in the Developer Dashboard and on GitHub: `docs/GITHUB_ENVIRONMENTS.md`. `GITHUB_TOKEN` is the only secret any workflow uses.
 
 ## 📊 Performance Optimization
 

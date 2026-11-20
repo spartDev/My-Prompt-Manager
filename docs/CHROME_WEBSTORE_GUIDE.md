@@ -57,21 +57,23 @@ This document outlines the steps to package and submit the Prompt Library extens
 
 ## Package for Submission
 
-1. **Create Submission Package:**
+A Release's zip is made, attested and submitted by `.github/workflows/release.yml` on the push of its tag (see [`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md)): the contents of `dist/`, `manifest.json` at the root, named `prompt-library-extension-vX.Y.Z.zip`. Make one locally only to try it by hand:
+
+1. **Create the package:**
    ```bash
    npm run package
-   # This automatically creates prompt-library-extension-v{version}.zip
+   # reinstalls, rebuilds, then creates prompt-library-extension-v{version}.zip
    ```
 
-   Or manually:
+   Or from an existing build:
    ```bash
    cd dist/
-   zip -r ../prompt-library-extension-v1.5.0.zip .
+   zip -r ../prompt-library-extension-vX.Y.Z.zip .
    cd ..
    ```
 
 2. **Verify Package Contents:**
-   The zip should contain:
+   The store requires `manifest.json` at the root of the zip, not under a `dist/` folder. The zip should contain:
    ```
    manifest.json
    src/popup.html
@@ -206,6 +208,8 @@ Start supercharging your AI workflow today with My Prompt Manager!
 4. Complete developer profile
 
 ### 2. Upload Extension
+The Chrome Web Store API cannot create an item, so the first version of an item is uploaded by hand; every later Release goes through `release.yml` (see [Version Updates](#version-updates)).
+
 1. Click "Add a new item"
 2. Upload the zip file created earlier
 3. Wait for automatic analysis to complete
@@ -248,27 +252,27 @@ Start supercharging your AI workflow today with My Prompt Manager!
 - [ ] No unauthorized data collection
 - [ ] Privacy policy (if collecting data)
 
-### 5. Submit for Review
+### 5. Submit for Store review
 1. Review all information for accuracy
 2. Click "Submit for review"
-3. Extension enters review queue
-4. Review typically takes 1-3 business days
+3. The Submission enters the Store review queue
+4. Store review typically takes 1-3 business days
 
 ## Post-Submission
 
-### Review Process
-- **Automated Review:** Initial checks for technical compliance
-- **Manual Review:** Human reviewer examines functionality and compliance
+### Store review
+- **Automated checks:** technical compliance
+- **Manual examination:** a Google reviewer examines functionality and compliance
 - **Possible Outcomes:**
-  - ✅ **Approved:** Extension goes live on Chrome Web Store
-  - ❌ **Rejected:** Review feedback provided, fixes required
+  - ✅ **Approved:** the Publication follows at once (`release.yml` submits with the default publish type)
+  - ❌ **Refused:** Google's e-mail to the publisher account gives the reasons
 
-### If Rejected
-1. Read rejection reason carefully
-2. Make necessary changes to code/listing
-3. Increment version number in manifest.json
-4. Rebuild and repackage
-5. Resubmit with changes noted
+### If Refused
+A refused Release is never submitted again:
+1. Read the reasons carefully
+2. Fix the code or the listing
+3. Release the fix as the next version, with a new tag (the `release` skill). Its CHANGELOG section and its What's new notes carry over the refused Release's notes too: What's new shows only the installed Release's notes, and no user installed the refused one
+4. `release.yml` submits it like any Release
 
 ### After Approval
 - Extension appears in Chrome Web Store
@@ -279,12 +283,10 @@ Start supercharging your AI workflow today with My Prompt Manager!
 ## Maintenance
 
 ### Version Updates
-1. Increment version in `manifest.json`
-2. Build and test new version
-3. Package updated extension
-4. Upload to developer dashboard
-5. Update store listing if needed
-6. Submit for review
+1. Bump the version and write its CHANGELOG section in a bump PR (the `release` skill, `.claude/skills/release/SKILL.md`)
+2. If the store listing changes with this Release, edit it in the Developer Dashboard first, and save it without submitting it: the API changes the package, not the listing, and the Submission sends the item's draft, listing included, to Store review. Once the Submission is in Store review its draft cannot change unless the Submission is cancelled, and `release.yml` never submits a cancelled version again
+3. Tag the bump's merge commit `vX.Y.Z` and push the tag
+4. `release.yml` validates, builds and attests the zip, creates the GitHub Release, then, once the owner approves the `chrome-webstore` environment, uploads the zip and submits it for Store review through the Chrome Web Store API V2 ([`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md); setup in [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md))
 
 ### Monitoring
 - Check Chrome Web Store reviews regularly
