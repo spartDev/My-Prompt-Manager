@@ -167,7 +167,7 @@ Put both in the values file.
 
 ## 8. The GitHub environment `chrome-webstore`
 
-The owner is its only required reviewer, and may approve the runs they start (`prevent_self_review` stays false). Only `main` and tags `v*` may deploy to it: a manual run on another branch skips the store job.
+The owner is its only required reviewer, and may approve the runs they start (`prevent_self_review` stays false). Only `main` and tags `v*` may deploy to it: a manual run on another branch skips the store job. Approve the rehearsal's status job as you would a Submission: it asks for a read-only token, but it holds the same Google identity, which can publish.
 
 ```sh
 . ~/.config/my-prompt-manager/cws-setup.sh

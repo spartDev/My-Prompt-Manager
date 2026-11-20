@@ -90,7 +90,7 @@ The store publishes with the visibility last published from the Developer Dashbo
 gh workflow run release.yml --repo spartDev/My-Prompt-Manager --ref main
 ```
 
-(or Actions, **🚀 Release & Chrome Web Store**, **Run workflow**). It takes its version from `package.json`, so it never names another Release, and runs the validation, the build and the attested zip, and the Release notes extraction. On `main` it also runs the status job: approve `chrome-webstore`, and its log and the summary show the published version and what a Submission of this zip would do. It creates and changes no GitHub Release, and submits nothing.
+(or Actions, **🚀 Release & Chrome Web Store**, **Run workflow**). It takes its version from `package.json`, so it never names another Release, and runs the validation, the build and the attested zip, and the Release notes extraction. On `main` it also runs the status job: approve `chrome-webstore`, and its log and the summary show the published version and what a Submission of this zip would do. It creates and changes no GitHub Release, and submits nothing. Approve its status job as you would a Submission: it asks for a read-only token, but it holds the same Google identity, which can publish.
 
 On another branch the status job is skipped (the environment admits `main` and tags `v*` only) and everything else runs: that is how a change to `release.yml` is tried before it merges.
 
