@@ -11,7 +11,7 @@ import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
-import { RETRY_READ_BOUND_MS } from './constants/ui';
+import { RETRY_FAILURE_HOLD_MS, RETRY_READ_BOUND_MS } from './constants/ui';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAddPacks } from './hooks/useAddPacks';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
@@ -551,18 +551,25 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // keyboard and nothing of the Library shows on the way (My-Prompt-Manager-ou48)
   const [retryError, setRetryError] = useState<AppError | null>(null);
   const retrying = useRef(false);
-  const shownLoadError = loadError ?? retryError;
   // While it reads, Try again is busy: the spinner and "Trying again..." of the Loading State,
   // aria-disabled and not disabled, as Chrome takes the keyboard from a disabled button. How it went is
   // said in a role=status: the Library back, the read failed again, or a read still pending past
   // RETRY_READ_BOUND_MS, when the button can be pressed again (My-Prompt-Manager-p4y9)
   const [retryBusy, setRetryBusy] = useState(false);
   const [loadStatus, setLoadStatus] = useState('');
+  // While busy, the screen shows the error it tries past, even once a read has failed with its own:
+  // the new error, the button and the role=status change together
+  const shownLoadError = retryBusy ? retryError : loadError ?? retryError;
   // The press an outcome belongs to: reads left pending past the bound, then overtaken by another
   // press, say nothing when they settle
   const retryAttempt = useRef(0);
   const retryBound = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => { clearTimeout(retryBound.current); }, []);
+  // A failure shows no sooner than RETRY_FAILURE_HOLD_MS after the press, so its busy state is seen
+  const retryHold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => {
+    clearTimeout(retryBound.current);
+    clearTimeout(retryHold.current);
+  }, []);
   // The Section back after Error Loading Data, other than the Library: its tab takes the keyboard
   const [focusSectionTab, setFocusSectionTab] = useState(false);
   const handleSectionTabFocused = useCallback(() => { setFocusSectionTab(false); }, []);
@@ -577,7 +584,9 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // Library gives the keyboard when the control that had it leaves; the first Prompt's Copy instead
   // when the Welcome's exit asked for it and the Library has not shown since; another Section, its tab.
   // A press while it reads does nothing. Past RETRY_READ_BOUND_MS the button can be pressed again,
-  // over the error shown, while the reads still pending go on (My-Prompt-Manager-p4y9)
+  // over the error shown, while the reads still pending go on (My-Prompt-Manager-p4y9). Reads that fail
+  // again before RETRY_FAILURE_HOLD_MS has passed since the press show their failure then, the button
+  // busy and a press doing nothing until it does; reads that work show the Section at once
   const retryLoad = useCallback(() => {
     // The error the press tries past: the read's own, or the one still shown once the bound has passed
     const past = loadError ?? retryError;
@@ -601,15 +610,35 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       setRetryBusy(false);
       setLoadStatus(LOAD_STATUS.stillReading);
     }, RETRY_READ_BOUND_MS);
+    const settle = (status: string): void => {
+      retrying.current = false;
+      setRetryBusy(false);
+      setRetryError(null);
+      setLoadStatus(status);
+    };
+    // The failure waits for the hold, whichever of the two ends last shows it
+    let holding = true;
+    let failedAgain = false;
+    clearTimeout(retryHold.current);
+    retryHold.current = setTimeout(() => {
+      holding = false;
+      if (failedAgain) {
+        settle(LOAD_STATUS.failedAgain);
+      }
+    }, RETRY_FAILURE_HOLD_MS);
     void Promise.all([refreshPrompts(), refreshCategories()]).then((reads) => {
       if (attempt !== retryAttempt.current) {
         return;
       }
       clearTimeout(retryBound.current);
-      retrying.current = false;
-      setRetryBusy(false);
-      setRetryError(null);
-      setLoadStatus(reads.every(Boolean) ? LOAD_STATUS.back : LOAD_STATUS.failedAgain);
+      if (reads.every(Boolean)) {
+        clearTimeout(retryHold.current);
+        settle(LOAD_STATUS.back);
+      } else if (holding) {
+        failedAgain = true;
+      } else {
+        settle(LOAD_STATUS.failedAgain);
+      }
     });
   }, [loadError, retryError, currentView, focusFirstPrompt, refreshPrompts, refreshCategories]);
 

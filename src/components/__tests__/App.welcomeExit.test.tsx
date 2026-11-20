@@ -643,7 +643,8 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
     });
 
@@ -716,7 +717,8 @@ describe('App: leaving the Welcome for a ready Library', () => {
       await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
       await settle();
       expect(screen.getByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Try again' })).toHaveFocus();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toHaveFocus();
     });
 
     // CR26 of PR #607: the Categories are part of the Library's read
@@ -761,7 +763,8 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       await waitFor(() => { expect(getCategories.mock.calls.length).toBeGreaterThan(readsBefore); });
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(cardsShown()).toBe(0);
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }));

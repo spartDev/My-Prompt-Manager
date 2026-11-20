@@ -23,6 +23,11 @@
  * - Try again busy (My-Prompt-Manager-p4y9): the read it makes held until the test lets it go, the
  *   button shows the Loading State's spinner and "Trying again...", aria-disabled, the keyboard on it
  *   and its focus ring whole; the read let go, the Library on All, the role=status saying it is back.
+ * - Try again whose read fails again at once (the owner's decision on PR #610, RETRY_FAILURE_HOLD_MS):
+ *   read from the animation frames from the press, "Trying again..." on every frame for 300 ms, wider
+ *   than the idle button and never back to its width before, the keyboard on it at every frame; then
+ *   Try again at its idle width, no sooner than 300 ms after the press, and the role=status saying the
+ *   read failed again.
  *
  * Light and dark, popup 400 x 500. Screenshots in LOAD_ERROR_FOCUS_SCREENSHOTS
  * (test-results/load-error-focus when unset): try-again-failed-again-<theme>.png (the keyboard on Try
@@ -68,6 +73,8 @@ const CATEGORIES = [
 interface ReadFailure {
   failing: boolean;
   rejected: number;
+  /** When each read was refused, by the page's performance.now() */
+  rejectedAt: number[];
   held: boolean;
   release?: () => void;
 }
@@ -89,7 +96,7 @@ interface ReadsToFail {
  * read and write goes through
  */
 const failThePromptsReads = ({ message, count, afterWriteOf, holdNext = false }: ReadsToFail): void => {
-  const state: ReadFailure = { failing: afterWriteOf === undefined, rejected: 0, held: false };
+  const state: ReadFailure = { failing: afterWriteOf === undefined, rejected: 0, rejectedAt: [], held: false };
   (window as Window & { __promptsReads?: ReadFailure }).__promptsReads = state;
   const local = chrome.storage.local;
   const get = local.get.bind(local) as (keys?: unknown) => Promise<Record<string, unknown>>;
@@ -109,6 +116,7 @@ const failThePromptsReads = ({ message, count, afterWriteOf, holdNext = false }:
     const names = keys === null || keys === undefined ? [] : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
     if (state.failing && names.includes('prompts') && state.rejected < count) {
       state.rejected += 1;
+      state.rejectedAt.push(performance.now());
       return Promise.reject(new Error(message));
     }
     if (state.failing && names.includes('prompts') && holdNext && !state.held) {
@@ -127,6 +135,64 @@ const releaseTheHeldRead = (page: Page): Promise<void> =>
 
 const rejectedReads = (page: Page): Promise<number | undefined> =>
   page.evaluate(() => (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.rejected);
+
+const refusedAt = (page: Page): Promise<number[] | undefined> =>
+  page.evaluate(() => (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.rejectedAt);
+
+/**
+ * How long Try again stays busy after its press when the read fails again: the owner's decision on PR
+ * #610, about 300 ms (RETRY_FAILURE_HOLD_MS), written here as the number decided
+ */
+const FAILURE_HOLD_MS = 300;
+
+/** What one animation frame showed of Try again: when, its label, busy or not, its width, and whether it has the keyboard */
+interface TryAgainFrame {
+  at: number;
+  label: string;
+  busy: boolean;
+  width: number;
+  keyboard: boolean;
+}
+
+/** The press of Try again, by the page's performance.now(), its width before, and the frames from the press on */
+interface TryAgainFrames {
+  idleWidth: number;
+  pressedAt?: number;
+  frames: TryAgainFrame[];
+}
+
+/**
+ * In the page, the keyboard on Try again: notes the time of its press (the click Enter makes, caught
+ * before the button's own handler), then what each animation frame shows of it for a second, timed
+ * when the frame's callback runs, so after any commit the frame paints
+ */
+const watchTryAgain = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    const button = document.activeElement as HTMLButtonElement;
+    const watch: TryAgainFrames = { idleWidth: button.getBoundingClientRect().width, frames: [] };
+    (window as Window & { __tryAgainFrames?: TryAgainFrames }).__tryAgainFrames = watch;
+    window.addEventListener('click', () => { watch.pressedAt = performance.now(); }, { capture: true, once: true });
+    const frame = (): void => {
+      const now = performance.now();
+      if (watch.pressedAt !== undefined) {
+        watch.frames.push({
+          at: now - watch.pressedAt,
+          label: button.textContent ?? '',
+          busy: button.getAttribute('aria-disabled') === 'true',
+          width: button.getBoundingClientRect().width,
+          keyboard: document.activeElement === button
+        });
+        if (now - watch.pressedAt > 1000) {
+          return;
+        }
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+
+const tryAgainFrames = (page: Page): Promise<TryAgainFrames | undefined> =>
+  page.evaluate(() => (window as Window & { __tryAgainFrames?: TryAgainFrames }).__tryAgainFrames);
 
 /** What the probe saw: how many times it read the keyboard, and the times the document had it */
 interface FocusProbe {
@@ -400,6 +466,62 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
       await expect(page.getByRole('radio', { name: 'All' })).toBeFocused();
       await expect(page.getByTestId('load-status')).toHaveText('Your library is back');
       await expectNeverOnTheDocument(page, `All, after a busy Try again (${theme})`);
+    });
+
+    // The owner's decision on PR #610: a read that fails again within a frame or two still shows the
+    // busy state long enough to be seen, where unheld it flashed for one frame
+    test(`Try again whose read fails again at once (${theme}): "Trying again..." on every frame for ${String(FAILURE_HOLD_MS)} ms from the press, the keyboard on it, never back to its idle width before; then Try again, and the role=status says so`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 2 });
+      const tryAgain = await tabToTryAgain(page);
+      await watchTheKeyboard(page);
+      await watchTryAgain(page);
+
+      await page.keyboard.press('Enter');
+
+      await expect(page.getByTestId('load-status')).toHaveText("Still couldn't read your library");
+      await expect(tryAgain).toBeFocused();
+      await expect(tryAgain).not.toHaveAttribute('aria-disabled');
+      await expect(page.getByRole('heading', { name: ERROR_TITLE })).toBeVisible();
+      await expect(page.getByTestId('prompt-card')).toHaveCount(0);
+      expect(await rejectedReads(page)).toBe(2);
+      await expect.poll(async () => (await tryAgainFrames(page))?.frames.at(-1)?.at ?? 0).toBeGreaterThan(1000);
+
+      const watch = await tryAgainFrames(page);
+      const pressedAt = watch?.pressedAt ?? Number.NaN;
+      const frames = watch?.frames ?? [];
+      const idleWidth = watch?.idleWidth ?? Number.NaN;
+      const readFailedAt = ((await refusedAt(page))?.[1] ?? Number.NaN) - pressedAt;
+      const held = frames.filter((frame) => frame.at < FAILURE_HOLD_MS);
+      const firstIdle = frames.find((frame) => !frame.busy);
+      const lastBusy = frames.filter((frame) => frame.busy).at(-1);
+      const round = (ms: number | undefined): number | undefined => (ms === undefined ? undefined : Math.round(ms * 10) / 10);
+      test.info().annotations.push({
+        type: 'frames',
+        description: JSON.stringify({
+          theme,
+          idleWidth,
+          readFailedAt: round(readFailedAt),
+          framesBefore300: held.length,
+          busyWidths: [...new Set(held.map((frame) => frame.width))],
+          firstBusy: round(frames.find((frame) => frame.busy)?.at),
+          lastBusy: round(lastBusy?.at),
+          firstIdle: firstIdle === undefined ? undefined : { at: round(firstIdle.at), label: firstIdle.label, width: firstIdle.width }
+        })
+      });
+
+      // The keyboard on Try again at every frame: Chrome takes it from a disabled button a few frames on
+      expect(frames.filter((frame) => !frame.keyboard), 'the frames with the keyboard off Try again').toEqual([]);
+      // The read failed well before the hold ends, so what follows is the hold, not a slow read
+      expect(readFailedAt).toBeLessThan(FAILURE_HOLD_MS);
+      // Busy on every frame before 300 ms, wider than the idle button, never back to it
+      expect(held.length).toBeGreaterThan(0);
+      expect(held.filter((frame) => !(frame.busy && frame.label === 'Trying again...' && frame.width > idleWidth))).toEqual([]);
+      // Then Try again, at its idle width, no sooner than 300 ms after the press
+      expect(firstIdle?.at).toBeGreaterThanOrEqual(FAILURE_HOLD_MS);
+      expect(firstIdle?.label).toBe('Try again');
+      expect(firstIdle?.width).toBeCloseTo(idleWidth, 1);
+      await expectNeverOnTheDocument(page, `Try again, its read failing again at once (${theme})`);
     });
   }
 });

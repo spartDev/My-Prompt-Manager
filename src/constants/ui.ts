@@ -14,6 +14,18 @@
 export const RETRY_READ_BOUND_MS = 10_000;
 
 /**
+ * How long after its press Try again on Error Loading Data stays busy when the Library's reads fail
+ * again (owner's decision on PR #610). Those reads end within a frame or two (about 33 ms for a 4 MB
+ * Library), so unheld the spinner and "Trying again..." flash for one frame, under the 0.1 s that a
+ * person takes as no change at all, and the screen looks as it did before the press, as if the press
+ * had done nothing. 300 ms is three times that 0.1 s, long enough to see and read "Trying again..." as
+ * the answer to the press, and well under the 1 s at which a wait breaks the flow of thought (Nielsen's
+ * limits, as for RETRY_READ_BOUND_MS). A read that works is never held: the Library replaces the
+ * screen as soon as the reads end
+ */
+export const RETRY_FAILURE_HOLD_MS = 300;
+
+/**
  * Z-Index scale for proper stacking contexts
  * Based on industry best practices and inspired by Tailwind CSS scale
  */

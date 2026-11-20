@@ -14,7 +14,7 @@
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { getMockStorageManager } from '../../test/mocks';
@@ -261,6 +261,75 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       expect(tryAgain).toHaveAccessibleName('Try again');
       expect(tryAgain).not.toHaveAttribute('aria-disabled');
       expect(tryAgain).toHaveFocus();
+    });
+
+    // Owner decision on PR #610: a failure is held so its busy state is seen, a success is not
+    describe('the busy state held 300 ms after the press when the read fails again (RETRY_FAILURE_HOLD_MS)', () => {
+      afterEach(() => { vi.useRealTimers(); });
+
+      it('a read that fails again at once: "Trying again..." stays until 300 ms after the press, over the message it tries past, nothing said; a press meanwhile reads nothing; at 300 ms, Try again with the failure, the role=status saying so then, the keyboard on it', async () => {
+        const user = userEvent.setup();
+        const tryAgain = await openOnTheError(user);
+        const status = loadStatus();
+        const getPrompts = getMockStorageManager().getPrompts;
+        getPrompts.mockRejectedValueOnce(new Error('Still unavailable'));
+        vi.useFakeTimers();
+
+        act(() => { tryAgain.click(); });
+        // The reads end, the Prompts' refused, with no time gone by
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(screen.queryByText('Still unavailable')).not.toBeInTheDocument();
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(299); });
+        expect(tryAgain).toHaveAccessibleName('Trying again...');
+        expect(tryAgain).toHaveAttribute('aria-disabled', 'true');
+        expect(tryAgain).toHaveFocus();
+        expect(screen.getByText('Storage unavailable')).toBeInTheDocument();
+        expect(screen.queryByText('Still unavailable')).not.toBeInTheDocument();
+        expect(status).toBeEmptyDOMElement();
+        const reads = getPrompts.mock.calls.length;
+        act(() => { tryAgain.click(); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+        expect(getPrompts.mock.calls.length).toBe(reads);
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+        expect(tryAgain).toHaveAccessibleName('Try again');
+        expect(tryAgain).not.toHaveAttribute('aria-disabled');
+        expect(tryAgain).toHaveFocus();
+        expect(screen.getByText('Still unavailable')).toBeInTheDocument();
+        expect(status).toHaveTextContent("Still couldn't read your library");
+      });
+
+      it('a read that works at once: the Library as soon as the reads end, not held', async () => {
+        const user = userEvent.setup();
+        const tryAgain = await openOnTheError(user);
+        vi.useFakeTimers();
+
+        act(() => { tryAgain.click(); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+        expect(screen.getAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+        expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
+        expect(loadStatus()).toHaveTextContent('Your library is back');
+      });
+
+      it('unmounted during the hold of a failure, it leaves no timer behind', async () => {
+        await seed();
+        const getPrompts = getMockStorageManager().getPrompts;
+        getPrompts.mockRejectedValueOnce(new Error('Storage unavailable'));
+        const user = userEvent.setup();
+        const { unmount } = render(<App />);
+        const tryAgain = await tabToTryAgain(user);
+        getPrompts.mockRejectedValueOnce(new Error('Still unavailable'));
+        vi.useFakeTimers();
+        act(() => { tryAgain.click(); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+        expect(tryAgain).toHaveAccessibleName('Trying again...');
+
+        unmount();
+
+        expect(vi.getTimerCount()).toBe(0);
+      });
     });
 
     it('AC3: a read that never settles: Try again stays busy for 10 s, then can be pressed again and the role=status says so; a read that works then brings the Library', async () => {
