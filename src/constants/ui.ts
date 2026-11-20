@@ -4,6 +4,28 @@
  */
 
 /**
+ * How long Try again on Error Loading Data waits for the Library's reads before it can be pressed
+ * again (My-Prompt-Manager-p4y9). A chrome.storage read of a 4 MB Library (2,000 Prompts) took about
+ * 33 ms when measured, so no read that settles is cut short; a read still pending after 10 s is taken
+ * as stuck, and 10 s is about as long as a person keeps their attention on a wait (Nielsen's limit).
+ * Only the reads count: drawing a large Library after them does not. The reads go on past it, and
+ * their outcome applies if they settle
+ */
+export const RETRY_READ_BOUND_MS = 10_000;
+
+/**
+ * How long after its press Try again on Error Loading Data stays busy when the Library's reads fail
+ * again (owner's decision on PR #610). Those reads end within a frame or two (about 33 ms for a 4 MB
+ * Library), so unheld the spinner and "Trying again..." flash for one frame, under the 0.1 s that a
+ * person takes as no change at all, and the screen looks as it did before the press, as if the press
+ * had done nothing. 300 ms is three times that 0.1 s, long enough to see and read "Trying again..." as
+ * the answer to the press, and well under the 1 s at which a wait breaks the flow of thought (Nielsen's
+ * limits, as for RETRY_READ_BOUND_MS). A read that works is never held: the Library replaces the
+ * screen as soon as the reads end
+ */
+export const RETRY_FAILURE_HOLD_MS = 300;
+
+/**
  * Z-Index scale for proper stacking contexts
  * Based on industry best practices and inspired by Tailwind CSS scale
  */

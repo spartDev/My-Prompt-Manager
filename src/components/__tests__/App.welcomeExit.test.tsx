@@ -9,12 +9,15 @@
  * stored.
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../../App';
 import { type LaunchStateChange, writeLaunchState } from '../../launch/write';
 import { SITE_SETTINGS_KEY } from '../../services/siteSettings';
 import { getMockStorageManager } from '../../test/mocks';
+import { keyboardAtCommits } from '../../test/utils/keyboardAtCommits';
 import { MOTION } from '../../theme/motion';
 import type { Prompt } from '../../types';
 import { PACKS } from '../../welcome/packs';
@@ -65,9 +68,9 @@ const settle = (ms = 20): Promise<void> => act(async () => { await new Promise((
 
 const primary = (): HTMLElement => screen.getByTestId('welcome-primary');
 
-/** Renders the popup and waits for the Welcome at `step` (0 to 2) */
-const openWelcome = async (step: number): Promise<void> => {
-  render(<App />);
+/** Renders the popup, in `wrap` when given, and waits for the Welcome at `step` (0 to 2) */
+const openWelcome = async (step: number, wrap: (app: ReactElement) => ReactElement = (app) => app): Promise<void> => {
+  render(wrap(<App />));
   expect(await screen.findByTestId('welcome')).toHaveAttribute('data-welcome-step', String(step));
 };
 
@@ -274,6 +277,47 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
       expect(errors).not.toHaveBeenCalled();
+    });
+  });
+
+  // My-Prompt-Manager-ou48, AC4: Start empty at a first opening whose read of the Categories failed.
+  // The Welcome hides the failure, so Start empty leaves it for Error Loading Data, and the editor it
+  // opens 250ms later waits behind that screen. Try again leads where Start empty leads: the empty
+  // Library with the editor on a new Prompt, the keyboard in its title field. No dead end
+  describe('Start empty at a first opening whose Categories read failed (My-Prompt-Manager-ou48, AC4)', () => {
+    it('Error Loading Data with Try again, the Welcome done; Try again: the empty Library, the editor on a new Prompt, the keyboard in its title field', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2, packs: [] } });
+      getMockStorageManager().getCategories.mockRejectedValueOnce(new Error('Storage could not be read'));
+      await openWelcome(2);
+      expect(primary()).toHaveTextContent('Start empty');
+      const user = userEvent.setup();
+      primary().focus();
+
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findByRole('heading', { name: 'Error Loading Data' })).toBeInTheDocument();
+      expect(screen.getByText('Storage could not be read')).toBeInTheDocument();
+      await waitFor(async () => { expect(await stored(WELCOME_KEY)).toEqual({ status: 'done' }); });
+      // The editor's 250ms go by: it waits behind the screen, which stays
+      await settle(MOTION.welcomeEditorDelay + 50);
+      expect(screen.getByRole('heading', { name: 'Error Loading Data' })).toBeInTheDocument();
+      expect(screen.queryByTestId('editor-sheet')).not.toBeInTheDocument();
+      const tryAgain = screen.getByRole('button', { name: 'Try again' });
+      await user.tab();
+      expect(tryAgain).toHaveFocus();
+
+      await user.keyboard('{Enter}');
+
+      const editor = await screen.findByTestId('editor-sheet');
+      expect(screen.queryByRole('heading', { name: 'Error Loading Data' })).not.toBeInTheDocument();
+      expect(screen.getByText('Your library is empty')).toBeInTheDocument();
+      const title = within(editor).getByLabelText(/title/i);
+      expect(title).toHaveValue('');
+      await waitFor(() => { expect(title).toHaveFocus(); });
+      await settle();
+      expect(title).toHaveFocus();
+      expect(screen.queryByTestId('welcome')).not.toBeInTheDocument();
+      expect(getMockStorageManager().addPacks).not.toHaveBeenCalled();
     });
   });
 
@@ -599,8 +643,82 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
+    });
+
+    // My-Prompt-Manager-ou48, AC1: the exit of the Welcome asked the keyboard for the first Prompt's
+    // Copy, and the Library has not shown since: Try again from the keyboard gives it there
+    it('Try again from the keyboard, the Library read: the keyboard on the first Prompt\'s Copy, where the Welcome\'s exit puts it, never on the document on the way', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      const keyboard = keyboardAtCommits();
+      await openWelcome(2, keyboard.wrap);
+      readsFailOnceAfterTheAdd(['getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      act(() => { tryAgain.focus(); });
+      keyboard.start();
+
+      await user.keyboard('{Enter}');
+
+      const cards = await screen.findAllByTestId('prompt-card');
+      const title = within(cards[0]).getByRole('heading').textContent ?? '';
+      await waitFor(() => { expect(within(cards[0]).getByRole('button', { name: `Copy content of ${title} to clipboard` })).toHaveFocus(); });
+      // Every commit since the press ended with the keyboard on an element: the Copy takes it in the
+      // commit that lists the cards (a layout effect), not after (My-Prompt-Manager-ou48)
+      expect(keyboard.commits()).toBeGreaterThan(0);
+      expect(keyboard.onDocument()).toEqual([]);
+    });
+
+    // CodeRabbit on PR #610 (src/App.tsx:568): the Copy the Welcome's exit asked for is still pending
+    // at the press of Try again. Every Prompt deleted meanwhile from another surface, there is no Copy
+    // to take the keyboard: the main action of the empty Library takes it
+    it('Try again from the keyboard, every Prompt deleted meanwhile from another surface: the keyboard on "Write your first prompt", never on the document on the way', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      const keyboard = keyboardAtCommits();
+      await openWelcome(2, keyboard.wrap);
+      readsFailOnceAfterTheAdd(['getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      // What the other surface's Delete writes, Prompt after Prompt: this surface is not told
+      const storageManager = getMockStorageManager();
+      for (const { id } of await stored<Prompt[]>('prompts')) {
+        await storageManager.deletePrompt(id);
+      }
+      expect(await stored<Prompt[]>('prompts')).toEqual([]);
+      act(() => { tryAgain.focus(); });
+      keyboard.start();
+
+      await user.keyboard('{Enter}');
+
+      const empty = await screen.findByTestId('library-empty');
+      await waitFor(() => { expect(within(empty).getByRole('button', { name: /write your first prompt/i })).toHaveFocus(); });
+      expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
+      expect(keyboard.commits()).toBeGreaterThan(0);
+      expect(keyboard.onDocument()).toEqual([]);
+    });
+
+    it('Try again from the keyboard, the read failing again: the keyboard stays on Try again', async () => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      await openWelcome(2);
+      readsFailOnceAfterTheAdd(['getPrompts', 'getPrompts']);
+      const user = userEvent.setup();
+      fireEvent.click(primary());
+      const tryAgain = await screen.findByRole('button', { name: 'Try again' });
+      act(() => { tryAgain.focus(); });
+      const getPrompts = vi.mocked(getMockStorageManager().getPrompts);
+      const readsBefore = getPrompts.mock.calls.length;
+
+      await user.keyboard('{Enter}');
+
+      await waitFor(() => { expect(getPrompts.mock.calls.length).toBeGreaterThan(readsBefore); });
+      await settle();
+      expect(screen.getByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toHaveFocus();
     });
 
     // CR26 of PR #607: the Categories are part of the Library's read
@@ -645,7 +763,8 @@ describe('App: leaving the Welcome for a ready Library', () => {
 
       await waitFor(() => { expect(getCategories.mock.calls.length).toBeGreaterThan(readsBefore); });
       expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      // The failure shows once the busy state's hold has passed (RETRY_FAILURE_HOLD_MS)
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
       expect(cardsShown()).toBe(0);
 
       fireEvent.click(screen.getByRole('button', { name: 'Try again' }));

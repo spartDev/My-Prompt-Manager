@@ -50,11 +50,16 @@ export interface WelcomeHostProps {
  *
  * Each step change is recorded from the click or key handler, without waiting for storage: the
  * handler requests the Welcome lock, and the step is written once the lock is granted and the record
- * read, a few milliseconds later. A popup closed after that write reopens on the step; one closed
- * before it reopens one step earlier, the window the epic accepted (D24). A Pack toggled records
- * the step with the new selection, and says it to onPacksChange; while packsLocked, a toggle does
- * nothing. The primary button of the last step finishes, with the Packs selected. The close button
- * records nothing: the step shown is already recorded, or being recorded.
+ * read, a few milliseconds later. A popup closed after that write reopens on the step. One closed
+ * before it loses the write, the window the epic accepted (D24), and reopens on what the last write
+ * that landed recorded, so for the one action whose write is lost: after Next (or ArrowRight), one
+ * step earlier than the step left on screen; after Back (or ArrowLeft), one step later; after Skip or
+ * a dot, the step the user moved from. A Pack toggled records the step with the new selection, and
+ * says it to onPacksChange; that write lost, the Welcome reopens on the same step with the selection
+ * from before the toggle (the Packs last recorded, else those selected by default). While
+ * packsLocked, a toggle does nothing. The primary button of the last step finishes, with the Packs
+ * selected. The close button records nothing: the step shown is already recorded, or being recorded.
+ * (src/components/__tests__/App.launch.test.tsx, "a write of the Welcome lost to a popup closed early")
  */
 const WelcomeHost: FC<WelcomeHostProps> = ({ step, packs, saveStep, finishWelcome, onFinish = finishWelcome, onStepChange, onPacksChange, packsLocked = false, notification, context = 'popup' }) => {
   const [state, setState] = useState<WelcomeState>(() => initialWelcomeState(step, packs));

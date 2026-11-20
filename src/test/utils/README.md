@@ -299,6 +299,10 @@ InMemoryStorage is extremely fast:
 
 This makes it ideal for unit tests where performance matters.
 
+## keyboardAtCommits
+
+`keyboardAtCommits()` reads where the keyboard is at the end of each commit of a tree: wrap the tree with its `wrap`, call `start()` before the action, then expect `onDocument()` to be empty. It is a React Profiler: `onRender` runs in the layout phase of each commit, after the layout effects of the components under it and before any passive effect. A focus moved by a layout effect is in place there; one moved by a passive effect is not, and the keyboard is still on the body or on an element the commit removed. No timing is involved, so happy-dom sees what Chrome would. The tests of the keyboard after Try again on Error Loading Data use it (My-Prompt-Manager-ou48).
+
 ## See Also
 
 - [Testing Best Practices](../../../docs/TESTING_BEST_PRACTICES.md)

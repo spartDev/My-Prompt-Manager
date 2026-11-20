@@ -96,6 +96,17 @@ const contentKey = (prompt: { readonly content: string }): string => prompt.cont
 const isNamed = (entry: unknown): entry is { name: string } =>
   typeof entry === 'object' && entry !== null && 'name' in entry && typeof entry.name === 'string';
 
+/**
+ * Reads the value stored under the categories key: its entries that are a Category (an object with
+ * a string name, as every reader of the raw value takes one), as they are and in their stored order.
+ * An entry that is not one (null, a string, an object without a string name) is skipped, as
+ * readPrompts skips what is not a Prompt, and a value that is not a list reads as no Categories.
+ * Pure: reading never writes, and the entries skipped stay in storage.
+ */
+const readCategories = (stored: unknown): Category[] =>
+  // A stored Category is read as it is, as getCategories always read it
+  Array.isArray(stored) ? (stored.filter(isNamed) as Category[]) : [];
+
 export class StorageManager {
   private static instance: StorageManager | undefined;
   private readonly STORAGE_KEYS = STORAGE_KEYS;
@@ -459,28 +470,37 @@ export class StorageManager {
   }
 
   /**
-   * The Library's Categories, the default Category always among them. When the default Category
-   * is not stored (a fresh store, or a by-id rename), it is created and written under the
-   * CATEGORIES lock, after reading the list again inside it, so the write cannot put back a list
-   * read before another context's Category write. Never call it while holding CATEGORIES (the
+   * The Library's Categories, the default Category always among them. A stored entry that is not a
+   * Category is skipped, and a stored value that is not a list reads as no Categories
+   * (readCategories), so a malformed store neither fails the read nor reaches the render. When the
+   * default Category is not stored (a fresh store, or a by-id rename), it is created and written
+   * under the CATEGORIES lock, after reading the list again inside it, so the write cannot put back
+   * a list read before another context's Category write. Never call it while holding CATEGORIES (the
    * locks are not reentrant): a locked writer reads through readCategoriesWithDefault().
    */
   async getCategories(): Promise<Category[]> {
     try {
-      const categories = await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES);
-      if (categories?.some(c => c.name === DEFAULT_CATEGORY)) {
+      const categories = readCategories(await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES));
+      if (categories.some(c => c.name === DEFAULT_CATEGORY)) {
         return categories;
       }
-      return await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.readCategoriesWithDefault());
+      return await this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => readCategories(await this.readCategoriesWithDefault()));
     } catch (error) {
       throw this.handleStorageError(error);
     }
   }
 
-  /** The stored Categories, writing the default Category first when it is absent. Caller holds CATEGORIES. */
+  /**
+   * The stored Categories, writing the default Category first when it is absent. Caller holds
+   * CATEGORIES. The write is the stored list itself, every entry as it is and in its order, with the
+   * default Category before it: an entry that is not a Category is kept, as the upgrade pass, addPacks
+   * and importPrompt keep one; a stored value that is not a list holds none, and is written over.
+   */
   private async readCategoriesWithDefault(): Promise<Category[]> {
-    const categories = (await this.getStorageData<Category[]>(this.STORAGE_KEYS.CATEGORIES)) ?? [];
-    if (categories.some(c => c.name === DEFAULT_CATEGORY)) {
+    const stored = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
+    // As they are: the writers that read through here take the stored entries as Categories
+    const categories = (Array.isArray(stored) ? stored : []) as Category[];
+    if (categories.some(entry => isNamed(entry) && entry.name === DEFAULT_CATEGORY)) {
       return categories;
     }
     const withDefault: Category[] = [{ id: uuidv4(), name: DEFAULT_CATEGORY }, ...categories];

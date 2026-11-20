@@ -17,6 +17,12 @@
  * without its Categories; the next Try again lists the Packs' Prompts, with their Categories in the
  * Library filter and on each card. One screenshot per theme, load-error-categories-<theme>.png (the
  * screen after the failed read of the Categories, at rest), in the same folder.
+ *
+ * AC4 of My-Prompt-Manager-ou48: Start empty at a first opening whose read of the Categories fails
+ * (the opening's own read, hidden behind the Welcome). Start empty leaves the Welcome, finished, for
+ * Error Loading Data, and the editor it opens 250ms later waits behind that screen. Try again, from
+ * the keyboard, leads where Start empty leads: the empty Library with the editor on a new Prompt, the
+ * keyboard in its title field. No dead end. One screenshot, start-empty-after-try-again-light.png.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -89,6 +95,25 @@ const failTheNextLibraryReads = ({ message, ...left }: ReadsToFail): void => {
     return get(keys);
   };
 };
+
+/** In the page, before its own scripts: the first `count` reads of the Categories reject, from the opening on */
+const failTheFirstCategoriesReads = ({ message, count }: { message: string; count: number }): void => {
+  const state = { rejected: 0 };
+  (window as Window & { __categoriesReads?: { rejected: number } }).__categoriesReads = state;
+  const local = chrome.storage.local;
+  const get = local.get.bind(local) as (keys?: unknown) => Promise<Record<string, unknown>>;
+  (local as unknown as { get: (keys?: unknown) => Promise<Record<string, unknown>> }).get = (keys) => {
+    const names = keys === null || keys === undefined ? [] : Array.isArray(keys) ? keys.map(String) : typeof keys === 'string' ? [keys] : Object.keys(keys);
+    if (names.includes('categories') && state.rejected < count) {
+      state.rejected += 1;
+      return Promise.reject(new Error(message));
+    }
+    return get(keys);
+  };
+};
+
+const categoriesReadsRejected = (page: Page): Promise<number | undefined> =>
+  page.evaluate(() => (window as Window & { __categoriesReads?: { rejected: number } }).__categoriesReads?.rejected);
 
 const readFailure = (page: Page): Promise<ReadFailure | undefined> =>
   page.evaluate(() => (window as Window & { __loadError?: ReadFailure }).__loadError);
@@ -219,19 +244,23 @@ test.describe('Error Loading Data after the Welcome\'s Packs', () => {
 
       await tryAgain.click();
 
-      // The Prompts read, the Categories not: the screen is back, with its way on, and no Prompt card
-      // was shown on the way
+      // The Prompts read, the Categories not: the screen, with its way on, which stays while Try again
+      // reads the Library (My-Prompt-Manager-ou48)
       await expect.poll(async () => (await readFailure(page))?.rejected).toEqual(['prompts', 'categories', 'categories']);
       await expect(title).toBeVisible();
       await expect(page.getByText(READ_FAILURE)).toBeVisible();
       await expect(tryAgain).toBeVisible();
-      expect(await cardsAdded(page)).toBe(0);
 
       // At rest, the pointer off the button so it shows no hover
       await animationsDone(page);
       await page.mouse.move(2, HEIGHT - 2);
       await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
       await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `load-error-categories-${theme}.png`) });
+
+      // No Prompt card was shown on the way, read at the last moment before the next Try again: the screen
+      // stays during the reads, so its title is no sign that they have ended, and a card shown once they
+      // have would come after an earlier look (My-Prompt-Manager-ou48, AC5)
+      expect(await cardsAdded(page)).toBe(0);
 
       await tryAgain.click();
 
@@ -249,4 +278,49 @@ test.describe('Error Loading Data after the Welcome\'s Packs', () => {
       expect((await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
     });
   }
+
+  test('AC4 (My-Prompt-Manager-ou48): Start empty at a first opening whose Categories read fails: Error Loading Data with Try again, the Welcome done, the editor waiting behind; Try again leads where Start empty leads, the empty Library and the editor on a new Prompt, the keyboard in its title field', async ({ page, storage, extensionId }) => {
+    await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2, packs: [] }, settings: { ...DEFAULT_SETTINGS, theme: 'light' } });
+    await page.addInitScript(failTheFirstCategoriesReads, { message: READ_FAILURE, count: 1 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.setViewportSize({ width: WIDTH, height: HEIGHT });
+    await page.goto(`chrome-extension://${extensionId}/src/popup.html`);
+    await expect(page.getByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+    const primary = page.getByTestId('welcome-primary');
+    await expect(primary).toHaveText('Start empty');
+    // The opening's own read of the Categories failed, behind the Welcome
+    await expect.poll(() => categoriesReadsRejected(page)).toBe(1);
+
+    await primary.press('Enter');
+
+    const title = page.getByRole('heading', { name: ERROR_TITLE });
+    const tryAgain = page.getByRole('button', { name: 'Try again' });
+    await expect(title).toBeVisible();
+    await expect(page.getByText(READ_FAILURE)).toBeVisible();
+    await expect(page.getByTestId('welcome')).toHaveCount(0);
+    await expect.poll(async () => (await storage.get<Record<string, unknown>>(WELCOME_KEY))[WELCOME_KEY]).toEqual({ status: 'done' });
+    // The editor's 250ms go by behind the screen, which stays
+    await page.waitForTimeout(500);
+    await expect(title).toBeVisible();
+    await expect(page.getByTestId('editor-sheet')).toHaveCount(0);
+
+    await page.keyboard.press('Tab');
+    await expect(tryAgain).toBeFocused();
+    await page.keyboard.press('Enter');
+
+    // Where Start empty leads: the empty Library, the editor on a new Prompt over it, the keyboard in its title field
+    const editor = page.getByTestId('editor-sheet');
+    await expect(editor).toBeVisible();
+    await expect(title).toHaveCount(0);
+    await expect(page.getByText('Your library is empty')).toBeAttached();
+    const titleField = editor.getByLabel(/title/i);
+    await expect(titleField).toHaveValue('');
+    await expect(titleField).toBeFocused();
+    await expect(page.getByTestId('prompt-card')).toHaveCount(0);
+    expect(await categoriesReadsRejected(page)).toBe(1);
+    expect(await storage.getPrompts()).toHaveLength(0);
+    await animationsDone(page);
+    await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+    await page.screenshot({ path: path.join(SCREENSHOTS_DIR, 'start-empty-after-try-again-light.png') });
+  });
 });

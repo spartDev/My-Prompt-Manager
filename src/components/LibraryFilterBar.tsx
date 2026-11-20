@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { DEFAULT_CATEGORY_COLOR } from '../constants/colors';
 import { useRadioGroup } from '../hooks/useRadioGroup';
@@ -126,7 +126,9 @@ const LibraryFilterBar: FC<LibraryFilterBarProps> = ({
       pills.current[0]?.focus();
     }
   }, [activeIndex, pills]);
-  useEffect(() => {
+  // In the commit that shows the pill, so the keyboard, which the control that had it lost as it left
+  // (Error Loading Data's Try again, My-Prompt-Manager-ou48), is never on the document in between
+  useLayoutEffect(() => {
     if (focusActive && !disabled && activeIndex >= 0) {
       pills.current[activeIndex]?.focus();
       onFocusActiveDone?.();

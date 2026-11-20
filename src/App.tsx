@@ -11,6 +11,7 @@ import TabBar, { SECTION_ORDER, type Section } from './components/TabBar';
 import ToastContainer from './components/ToastContainer';
 import WelcomeHost from './components/welcome/WelcomeHost';
 import WhatsNewHost from './components/whatsNew/WhatsNewHost';
+import { RETRY_FAILURE_HOLD_MS, RETRY_READ_BOUND_MS } from './constants/ui';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useAddPacks } from './hooks/useAddPacks';
 import { useAnimatedPresence } from './hooks/useAnimatedPresence';
@@ -41,6 +42,13 @@ interface SavedNotice {
 
 /** How long the Notification of a deleted Category stays, so its Undo can be reached */
 const UNDO_DURATION_MS = 6000;
+
+/** What the role=status of Error Loading Data says once Try again has read, or waited past its bound (My-Prompt-Manager-p4y9) */
+const LOAD_STATUS = {
+  back: 'Your library is back',
+  failedAgain: "Still couldn't read your library",
+  stillReading: 'Still reading your library. You can try again.'
+} as const;
 
 /** A Category name refused (by Admission, or taken): the Category sheet shows why, so no failure Notification */
 const isRefusal = (error: AppError): boolean => error.type === 'VALIDATION_ERROR';
@@ -535,14 +543,104 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const loading = promptsLoading || categoriesLoading;
 
-  // Try again on Error Loading Data: the Prompts and the Categories read again. Each read clears its
-  // error as it starts, so the Library comes back once both work, and the screen with its Try again
-  // once more while one still fails. Nothing else is redone: after the Welcome's Packs, the add has
-  // resolved and the Welcome is finished (My-Prompt-Manager-ojz.22)
+  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
+  // Packs were stored: Error Loading Data, with Try again as the way on (CR26 of PR #607)
+  const loadError = promptsError ?? categoriesError;
+  // While Try again reads the Library, the error it is trying past: each read clears its own error as
+  // it starts, and the screen stays on this one until both have ended, so its Try again keeps the
+  // keyboard and nothing of the Library shows on the way (My-Prompt-Manager-ou48)
+  const [retryError, setRetryError] = useState<AppError | null>(null);
+  const retrying = useRef(false);
+  // While it reads, Try again is busy: the spinner and "Trying again..." of the Loading State,
+  // aria-disabled and not disabled, as Chrome takes the keyboard from a disabled button. How it went is
+  // said in a role=status: the Library back, the read failed again, or a read still pending past
+  // RETRY_READ_BOUND_MS, when the button can be pressed again (My-Prompt-Manager-p4y9)
+  const [retryBusy, setRetryBusy] = useState(false);
+  const [loadStatus, setLoadStatus] = useState('');
+  // While busy, the screen shows the error it tries past, even once a read has failed with its own:
+  // the new error, the button and the role=status change together
+  const shownLoadError = retryBusy ? retryError : loadError ?? retryError;
+  // The press an outcome belongs to: reads left pending past the bound, then overtaken by another
+  // press, say nothing when they settle
+  const retryAttempt = useRef(0);
+  const retryBound = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // A failure shows no sooner than RETRY_FAILURE_HOLD_MS after the press, so its busy state is seen
+  const retryHold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => {
+    clearTimeout(retryBound.current);
+    clearTimeout(retryHold.current);
+  }, []);
+  // The Section back after Error Loading Data, other than the Library: its tab takes the keyboard
+  const [focusSectionTab, setFocusSectionTab] = useState(false);
+  const handleSectionTabFocused = useCallback(() => { setFocusSectionTab(false); }, []);
+
+  // Try again on Error Loading Data: the Prompts and the Categories read again. Once both have ended,
+  // the Section comes back if both worked, else the screen with the new error, its Try again still
+  // with the keyboard. Nothing else is redone: after the Welcome's Packs, the add has resolved and the
+  // Welcome is finished (My-Prompt-Manager-ojz.22). The Try again pressed leaves with the screen, so
+  // the keyboard is asked where it goes, never left on the document (My-Prompt-Manager-ou48): in the
+  // Library, which a normal opening leaves with the keyboard on no control, its active Library filter
+  // (All, as at every opening), or with no Prompt the main action of its empty state, the place the
+  // Library gives the keyboard when the control that had it leaves; the first Prompt's Copy instead
+  // when the Welcome's exit asked for it and the Library has not shown since; another Section, its tab.
+  // A press while it reads does nothing. Past RETRY_READ_BOUND_MS the button can be pressed again,
+  // over the error shown, while the reads still pending go on (My-Prompt-Manager-p4y9). Reads that fail
+  // again before RETRY_FAILURE_HOLD_MS has passed since the press show their failure then, the button
+  // busy and a press doing nothing until it does; reads that work show the Section at once
   const retryLoad = useCallback(() => {
-    void refreshPrompts();
-    void refreshCategories();
-  }, [refreshPrompts, refreshCategories]);
+    // The error the press tries past: the read's own, or the one still shown once the bound has passed
+    const past = loadError ?? retryError;
+    if (retrying.current || past === null) {
+      return;
+    }
+    retrying.current = true;
+    const attempt = retryAttempt.current + 1;
+    retryAttempt.current = attempt;
+    setRetryError(past);
+    setRetryBusy(true);
+    setLoadStatus('');
+    if (currentView !== 'library') {
+      setFocusSectionTab(true);
+    } else if (!focusFirstPrompt) {
+      setFocusLibraryFilter(true);
+    }
+    clearTimeout(retryBound.current);
+    retryBound.current = setTimeout(() => {
+      retrying.current = false;
+      setRetryBusy(false);
+      setLoadStatus(LOAD_STATUS.stillReading);
+    }, RETRY_READ_BOUND_MS);
+    const settle = (status: string): void => {
+      retrying.current = false;
+      setRetryBusy(false);
+      setRetryError(null);
+      setLoadStatus(status);
+    };
+    // The failure waits for the hold, whichever of the two ends last shows it
+    let holding = true;
+    let failedAgain = false;
+    clearTimeout(retryHold.current);
+    retryHold.current = setTimeout(() => {
+      holding = false;
+      if (failedAgain) {
+        settle(LOAD_STATUS.failedAgain);
+      }
+    }, RETRY_FAILURE_HOLD_MS);
+    void Promise.all([refreshPrompts(), refreshCategories()]).then((reads) => {
+      if (attempt !== retryAttempt.current) {
+        return;
+      }
+      clearTimeout(retryBound.current);
+      if (reads.every(Boolean)) {
+        clearTimeout(retryHold.current);
+        settle(LOAD_STATUS.back);
+      } else if (holding) {
+        failedAgain = true;
+      } else {
+        settle(LOAD_STATUS.failedAgain);
+      }
+    });
+  }, [loadError, retryError, currentView, focusFirstPrompt, refreshPrompts, refreshCategories]);
 
   // Until the opening knows what it shows, only the background: the Library never flashes before the Welcome
   if (launch.loading) {
@@ -578,27 +676,42 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
     );
   }
 
-  // A read of the Library that failed, its Prompts or its Categories, even right after the Welcome's
-  // Packs were stored: Try again is the way on, so no one is left on a screen with nothing to do but
+  // Error Loading Data: Try again is the way on, so no one is left on a screen with nothing to do but
   // close it, nor on a Library that lacks its Categories and says nothing (CR26 of PR #607)
-  const loadError = promptsError ?? categoriesError;
-  if (loadError) {
+  // The role=status of Try again, second in the error screen and second in the Section's tree, right
+  // after the screen's own element, so React keeps the one element from one to the other and a screen
+  // reader hears it (My-Prompt-Manager-p4y9). Never first: the app stays the root's first element, and
+  // the status's sr-only box (1px, margin -1px) sits at -1px where it would be measured for the app
+  const loadStatusRegion = (
+    <p role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="load-status">{loadStatus}</p>
+  );
+
+  if (shownLoadError) {
     return (
       <ThemeProvider>
         <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
-            <p className="text-secondary">{loadError.message}</p>
-            {/* The Primary Button of docs/DESIGN_GUIDELINES.md */}
+            <p className="text-secondary">{shownLoadError.message}</p>
+            {/* The Primary Button of docs/DESIGN_GUIDELINES.md, with its Loading State while it reads.
+                Busy, it keeps its fill, label and focus ring at full strength: opacity-50 would take the
+                ring to 2.39:1 in light and 1.83:1 in dark, under the 3:1 of a focus indicator */}
             <button
               type="button"
               onClick={retryLoad}
-              className="mt-5 px-6 py-3 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl focus-primary"
+              aria-disabled={retryBusy ? true : undefined}
+              className="mt-5 px-6 py-3 text-sm font-semibold text-on-accent bg-accent hover:bg-accent-hover rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl focus-primary aria-disabled:cursor-wait aria-disabled:hover:bg-accent aria-disabled:hover:shadow-lg"
             >
-              Try again
+              {retryBusy ? (
+                <span className="flex items-center justify-center space-x-2">
+                  <span aria-hidden="true" className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  <span>Trying again...</span>
+                </span>
+              ) : 'Try again'}
             </button>
           </div>
         </div>
+        {loadStatusRegion}
         {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
         <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </ThemeProvider>
@@ -693,7 +806,13 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
       )}
       </div>
 
-      <TabBar activeSection={currentView} onSelect={handleSelectSection} inert={categorySheetOpen} />
+      <TabBar
+        activeSection={currentView}
+        onSelect={handleSelectSection}
+        inert={categorySheetOpen}
+        focusActive={focusSectionTab}
+        onFocusActiveDone={handleSectionTabFocused}
+      />
       </div>
 
       {editorSheet.shown && (
@@ -740,6 +859,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
       <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>
+      {loadStatusRegion}
     </ThemeProvider>
   );
 };

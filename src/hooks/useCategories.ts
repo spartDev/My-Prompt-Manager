@@ -11,14 +11,18 @@ export const useCategories = (): UseCategoriesReturn => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<AppError | null>(null);
 
-  const refreshCategories = useCallback(async () => {
+  // Never rejects: resolves to true once the Categories are read, to false when the read failed, its
+  // error then in `error` (Try again says which, My-Prompt-Manager-p4y9)
+  const refreshCategories = useCallback(async (): Promise<boolean> => {
     try {
       setLoading(true);
       setError(null);
       const allCategories = await StorageManager.getInstance().getCategories();
       setCategories(allCategories);
+      return true;
     } catch (err) {
       setError(err as AppError);
+      return false;
     } finally {
       setLoading(false);
     }
