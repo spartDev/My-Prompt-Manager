@@ -403,8 +403,8 @@ jobs:
     permissions:
       contents: write # create the release and upload its asset
     steps:
-      # One zip per Release. "Re-run all jobs" builds a new zip (zip stores the files' times) that the next step
-      # would put in place of the one the store may already hold; only "Re-run failed jobs" keeps the first.
+      # One zip per Release. "Re-run all jobs" builds a new zip (zip stores the files' times); this step stops that
+      # run, so the Submission never sends the new zip while the Release keeps the first. Use "Re-run failed jobs".
       # It decides from one REST listing of the Releases, drafts included (softprops creates the Release as a
       # draft, attaches the zip, then publishes it), and compares the digest GitHub computed at the upload. A
       # failed call fails the step: an error is never read as "no Release yet". An asset without a digest, or with
