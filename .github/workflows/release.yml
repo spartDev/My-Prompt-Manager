@@ -408,7 +408,8 @@ jobs:
       # It decides from one REST listing of the Releases, drafts included (softprops creates the Release as a
       # draft, attaches the zip, then publishes it), and compares the digest GitHub computed at the upload. A
       # failed call fails the step: an error is never read as "no Release yet". An asset without a digest, or with
-      # an empty one, fails.
+      # an empty one, fails. An asset is the zip when its name or its label is the zip's name, as softprops matches
+      # an existing asset (its third form, the name with spaces made dots, is the zip's name itself).
       - name: 🔒 Check the Release holds no other zip
         env:
           GH_TOKEN: ${{ github.token }}
@@ -416,7 +417,7 @@ jobs:
           ZIP: ${{ needs.build-release.outputs.zip }}
           SHA256: ${{ needs.build-release.outputs.sha256 }}
         run: |
-          if ! digests=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name == env.TAG) | .assets[] | select(.name == env.ZIP) | .digest | if (. // "") == "" then "none" else . end'); then
+          if ! digests=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name == env.TAG) | .assets[] | select(.name == env.ZIP or .label == env.ZIP) | .digest | if (. // "") == "" then "none" else . end'); then
             echo "::error::Could not list the GitHub Releases, so whether $TAG already holds a $ZIP is unknown. Nothing was changed: Re-run failed jobs."
             exit 1
           fi
