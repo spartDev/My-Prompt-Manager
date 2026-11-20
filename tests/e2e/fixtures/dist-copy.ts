@@ -1,6 +1,6 @@
 /**
  * The copy of dist/ every test-only build starts from: the custom-site build (custom-site-build.ts)
- * and the What's new 2.0.0 build (whats-new-build.ts). Each changes its manifest only.
+ * and the two What's new builds, at 2.0.0 and at 1.9.0 (whats-new-build.ts). Each changes its manifest only.
  */
 import fs from 'node:fs';
 import path from 'node:path';

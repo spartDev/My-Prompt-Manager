@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ICON_PLACEMENT_REPAIRS_KEY } from '../../services/iconPlacementRepairs';
 import { withoutWritten } from '../../test/helpers/icon-placement-repairs';
@@ -277,16 +277,6 @@ describe('background: the icon placement of each tab of a Platform', () => {
     const REDIRECTED_TAB = { id: 12, windowId: 3, url: 'https://copilot.cloud.microsoft/chat', active: true } as chrome.tabs.Tab;
     const M365_PICK = { mode: 'custom', placement: 'before', selector: SEND_BUTTON };
 
-    /**
-     * The service worker started on a Platform list where M365 Copilot has copilot.cloud.microsoft
-     * back, as ticket My-Prompt-Manager-j74b brings it: it loads a list of its own (vi.resetModules)
-     */
-    const startWithTheWorkAccountHost = async (): Promise<MessageListener> => {
-      const listener = await startServiceWorker();
-      giveTheWorkAccountHostBack((await import('../../config/platforms')).SUPPORTED_PLATFORMS);
-      return listener;
-    };
-
     /** The browser starts again with the tabs restored: the service worker starts, then Chrome tells it of the startup */
     const restart = async (tabs: chrome.tabs.Tab[], start = startServiceWorker) => {
       await chrome.storage.session.clear();
@@ -302,6 +292,24 @@ describe('background: the icon placement of each tab of a Platform', () => {
     };
 
     describe('with a tab at copilot.cloud.microsoft, once ticket My-Prompt-Manager-j74b gives it back to M365 Copilot', () => {
+      /** Takes the host away again from the Platform list the test's service worker loaded */
+      let takeBack: (() => void) | undefined;
+      afterEach(() => {
+        takeBack?.();
+        takeBack = undefined;
+      });
+
+      /**
+       * The service worker started on a Platform list where M365 Copilot has copilot.cloud.microsoft
+       * back, as ticket My-Prompt-Manager-j74b brings it: it loads a list of its own (vi.resetModules),
+       * so the host is given back on that list, and taken away after the test
+       */
+      const startWithTheWorkAccountHost = async (): Promise<MessageListener> => {
+        const listener = await startServiceWorker();
+        takeBack = giveTheWorkAccountHostBack((await import('../../config/platforms')).SUPPORTED_PLATFORMS);
+        return listener;
+      };
+
       it('keeps the pick of a restored M365 Copilot tab when a tab at its other host reports first', async () => {
         await chrome.storage.local.set({ [ICON_PLACEMENT_REPAIRS_KEY]: { 'm365.cloud.microsoft': { status: 'override', override: M365_PICK } } });
 

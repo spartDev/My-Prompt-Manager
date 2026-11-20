@@ -1,9 +1,10 @@
 /**
  * E2E: What's new over the Library, in the real extension (My-Prompt-Manager-d1g.11)
  *
- * The manifest is still 1.9.0, which has no Release notes, so the spec runs on the copy of the build
- * at 2.0.0 (fixtures/whats-new-build.ts), as after the update of an existing user from 1.9.0. (Debug
- * mode no longer shows What's new at once: the Welcome comes first, My-Prompt-Manager-ojz.2.) In the
+ * The spec runs on the copy of the build at 2.0.0, a Release that has Release notes, whatever the
+ * manifest's version (fixtures/whats-new-build.ts), as after the update of an existing user from
+ * 1.9.0. (Debug mode no longer shows What's new at once: the Welcome comes first,
+ * My-Prompt-Manager-ojz.2.) In the
  * popup (400 x 500) and the side panel (360 x 720), light and dark: the sheet rises over a seeded
  * Library with the pill "New in 2.0.0", and after Got it and its exit, the Library is back, the
  * Release marked seen.

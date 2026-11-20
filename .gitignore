@@ -5,8 +5,9 @@ dist/
 # Test-only build of the custom-site e2e (tests/e2e/fixtures/custom-site-build.ts)
 dist-e2e-custom-site/
 dist-e2e-stale-build/
-# Test-only build of the What's new e2e at 2.0.0 (tests/e2e/fixtures/whats-new-build.ts)
+# Test-only builds of the What's new e2e, at 2.0.0 and at 1.9.0 (tests/e2e/fixtures/whats-new-build.ts)
 dist-e2e-whats-new/
+dist-e2e-without-notes/
 build/
 
 # Node.js dependencies
