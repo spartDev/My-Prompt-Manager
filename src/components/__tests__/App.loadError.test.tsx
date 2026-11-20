@@ -247,6 +247,25 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       expect(status).toHaveTextContent('Your library is back');
     });
 
+    // PR #610's e2e on 51d05623: the status first in #root, the side panel's editor motion measured it
+    // (its sr-only box at -1px) for the app. The app is the root's first element, on either screen
+    it('AC2: the live region comes after the screen, never first in the root, on the error screen and on the Library', async () => {
+      const user = userEvent.setup();
+      await openOnTheError(user);
+      const status = loadStatus();
+      const root = status.parentElement;
+      expect(root?.firstElementChild).not.toBe(status);
+      expect(root?.firstElementChild).toContainElement(screen.getByRole('heading', { name: ERROR_TITLE }));
+
+      await user.keyboard('{Enter}');
+
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+      expect(loadStatus()).toBe(status);
+      expect(status.parentElement).toBe(root);
+      expect(root?.firstElementChild).not.toBe(status);
+      expect(root?.firstElementChild).toContainElement(screen.getAllByTestId('prompt-card')[0]);
+    });
+
     it('AC2: the read failing again, the role=status says so; Try again leaves its busy state, the keyboard on it', async () => {
       const user = userEvent.setup();
       const tryAgain = await openOnTheError(user);

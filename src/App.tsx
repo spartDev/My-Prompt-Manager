@@ -678,8 +678,10 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   // Error Loading Data: Try again is the way on, so no one is left on a screen with nothing to do but
   // close it, nor on a Library that lacks its Categories and says nothing (CR26 of PR #607)
-  // The role=status of Try again, first in the error screen and first in the Section's tree, so React
-  // keeps the one element from one to the other and a screen reader hears it (My-Prompt-Manager-p4y9)
+  // The role=status of Try again, second in the error screen and second in the Section's tree, right
+  // after the screen's own element, so React keeps the one element from one to the other and a screen
+  // reader hears it (My-Prompt-Manager-p4y9). Never first: the app stays the root's first element, and
+  // the status's sr-only box (1px, margin -1px) sits at -1px where it would be measured for the app
   const loadStatusRegion = (
     <p role="status" aria-live="polite" aria-atomic="true" className="sr-only" data-testid="load-status">{loadStatus}</p>
   );
@@ -687,7 +689,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   if (shownLoadError) {
     return (
       <ThemeProvider>
-        {loadStatusRegion}
         <div className="h-full w-full p-4 bg-app flex items-center justify-center">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-danger mb-2">Error Loading Data</h2>
@@ -710,6 +711,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
             </button>
           </div>
         </div>
+        {loadStatusRegion}
         {/* A Notification stays: the Undo of a deletion whose Prompts could not be read again is in it */}
         <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </ThemeProvider>
@@ -718,7 +720,6 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   return (
     <ThemeProvider>
-      {loadStatusRegion}
       <div className={`h-full w-full bg-app section-scroll-scope relative flex flex-col ${context === 'sidepanel' ? 'sidepanel' : ''}`}>
       {/* The Section and the tab bar wait, out of reach, while the editor is open above them; they
           recede a little as it rises and come back as it leaves */}
@@ -858,6 +859,7 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
       <ToastContainer toast={toast} onDismiss={hideToast} onPause={pauseToast} onResume={resumeToast} />
       </div>
+      {loadStatusRegion}
     </ThemeProvider>
   );
 };
