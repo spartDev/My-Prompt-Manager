@@ -110,25 +110,47 @@ gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
 
 ## 5. Let the provider act as the service account
 
-The binding names one subject: the `sub` claim GitHub gives a job of this repository in the `chrome-webstore` environment, `repo:spartDev/My-Prompt-Manager:environment:chrome-webstore`. That is GitHub's default form; check that the repository does not customize it (the answer must hold `"use_default": true`):
+The binding names one subject: the `sub` claim GitHub gives a job of this repository in the `chrome-webstore` environment. Its form depends on the repository's OIDC settings; read them:
 
 ```sh
 . ~/.config/my-prompt-manager/cws-setup.sh
 gh api "repos/$REPO/actions/oidc/customization/sub"
+gh api "repos/$REPO/actions/oidc/customization/sub" --jq '.sub_claim_prefix + ":environment:chrome-webstore"'
 ```
 
-Then grant that subject `roles/iam.workloadIdentityUser` on the service account:
+The first line prints the settings, the second the subject the binding below names.
+
+- `use_default` must be `true`. With `false`, the repository builds its subject from a template of its own (`include_claim_keys`) and the subject printed is wrong: turn the template off (`gh api -X PUT "repos/$REPO/actions/oidc/customization/sub" -F use_default=true`), then read the settings again.
+- `use_immutable_subject` gives the form of the subject:
+  - `false`, GitHub's default form for a repository created before 2026-07-15: `repo:spartDev/My-Prompt-Manager:environment:chrome-webstore`, and `sub_claim_prefix` is `repo:spartDev/My-Prompt-Manager`;
+  - `true`, the immutable form, for a repository created after 2026-07-15, one that opted in, and one renamed or transferred after that date: the owner's and the repository's numeric IDs follow their names, `repo:spartDev@<owner-id>/My-Prompt-Manager@<repo-id>:environment:chrome-webstore`, and `sub_claim_prefix` is the part before `:environment:`.
+
+Either way the subject is `sub_claim_prefix` followed by `:environment:chrome-webstore`. Grant it `roles/iam.workloadIdentityUser` on the service account:
 
 ```sh
 . ~/.config/my-prompt-manager/cws-setup.sh
 POOL_NAME="$(gcloud iam workload-identity-pools describe "$POOL_ID" --project "$PROJECT_ID" --location global --format "value(name)")"
+SUBJECT="$(gh api "repos/$REPO/actions/oidc/customization/sub" --jq '.sub_claim_prefix'):environment:chrome-webstore"
 gcloud iam service-accounts add-iam-policy-binding "$SA_EMAIL" \
   --project "$PROJECT_ID" \
   --role "roles/iam.workloadIdentityUser" \
-  --member "principal://iam.googleapis.com/${POOL_NAME}/subject/repo:${REPO}:environment:chrome-webstore"
+  --member "principal://iam.googleapis.com/${POOL_NAME}/subject/${SUBJECT}"
 ```
 
 `POOL_NAME` has the form `projects/<project-number>/locations/global/workloadIdentityPools/github`.
+
+**A rename or a transfer of the repository** changes the subject: the new name, and after 2026-07-15 the immutable form too. The binding then names a subject GitHub no longer gives, and 🔑 Authenticate to Google Cloud fails with `Permission 'iam.serviceAccounts.getAccessToken' denied`. Update `REPO` in the values file, run this step again, then remove the old binding, `<old-subject>` being the one it named:
+
+```sh
+. ~/.config/my-prompt-manager/cws-setup.sh
+POOL_NAME="$(gcloud iam workload-identity-pools describe "$POOL_ID" --project "$PROJECT_ID" --location global --format "value(name)")"
+gcloud iam service-accounts remove-iam-policy-binding "$SA_EMAIL" \
+  --project "$PROJECT_ID" \
+  --role "roles/iam.workloadIdentityUser" \
+  --member "principal://iam.googleapis.com/${POOL_NAME}/subject/<old-subject>"
+```
+
+The provider of step 4 needs no change: it names the repository by its ID, which a rename or a transfer keeps.
 
 ## 6. Add the service account in the Developer Dashboard
 
@@ -214,7 +236,7 @@ The **🔎 Chrome Web Store Status** job then waits for approval: open the run i
 | Where it fails | What it says | Cause |
 | --- | --- | --- |
 | 🔑 Authenticate to Google Cloud | the credential is rejected by the attribute condition | the job is not in the `chrome-webstore` environment, or the repository ID in the condition is wrong (step 4) |
-| 🔑 Authenticate to Google Cloud | `Permission 'iam.serviceAccounts.getAccessToken' denied` | the binding of step 5 is missing, not applied yet (wait 5 minutes), or names another subject |
+| 🔑 Authenticate to Google Cloud | `Permission 'iam.serviceAccounts.getAccessToken' denied` | the binding of step 5 is missing, not applied yet (wait 5 minutes), or names another subject: after a rename or a transfer of the repository, or since `use_immutable_subject` turned `true` (step 5) |
 | 🔑 Authenticate to Google Cloud | an API is not enabled | step 2 |
 | the store call, HTTP 403 | `The caller does not have permission` | the service account is not added in the Developer Dashboard (step 6), or the publisher ID is not this publisher's |
 | the store call, HTTP 403 | `SERVICE_DISABLED` | the Chrome Web Store API is off in the project (step 2) |
@@ -232,10 +254,6 @@ gh secret delete CHROME_EXTENSION_ID --repo spartDev/My-Prompt-Manager
 gh secret delete CHROME_WEB_STORE_API_KEYS --repo spartDev/My-Prompt-Manager
 ```
 
-## The `emergency-rollback` environment
-
-`release.yml`'s Emergency Rollback job runs in an environment of that name after a failed manual run. It only prints the steps to take by hand and needs no secret; this guide does not change it.
-
 ## References
 
 - [Use the Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-api): the publishing workflow, the publisher ID and the item ID.
@@ -243,4 +261,4 @@ gh secret delete CHROME_WEB_STORE_API_KEYS --repo spartDev/My-Prompt-Manager
 - [Use a service account with the Chrome Web Store API](https://developer.chrome.com/docs/webstore/service-accounts).
 - [Introducing a new Chrome Web Store API](https://developer.chrome.com/blog/cws-api-v2): V2, and the end of V1 on 2026-10-15.
 - [google-github-actions/auth](https://github.com/google-github-actions/auth): Workload Identity Federation through a service account, and its security considerations.
-- [GitHub: OpenID Connect claims](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect) and [deployment environments](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment).
+- [GitHub: OpenID Connect reference](https://docs.github.com/en/actions/reference/security/oidc) (the `sub` claim, its default and immutable forms), [the REST API for a repository's OIDC subject](https://docs.github.com/en/rest/actions/oidc), [OpenID Connect claims](https://docs.github.com/en/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect) and [deployment environments](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-deployments/managing-environments-for-deployment).

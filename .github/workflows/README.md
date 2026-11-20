@@ -72,7 +72,7 @@ GH_TOKEN=$(gh auth token) uvx zizmor .github/workflows  # plus the online audits
 - 🔍 Validation: the tag equals `package.json`'s version, lint, tests with coverage, `node scripts/audit.mjs`
 - 🏗️ Build: `npm run build`, then one zip of the contents of `dist/` (`manifest.json` at its root), `prompt-library-extension-vX.Y.Z.zip`, attested with `actions/attest-build-provenance`
 - 📝 Release notes: the version's section of `CHANGELOG.md`
-- 🏷️ GitHub Release with that zip attached under its own name (a name that matches no file fails the step)
+- 🏷️ GitHub Release with that zip attached under its own name (a name that matches no file fails the step). It fails first when the Release already holds a zip of that name with another SHA-256: that is a "Re-run all jobs", which builds a new zip. On a tag run, use "Re-run failed jobs" only
 - 🚀 Chrome Web Store Submission, for a tag without `-alpha`, `-beta` or `-rc`: once the owner approves the `chrome-webstore` environment, `google-github-actions/auth` trades the job's OIDC token for a Google access token (Workload Identity Federation), and `node scripts/chrome-web-store.mjs submit` uploads the same zip and submits it for Store review through the Chrome Web Store API V2. A rerun for a version already submitted or published sends nothing; a Submission of another version in Store review fails the job and is never cancelled
 - 📊 Release summary: one row per job; a failed or cancelled job fails it
 

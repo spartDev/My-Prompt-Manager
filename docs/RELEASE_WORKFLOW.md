@@ -30,10 +30,9 @@ Runs go one at a time (concurrency group `release-process`): a run waiting for t
 │                                               manual run on main; chrome-webstore, read-only
 └── 📝 Release Notes (release-notes)            the version's section of CHANGELOG.md
 📊 Release Summary (release-summary)            always; fails when a job failed or was cancelled
-🚨 Emergency Rollback (emergency-rollback)      after a failed manual run; prints manual steps
 ```
 
-The GitHub Release also waits for the Release Notes job. Only Release Build (for its attestation) and the two store jobs hold `id-token: write`; only the GitHub Release job writes to the repository.
+The GitHub Release also waits for the Release Notes job. Only Release Build (for its attestation) and the two store jobs hold `id-token: write`. Two jobs write to the repository: Release Build its attestation (`attestations: write`), and the GitHub Release job the Release and its zip (`contents: write`).
 
 ## The zip
 
@@ -41,7 +40,7 @@ One file, `prompt-library-extension-vX.Y.Z.zip`: the contents of `dist/`, with `
 
 - attested by `actions/attest-build-provenance`;
 - the artifact `chrome-extension-release-vX.Y.Z` of the run (90 days);
-- attached to the GitHub Release under its own name;
+- attached to the GitHub Release under its own name, once: the GitHub Release job fails rather than put another zip in its place (see Rerunning);
 - uploaded to the store. Each store job first checks that its copy has the SHA-256 Release Build computed.
 
 To check a Release's zip:
@@ -62,7 +61,7 @@ After the GitHub Release, the Submission job waits for the owner to approve the 
 2. runs `node scripts/chrome-web-store.mjs submit`, which calls the [Chrome Web Store API V2](https://developer.chrome.com/docs/webstore/using-api) directly:
    - **check**: `fetchStatus`, and the rules below;
    - **upload**: the zip to the `upload` URI;
-   - **poll**: while the upload is `IN_PROGRESS`, `fetchStatus` every 10 s, up to 30 times;
+   - **poll**: while the upload is in progress (`IN_PROGRESS`, which the reference also spells `UPLOAD_IN_PROGRESS`), `fetchStatus` every 10 s, up to 30 times;
    - **publish**: with `publishType` `DEFAULT_PUBLISH`, so the Release is published as soon as the Store review approves it;
    - **status**: `fetchStatus` again, into the job summary.
 
@@ -77,7 +76,8 @@ What the check decides, from the store's answer:
 | another version in Store review or staged | fails and says so; it never cancels a Submission |
 | a published version higher than the zip's | fails, uploads nothing |
 | a refused or cancelled Submission of this version or a higher one | fails, uploads nothing |
-| an earlier upload still processing, no published version, or anything the API reference does not describe | fails, uploads nothing |
+| an earlier upload still in progress, or a last upload in a state other than `SUCCEEDED`, `FAILED` or `NOT_FOUND` | fails, uploads nothing |
+| no published version, or anything else the API reference does not describe | fails, uploads nothing |
 | a published version lower than the zip's, nothing pending | uploads and submits |
 
 Every failure is red, with Google's message verbatim in the job summary. The access token never appears in a log line or the summary.
@@ -95,6 +95,8 @@ gh workflow run release.yml --repo spartDev/My-Prompt-Manager --ref main
 On another branch the status job is skipped (the environment admits `main` and tags `v*` only) and everything else runs: that is how a change to `release.yml` is tried before it merges.
 
 ## Rerunning
+
+On a tag run, only **Re-run failed jobs**, never **Re-run all jobs**. Re-run all jobs builds a new zip (zip stores the files' times) and attests it, while the GitHub Release and the store may already hold the first one; the GitHub Release job then fails before it changes anything, as the Release already holds a zip of that name with another SHA-256 (step **🔒 Check the Release holds no other zip**).
 
 - **A failed run**: fix the cause, then **Re-run failed jobs**. A rerun of the Submission for a version already submitted or published sends nothing and ends green; a rerun of the GitHub Release updates the Release of the tag.
 - **The publish call failed after the upload succeeded**: the upload is a draft in the Developer Dashboard. A rerun uploads the zip again; if the store refuses that, submit the draft from the Dashboard's **Package** tab.
@@ -115,6 +117,7 @@ It is never submitted again. Fix it, then release the fix as the next version, w
 | `Repository variables not set: ...` | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), step 9 |
 | 🔑 Authenticate to Google Cloud fails | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), Troubleshooting |
 | the store refuses a call | the job summary holds Google's message verbatim |
+| `The GitHub Release of vX.Y.Z already holds another prompt-library-extension-vX.Y.Z.zip` | the tag run was rerun with Re-run all jobs; the GitHub Release keeps the first run's zip. If the first run's Submission uploaded it, nothing is left to redo. If it uploaded nothing, delete the zip from the GitHub Release, then Re-run failed jobs: the new zip, attested by this attempt, is attached and then submitted |
 
 ## Checklist
 

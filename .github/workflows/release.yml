@@ -124,11 +124,10 @@ jobs:
     name: 🏗️ Release Build
     runs-on: ubuntu-latest
     needs: validate-release
-    # attest-build-provenance signs the package with the job's OIDC token and stores the attestation
     permissions:
       contents: read
-      id-token: write
-      attestations: write
+      id-token: write # attest-build-provenance signs the zip's provenance with the job's OIDC token
+      attestations: write # and stores the attestation in the repository
     outputs:
       zip: ${{ steps.package.outputs.zip }}
       sha256: ${{ steps.package.outputs.sha256 }}
@@ -403,6 +402,33 @@ jobs:
     permissions:
       contents: write # create the release and upload its asset
     steps:
+      # One zip per Release. "Re-run all jobs" builds a new zip (zip stores the files' times) that the next step
+      # would put in place of the one the store may already hold; only "Re-run failed jobs" keeps the first.
+      - name: 🔒 Check the Release holds no other zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.validate-release.outputs.version }}
+          ZIP: ${{ needs.build-release.outputs.zip }}
+          SHA256: ${{ needs.build-release.outputs.sha256 }}
+        run: |
+          if ! assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2> view-error.txt); then
+            if grep -qx 'release not found' view-error.txt; then
+              echo "No GitHub Release of $TAG yet."
+              exit 0
+            fi
+            cat view-error.txt >&2
+            exit 1
+          fi
+          if ! grep -qxF "$ZIP" <<< "$assets"; then
+            echo "The GitHub Release of $TAG holds no $ZIP yet."
+            exit 0
+          fi
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ZIP" --dir attached
+          if ! echo "$SHA256  attached/$ZIP" | sha256sum --check --strict; then
+            echo "::error::The GitHub Release of $TAG already holds another $ZIP: this run built a new one. Rerun a tag run with Re-run failed jobs only, never Re-run all jobs (docs/RELEASE_WORKFLOW.md, Rerunning)."
+            exit 1
+          fi
+
       - name: 📤 Download Release Build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
@@ -635,34 +661,3 @@ jobs:
             fi
           done
           echo "✅ $run_kind v$RELEASE_VERSION completed" | tee -a "$GITHUB_STEP_SUMMARY"
-
-  # Emergency rollback capability
-  emergency-rollback:
-    name: 🚨 Emergency Rollback
-    runs-on: ubuntu-latest
-    if: failure() && github.event_name == 'workflow_dispatch'
-    needs: [validate-release, build-release, create-github-release, release-summary]
-    environment: emergency-rollback
-    steps:
-      - name: 🛎️ Checkout Repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-
-      - name: 🚨 Emergency Rollback Actions
-        env:
-          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
-        run: |
-          echo "🚨 EMERGENCY ROLLBACK INITIATED"
-          echo "Version: v$RELEASE_VERSION"
-          echo "================================="
-          echo ""
-          echo "🔧 Rollback actions to perform manually:"
-          echo "1. 🗑️ Delete the failed GitHub release if created"
-          echo "2. 🏷️ Remove the git tag: git tag -d v$RELEASE_VERSION"
-          echo "3. 🌐 Cancel Chrome Web Store submission if in review"
-          echo "4. 📧 Notify stakeholders of rollback"
-          echo "5. 🐛 Investigate and fix the root cause"
-          echo ""
-          echo "🔗 Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
