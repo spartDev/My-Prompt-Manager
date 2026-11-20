@@ -33,13 +33,13 @@ A failed read of the Library, its Prompts or its Categories, replaces the Sectio
 - **Status announcement**
   - The outcome is said in a `role="status"` (`load-status`): "Your library is back", "Still couldn't read your library", or, past `RETRY_READ_BOUND_MS`, "Still reading your library. You can try again."
   - It comes second in both the error screen and the Section's tree, right after the screen's own element, so React keeps the one element from one to the other.
-  - It is never first: the app stays the root's first element, and the status's sr-only box sits at -1px, where the side panel's editor motion would measure it for the app.
+  - It is never first. Placed first, its sr-only box (1px, margin -1px) would sit at -1px, where the side panel's editor motion would measure it for the app. Second, it sits at the bottom edge, and the app stays the root's first element.
 - **Focus destinations** (never the document on the way)
-  - A read that fails again: Try again keeps the keyboard, the whole time it is busy.
+  - While the reads run, and after reads that fail again: Try again keeps the keyboard. When the reads work, it stays there until the Section that comes back takes it.
   - The Library back: its active Library filter, All at an opening, or with no Prompt the main action of its empty state.
   - Another Section back: its tab (`TabBar`'s `focusActive`).
 - **The Welcome exit**
-  - The Welcome's exit asked for the first card's Copy and the Library has not shown since: that Copy (`LibraryView`'s `focusFirstPrompt`).
+  - The Welcome's exit asked for the first card's Copy and the Library has not shown since: that Copy, instead of the filter (`LibraryView`'s `focusFirstPrompt`).
   - With no card left, every Prompt deleted from another surface meanwhile: the main action of the empty Library.
 
 ### Views (one per section of the `TabBar`)
