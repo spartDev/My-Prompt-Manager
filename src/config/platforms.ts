@@ -46,7 +46,8 @@ export interface PlatformDefinition {
   /**
    * Other hosts the same Platform is served on, such as the host a sign-in redirects to. Each is
    * in the manifest beside `hostname`, and follows the Platform choice of the Platform. Icon placement
-   * repairs take `hostname` to redirect to them, never the reverse (redirectSourcesOf).
+   * repairs take `hostname` to redirect to them, never the reverse (redirectSourcesOf). None in
+   * 2.0.0: see M365_WORK_ACCOUNT_HOSTNAME.
    */
   otherHostnames?: string[];
   /** Human-readable platform name */
@@ -78,6 +79,16 @@ export interface PlatformDefinition {
   /** Platform IDs that should toggle together (bidirectional relationship) */
   linkedPlatforms?: string[];
 }
+
+/**
+ * copilot.cloud.microsoft, where M365 Copilot and Copilot send a work account. No Platform's host
+ * in 2.0.0, so the extension neither runs nor claims to work there: a host the manifest of 1.9.0
+ * did not have disables the extension on update, for every user, until the user accepts it (ticket
+ * My-Prompt-Manager-totf, src/test/guardrails/manifestHosts.test.ts). Ticket My-Prompt-Manager-j74b
+ * gives it back to M365 Copilot's otherHostnames, through the optional host permission the user
+ * grants. M365 Copilot's selectors and anchor chain for the composer there stay.
+ */
+export const M365_WORK_ACCOUNT_HOSTNAME = "copilot.cloud.microsoft";
 
 /**
  * Centralized platform definitions
@@ -264,9 +275,10 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
     displayName: "Microsoft 365 Copilot",
     priority: 80,
     defaultEnabled: true,
-    // A work account lands on copilot.cloud.microsoft from m365.cloud.microsoft and from
-    // copilot.microsoft.com (seen on 2026-11-15, ticket My-Prompt-Manager-axv)
-    otherHostnames: ["copilot.cloud.microsoft"],
+    // None in 2.0.0. M365_WORK_ACCOUNT_HOSTNAME, where a work account lands from
+    // m365.cloud.microsoft and from copilot.microsoft.com (seen on 2026-11-15, ticket
+    // My-Prompt-Manager-axv), comes back here with ticket My-Prompt-Manager-j74b
+    otherHostnames: [],
     selectors: [
       'span[id="m365-chat-editor-target-element"]', // Primary selector - specific ID
       '[data-lexical-editor][contenteditable="true"][role="textbox"]', // Lexical editor of copilot.cloud.microsoft
@@ -275,7 +287,8 @@ export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefin
       'div[contenteditable="true"]', // Generic contenteditable fallback
       'textarea[placeholder*="Message"]', // Legacy textarea fallback
     ],
-    // copilot.cloud.microsoft first: the composer is the div two levels above the editor, which
+    // copilot.cloud.microsoft first (kept for ticket My-Prompt-Manager-j74b: see
+    // M365_WORK_ACCOUNT_HOSTNAME): the composer is the div two levels above the editor, which
     // holds it in a span beside an empty span (or the editor alone, as a capture folds a wrapper
     // that holds one element), then the plus menu and the dictation button (nesting read on the live
     // page signed in, 2026-11-15, ticket My-Prompt-Manager-axv). The plus menu is found by its
@@ -433,7 +446,7 @@ export function getPlatformsByPriority(): PlatformDefinition[] {
  * @example
  * ```typescript
  * getLinkedPlatformHostnames('copilot.microsoft.com')
- * // Returns: ['copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']
+ * // Returns: ['copilot.microsoft.com', 'm365.cloud.microsoft']
  *
  * getLinkedPlatformHostnames('claude.ai')
  * // Returns: ['claude.ai'] (no linked platforms)

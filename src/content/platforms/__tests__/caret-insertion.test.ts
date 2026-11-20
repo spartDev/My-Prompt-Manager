@@ -100,8 +100,8 @@ const PLATFORMS: PlatformCase[] = [
   },
   {
     // Where nothing takes a paste. Its Lexical editor is in m365copilot-strategy.test.ts
-    platform: 'M365 Copilot at copilot.cloud.microsoft',
-    strategy: () => new M365CopilotStrategy('copilot.cloud.microsoft'),
+    platform: 'M365 Copilot, the composer a work account gets',
+    strategy: () => new M365CopilotStrategy('m365.cloud.microsoft'),
     editor: editable('div', { 'data-lexical-editor': 'true', role: 'textbox', 'aria-label': 'Message Copilot' })
   }
 ];

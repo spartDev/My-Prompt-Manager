@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { getAllSupportedHostnames, getDefaultEnabledPlatforms, getLinkedPlatformHostnames } from '../../config/platforms';
+import { withTheWorkAccountHost } from '../../test/helpers/work-account-host';
 import { getChromeMock } from '../../test/mocks';
 import type { CustomSite } from '../../types';
 import {
@@ -68,7 +69,7 @@ describe('parseSiteSettings', () => {
       const settings = parseSiteSettings({ enabledSites: ['claude.ai', 'copilot.microsoft.com'] });
 
       expect(isPlatformEnabled(settings, 'm365.cloud.microsoft')).toBe(true);
-      expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft', 'copilot.cloud.microsoft']);
+      expect(enabledPlatforms(settings)).toEqual(['claude.ai', 'copilot.microsoft.com', 'm365.cloud.microsoft']);
     });
 
     it('takes M365 Copilot from a list an earlier release changed after a rollback, which lists it as it is', () => {
@@ -162,56 +163,70 @@ describe('isPlatformEnabled', () => {
     expect(isPlatformEnabled(parseSiteSettings({ platformChoices: { 'm365.cloud.microsoft': false } }), 'copilot.microsoft.com')).toBe(false);
   });
 
-  it('turns copilot.cloud.microsoft, where M365 Copilot redirects a work account, on and off with M365 Copilot and Copilot', () => {
-    expect(isHostnameEnabled(defaultSiteSettings(), 'copilot.cloud.microsoft')).toBe(true);
-    // A store written before the host was added holds no choice for it: the Copilot choices decide
-    expect(isHostnameEnabled(parseSiteSettings({ platformChoices: { 'm365.cloud.microsoft': false } }), 'copilot.cloud.microsoft')).toBe(false);
-    expect(isHostnameEnabled(parseSiteSettings({ platformChoices: { 'copilot.microsoft.com': false } }), 'copilot.cloud.microsoft')).toBe(false);
-    expect(isHostnameEnabled(parseSiteSettings({ enabledSites: ['claude.ai'] }), 'copilot.cloud.microsoft')).toBe(false);
-    expect(isHostnameEnabled(parseSiteSettings({ enabledSites: ['claude.ai', 'copilot.microsoft.com'] }), 'copilot.cloud.microsoft')).toBe(true);
+  it('turns nothing on at copilot.cloud.microsoft in 2.0.0, which is no Platform\'s, and keeps a Custom site there as 1.9.0 did (ticket My-Prompt-Manager-totf)', () => {
+    expect(isHostnameEnabled(defaultSiteSettings(), 'copilot.cloud.microsoft')).toBe(false);
+    expect(enabledHostnames(defaultSiteSettings())).not.toContain('copilot.cloud.microsoft');
 
-    const off = applySiteSettingsChange(defaultSiteSettings(), { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
-    expect(isHostnameEnabled(off, 'copilot.cloud.microsoft')).toBe(false);
-    const on = applySiteSettingsChange(off, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: true }, 0);
-    expect(isHostnameEnabled(on, 'copilot.cloud.microsoft')).toBe(true);
-    expect(enabledHostnames(on)).toContain('copilot.cloud.microsoft');
+    const settings = parseSiteSettings({ customSites: [customSite({ hostname: 'copilot.cloud.microsoft' })] });
+    expect(settings.customSites.map((site) => site.hostname)).toEqual(['copilot.cloud.microsoft']);
+    expect(isHostnameEnabled(settings, 'copilot.cloud.microsoft')).toBe(true);
   });
 
-  it('keeps copilot.cloud.microsoft with the Copilot switch across a rollback to a release that does not know it', () => {
-    // Everything on, then Copilot turned off in v1.9.0, which only knows the two hosts of its time
-    const allOn = applySiteSettingsChange(defaultSiteSettings(), { type: 'setDebugMode', enabled: false }, 0);
-    const written = enabledPlatforms(allOn).filter((hostname) => hostname !== 'copilot.cloud.microsoft');
-    const offThere = written.filter((hostname) => hostname !== 'copilot.microsoft.com' && hostname !== 'm365.cloud.microsoft');
-    const afterOff = parseSiteSettings({ platformChoices: {}, enabledSites: [...offThere, 'copilot.cloud.microsoft'], enabledSitesWritten: written });
-    expect(isHostnameEnabled(afterOff, 'copilot.microsoft.com')).toBe(false);
-    expect(isHostnameEnabled(afterOff, 'copilot.cloud.microsoft')).toBe(false);
-    // As this release writes it: the host on neither list, so v1.9.0 never carries it
-    const asWritten = parseSiteSettings({ platformChoices: {}, enabledSites: offThere, enabledSitesWritten: written });
-    expect(written).not.toContain('copilot.cloud.microsoft');
-    expect(isHostnameEnabled(asWritten, 'copilot.cloud.microsoft')).toBe(false);
+  describe('once ticket My-Prompt-Manager-j74b gives copilot.cloud.microsoft back to M365 Copilot', () => {
+    withTheWorkAccountHost();
 
-    // Copilot off in this release, then back on in v1.9.0
-    const off = applySiteSettingsChange(defaultSiteSettings(), { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
-    expect(off.platformChoices).not.toHaveProperty(['copilot.cloud.microsoft']);
-    const offWritten = enabledPlatforms(off).filter((hostname) => hostname !== 'copilot.cloud.microsoft');
-    const afterOn = parseSiteSettings({
-      platformChoices: { ...off.platformChoices, 'copilot.cloud.microsoft': false },
-      enabledSites: [...offWritten, 'copilot.microsoft.com', 'm365.cloud.microsoft'],
-      enabledSitesWritten: offWritten
-    });
-    expect(isHostnameEnabled(afterOn, 'copilot.microsoft.com')).toBe(true);
-    expect(isHostnameEnabled(afterOn, 'copilot.cloud.microsoft')).toBe(true);
-  });
+    it('turns copilot.cloud.microsoft, where M365 Copilot redirects a work account, on and off with M365 Copilot and Copilot', () => {
+      expect(isHostnameEnabled(defaultSiteSettings(), 'copilot.cloud.microsoft')).toBe(true);
+      // A store written before the host was added holds no choice for it: the Copilot choices decide
+      expect(isHostnameEnabled(parseSiteSettings({ platformChoices: { 'm365.cloud.microsoft': false } }), 'copilot.cloud.microsoft')).toBe(false);
+      expect(isHostnameEnabled(parseSiteSettings({ platformChoices: { 'copilot.microsoft.com': false } }), 'copilot.cloud.microsoft')).toBe(false);
+      expect(isHostnameEnabled(parseSiteSettings({ enabledSites: ['claude.ai'] }), 'copilot.cloud.microsoft')).toBe(false);
+      expect(isHostnameEnabled(parseSiteSettings({ enabledSites: ['claude.ai', 'copilot.microsoft.com'] }), 'copilot.cloud.microsoft')).toBe(true);
 
-  it('drops a Custom site added at copilot.cloud.microsoft before it was a host of M365 Copilot, so the Copilot switch decides there', () => {
-    const settings = parseSiteSettings({
-      platformChoices: { 'copilot.microsoft.com': false, 'm365.cloud.microsoft': false },
-      customSites: [customSite({ hostname: 'copilot.cloud.microsoft' }), customSite({ hostname: 'on.example.com' })]
+      const off = applySiteSettingsChange(defaultSiteSettings(), { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
+      expect(isHostnameEnabled(off, 'copilot.cloud.microsoft')).toBe(false);
+      const on = applySiteSettingsChange(off, { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: true }, 0);
+      expect(isHostnameEnabled(on, 'copilot.cloud.microsoft')).toBe(true);
+      expect(enabledHostnames(on)).toContain('copilot.cloud.microsoft');
     });
 
-    expect(settings.customSites.map((site) => site.hostname)).toEqual(['on.example.com']);
-    expect(isHostnameEnabled(settings, 'copilot.cloud.microsoft')).toBe(false);
-    expect(enabledHostnames(settings)).not.toContain('copilot.cloud.microsoft');
+    it('keeps copilot.cloud.microsoft with the Copilot switch across a rollback to a release that does not know it', () => {
+      // Everything on, then Copilot turned off in v1.9.0, which only knows the two hosts of its time
+      const allOn = applySiteSettingsChange(defaultSiteSettings(), { type: 'setDebugMode', enabled: false }, 0);
+      const written = enabledPlatforms(allOn).filter((hostname) => hostname !== 'copilot.cloud.microsoft');
+      const offThere = written.filter((hostname) => hostname !== 'copilot.microsoft.com' && hostname !== 'm365.cloud.microsoft');
+      const afterOff = parseSiteSettings({ platformChoices: {}, enabledSites: [...offThere, 'copilot.cloud.microsoft'], enabledSitesWritten: written });
+      expect(isHostnameEnabled(afterOff, 'copilot.microsoft.com')).toBe(false);
+      expect(isHostnameEnabled(afterOff, 'copilot.cloud.microsoft')).toBe(false);
+      // As this release writes it: the host on neither list, so v1.9.0 never carries it
+      const asWritten = parseSiteSettings({ platformChoices: {}, enabledSites: offThere, enabledSitesWritten: written });
+      expect(written).not.toContain('copilot.cloud.microsoft');
+      expect(isHostnameEnabled(asWritten, 'copilot.cloud.microsoft')).toBe(false);
+
+      // Copilot off in this release, then back on in v1.9.0
+      const off = applySiteSettingsChange(defaultSiteSettings(), { type: 'setPlatformEnabled', hostname: 'copilot.microsoft.com', enabled: false }, 0);
+      expect(off.platformChoices).not.toHaveProperty(['copilot.cloud.microsoft']);
+      const offWritten = enabledPlatforms(off).filter((hostname) => hostname !== 'copilot.cloud.microsoft');
+      const afterOn = parseSiteSettings({
+        platformChoices: { ...off.platformChoices, 'copilot.cloud.microsoft': false },
+        enabledSites: [...offWritten, 'copilot.microsoft.com', 'm365.cloud.microsoft'],
+        enabledSitesWritten: offWritten
+      });
+      expect(isHostnameEnabled(afterOn, 'copilot.microsoft.com')).toBe(true);
+      expect(isHostnameEnabled(afterOn, 'copilot.cloud.microsoft')).toBe(true);
+    });
+
+    it('drops a Custom site added at copilot.cloud.microsoft before it was a host of M365 Copilot, so the Copilot switch decides there', () => {
+      const settings = parseSiteSettings({
+        platformChoices: { 'copilot.microsoft.com': false, 'm365.cloud.microsoft': false },
+        customSites: [customSite({ hostname: 'copilot.cloud.microsoft' }), customSite({ hostname: 'on.example.com' })]
+      });
+
+      expect(settings.customSites.map((site) => site.hostname)).toEqual(['on.example.com']);
+      expect(isHostnameEnabled(settings, 'copilot.cloud.microsoft')).toBe(false);
+      expect(enabledHostnames(settings)).not.toContain('copilot.cloud.microsoft');
+    });
+
   });
 
   it('is the default of a Platform the user never switched', () => {
@@ -233,8 +248,9 @@ describe('PLATFORMS_OF_THE_ENABLED_LIST', () => {
   // The hostnames of the Platforms added after the release that started storing the Platform
   // choices. A new Platform goes here, never in the frozen list, which says which Platforms a stored
   // list of the Platforms that were on could hold (.claude/skills/add-platform/SKILL.md)
-  // The host Microsoft 365 Copilot redirects a work account to (ticket My-Prompt-Manager-axv)
-  const ADDED_AFTER_THE_PLATFORM_CHOICES: string[] = ['copilot.cloud.microsoft'];
+  // None in 2.0.0: copilot.cloud.microsoft, where Microsoft 365 Copilot redirects a work account
+  // (ticket My-Prompt-Manager-axv), comes here again with ticket My-Prompt-Manager-j74b
+  const ADDED_AFTER_THE_PLATFORM_CHOICES: string[] = [];
 
   it('is every Platform of the release that started storing the Platform choices', () => {
     const platformsOfThatRelease = getAllSupportedHostnames().filter((hostname) => !ADDED_AFTER_THE_PLATFORM_CHOICES.includes(hostname));
@@ -432,9 +448,26 @@ describe('changeSiteSettings', () => {
       platformChoices: { 'chatgpt.com': false },
       customSites: [],
       debugMode: false,
-      // The list an earlier release reads holds the hosts it knows: not copilot.cloud.microsoft, which follows M365 Copilot
-      enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com' && hostname !== 'copilot.cloud.microsoft'),
-      enabledSitesWritten: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com' && hostname !== 'copilot.cloud.microsoft')
+      enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com'),
+      enabledSitesWritten: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com')
+    });
+  });
+
+  describe('once ticket My-Prompt-Manager-j74b gives copilot.cloud.microsoft back to M365 Copilot', () => {
+    withTheWorkAccountHost();
+
+    it('stores a list for an earlier release without copilot.cloud.microsoft, which follows M365 Copilot', async () => {
+      await changeSiteSettings({ type: 'setPlatformEnabled', hostname: 'chatgpt.com', enabled: false });
+
+      expect(getDefaultEnabledPlatforms()).toContain('copilot.cloud.microsoft');
+      expect(await stored()).toEqual({
+        platformChoices: { 'chatgpt.com': false },
+        customSites: [],
+        debugMode: false,
+        // The list an earlier release reads holds the hosts it knows: not copilot.cloud.microsoft, which follows M365 Copilot
+        enabledSites: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com' && hostname !== 'copilot.cloud.microsoft'),
+        enabledSitesWritten: getDefaultEnabledPlatforms().filter((hostname) => hostname !== 'chatgpt.com' && hostname !== 'copilot.cloud.microsoft')
+      });
     });
   });
 

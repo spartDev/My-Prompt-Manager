@@ -156,7 +156,8 @@ test.describe('Site integration Settings on the tokens', () => {
       await expect(section.getByTestId('site-row')).toHaveCount(6);
       // In the order of Atelier 1C, Copilot showing the M365 domain its switch also turns on
       await expect(section.getByTestId('site-row').locator('span[id]')).toHaveText(['Claude', 'ChatGPT', 'Google Gemini', 'Mistral AI', 'Perplexity', 'Microsoft Copilot']);
-      await expect(section.getByText('copilot.microsoft.com · m365.cloud.microsoft · copilot.cloud.microsoft')).toBeVisible();
+      // Not copilot.cloud.microsoft, where 2.0.0 does not run (ticket My-Prompt-Manager-totf)
+      await expect(section.getByText('copilot.microsoft.com · m365.cloud.microsoft', { exact: true })).toBeVisible();
 
       const chatgpt = siteRow(section, 'ChatGPT');
       await expect(chatgpt.getByText('chatgpt.com', { exact: true })).toHaveCSS('color', colors.tertiary);

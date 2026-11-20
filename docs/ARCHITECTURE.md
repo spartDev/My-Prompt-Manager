@@ -1156,7 +1156,7 @@ npm run build
 - [ ] Strategy registered in `STRATEGY_REGISTRY`
 - [ ] Icon component created (content script + React)
 - [ ] Settings UI updated with platform info
-- [ ] Manifest permissions added (`host_permissions`, `content_scripts`)
+- [ ] Manifest permissions added (`host_permissions`, `content_scripts`), once the owner has decided: a host the published Release does not have disables the extension on update for every user (`src/test/guardrails/manifestHosts.test.ts`)
 - [ ] Unit tests written (15+ tests)
 - [ ] Manual QA document created
 - [ ] All tests passing (`npm test`)

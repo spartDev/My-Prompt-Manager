@@ -3,7 +3,8 @@
  *
  * Runs the built extension's content script on the stand-in page of each of the seven Platforms,
  * on the stand-ins of the rich text editors four of them have live (ProseMirror on ChatGPT and
- * Mistral, Lexical on Perplexity and on Microsoft 365 Copilot at copilot.cloud.microsoft), and on
+ * Mistral, Lexical on Perplexity and on Microsoft 365 Copilot's composer of copilot.cloud.microsoft,
+ * served at m365.cloud.microsoft as 2.0.0 does not run there), and on
  * the composer M365 Copilot had at m365.cloud.microsoft. On each, with a real caret in a real browser:
  * - the Prompt goes where the caret is, and the text before and after it stays;
  * - the caret ends right after the Prompt;

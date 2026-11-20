@@ -88,7 +88,7 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 
 > ℹ️ `defaultEnabled: true` turns the new Platform on for every user on update, a user who switched other Platforms included: the Site settings store the user's Platform choices, and a Platform without one takes its default (`src/services/siteSettings.ts`). Never add the new hostname to `PLATFORMS_OF_THE_ENABLED_LIST` there: that frozen list says which Platforms an older store could hold, and a Platform on it that an older store left out is read as turned off. The test `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/__tests__/siteSettings.test.ts` fails once you add the Platform: add its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in that test. A new Platform linked to an existing one (`linkedPlatforms`) has no row of its own: without a choice it follows the choice the user made for its partner, and its `defaultEnabled` only applies when there is none.
 
-> ℹ️ A Platform that moved to, or is also served on, another host (a sign-in that redirects, as Microsoft 365 Copilot to `copilot.cloud.microsoft`) is not a new Platform: add the host to its `otherHostnames`, its origin to `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` checks both), and its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES`. Without a choice of its own, the host follows the Platform choice of its Platform; the Platform's row in Settings lists it under its name.
+> ℹ️ A Platform that moved to, or is also served on, another host (a sign-in that redirects, as Microsoft 365 Copilot to `copilot.cloud.microsoft`) is not a new Platform: add the host to its `otherHostnames`, its origin to `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` checks both; a new origin there needs the owner's decision, see Step 5), and its hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES`. 2.0.0 left `copilot.cloud.microsoft` out for that reason (`M365_WORK_ACCOUNT_HOSTNAME` in `src/config/platforms.ts`). Without a choice of its own, the host follows the Platform choice of its Platform; the Platform's row in Settings lists it under its name.
 
 **Priority Guidelines:**
 - 100: Claude
@@ -218,6 +218,8 @@ export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => Pl
 **File:** `manifest.json`
 
 **Action:** A built-in Platform is listed by origin in two places: add `https://your-ai-platform.com/*` to both `host_permissions` and the `matches` of the `content_scripts` entry. Without them the content script never runs on the Platform.
+
+> ⚠️ Stop and ask the owner first. A host the published Release does not have is a permission increase: Chrome disables the extension on update, for every user, until each one accepts it in a dialog that also offers Remove (proven in ticket My-Prompt-Manager-totf). `src/test/guardrails/manifestHosts.test.ts` fails on any change to these two lists, and only the owner decides to change them. The way that keeps everyone enabled is the optional host permission the user grants (`optional_host_permissions`, as ticket My-Prompt-Manager-j74b does for `copilot.cloud.microsoft`).
 
 ### Step 6: Create Unit Tests
 
@@ -622,7 +624,7 @@ Use this checklist when adding a new platform:
 - [ ] **Step 2.1:** Added the Platform's row in Settings (optional)
 - [ ] **Step 3:** Created strategy class in `src/content/platforms/`
 - [ ] **Step 4:** Registered strategy in `strategy-constructors.ts` and `index.ts`
-- [ ] **Step 5:** Added the origin to `host_permissions` and `content_scripts` matches
+- [ ] **Step 5:** The owner decided the new origin; added it to `host_permissions` and `content_scripts` matches, and to the list `src/test/guardrails/manifestHosts.test.ts` holds
 - [ ] **Step 6:** Created unit tests
 - [ ] **Step 7:** Tested manually in browser
 - [ ] **Step 8:** `npm test && npm run lint && npm run lint:changed && npm run typecheck` passes

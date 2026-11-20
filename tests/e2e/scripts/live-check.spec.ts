@@ -1,6 +1,6 @@
 /**
  * E2E: the cleanup of `npm run live:check` in a real browser, on the Lexical stand-ins of
- * Perplexity and copilot.cloud.microsoft (a real lexical editor, as on the live sites). Its unit
+ * Perplexity and Microsoft 365 Copilot (a real lexical editor, as on the live sites). Its unit
  * tests drive a fake page; only a browser shows what Select All then Backspace leaves in the
  * editor itself (My-Prompt-Manager-mew: the hand-written Lexical imitation deleted one character).
  */

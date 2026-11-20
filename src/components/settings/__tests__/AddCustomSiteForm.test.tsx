@@ -374,10 +374,10 @@ describe('AddCustomSiteForm', () => {
       });
     });
 
-    it('refuses a host of a Platform that has no row of its own, such as copilot.cloud.microsoft', async () => {
+    it('refuses a host of a Platform that has no row of its own, such as m365.cloud.microsoft', async () => {
       renderForm({ siteConfigs: {} });
 
-      await userEvent.type(screen.getByLabelText('Website URL *'), 'https://copilot.cloud.microsoft/chat');
+      await userEvent.type(screen.getByLabelText('Website URL *'), 'https://m365.cloud.microsoft/chat');
       fireEvent.click(screen.getByRole('button', { name: /add site/i }));
 
       await waitFor(() => {

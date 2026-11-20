@@ -93,9 +93,10 @@ function choicesOfEnabledList(enabledSites: readonly string[], mayPredateM365: b
 }
 
 /**
- * Whether a hostname is one of the other hosts of a Platform (`otherHostnames`, such as
- * copilot.cloud.microsoft for M365 Copilot). Such a host holds no Platform choice of its own: it is
- * on or off as its Platform is, whatever a store or the list of an earlier release says of it.
+ * Whether a hostname is one of the other hosts of a Platform (`otherHostnames`: none in 2.0.0,
+ * copilot.cloud.microsoft for M365 Copilot once ticket My-Prompt-Manager-j74b brings it back). Such
+ * a host holds no Platform choice of its own: it is on or off as its Platform is, whatever a store
+ * or the list of an earlier release says of it.
  */
 function followsItsPlatform(hostname: string): boolean {
   const platform = getPlatformByHostname(hostname);
@@ -199,8 +200,9 @@ export function parseSiteSettings(stored: unknown): SiteSettings {
 
   return {
     platformChoices: withoutOtherHosts(platformChoices),
-    // A Custom site at a host a later release made a Platform's (copilot.cloud.microsoft, added by
-    // hand while the extension did nothing there) gives way to the Platform: its switch decides
+    // A Custom site at a host a later release made a Platform's (copilot.cloud.microsoft once ticket
+    // My-Prompt-Manager-j74b does, added by hand while the extension did nothing there) gives way to
+    // the Platform: its switch decides
     customSites: Array.isArray(stored.customSites)
       ? stored.customSites.filter(isCustomSite).filter((site) => getPlatformByHostname(site.hostname) === undefined)
       : defaults.customSites,
