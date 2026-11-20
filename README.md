@@ -306,11 +306,9 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
    ```
    This creates `prompt-library-extension-v1.9.0.zip`
 
-4. **Upload to Chrome Web Store:**
-   - Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
-   - Upload the generated ZIP file
-   - Fill in store listing details
-   - Submit for review
+4. **Submit to the Chrome Web Store:**
+   - A release tag does it: `.github/workflows/release.yml` builds and attests the zip, attaches it to the GitHub Release, then uploads it and submits it for Store review through the Chrome Web Store API V2 once the owner approves the run ([docs/RELEASE_WORKFLOW.md](docs/RELEASE_WORKFLOW.md))
+   - The store listing details stay in the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
 
 ### Performance Optimizations
 

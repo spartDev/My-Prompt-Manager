@@ -1,462 +1,125 @@
-# Chrome Extension Release Workflow
+# Release workflow
 
-This document provides comprehensive, step-by-step instructions for releasing the Chrome Extension to production. The project uses GitHub Actions for automated CI/CD, semantic versioning, and Chrome Web Store distribution.
+How a Release goes from a tag to the Chrome Web Store, through `.github/workflows/release.yml`. Preparing the Release (the version in `package.json`, `package-lock.json` and `manifest.json`, the CHANGELOG section, the bump PR, the tag) is the `release` skill: `.claude/skills/release/SKILL.md`. The one-time Google Cloud, Developer Dashboard and GitHub setup is [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md).
 
-## 📋 Release Overview
+Terms (`CONTEXT.md`, section Releases): a **Submission** is a Release sent to the Chrome Web Store, waiting for its **Store review**; its **Publication** is the moment the store starts installing it and offering it as an update.
 
-The release process consists of two main paths:
-- **Automated Release**: Tag-based releases using GitHub Actions
-- **Manual Release**: Using GitHub workflow dispatch for custom releases
+## Two kinds of run
 
-## 🚨 Prerequisites & Requirements
+| | Tag push `vX.Y.Z` | Manual run (the rehearsal) |
+| --- | --- | --- |
+| Version | the tag's; `package.json` must say the same | `package.json`'s |
+| Validation, build, attested zip, Release notes | yes | yes |
+| GitHub Release, with the zip attached | yes | no |
+| Submission to the Chrome Web Store | yes, after the owner approves `chrome-webstore`; never for a tag with `-alpha`, `-beta` or `-rc` | never |
+| Store status call (read-only) | no | yes, on `main` only, after the owner approves `chrome-webstore` |
 
-Before starting any release, ensure:
+A tag with `-alpha`, `-beta` or `-rc` makes a pre-release GitHub Release and no Submission. In practice it cannot pass validation: Chrome's manifest version takes integers only, and the build must carry the tag's version.
 
-1. **Code Quality Standards Met**
-   - All PRs merged to `main` have passed quality gates
-   - Latest `main` branch has clean CI/CD status
-   - No outstanding security vulnerabilities
+Runs go one at a time (concurrency group `release-process`): a run waiting for the owner's approval holds the next one, and GitHub keeps only the latest of the runs waiting behind it.
 
-2. **Required Permissions**
-   - Write access to repository for creating tags/releases
-   - Access to Chrome Web Store Developer Console (for manual publishing)
-   - Repository secrets configured (see [Secrets Configuration](#secrets-configuration))
+## The jobs
 
-3. **Version Strategy**
-   - Follow [semantic versioning](https://semver.org/) (MAJOR.MINOR.PATCH)
-   - Version must be incremented from current `package.json` version
-
-## 🔄 Release Process Options
-
-### Option 1: Automated Tag-Based Release (Recommended)
-
-This is the recommended approach for regular releases.
-
-#### Step 1: Pre-Release Preparation
-
-1. **Verify Main Branch Status**
-   ```bash
-   git checkout main
-   git pull origin main
-   git status
-   ```
-
-2. **Run Mandatory Quality Checks Locally**
-   ```bash
-   # MANDATORY - Must pass before release
-   npm test
-   npm run lint
-   
-   # Optional but recommended
-   npm run test:coverage
-   npm run build
-   ```
-
-3. **Version Consistency Check**
-   - Ensure `package.json` version matches planned release
-   - Ensure `manifest.json` version matches `package.json`
-
-#### Step 2: Version Bumping
-
-1. **Update Version Numbers**
-   ```bash
-   # For patch release (1.0.1 -> 1.0.2)
-   npm version patch
-   
-   # For minor release (1.0.1 -> 1.1.0)  
-   npm version minor
-   
-   # For major release (1.0.1 -> 2.0.0)
-   npm version major
-   ```
-   
-   This automatically:
-   - Updates `package.json` version
-   - Creates a git commit with version bump
-   - Creates a git tag (e.g., `v1.0.2`)
-
-2. **Push Version Tag**
-   ```bash
-   git push origin main --follow-tags
-   ```
-
-#### Step 3: Automatic Release Execution
-
-Once the tag is pushed, GitHub Actions automatically:
-- ✅ **Validates Release**: Runs comprehensive quality gates
-- ✅ **Builds Extension**: Creates production-ready Chrome extension
-- ✅ **Creates GitHub Release**: With auto-generated release notes
-- ✅ **Prepares Web Store Package**: Ready for Chrome Web Store submission
-- ✅ **Publishes to Web Store**: If secrets are configured (optional)
-
-#### Step 4: Monitor Release Progress
-
-1. **Watch GitHub Actions**
-   - Go to: `https://github.com/[username]/[repo]/actions`
-   - Monitor the "🚀 Release & Chrome Web Store" workflow
-   - Expected duration: 5-10 minutes
-
-2. **Verify Release Artifacts**
-   - GitHub release created with `.zip` file
-   - Chrome Web Store package artifact available
-   - All quality gates passed
-
-### Option 2: Manual Workflow Dispatch Release
-
-Use this for pre-releases, hotfixes, or custom release scenarios.
-
-#### Step 1: Navigate to GitHub Actions
-
-1. Go to: `https://github.com/[username]/[repo]/actions`
-2. Select "🚀 Release & Chrome Web Store" workflow
-3. Click "Run workflow" button
-
-#### Step 2: Configure Release Parameters
-
-```yaml
-Branch: main (or specific branch for hotfix)
-Version: 1.0.2 (must match package.json)
-Pre-release: false (true for beta/alpha releases)
+```text
+🔍 Release Validation (validate-release)        version, npm run lint, npm run test:coverage, audit
+├── 🏗️ Release Build (build-release)            npm run build, the zip, its attestation
+│   ├── 🏷️ GitHub Release (create-github-release)       tag push only
+│   │   └── 🚀 Chrome Web Store Submission (chrome-web-store-submission)
+│   │                                           tag push without a suffix; chrome-webstore
+│   └── 🔎 Chrome Web Store Status (chrome-web-store-status)
+│                                               manual run on main; chrome-webstore, read-only
+└── 📝 Release Notes (release-notes)            the version's section of CHANGELOG.md
+📊 Release Summary (release-summary)            always; fails when a job failed or was cancelled
+🚨 Emergency Rollback (emergency-rollback)      after a failed manual run; prints manual steps
 ```
 
-#### Step 3: Execute and Monitor
+The GitHub Release also waits for the Release Notes job. Only Release Build (for its attestation) and the two store jobs hold `id-token: write`; only the GitHub Release job writes to the repository.
 
-- Same monitoring process as automated release
-- Manual tag creation if workflow succeeds
+## The zip
 
-## 📊 Release Workflow Details
+One file, `prompt-library-extension-vX.Y.Z.zip`: the contents of `dist/`, with `manifest.json` at its root as the store requires, zipped from Release Build's own `npm run build` (no `npm install`, no second build). That file is:
 
-### Quality Gates (All Must Pass)
+- attested by `actions/attest-build-provenance`;
+- the artifact `chrome-extension-release-vX.Y.Z` of the run (90 days);
+- attached to the GitHub Release under its own name;
+- uploaded to the store. Each store job first checks that its copy has the SHA-256 Release Build computed.
 
-The release process enforces these mandatory quality gates:
+To check a Release's zip:
 
-1. **🔍 Release Validation**
-   - Version consistency check (package.json vs release tag)
-   - Complete Biome lint check with zero tolerance
-   - Full test suite execution with coverage
-   - Security audit (moderate+ vulnerabilities fail release)
-   - Advanced security scanning (CodeQL)
-
-2. **🏗️ Release Build**
-   - Production build creation
-   - Chrome extension packaging
-   - Build verification (manifest validation)
-   - Build size analysis and optimization check
-   - Supply chain attestation generation
-
-3. **🏷️ GitHub Release Creation**
-   - Auto-generated release notes from commits
-   - Release asset upload (`.zip` file)
-   - Tag creation if not exists
-   - Pre-release flag handling
-
-4. **🌐 Chrome Web Store Preparation**
-   - Web Store compliance validation
-   - Store-specific package creation
-   - Icon and manifest verification
-   - Final package validation
-
-### Release Artifacts
-
-Each successful release produces:
-
-- **GitHub Release**: With downloadable `.zip` file
-- **Chrome Extension Package**: `chrome-extension-release-v[VERSION]`  
-- **Chrome Web Store Package**: `chrome-webstore-package-v[VERSION]`
-- **Coverage Reports**: Test coverage artifacts
-- **Build Attestations**: Supply chain security proof
-
-## 🔒 Secrets Configuration
-
-Configure these repository secrets for full automation:
-
-### Required Secrets
 ```bash
-GITHUB_TOKEN  # Auto-provided by GitHub Actions
+gh release download vX.Y.Z --repo spartDev/My-Prompt-Manager --pattern 'prompt-library-extension-v*.zip'
+unzip -Z1 prompt-library-extension-vX.Y.Z.zip | grep -x manifest.json
+gh attestation verify prompt-library-extension-vX.Y.Z.zip --repo spartDev/My-Prompt-Manager
 ```
 
-### Optional Secrets (for Chrome Web Store automation)
+`npm run package` makes a zip of the same name locally; it reinstalls and rebuilds first, so the workflow does not use it.
+
+## The Submission
+
+After the GitHub Release, the Submission job waits for the owner to approve the `chrome-webstore` environment (the run's page, **Review deployments**). Then it:
+
+1. trades the job's GitHub OIDC token for a Google access token with the `chromewebstore` scope (`google-github-actions/auth`, Workload Identity Federation: no store secret in GitHub);
+2. runs `node scripts/chrome-web-store.mjs submit`, which calls the [Chrome Web Store API V2](https://developer.chrome.com/docs/webstore/using-api) directly:
+   - **check**: `fetchStatus`, and the rules below;
+   - **upload**: the zip to the `upload` URI;
+   - **poll**: while the upload is `IN_PROGRESS`, `fetchStatus` every 10 s, up to 30 times;
+   - **publish**: with `publishType` `DEFAULT_PUBLISH`, so the Release is published as soon as the Store review approves it;
+   - **status**: `fetchStatus` again, into the job summary.
+
+The job ends at the Submission. The Store review result arrives by Google's e-mail to the publisher account; on approval the Publication happens with no further step.
+
+What the check decides, from the store's answer:
+
+| The store reports | The job |
+| --- | --- |
+| this version published | sends nothing, ends green |
+| this version submitted, in Store review or approved and staged | sends nothing, ends green |
+| another version in Store review or staged | fails and says so; it never cancels a Submission |
+| a published version higher than the zip's | fails, uploads nothing |
+| a refused or cancelled Submission of this version or a higher one | fails, uploads nothing |
+| an earlier upload still processing, no published version, or anything the API reference does not describe | fails, uploads nothing |
+| a published version lower than the zip's, nothing pending | uploads and submits |
+
+Every failure is red, with Google's message verbatim in the job summary. The access token never appears in a log line or the summary.
+
+The store publishes with the visibility last published from the Developer Dashboard. After a visibility change in the Dashboard, publish once by hand there before the next tag.
+
+## The rehearsal
+
 ```bash
-CHROME_WEB_STORE_API_KEYS  # Chrome Web Store API credentials
-CHROME_EXTENSION_ID        # Your extension's Web Store ID
-CHROME_CLIENT_ID          # OAuth client ID for Web Store API
+gh workflow run release.yml --repo spartDev/My-Prompt-Manager --ref main
 ```
 
-### Optional Notification Secrets
-```bash
-SLACK_WEBHOOK_URL         # For release notifications
-```
+(or Actions, **🚀 Release & Chrome Web Store**, **Run workflow**). It takes its version from `package.json`, so it never names another Release, and runs the validation, the build and the attested zip, and the Release notes extraction. On `main` it also runs the status job: approve `chrome-webstore`, and its log and the summary show the published version and what a Submission of this zip would do. It creates and changes no GitHub Release, and submits nothing.
 
-## 🚀 Chrome Web Store Publishing
+On another branch the status job is skipped (the environment admits `main` and tags `v*` only) and everything else runs: that is how a change to `release.yml` is tried before it merges.
 
-### Automated Publishing
+## Rerunning
 
-If Chrome Web Store secrets are configured:
-- Release workflow automatically submits to Chrome Web Store
-- Review process starts immediately
-- Extension updates after Google approval (1-3 business days)
+- **A failed run**: fix the cause, then **Re-run failed jobs**. A rerun of the Submission for a version already submitted or published sends nothing and ends green; a rerun of the GitHub Release updates the Release of the tag.
+- **The publish call failed after the upload succeeded**: the upload is a draft in the Developer Dashboard. A rerun uploads the zip again; if the store refuses that, submit the draft from the Dashboard's **Package** tab.
+- **Another version is in Store review**: wait for its result, or cancel it in the Developer Dashboard, then rerun. The workflow never cancels a Submission.
 
-### Manual Publishing
+## A Release refused at Store review
 
-If automation isn't configured:
+It is never submitted again. Fix it, then release the fix as the next version, with a new tag. That version's CHANGELOG section and its What's new notes (`src/whatsNew/releaseNotes.ts`) carry over the refused Release's notes as well as its own: What's new shows only the installed Release's notes (`src/whatsNew/decide.ts`), and no user ever installed the refused one.
 
-1. **Download Web Store Package**
-   - Go to GitHub Actions artifacts
-   - Download `chrome-webstore-package-v[VERSION].zip`
+## Troubleshooting
 
-2. **Submit to Chrome Web Store**
-   - Login to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/developer/dashboard)
-   - Select your extension
-   - Click "Package" tab
-   - Upload the downloaded `.zip` file
-   - Update store listing if needed
-   - Submit for review
+| Failure | Fix |
+| --- | --- |
+| `Version mismatch between package.json (A) and release (B)` | the tag and `package.json` differ: tag the bump's merge commit, as the `release` skill does |
+| lint or tests fail in Release Validation | run `npm run lint` and `npm test` locally on the tagged commit |
+| `Manifest version (A) doesn't match release (B)` | `manifest.json` was not bumped with `package.json` |
+| `... has no manifest.json at its root` | the zip step changed: it must zip the contents of `dist/`, not the folder |
+| `Repository variables not set: ...` | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), step 9 |
+| 🔑 Authenticate to Google Cloud fails | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), Troubleshooting |
+| the store refuses a call | the job summary holds Google's message verbatim |
 
-3. **Post-Submission**
-   - Review process: 1-3 business days
-   - Monitor developer dashboard for approval status
-   - Extension auto-updates for users after approval
+## Checklist
 
-## ✅ Post-Release Verification
-
-### Immediate Verification (< 5 minutes)
-
-1. **GitHub Release Check**
-   - Verify release appears at: `https://github.com/[username]/[repo]/releases`
-   - Download and test extension `.zip` file
-   - Confirm version numbers match
-
-2. **Build Artifact Validation**
-   ```bash
-   # Download and extract release
-   unzip chrome-extension-release-v[VERSION].zip
-   cd dist/
-   
-   # Verify key files exist
-   ls -la manifest.json popup.html
-   
-   # Verify manifest version
-   grep version manifest.json
-   ```
-
-3. **Local Testing**
-   - Load unpacked extension in Chrome
-   - Test core functionality
-   - Verify version in extension details
-
-### Chrome Web Store Verification (1-3 days)
-
-1. **Review Status**
-   - Monitor Chrome Web Store Developer Dashboard
-   - Check for approval notifications
-
-2. **Live Extension Testing**
-   - Install from Chrome Web Store after approval
-   - Test all features in production environment
-   - Verify auto-update functionality
-
-## 🚨 Rollback Procedures
-
-### Immediate Rollback (Within Hours)
-
-If critical issues are discovered immediately after release:
-
-1. **Emergency Workflow Trigger**
-   - Failed release workflows automatically trigger rollback procedures
-   - Manual rollback available via GitHub Actions
-
-2. **Manual Rollback Steps**
-   ```bash
-   # Delete problematic tag
-   git tag -d v[VERSION]
-   git push origin --delete v[VERSION]
-   
-   # Delete GitHub release
-   # Use GitHub UI or gh CLI
-   gh release delete v[VERSION]
-   ```
-
-3. **Chrome Web Store Actions**
-   - Cancel submission if still in review
-   - Contact Chrome Web Store support if already published
-
-### Version Revert
-
-For more significant issues requiring version revert:
-
-1. **Create Hotfix Branch**
-   ```bash
-   git checkout -b hotfix/v[PREVIOUS_VERSION]
-   git checkout [PREVIOUS_GOOD_COMMIT]
-   ```
-
-2. **Emergency Release Process**
-   - Follow normal release process with incremented version
-   - Use manual workflow dispatch for speed
-   - Mark as hotfix in release notes
-
-## 📈 Release Metrics & Monitoring
-
-### Success Metrics
-
-Track these metrics for each release:
-
-- **Build Success Rate**: Target 100%
-- **Test Coverage**: Maintain >80%
-- **Build Time**: Target <10 minutes
-- **Chrome Web Store Approval Rate**: Target >95%
-- **User Adoption Rate**: Monitor via Web Store analytics
-
-### Monitoring Setup
-
-1. **GitHub Actions Monitoring**
-   - Enable workflow notifications
-   - Set up status checks on main branch
-   - Monitor artifact storage usage
-
-2. **Chrome Web Store Analytics**
-   - Weekly active users
-   - Version adoption rates
-   - Review scores and feedback
-
-3. **Error Tracking**
-   - Monitor extension error reports
-   - Set up alerts for critical failures
-
-## 🛠️ Troubleshooting Guide
-
-### Common Release Issues
-
-#### Version Mismatch Errors
-```bash
-❌ Version mismatch between package.json (1.0.1) and release (1.0.2)
-```
-**Solution:**
-```bash
-# Update package.json version to match tag
-npm version [TARGET_VERSION] --no-git-tag-version
-git add package.json
-git commit -m "chore: update version to [TARGET_VERSION]"
-```
-
-#### Linting Failures
-```bash
-❌ Biome lint found issues - release failed
-```
-**Solution:**
-```bash
-# Fix linting issues locally
-npm run lint:fix
-npm run lint  # Verify fixes
-git add .
-git commit -m "fix: resolve linting issues for release"
-```
-
-#### Test Failures
-```bash
-❌ Test suite failed - release blocked
-```
-**Solution:**
-```bash
-# Run tests locally and fix issues
-npm test
-# Fix failing tests, then:
-git add .
-git commit -m "fix: resolve test failures for release"
-```
-
-#### Build Failures
-```bash
-❌ Production build failed
-```
-**Solution:**
-```bash
-# Test build locally
-npm run build
-# Fix build issues, then commit fixes
-```
-
-#### Chrome Web Store Validation Errors
-```bash
-❌ Manifest validation failed for Web Store
-```
-**Solution:**
-- Check manifest.json for Chrome Web Store compliance
-- Ensure all required fields are present
-- Verify icon files exist and meet requirements
-
-### Recovery Procedures
-
-#### Partial Release Failure
-
-If release partially completes but fails at Web Store:
-
-1. **GitHub Release**: Will be created successfully
-2. **Web Store Package**: Available in artifacts
-3. **Manual Web Store**: Submit manually using artifacts
-
-#### Complete Release Failure
-
-If release fails entirely:
-
-1. **Check Logs**: Review GitHub Actions logs
-2. **Fix Issues**: Address root cause locally
-3. **Retry Release**: Push new tag or re-run workflow
-4. **Emergency Rollback**: If needed, follow rollback procedures
-
-## 📚 Additional Resources
-
-### Documentation Links
-- [Chrome Extension Manifest V3](https://developer.chrome.com/docs/extensions/mv3/)
-- [Chrome Web Store Developer Guide](https://developer.chrome.com/docs/webstore/)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Semantic Versioning Specification](https://semver.org/)
-
-### Internal Links
-- [CLAUDE.md](../CLAUDE.md) - Development guidelines
-- [GitHub Actions Workflows](../.github/workflows/) - CI/CD configuration
-- [Chrome Web Store Visuals](./CHROME_STORE_VISUALS.md) - Store listing assets
-
-### Support Channels
-- **Technical Issues**: GitHub Issues
-- **Release Emergencies**: Repository maintainers
-- **Chrome Web Store**: [Developer Support](https://support.google.com/chrome_webstore/contact/developer_policy)
-
----
-
-## 📋 Release Checklist Template
-
-Copy this checklist for each release:
-
-### Pre-Release
-- [ ] All PRs merged to main
-- [ ] Quality gates passing on main branch
-- [ ] Version numbers updated in package.json
-- [ ] Release notes drafted (if manual)
-- [ ] Chrome Web Store assets ready (if needed)
-
-### Release Execution
-- [ ] Tag created and pushed (automated) OR workflow dispatched (manual)
-- [ ] GitHub Actions workflow completed successfully
-- [ ] All quality gates passed
-- [ ] GitHub release created with assets
-- [ ] Chrome Web Store package generated
-
-### Post-Release
-- [ ] GitHub release verified and tested
-- [ ] Extension manually tested locally
-- [ ] Chrome Web Store submission confirmed (if automated)
-- [ ] Team notified of successful release
-- [ ] Monitoring enabled for new version
-
-### Follow-up (1-3 days)
-- [ ] Chrome Web Store approval confirmed
-- [ ] Live extension tested from store
-- [ ] User feedback monitored
-- [ ] Release metrics reviewed
-- [ ] Next release planning (if needed)
-
----
-
-*Last Updated: 2025-09-03*
-*Version: 1.0*
+- [ ] The bump PR is merged, its checks green (`release` skill, steps 1 to 5).
+- [ ] The tag is the bump's merge commit, pushed (`release` skill, step 6).
+- [ ] The run's GitHub Release holds `prompt-library-extension-vX.Y.Z.zip`.
+- [ ] The owner approved `chrome-webstore`; the Submission job is green and its summary says the version is in Store review.
+- [ ] Google's e-mail reports the Store review; on approval the Developer Dashboard shows the version published.

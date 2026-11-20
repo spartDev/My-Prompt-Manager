@@ -1,20 +1,20 @@
 name: 🚀 Release & Chrome Web Store
 
+# A tag push (vX.Y.Z) releases: validation, the build and its attested zip, the CHANGELOG notes, the GitHub
+# Release with the zip attached, then, for a tag without -alpha, -beta or -rc, the Submission of that same zip to
+# the Chrome Web Store, once the owner approves the chrome-webstore environment.
+#
+# A manual run (workflow_dispatch) is the rehearsal. Its version is package.json's. It runs the validation, the
+# build and the attested zip, the extraction of the CHANGELOG notes and, on main only, one read-only status call
+# to the store in the chrome-webstore environment. It creates no GitHub Release and submits nothing.
+#
+# Path and reruns: docs/RELEASE_WORKFLOW.md. Google Cloud, Developer Dashboard and GitHub setup:
+# docs/GITHUB_ENVIRONMENTS.md.
 on:
   push:
     tags:
       - "v*.*.*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g., 1.0.0)"
-        required: true
-        type: string
-      prerelease:
-        description: "Mark as pre-release"
-        required: false
-        type: boolean
-        default: false
 
 # Ensure only one release process runs at a time
 concurrency:
@@ -57,13 +57,11 @@ jobs:
 
       - name: 📋 Extract Version Information
         id: version
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          INPUT_PRERELEASE: ${{ github.event.inputs.prerelease }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            version="$INPUT_VERSION"
-            is_prerelease="$INPUT_PRERELEASE"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            # The rehearsal: the version is package.json's, so it never names another Release
+            version=$(node -p "require('./package.json').version")
+            is_prerelease="false"
           else
             # Tag push event
             version=${GITHUB_REF#refs/tags/v}
@@ -75,8 +73,8 @@ jobs:
             fi
           fi
 
-          echo "version=$version" >> $GITHUB_OUTPUT
-          echo "is-prerelease=$is_prerelease" >> $GITHUB_OUTPUT
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "is-prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
 
           echo "📦 Release Version: $version"
           echo "🏷️ Pre-release: $is_prerelease"
@@ -121,7 +119,7 @@ jobs:
           echo "🔒 Final security audit for release..."
           node scripts/audit.mjs # npm audit at moderate, minus the waivers in the script
 
-  # Production build for release
+  # Production build for release: one zip, attested, attached to the GitHub Release and submitted to the store
   build-release:
     name: 🏗️ Release Build
     runs-on: ubuntu-latest
@@ -131,6 +129,9 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+    outputs:
+      zip: ${{ steps.package.outputs.zip }}
+      sha256: ${{ steps.package.outputs.sha256 }}
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -160,11 +161,6 @@ jobs:
           NODE_ENV: production
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
 
-      - name: 📦 Chrome Extension Packaging
-        run: |
-          echo "📦 Packaging Chrome extension for release..."
-          npm run package
-
       - name: 🔍 Build Verification
         env:
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
@@ -191,12 +187,42 @@ jobs:
 
           echo "✅ Build verification passed"
 
+      # The contents of dist/, manifest.json at the root as the store requires, from the build above: no npm
+      # install and no second build (npm run package does both, so it stays for local use only).
+      - name: 📦 Zip the Build
+        id: package
+        env:
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+        run: |
+          zip_name="prompt-library-extension-v$RELEASE_VERSION.zip"
+          (cd dist && zip -r -X -q "../$zip_name" .)
+
+          # The listing is read whole first: grep -q would stop at the match, and under pipefail
+          # the unzip it cut off would fail the test
+          listing=$(unzip -Z1 "$zip_name")
+          if ! grep -qx 'manifest.json' <<< "$listing"; then
+            echo "❌ $zip_name has no manifest.json at its root"
+            exit 1
+          fi
+          zipped_version=$(unzip -p "$zip_name" manifest.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).version')
+          if [ "$zipped_version" != "$RELEASE_VERSION" ]; then
+            echo "❌ The zipped manifest says $zipped_version, the release is $RELEASE_VERSION"
+            exit 1
+          fi
+
+          sha256=$(sha256sum "$zip_name" | cut -d ' ' -f 1)
+          echo "zip=$zip_name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "✅ $zip_name: manifest.json $zipped_version at the root, sha256 $sha256"
+
       - name: 📊 Release Build Analysis
+        env:
+          ZIP: ${{ steps.package.outputs.zip }}
         run: |
           echo "📊 Release Build Analysis"
           echo "========================"
           echo "📦 Total build size: $(du -sh dist/ | cut -f1)"
-          echo "📋 Extension package size: $(ls -lh *.zip | awk '{print $5}')"
+          echo "📋 Extension package size: $(du -h "$ZIP" | cut -f1)"
           echo ""
           echo "📁 Build contents:"
           find dist/ -type f -exec sh -c 'echo "  $(basename "$1"): $(wc -c < "$1") bytes"' _ {} \;
@@ -204,43 +230,34 @@ jobs:
       - name: 🔐 Generate Build Attestation
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: "*.zip"
+          subject-path: ${{ steps.package.outputs.zip }}
 
       - name: 📤 Upload Release Build
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
-          path: |
-            dist/
-            *.zip
+          path: ${{ steps.package.outputs.zip }}
+          if-no-files-found: error
           retention-days: 90
           # Enhanced security options
           compression-level: 6
 
-  # Create GitHub release with assets
-  create-github-release:
-    name: 🏷️ GitHub Release
+  # The Release notes, from the version's section of CHANGELOG.md
+  release-notes:
+    name: 📝 Release Notes
     runs-on: ubuntu-latest
-    needs: [validate-release, build-release]
-    permissions:
-      contents: write # create the release and upload its asset
+    needs: validate-release
     steps:
       - name: 🛎️ Checkout Repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-
-      - name: 📤 Download Release Build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
-          path: ./release-assets
 
       - name: 📝 Extract Release Notes from CHANGELOG
         id: release-notes
         env:
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
+          ZIP: prompt-library-extension-v${{ needs.validate-release.outputs.version }}.zip
         run: |
           echo "📝 Extracting release notes from CHANGELOG.md..."
 
@@ -260,14 +277,14 @@ jobs:
           Visit the Chrome Web Store listing (link will be available after store approval)
 
           ### Manual Installation
-          1. Download the chrome-extension-v$version.zip file
+          1. Download the $ZIP file
           2. Extract the contents
           3. Open Chrome and navigate to chrome://extensions/
           4. Enable "Developer mode"
           5. Click "Load unpacked" and select the extracted folder
 
           ## 🐛 Bug Reports
-          Please report issues at https://github.com/${{ github.repository }}/issues
+          Please report issues at https://github.com/$GITHUB_REPOSITORY/issues
           EOF
           else
             # Extract the changelog section for this version
@@ -296,13 +313,13 @@ jobs:
           Visit the Chrome Web Store listing
 
           ### Manual Installation
-          1. Download and extract chrome-extension-v$version.zip
+          1. Download and extract $ZIP
           2. Open chrome://extensions/
           3. Enable Developer mode
           4. Load unpacked extension
 
           ## 🐛 Bug Reports
-          https://github.com/${{ github.repository }}/issues
+          https://github.com/$GITHUB_REPOSITORY/issues
           EOF
             else
               # Create enhanced release notes with changelog
@@ -321,7 +338,7 @@ jobs:
           - Extension will auto-update with new releases
 
           ### Manual Installation (Developer Mode)
-          1. Download the \`chrome-extension-v$version.zip\` file from release assets
+          1. Download the \`$ZIP\` file from release assets
           2. Extract the ZIP file to a folder
           3. Open Chrome and navigate to \`chrome://extensions/\`
           4. Enable **Developer mode** (toggle in top-right corner)
@@ -333,8 +350,8 @@ jobs:
           - **Version**: $version
           - **Manifest Version**: 3
           - **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          - **Commit**: ${{ github.sha }}
-          - **Node Version**: ${{ env.NODE_VERSION }}
+          - **Commit**: $GITHUB_SHA
+          - **Node Version**: $NODE_VERSION
 
           ## 🛠️ Key Features
 
@@ -348,16 +365,16 @@ jobs:
 
           ## 🐛 Bug Reports & Feature Requests
 
-          - **Issues**: [GitHub Issues](https://github.com/${{ github.repository }}/issues)
-          - **Discussions**: [GitHub Discussions](https://github.com/${{ github.repository }}/discussions)
-          - **Security**: Report via [Security Advisory](https://github.com/${{ github.repository }}/security/advisories/new)
+          - **Issues**: [GitHub Issues](https://github.com/$GITHUB_REPOSITORY/issues)
+          - **Discussions**: [GitHub Discussions](https://github.com/$GITHUB_REPOSITORY/discussions)
+          - **Security**: Report via [Security Advisory](https://github.com/$GITHUB_REPOSITORY/security/advisories/new)
 
           ## 📚 Documentation
 
-          - [Installation Guide](https://github.com/${{ github.repository }}#installation)
-          - [User Guide](https://github.com/${{ github.repository }}#usage)
-          - [Contributing](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md)
-          - [Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          - [Installation Guide](https://github.com/$GITHUB_REPOSITORY#installation)
+          - [User Guide](https://github.com/$GITHUB_REPOSITORY#usage)
+          - [Contributing](https://github.com/$GITHUB_REPOSITORY/blob/main/CONTRIBUTING.md)
+          - [Changelog](https://github.com/$GITHUB_REPOSITORY/blob/main/CHANGELOG.md)
           EOF
             fi
           fi
@@ -369,6 +386,35 @@ jobs:
           head -30 release-notes.md
           echo "========================================"
 
+      - name: 📤 Upload Release Notes
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-notes-v${{ needs.validate-release.outputs.version }}
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 90
+
+  # Create GitHub release with assets. A tag push only: the rehearsal creates and changes no Release.
+  create-github-release:
+    name: 🏷️ GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release, release-notes]
+    if: github.event_name == 'push'
+    permissions:
+      contents: write # create the release and upload its asset
+    steps:
+      - name: 📤 Download Release Build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
+          path: ./release-assets
+
+      - name: 📤 Download Release Notes
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-notes-v${{ needs.validate-release.outputs.version }}
+          path: ./release-notes
+
       - name: 🏷️ Create GitHub Release
         id: create-release
         # zizmor: ignore[superfluous-actions] kept on purpose: unlike gh release create, it updates the release when the tag already has one, and uploads the asset in the same step
@@ -376,257 +422,226 @@ jobs:
         with:
           tag_name: v${{ needs.validate-release.outputs.version }}
           name: 🚀 My Prompt Manager v${{ needs.validate-release.outputs.version }}
-          body_path: release-notes.md
+          body_path: ./release-notes/release-notes.md
           draft: false
           prerelease: ${{ needs.validate-release.outputs.is-prerelease }}
-          files: |
-            ./release-assets/chrome-extension-v${{ needs.validate-release.outputs.version }}.zip
+          # The attested zip under its real name; a name that matches no file fails the step
+          files: ./release-assets/${{ needs.build-release.outputs.zip }}
+          fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Chrome Web Store preparation
-  chrome-web-store-prep:
-    name: 🌐 Chrome Web Store Preparation
+  # The rehearsal's read-only call to the store. On main only: the chrome-webstore environment admits main and
+  # tags v*, so a manual run on another branch skips this job and runs everything else.
+  chrome-web-store-status:
+    name: 🔎 Chrome Web Store Status
     runs-on: ubuntu-latest
     needs: [validate-release, build-release]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    environment: chrome-webstore # the owner approves each run
+    permissions:
+      contents: read
+      id-token: write # google-github-actions/auth trades the job's OIDC token for a Google access token
     steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false # see build-release: a release never reads the Actions cache
+
       - name: 📤 Download Release Build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
-          path: ./webstore-prep
+          path: ./release-assets
 
-      - name: 🔍 Chrome Web Store Validation
+      - name: 🔐 Check the Zip Is the Attested One
+        env:
+          ZIP: release-assets/${{ needs.build-release.outputs.zip }}
+          SHA256: ${{ needs.build-release.outputs.sha256 }}
+        run: echo "$SHA256  $ZIP" | sha256sum --check --strict
+
+      - name: 🔍 Check the Store Variables
+        env:
+          CWS_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+          CWS_SERVICE_ACCOUNT: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
         run: |
-          echo "🔍 Validating extension for Chrome Web Store submission..."
-
-          cd webstore-prep
-
-          # Check for Chrome Web Store requirements
-          if [ ! -f "dist/manifest.json" ]; then
-            echo "❌ Missing manifest.json"
+          missing=""
+          for name in CWS_WORKLOAD_IDENTITY_PROVIDER CWS_SERVICE_ACCOUNT CWS_PUBLISHER_ID CWS_EXTENSION_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Repository variables not set:$missing. The setup is in docs/GITHUB_ENVIRONMENTS.md."
             exit 1
           fi
 
-          # Validate manifest for Web Store
-          echo "📋 Validating manifest for Chrome Web Store..."
+      # Workload Identity Federation: no store secret in GitHub. The read-only scope is enough for fetchStatus, and
+      # it makes the rehearsal unable to change anything in the store.
+      - name: 🔑 Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore.readonly
+          access_token_lifetime: 600s
+          create_credentials_file: false
+          export_environment_variables: false
 
-          # Check required manifest fields for Web Store
-          required_fields=("name" "version" "description" "permissions" "manifest_version")
-          for field in "${required_fields[@]}"; do
-            if ! grep -q "\"$field\"" dist/manifest.json; then
-              echo "❌ Missing required manifest field: $field"
-              exit 1
-            fi
+      - name: 🔎 Read the Store Status
+        env:
+          CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          ZIP: release-assets/${{ needs.build-release.outputs.zip }}
+        run: node scripts/chrome-web-store.mjs status --zip "$ZIP"
+
+  # The Submission: the attested zip, uploaded and submitted for Store review, published as soon as the Store
+  # review approves it. Only the push of a tag without -alpha, -beta or -rc; never a manual run.
+  chrome-web-store-submission:
+    name: 🚀 Chrome Web Store Submission
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-release, create-github-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.validate-release.outputs.is-prerelease == 'false'
+    environment: chrome-webstore # the owner approves each run
+    permissions:
+      contents: read
+      id-token: write # google-github-actions/auth trades the job's OIDC token for a Google access token
+    steps:
+      - name: 🛎️ Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false # see build-release: a release never reads the Actions cache
+
+      - name: 📤 Download Release Build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: chrome-extension-release-v${{ needs.validate-release.outputs.version }}
+          path: ./release-assets
+
+      - name: 🔐 Check the Zip Is the Attested One
+        env:
+          ZIP: release-assets/${{ needs.build-release.outputs.zip }}
+          SHA256: ${{ needs.build-release.outputs.sha256 }}
+        run: echo "$SHA256  $ZIP" | sha256sum --check --strict
+
+      - name: 🔍 Check the Store Variables
+        env:
+          CWS_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+          CWS_SERVICE_ACCOUNT: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: |
+          missing=""
+          for name in CWS_WORKLOAD_IDENTITY_PROVIDER CWS_SERVICE_ACCOUNT CWS_PUBLISHER_ID CWS_EXTENSION_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
           done
-
-          # Check for prohibited permissions or content
-          echo "🔒 Checking for prohibited content..."
-
-          # Validate icons exist
-          if ! grep -q "\"icons\"" dist/manifest.json || [ ! -f "dist/icons/icon-128.png" ]; then
-            echo "⚠️ Warning: Icons may be missing or not properly configured"
+          if [ -n "$missing" ]; then
+            echo "::error::Repository variables not set:$missing. The setup is in docs/GITHUB_ENVIRONMENTS.md."
+            exit 1
           fi
 
-          echo "✅ Chrome Web Store validation passed"
-
-      - name: 📦 Prepare Web Store Package
-        env:
-          RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
-        run: |
-          echo "📦 Preparing final package for Chrome Web Store..."
-
-          cd webstore-prep
-
-          # Create a clean Web Store package
-          zip -r "chrome-extension-webstore-v$RELEASE_VERSION.zip" dist/
-
-          echo "📊 Web Store package details:"
-          ls -lh *.zip
-          echo "📁 Package contents:"
-          unzip -l "chrome-extension-webstore-v$RELEASE_VERSION.zip"
-
-      - name: 📤 Upload Web Store Package
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # Workload Identity Federation: no store secret in GitHub. upload and publish need the chromewebstore scope.
+      - name: 🔑 Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
-          path: webstore-prep/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
-          retention-days: 90
+          workload_identity_provider: ${{ vars.CWS_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.CWS_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+          access_token_lifetime: 1200s
+          create_credentials_file: false
+          export_environment_variables: false
 
-      - name: 📝 Web Store Submission Instructions
+      # Fails red with Google's message in the job summary; a rerun for a version already submitted or published
+      # sends nothing and ends green. It never cancels a Submission.
+      - name: 🚀 Submit to the Chrome Web Store
         env:
+          CWS_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          ZIP: release-assets/${{ needs.build-release.outputs.zip }}
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
-        run: |
-          echo "📝 Chrome Web Store Submission Instructions"
-          echo "==========================================="
-          echo ""
-          echo "🎯 Next Steps for Chrome Web Store:"
-          echo "1. 📥 Download the Web Store package artifact"
-          echo "2. 🌐 Go to Chrome Web Store Developer Dashboard"
-          echo "3. 📤 Upload the chrome-extension-webstore-v$RELEASE_VERSION.zip file"
-          echo "4. 📋 Fill in store listing details (description, screenshots, etc.)"
-          echo "5. 🔍 Submit for review"
-          echo ""
-          echo "📦 Package ready: chrome-extension-webstore-v$RELEASE_VERSION.zip"
-          echo "🎉 Release v$RELEASE_VERSION is ready for publication!"
+        run: node scripts/chrome-web-store.mjs submit --zip "$ZIP" --version "$RELEASE_VERSION"
 
-  # Chrome Web Store Publishing (Optional - requires secrets)
-  # chrome-web-store-publish:
-  #   name: 🚀 Chrome Web Store Publishing
-  #   runs-on: ubuntu-latest
-  #   needs: [validate-release, build-release, chrome-web-store-prep]
-  #   if: github.event_name != 'workflow_dispatch' || github.event.inputs.prerelease == 'false'
-  #   environment: chrome-webstore # Protect production releases
-  #   steps:
-  #     - name: 📤 Download Web Store Package
-  #       uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-  #       with:
-  #         name: chrome-webstore-package-v${{ needs.validate-release.outputs.version }}
-  #         path: ./webstore-package
-
-  #     - name: 🔍 Check Chrome Web Store Configuration
-  #       id: check-secrets
-  #       run: |
-  #         if [[ -n "${{ secrets.CHROME_EXTENSION_ID }}" && -n "${{ secrets.CHROME_CLIENT_ID }}" && -n "${{ secrets.CHROME_WEB_STORE_API_KEYS }}" ]]; then
-  #           echo "configured=true" >> $GITHUB_OUTPUT
-  #           echo "✅ Chrome Web Store secrets are configured"
-  #         else
-  #           echo "configured=false" >> $GITHUB_OUTPUT
-  #           echo "⚠️ Chrome Web Store secrets are not configured - skipping publication"
-  #         fi
-
-  #     - name: 🚀 Publish to Chrome Web Store
-  #       if: steps.check-secrets.outputs.configured == 'true'
-  #       uses: PlasmoHQ/bpp@v3
-  #       with:
-  #         keys: ${{ secrets.CHROME_WEB_STORE_API_KEYS }}
-  #         artifact: ./webstore-package/chrome-extension-webstore-v${{ needs.validate-release.outputs.version }}.zip
-  #         verbose: true
-  #         # Enhanced security and reliability options
-  #         upload-timeout: 300000 # 5 minutes timeout
-  #         submit-timeout: 300000 # 5 minutes timeout
-
-  #     - name: 📝 Publication Status
-  #       run: |
-  #         if [[ "${{ secrets.CHROME_EXTENSION_ID }}" != "" ]]; then
-  #           echo "🚀 Chrome Web Store publication initiated"
-  #           echo "🔗 Extension URL: https://chrome.google.com/webstore/detail/${{ secrets.CHROME_EXTENSION_ID }}"
-  #           echo "⏳ Review process typically takes 1-3 business days"
-  #         else
-  #           echo "⚠️ Chrome Web Store secrets not configured - skipping automated publication"
-  #           echo "📋 Manual publication required via Chrome Web Store Developer Dashboard"
-  #         fi
-
-  # Release summary and cleanup
+  # Release summary: one row per job. A skipped job is expected (the GitHub Release and the Submission on a
+  # rehearsal, the status call on a tag push or off main); a failed or cancelled one fails the run.
   release-summary:
     name: 📊 Release Summary
     runs-on: ubuntu-latest
-    needs: [
-        validate-release,
-        build-release,
-        create-github-release,
-        chrome-web-store-prep,
-        # chrome-web-store-publish,
-      ]
+    needs:
+      - validate-release
+      - build-release
+      - release-notes
+      - create-github-release
+      - chrome-web-store-status
+      - chrome-web-store-submission
     if: always()
     steps:
       - name: 📊 Release Process Summary
         env:
           RELEASE_VERSION: ${{ needs.validate-release.outputs.version }}
           IS_PRERELEASE: ${{ needs.validate-release.outputs.is-prerelease }}
+          ZIP: ${{ needs.build-release.outputs.zip }}
+          VALIDATE: ${{ needs.validate-release.result }}
+          BUILD: ${{ needs.build-release.result }}
+          NOTES: ${{ needs.release-notes.result }}
+          GITHUB_RELEASE: ${{ needs.create-github-release.result }}
+          STORE_STATUS: ${{ needs.chrome-web-store-status.result }}
+          STORE_SUBMISSION: ${{ needs.chrome-web-store-submission.result }}
         run: |
-          echo "📊 Release Process Summary"
-          echo "=========================="
-          echo "🏷️ Version: v$RELEASE_VERSION"
-          echo "📅 Release Date: $(date -u)"
-          echo "🔖 Pre-release: $IS_PRERELEASE"
-          echo "📝 Commit: $GITHUB_SHA"
-          echo ""
-
-          # Check job statuses
-          validate_status="${{ needs.validate-release.result }}"
-          build_status="${{ needs.build-release.result }}"
-          github_release_status="${{ needs.create-github-release.result }}"
-          webstore_status="${{ needs.chrome-web-store-prep.result }}"
-
-          echo "Job Results:"
-          echo "🔍 Validation: $validate_status"
-          echo "🏗️ Build: $build_status"
-          echo "🏷️ GitHub Release: $github_release_status"
-          echo "🌐 Web Store Prep: $webstore_status"
-          echo ""
-
-          # The here-documents below expand the version, the date and the job statuses, so their
-          # terminator is unquoted and starts its line: bash never finds an indented terminator,
-          # and then fails the step at the end of the script.
-          if [[ "$validate_status" == "success" && "$build_status" == "success" ]]; then
-            echo "🎉 ✅ RELEASE PROCESS COMPLETED SUCCESSFULLY!"
-            echo ""
-            echo "📦 Deliverables:"
-            echo "- ✅ Chrome extension package ready"
-            echo "- ✅ GitHub release created (if applicable)"
-            echo "- ✅ Chrome Web Store package prepared"
-            echo ""
-            echo "🚀 Chrome Extension v$RELEASE_VERSION is ready for distribution!"
-
-            # Add to GitHub workflow summary
-            cat >> "$GITHUB_STEP_SUMMARY" << SUMMARY_EOF
-          ## 🎉 Release v$RELEASE_VERSION Completed Successfully!
-
-          ### 📊 Release Summary
-          - **Version**: v$RELEASE_VERSION
-          - **Release Date**: $(date -u)
-          - **Pre-release**: $IS_PRERELEASE
-          - **Commit**: $GITHUB_SHA
-
-          ### ✅ Completed Tasks
-          - 🔍 Release validation and quality gates passed
-          - 🏗️ Production build completed successfully
-          - 🏷️ GitHub release created with assets
-          - 🌐 Chrome Web Store package prepared
-          - 🔐 Build attestation generated for supply chain security
-
-          ### 📦 Available Artifacts
-          - Chrome Extension Package: \`chrome-extension-release-v$RELEASE_VERSION\`
-          - Chrome Web Store Package: \`chrome-webstore-package-v$RELEASE_VERSION\`
-
-          ### 🚀 Next Steps
-          - Chrome Web Store: Package is ready for submission
-          - GitHub Release: Available at [releases page](https://github.com/$GITHUB_REPOSITORY/releases/tag/v$RELEASE_VERSION)
-          SUMMARY_EOF
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            run_kind="Rehearsal"
           else
-            echo "❌ 🚨 RELEASE PROCESS FAILED!"
-            echo "🔧 Please check failed jobs and retry the release"
-
-            # Add failure summary to GitHub workflow summary
-            cat >> "$GITHUB_STEP_SUMMARY" << SUMMARY_EOF
-          ## 🚨 Release v$RELEASE_VERSION Failed!
-
-          ### ❌ Failed Jobs
-          - 🔍 Validation: $validate_status
-          - 🏗️ Build: $build_status
-          - 🏷️ GitHub Release: $github_release_status
-          - 🌐 Web Store Prep: $webstore_status
-
-          ### 🔧 Troubleshooting
-          Please check the failed job logs and retry the release after fixing issues.
-          SUMMARY_EOF
-
-            exit 1
+            run_kind="Release"
           fi
+
+          {
+            echo "## 📊 $run_kind v$RELEASE_VERSION"
+            echo ""
+            echo "- **Commit**: $GITHUB_SHA"
+            echo "- **Pre-release**: $IS_PRERELEASE"
+            echo "- **Zip**: ${ZIP:-none} (artifact \`chrome-extension-release-v$RELEASE_VERSION\`)"
+            echo ""
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            echo "| 🔍 Validation | $VALIDATE |"
+            echo "| 🏗️ Build and attested zip | $BUILD |"
+            echo "| 📝 Release notes | $NOTES |"
+            echo "| 🏷️ GitHub Release | $GITHUB_RELEASE |"
+            echo "| 🔎 Chrome Web Store status | $STORE_STATUS |"
+            echo "| 🚀 Chrome Web Store Submission | $STORE_SUBMISSION |"
+            echo ""
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+          for result in "$VALIDATE" "$BUILD" "$NOTES" "$GITHUB_RELEASE" "$STORE_STATUS" "$STORE_SUBMISSION"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "❌ $run_kind v$RELEASE_VERSION failed: see the jobs above" | tee -a "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          done
+          echo "✅ $run_kind v$RELEASE_VERSION completed" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # Emergency rollback capability
   emergency-rollback:
     name: 🚨 Emergency Rollback
     runs-on: ubuntu-latest
     if: failure() && github.event_name == 'workflow_dispatch'
-    needs: [
-        validate-release,
-        build-release,
-        create-github-release,
-        chrome-web-store-prep,
-        # chrome-web-store-publish,
-        release-summary,
-      ]
+    needs: [validate-release, build-release, create-github-release, release-summary]
     environment: emergency-rollback
     steps:
       - name: 🛎️ Checkout Repository

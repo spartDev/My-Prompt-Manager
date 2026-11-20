@@ -149,6 +149,18 @@ _Avoid_: Toast, alert, snackbar
 A version of the extension the user installs, named by its version number (2.0.0). Installing a newer Release over an older one is an update; installing the extension where it was not is a first install.
 _Avoid_: Build, deploy
 
+**Submission**:
+A Release sent to the Chrome Web Store, waiting for its Store review.
+_Avoid_: Upload, deploy
+
+**Store review**:
+Google's examination of a Submission before any Publication.
+_Avoid_: "review" alone, which means a code review here
+
+**Publication**:
+The moment an approved Release becomes the one the Chrome Web Store installs and offers as an update.
+_Avoid_: Deploy, ship, go live
+
 **Release notes**:
 What a Release brings that the user should know about: its Features and its Critical fixes, nothing else. A Release may have none.
 _Avoid_: Changelog (the changelog lists every change, technical ones included)
@@ -183,3 +195,4 @@ _Avoid_: Dev mode, test mode
 - Each Prompt belongs to exactly one Category.
 - Every Prompt in a Library is free of Hidden characters, however it arrived. Admitting text that has already been admitted changes nothing.
 - Insertion delivers a Prompt's content Verbatim into a Platform.
+- A Release reaches users through its Submission, its Store review, then its Publication. A Release refused at Store review is never submitted again: its fix is the next Release, which carries the refused one's Release notes too, since What's new shows only the installed Release's notes.

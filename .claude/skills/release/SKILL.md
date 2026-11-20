@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Release
 
-A release is two hand-offs: a **bump PR** that the user merges, then an annotated tag on `main` whose push runs `.github/workflows/release.yml` (validation, build, GitHub Release, Chrome Web Store package). Each step ends on its own criterion; stop at the two hand-offs and wait for the user.
+A release is two hand-offs: a **bump PR** that the user merges, then an annotated tag on `main` whose push runs `.github/workflows/release.yml` (validation, build and attested zip, GitHub Release, then the Submission of that zip to the Chrome Web Store once the owner approves it). Each step ends on its own criterion; stop at the two hand-offs and wait for the user.
 
 ## 1. Read the state
 
@@ -98,17 +98,21 @@ if [ -z "$EXTRA" ]; then git tag -a vX.Y.Z -m "Release vX.Y.Z" "$SHA"; else prin
 
 `EXTRA` lists what reached `main` between `$BASE` and the merge, and the tag exists only when it is empty. Anything it prints would ship unlisted: show the user, and leave the version untagged until they decide.
 
-Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
+Confirm with the user before `git push origin vX.Y.Z`: the push publishes the GitHub Release, then submits the Release to the Chrome Web Store once the owner approves the `chrome-webstore` environment. A tag run carries the tag as its branch, and GitHub takes a few seconds to register it, so wait for that run before watching it, in the background:
 
 ```bash
 until RUN=$(gh run list --workflow release.yml --branch vX.Y.Z --limit 1 --json databaseId -q '.[0].databaseId') && [ -n "$RUN" ]; do sleep 5; done
 gh run watch "$RUN" --exit-status
 ```
 
-Done when: the run is green and `gh release view vX.Y.Z` shows the release.
+The run stops at the 🚀 Chrome Web Store Submission job until the owner approves `chrome-webstore` on the run's page (**Review deployments**). Tell the user when it waits; only they can approve it.
+
+Done when: the run is green, `gh release view vX.Y.Z` shows the release with `prompt-library-extension-vX.Y.Z.zip` attached, and the Submission job's summary says the version is in Store review.
 
 ## 7. Chrome Web Store
 
-The store publish job of `release.yml` is commented out, so the upload is manual. Tell the user where the package is: the `chrome-webstore-package-vX.Y.Z` artifact of the run, to upload in the Chrome Web Store developer dashboard.
+The Submission job uploaded the attested zip and submitted it for Store review through the Chrome Web Store API V2; the Release is published as soon as the Store review approves it. Google's e-mail to the publisher account gives the result. A failed Submission job holds Google's message in its summary: the user fixes the cause, then reruns the failed jobs (a rerun for a version already submitted sends nothing). `docs/RELEASE_WORKFLOW.md` has the rules.
 
-Done when: the user has the artifact link.
+A Release refused at Store review is never submitted again: the fix is the next version, through this skill from step 1, and its CHANGELOG section and What's new notes (`src/whatsNew/releaseNotes.ts`) carry over the refused Release's notes too, since What's new shows only the installed Release's notes.
+
+Done when: the user knows the Release is in Store review, or holds Google's message from a failed Submission.
