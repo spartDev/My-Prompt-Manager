@@ -404,6 +404,9 @@ jobs:
     steps:
       # One zip per Release. "Re-run all jobs" builds a new zip (zip stores the files' times) that the next step
       # would put in place of the one the store may already hold; only "Re-run failed jobs" keeps the first.
+      # It decides from one REST listing of the Releases, drafts included (softprops creates the Release as a
+      # draft, attaches the zip, then publishes it), and compares the digest GitHub computed at the upload. A
+      # failed call fails the step: an error is never read as "no Release yet". An asset without a digest fails.
       - name: 🔒 Check the Release holds no other zip
         env:
           GH_TOKEN: ${{ github.token }}
@@ -411,23 +414,19 @@ jobs:
           ZIP: ${{ needs.build-release.outputs.zip }}
           SHA256: ${{ needs.build-release.outputs.sha256 }}
         run: |
-          if ! assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2> view-error.txt); then
-            if grep -qx 'release not found' view-error.txt; then
-              echo "No GitHub Release of $TAG yet."
-              exit 0
-            fi
-            cat view-error.txt >&2
+          if ! digests=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name == env.TAG) | .assets[] | select(.name == env.ZIP) | .digest // "none"'); then
+            echo "::error::Could not list the GitHub Releases, so whether $TAG already holds a $ZIP is unknown. Nothing was changed: Re-run failed jobs."
             exit 1
           fi
-          if ! grep -qxF "$ZIP" <<< "$assets"; then
+          if [ -z "$digests" ]; then
             echo "The GitHub Release of $TAG holds no $ZIP yet."
             exit 0
           fi
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ZIP" --dir attached
-          if ! echo "$SHA256  attached/$ZIP" | sha256sum --check --strict; then
-            echo "::error::The GitHub Release of $TAG already holds another $ZIP: this run built a new one. Rerun a tag run with Re-run failed jobs only, never Re-run all jobs (docs/RELEASE_WORKFLOW.md, Rerunning)."
+          if [ "$digests" != "sha256:$SHA256" ]; then
+            echo "::error::The GitHub Release of $TAG already holds another $ZIP (${digests//$'\n'/, }), not this run's (sha256:$SHA256). Rerun a tag run with Re-run failed jobs only, never Re-run all jobs (docs/RELEASE_WORKFLOW.md, Rerunning)."
             exit 1
           fi
+          echo "The GitHub Release of $TAG already holds this run's $ZIP."
 
       - name: 📤 Download Release Build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

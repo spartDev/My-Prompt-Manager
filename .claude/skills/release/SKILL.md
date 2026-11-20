@@ -111,7 +111,7 @@ Done when: the run is green, `gh release view vX.Y.Z` shows the release with `pr
 
 ## 7. Chrome Web Store
 
-The Submission job uploaded the attested zip and submitted it for Store review through the Chrome Web Store API V2; the Release is published as soon as the Store review approves it. Google's e-mail to the publisher account gives the result. A failed Submission job holds Google's message in its summary: the user fixes the cause, then **Re-run failed jobs** (a rerun for a version already submitted sends nothing). Never **Re-run all jobs** on a tag run: it builds a new zip, and the GitHub Release job refuses it. `docs/RELEASE_WORKFLOW.md` has the rules.
+The Submission job uploaded the attested zip and submitted it for Store review through the Chrome Web Store API V2; the Release is published as soon as the Store review approves it. Google's e-mail to the publisher account gives the result. A failed Submission job holds Google's message in its summary: the user fixes the cause, then **Re-run failed jobs** (a rerun for a version already submitted sends nothing). Never **Re-run all jobs** on a tag run: it builds a new zip, and the GitHub Release job fails rather than replace the zip the Release already holds. `docs/RELEASE_WORKFLOW.md` has the rules.
 
 A Release refused at Store review is never submitted again: the fix is the next version, through this skill from step 1, and its CHANGELOG section and What's new notes (`src/whatsNew/releaseNotes.ts`) carry over the refused Release's notes too, since What's new shows only the installed Release's notes.
 

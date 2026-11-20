@@ -96,7 +96,7 @@ On another branch the status job is skipped (the environment admits `main` and t
 
 ## Rerunning
 
-On a tag run, only **Re-run failed jobs**, never **Re-run all jobs**. Re-run all jobs builds a new zip (zip stores the files' times) and attests it, while the GitHub Release and the store may already hold the first one; the GitHub Release job then fails before it changes anything, as the Release already holds a zip of that name with another SHA-256 (step **🔒 Check the Release holds no other zip**).
+On a tag run, only **Re-run failed jobs**, never **Re-run all jobs**. Re-run all jobs builds a new zip (zip stores the files' times) and attests it, while the GitHub Release and the store may already hold the first one. The GitHub Release job's first step, **🔒 Check the Release holds no other zip**, lists the Releases, drafts included, and fails before anything changes when the Release of the tag holds a zip of that name whose digest (the SHA-256 GitHub computed at its upload) is not this run's, or has none, or when the listing fails.
 
 - **A failed run**: fix the cause, then **Re-run failed jobs**. A rerun of the Submission for a version already submitted or published sends nothing and ends green; a rerun of the GitHub Release updates the Release of the tag.
 - **The publish call failed after the upload succeeded**: the upload is a draft in the Developer Dashboard. A rerun uploads the zip again; if the store refuses that, submit the draft from the Dashboard's **Package** tab.
@@ -117,7 +117,8 @@ It is never submitted again. Fix it, then release the fix as the next version, w
 | `Repository variables not set: ...` | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), step 9 |
 | 🔑 Authenticate to Google Cloud fails | [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md), Troubleshooting |
 | the store refuses a call | the job summary holds Google's message verbatim |
-| `The GitHub Release of vX.Y.Z already holds another prompt-library-extension-vX.Y.Z.zip` | the tag run was rerun with Re-run all jobs; the GitHub Release keeps the first run's zip. If the first run's Submission uploaded it, nothing is left to redo. If it uploaded nothing, delete the zip from the GitHub Release, then Re-run failed jobs: the new zip, attested by this attempt, is attached and then submitted |
+| `The GitHub Release of vX.Y.Z already holds another prompt-library-extension-vX.Y.Z.zip` | the tag run was rerun with Re-run all jobs; the GitHub Release keeps the first run's zip. If the first run's Submission submitted it, nothing is left to redo. If that Submission uploaded it but its publish call failed, the zip is a draft in the Developer Dashboard, which this run can no longer submit: submit it from the Dashboard's **Package** tab. If it uploaded nothing, delete the zip from the GitHub Release, then Re-run failed jobs: the new zip, attested by this attempt, is attached and then submitted |
+| `Could not list the GitHub Releases, so whether vX.Y.Z already holds a ... is unknown` | a GitHub API call failed (an outage, a rate limit); nothing was changed: Re-run failed jobs |
 
 ## Checklist
 
