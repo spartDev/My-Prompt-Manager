@@ -410,8 +410,9 @@ jobs:
       # failed call fails the step: an error is never read as "no Release yet". An asset without a digest, or with
       # an empty one, fails. An asset is the zip when its name or its label is the zip's name, as softprops matches
       # an existing asset (its other form, spaces turned into dots, is the zip's name itself: a tag holds no space).
-      # It passes only when exactly one asset matches, under the zip's own name, with this run's digest: softprops
-      # uploads nothing over a match, so a labelled asset of another name would leave the Release without the zip.
+      # It passes when, across the tag's Releases, no asset matches (the first run), or exactly one does, under the
+      # zip's own name, with this run's digest: softprops uploads nothing over a match, so a labelled asset of
+      # another name would leave the Release without the zip.
       - name: 🔒 Check the Release holds no other zip
         env:
           GH_TOKEN: ${{ github.token }}
