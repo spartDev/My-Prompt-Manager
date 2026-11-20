@@ -32,7 +32,8 @@ export const RELEASE_WITHOUT_NOTES = '1.9.0';
 
 export const RELEASE_WITHOUT_NOTES_EXTENSION_PATH = path.resolve(process.cwd(), 'dist-e2e-without-notes');
 
-const hasReleaseNotes = (version: string): boolean => RELEASE_NOTES.some((notes) => notes.version === version);
+/** Whether What's new has notes to show for `version`: an entry with at least one item, as src/whatsNew/decide.ts counts it */
+const hasReleaseNotes = (version: string): boolean => RELEASE_NOTES.some((notes) => notes.version === version && notes.items.length > 0);
 
 /** Copies the build in `dist` to WHATS_NEW_UPDATE_EXTENSION_PATH at version WHATS_NEW_UPDATE_VERSION */
 export function buildWhatsNewUpdateExtension(dist: string): void {
