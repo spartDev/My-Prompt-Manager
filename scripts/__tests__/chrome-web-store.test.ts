@@ -34,13 +34,13 @@ afterAll(() => {
 });
 
 /** A zip made the way release.yml makes it: `zip -r` run inside the folder that holds the files. */
-function makeZip(files: Record<string, string>): Buffer {
+function makeZip(files: Record<string, string>, options: string[] = []): Buffer {
   const folder = path.join(workdir, `zip-${made++}`);
   for (const [name, content] of Object.entries(files)) {
     mkdirSync(path.dirname(path.join(folder, name)), { recursive: true });
     writeFileSync(path.join(folder, name), content);
   }
-  const result = spawnSync('zip', ['-r', '-X', '-q', '../out.zip', '.'], { cwd: folder, encoding: 'utf-8' });
+  const result = spawnSync('zip', ['-r', '-X', '-q', ...options, '../out.zip', '.'], { cwd: folder, encoding: 'utf-8' });
   expect(result.status, result.stderr).toBe(0);
   const zip = readFileSync(path.join(workdir, 'out.zip'));
   rmSync(path.join(workdir, 'out.zip'));
@@ -139,15 +139,17 @@ describe('submitRelease', () => {
     expect(summary).toContain('Submission: 2.0.0 at 100% (PENDING_REVIEW)');
   });
 
-  it('polls fetchStatus while the upload is IN_PROGRESS, and publishes only once it has SUCCEEDED', async () => {
+  // The reference spells the in-progress UploadState IN_PROGRESS in the enum and UPLOAD_IN_PROGRESS in uploadState's
+  // description; the upload's answer and fetchStatus's lastAsyncUploadState have that same type.
+  it.each(['IN_PROGRESS', 'UPLOAD_IN_PROGRESS'])('polls fetchStatus while the upload is %s, and publishes only once it has SUCCEEDED', async (uploading) => {
     const store = fakeStore({
       fetchStatus: [
         { body: storeState() },
-        { body: storeState({ lastAsyncUploadState: 'IN_PROGRESS' }) },
+        { body: storeState({ lastAsyncUploadState: uploading }) },
         { body: storeState({ lastAsyncUploadState: 'SUCCEEDED' }) },
         { body: storeState({ submittedItemRevisionStatus: revision('PENDING_REVIEW', '2.0.0') }) }
       ],
-      upload: [{ body: { uploadState: 'IN_PROGRESS', itemId: ITEM } }],
+      upload: [{ body: { uploadState: uploading, itemId: ITEM } }],
       publish: [{ body: { state: 'PENDING_REVIEW' } }]
     });
 
@@ -165,18 +167,19 @@ describe('submitRelease', () => {
     expect(sleeps).toEqual([5, 5]);
   });
 
-  it('publishes nothing when the upload is still IN_PROGRESS after the last poll', async () => {
+  it('polls exactly poll.attempts times, then publishes nothing when the upload is still IN_PROGRESS', async () => {
     const inProgress = { body: storeState({ lastAsyncUploadState: 'IN_PROGRESS' }) };
     const store = fakeStore({
       fetchStatus: [{ body: storeState() }, inProgress, inProgress, inProgress],
       upload: [{ body: { uploadState: 'IN_PROGRESS' } }]
     });
 
-    const { result, summary } = await submit(store);
+    const { result, summary, sleeps } = await submit(store); // poll: { attempts: 3, intervalMs: 5 }
 
     expect(result).toEqual({ ok: false, outcome: 'failed' });
-    expect(store.requests()).not.toContain('POST publish');
-    expect(summary).toContain('still IN_PROGRESS after 3 polls');
+    expect(store.requests()).toEqual(['GET fetchStatus', 'POST upload', 'GET fetchStatus', 'GET fetchStatus', 'GET fetchStatus']);
+    expect(sleeps).toEqual([5, 5, 5]);
+    expect(summary).toContain('the upload was still IN_PROGRESS after 3 polls, 0.005 s apart');
   });
 
   describe('when the upload fails', () => {
@@ -252,6 +255,16 @@ describe('submitRelease', () => {
       expect(summary).toContain('PERMISSIONS: New host permission.');
     });
 
+    it('ends green when the publish answers PUBLISHED', async () => {
+      const store = fakeStore({ ...uploaded, publish: [{ body: { state: 'PUBLISHED' } }] });
+
+      const { result, summary } = await submit(store);
+
+      expect(result).toEqual({ ok: true, outcome: 'submitted' });
+      expect(store.requests()).toEqual(['GET fetchStatus', 'POST upload', 'POST publish', 'GET fetchStatus']);
+      expect(summary).toContain('2.0.0 is submitted (PUBLISHED).');
+    });
+
     it("fails, with Google's message verbatim, when the store refuses the publish", async () => {
       const message = 'Publish condition not met: the item is in review.';
       const store = fakeStore({ ...uploaded, publish: [{ status: 400, body: GOOGLE_ERROR(400, message) }] });
@@ -270,6 +283,28 @@ describe('submitRelease', () => {
 
       expect(result).toEqual({ ok: false, outcome: 'failed' });
       expect(summary).toContain("the Submission's state is REJECTED");
+    });
+  });
+
+  describe("when the store's last upload has not ended", () => {
+    it.each(['IN_PROGRESS', 'UPLOAD_IN_PROGRESS'])('uploads nothing while the store still processes an earlier upload (%s)', async (uploading) => {
+      const store = fakeStore({ fetchStatus: [{ body: storeState({ lastAsyncUploadState: uploading }) }] });
+
+      const { result, summary } = await submit(store);
+
+      expect(result).toEqual({ ok: false, outcome: 'refused' });
+      expect(store.requests()).toEqual(['GET fetchStatus']);
+      expect(summary).toContain(`The store is still processing an earlier upload (lastAsyncUploadState ${uploading}).`);
+    });
+
+    it.each(['UPLOAD_STATE_UNSPECIFIED', 'UPLOAD_PAUSED'])('uploads nothing when the last upload is in a state the reference does not describe (%s)', async (unknown) => {
+      const store = fakeStore({ fetchStatus: [{ body: storeState({ lastAsyncUploadState: unknown }) }] });
+
+      const { result, summary } = await submit(store);
+
+      expect(result).toEqual({ ok: false, outcome: 'refused' });
+      expect(store.requests()).toEqual(['GET fetchStatus']);
+      expect(summary).toContain(`The last upload is in a state this job does not know: lastAsyncUploadState "${unknown}".`);
     });
   });
 
@@ -362,6 +397,20 @@ describe('submitRelease', () => {
       expect(summary).toContain("The zip's manifest says 1.9.9, the Release is 2.0.0.");
     });
 
+    it.each([
+      ['too short', 'abcdefghijklmnop'],
+      ['a letter after p', 'abcdefghijklmnopabcdefghijklmnoq'],
+      ['upper case', 'ABCDEFGHIJKLMNOPABCDEFGHIJKLMNOP']
+    ])('sends nothing when CWS_EXTENSION_ID is not an extension ID (%s)', async (_case, id) => {
+      const store = fakeStore({});
+
+      const { result, summary } = await submit(store, '2.0.0', zipOf('2.0.0'), { ...ENV, CWS_EXTENSION_ID: id });
+
+      expect(result).toEqual({ ok: false, outcome: 'invalid' });
+      expect(store.calls).toEqual([]);
+      expect(summary).toContain('CWS_EXTENSION_ID is not an extension ID (32 letters from a to p).');
+    });
+
     it('sends nothing when an identifier is missing', async () => {
       const store = fakeStore({});
 
@@ -398,10 +447,18 @@ describe('planSubmission', () => {
     ['no published revision', { publishedItemRevisionStatus: undefined }, 'no published version'],
     ['a published revision without a version', { publishedItemRevisionStatus: { state: 'PUBLISHED' } }, 'no readable version'],
     ['a malformed version', { publishedItemRevisionStatus: revision('PUBLISHED', '1.9.0-beta') }, 'no readable version'],
+    ['a submitted revision without a version', { submittedItemRevisionStatus: { state: 'PENDING_REVIEW' } }, 'The submitted revision reports no readable version'],
+    ['a submitted revision with a malformed version', { submittedItemRevisionStatus: revision('PENDING_REVIEW', 'v2.0.0') }, 'The submitted revision reports no readable version'],
     ['an unknown Submission state', { submittedItemRevisionStatus: revision('ITEM_STATE_UNSPECIFIED', '2.0.0') }, 'does not know'],
-    ['an upload still processed', { lastAsyncUploadState: 'IN_PROGRESS' }, 'still processing']
+    ['an upload still processed', { lastAsyncUploadState: 'IN_PROGRESS' }, 'still processing'],
+    ['an upload still processed, in the other spelling', { lastAsyncUploadState: 'UPLOAD_IN_PROGRESS' }, 'still processing'],
+    ['an unknown upload state', { lastAsyncUploadState: 'UPLOAD_STATE_UNSPECIFIED' }, 'The last upload is in a state this job does not know']
   ])('refuses when the store reports %s', (_case, extra, reason) => {
     expect(planSubmission(storeState(extra), '2.0.0')).toMatchObject({ action: 'refuse', reason: expect.stringContaining(reason) });
+  });
+
+  it.each(['SUCCEEDED', 'FAILED', 'NOT_FOUND', undefined])('uploads when the last upload ended or the store knows of none (%s)', (lastAsyncUploadState) => {
+    expect(planSubmission(storeState({ lastAsyncUploadState }), '2.0.0')).toEqual({ action: 'upload' });
   });
 });
 
@@ -428,6 +485,15 @@ describe('zipVersion', () => {
       'src/manifest.json': manifest('9.9.9')
     });
     expect(zipVersion(zip)).toBe('2.3.4');
+  });
+
+  it('reads a manifest stored without compression', () => {
+    expect(zipVersion(makeZip({ 'manifest.json': manifest('2.3.4') }, ['-0']))).toBe('2.3.4');
+  });
+
+  it('refuses an encrypted manifest', () => {
+    const zip = makeZip({ 'manifest.json': manifest('2.3.4') }, ['-P', 'test-only']);
+    expect(() => zipVersion(zip)).toThrow("The zip's manifest.json is encrypted.");
   });
 
   it('refuses a file that is not a zip', () => {
@@ -459,6 +525,18 @@ describe('storeStatus', () => {
     expect(result.ok).toBe(true);
     expect(store.requests()).toEqual(['GET fetchStatus']);
     expect(lines).toContain('A Submission of 1.9.0 would send nothing: 1.9.0 is already published. Nothing is sent.');
+  });
+
+  it('fails when a Submission of the zip would be refused, so that the rehearsal goes red', async () => {
+    const store = fakeStore({ fetchStatus: [{ body: storeState({ submittedItemRevisionStatus: revision('PENDING_REVIEW', '2.0.0') }) }] });
+    const { lines, summary, out } = output();
+
+    const result = await storeStatus({ env: ENV, fetch: store.fetch, out, zip: zipOf('1.9.1') });
+    printed.push(...lines, ...summary);
+
+    expect(result).toEqual({ ok: false, plan: { action: 'refuse', reason: expect.stringContaining('2.0.0 is in Store review (PENDING_REVIEW)') } });
+    expect(store.requests()).toEqual(['GET fetchStatus']);
+    expect(lines).toContain(`A Submission of 1.9.1 would be refused: ${result.plan?.reason}`);
   });
 
   it("fails with Google's message verbatim when the call is refused", async () => {

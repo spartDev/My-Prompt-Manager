@@ -40,6 +40,15 @@ const IN_REVIEW = new Set(['PENDING_REVIEW', 'STAGED']);
 const LIVE = new Set(['PUBLISHED', 'PUBLISHED_TO_TESTERS']);
 const CLOSED = new Set(['REJECTED', 'CANCELLED']);
 
+/**
+ * UploadState values (reference, UploadState). The reference spells the state of an upload the store is still
+ * processing IN_PROGRESS in the enum and UPLOAD_IN_PROGRESS in uploadState's description: both mean it.
+ */
+const UPLOADING = new Set(['IN_PROGRESS', 'UPLOAD_IN_PROGRESS']);
+const isUploading = (state) => UPLOADING.has(state);
+/** The states of the last upload that let a new one start: it ended, or the store knows of none. */
+const UPLOAD_ENDED = new Set(['SUCCEEDED', 'FAILED', 'NOT_FOUND']);
+
 /** Chrome's manifest version: one to four dot-separated integers from 0 to 65535, without leading zeros. */
 const VERSION = /^(0|[1-9]\d{0,4})(\.(0|[1-9]\d{0,4})){0,3}$/;
 
@@ -154,8 +163,12 @@ function versionsOf(revision) {
  */
 export function planSubmission(status, version) {
   const refuse = (reason) => ({ action: 'refuse', reason });
-  if (status?.lastAsyncUploadState === 'IN_PROGRESS') {
-    return refuse('The store is still processing an earlier upload (lastAsyncUploadState IN_PROGRESS).');
+  const lastUpload = status?.lastAsyncUploadState;
+  if (isUploading(lastUpload)) {
+    return refuse(`The store is still processing an earlier upload (lastAsyncUploadState ${lastUpload}).`);
+  }
+  if (lastUpload !== undefined && !UPLOAD_ENDED.has(lastUpload)) {
+    return refuse(`The last upload is in a state this job does not know: lastAsyncUploadState ${JSON.stringify(lastUpload)}.`);
   }
   const live = [];
   const published = status?.publishedItemRevisionStatus;
@@ -414,18 +427,17 @@ export async function submitRelease({ env, fetch, out, zip, version, sleep = (ms
     say.log(`Uploading ${version}…`);
     const uploaded = await store.upload(zip);
     let state = uploaded.json.uploadState;
-    // The reference says both IN_PROGRESS (UploadState) and UPLOAD_IN_PROGRESS (in uploadState's description).
-    for (let attempt = 0; state === 'IN_PROGRESS' || state === 'UPLOAD_IN_PROGRESS'; attempt++) {
+    for (let attempt = 0; isUploading(state); attempt++) {
       if (attempt === poll.attempts) {
         throw new StoreError('fetchStatus', {
-          description: `the upload was still IN_PROGRESS after ${poll.attempts} polls, ${poll.intervalMs / 1000} s apart`
+          description: `the upload was still ${state} after ${poll.attempts} polls, ${poll.intervalMs / 1000} s apart`
         });
       }
       say.log(`The store is processing the upload (${state}); polling again in ${poll.intervalMs / 1000} s.`);
       await sleep(poll.intervalMs);
       const { json, text } = await store.fetchStatus();
       state = json.lastAsyncUploadState;
-      if (state !== 'IN_PROGRESS' && state !== 'SUCCEEDED') {
+      if (!isUploading(state) && state !== 'SUCCEEDED') {
         throw new StoreError('fetchStatus', { description: `lastAsyncUploadState is ${state ?? 'unset'}`, body: text });
       }
     }
