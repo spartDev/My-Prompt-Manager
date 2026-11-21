@@ -95,7 +95,7 @@ The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md
 1. **`//`**: "Stop retyping your prompts", a Platform composer with `//` typed and the Prompt selector open
 2. **Variables**: "Write it once. Reuse it everywhere.", the selector's Variables step, then the Insertion with its Undo confirmation
 3. **Platforms**: "One Library for every AI chat", the Prompts button in the composer of each Platform
-4. **Library**: "A home for every prompt you write", the side panel Library with its filter pills, Categories and cards, and the line "Stays on your device. No account, no cloud."
+4. **Library**: "A home for every prompt you write", the side panel Library with the Library filter, Categories and cards, and the line "Stays on your device. No account, no cloud."
 5. **Packs**: "Not sure where to start? Pick a Pack", the Welcome's Packs step
 
 **Promotional images:** the small promo tile, "Your prompts, one // away", and the marquee, "Write it once. Reuse it everywhere."
@@ -140,7 +140,7 @@ The Chrome Web Store API cannot create an item, so the first version of an item 
 
 ### 3. Complete Store Listing
 1. **Item Details:**
-   - Fill in description and summary
+   - Fill in the description (the summary is the `description` of `manifest.json`, which the Dashboard cannot edit)
    - Select category (Workflow & Planning)
    - Add screenshots (5 recommended)
    - Add promotional images (optional)
@@ -210,6 +210,12 @@ A refused Release is never submitted again:
 2. If the store listing changes with this Release, edit it in the Developer Dashboard first, and save it without submitting it: the API changes the package, not the listing, and the Submission sends the item's draft, listing included, to Store review. Once the Submission is in Store review its draft cannot change unless the Submission is cancelled, and `release.yml` never submits a cancelled version again
 3. Tag the bump's merge commit `vX.Y.Z` and push the tag
 4. `release.yml` validates, builds and attests the zip, creates the GitHub Release, then, once the owner approves the `chrome-webstore` environment, uploads the zip and submits it for Store review through the Chrome Web Store API V2 ([`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md); setup in [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md))
+
+### Listing-only Updates
+New text or images with no new Release, as for the 2.0 listing on the published 2.0.0 (`chrome-web-store-listing.md`):
+1. Edit the listing on the Developer Dashboard tabs and upload the images; no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata))
+2. Click Submit for review. Google reviews it like any submission, and the store keeps the published listing until it passes ([Review process](https://developer.chrome.com/docs/webstore/review-process#rejection))
+3. Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item))
 
 ### Monitoring
 - Check Chrome Web Store reviews regularly
