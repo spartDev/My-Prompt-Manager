@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -33,19 +33,36 @@ function routesOf(markdown: string): string[] {
   return [...new Set(markdown.match(ROUTE) ?? [])];
 }
 
-/** The docs a route names: a folder's .md files, or the .md file itself; a folder that is gone stays, to fail */
-function docsOf(route: string): string[] {
+const isFolder = (route: string): boolean =>
+  statSync(path.join(ROOT, route), { throwIfNoEntry: false })?.isDirectory() ?? false;
+
+/** The folder a route names, with its trailing slash, whether or not the route was written with it */
+function folderOf(route: string): string | undefined {
   if (route.endsWith('/')) {
-    return existsSync(path.join(ROOT, route))
-      ? readdirSync(path.join(ROOT, route))
-          .filter((file) => file.endsWith('.md'))
-          .map((file) => `${route}${file}`)
-      : [route];
+    return route;
   }
-  return route.endsWith('.md') ? [route] : [];
+  return path.extname(route) === '' && isFolder(route) ? `${route}/` : undefined;
 }
 
-const ROUTED_DOCS = [...new Set(ROUTING_FILES.flatMap((file) => routesOf(read(file))).flatMap(docsOf))].sort();
+/**
+ * The docs a route names: a folder's .md files, or the .md file itself. A folder that is gone, and a
+ * route with no extension that names no folder, stay, so that their "exists" case fails; a route to
+ * another kind of file, such as an image, names no doc.
+ */
+function docsOf(route: string): string[] {
+  const folder = folderOf(route);
+  if (folder !== undefined) {
+    return isFolder(folder)
+      ? readdirSync(path.join(ROOT, folder))
+          .filter((file) => file.endsWith('.md'))
+          .map((file) => `${folder}${file}`)
+      : [folder];
+  }
+  return route.endsWith('.md') || path.extname(route) === '' ? [route] : [];
+}
+
+const ROUTES = ROUTING_FILES.flatMap((file) => routesOf(read(file)));
+const ROUTED_DOCS = [...new Set(ROUTES.flatMap(docsOf))].sort();
 
 /**
  * CODING_STANDARDS.md and the docs it routes to by name each cite at least one path, so a regex that
@@ -53,7 +70,7 @@ const ROUTED_DOCS = [...new Set(ROUTING_FILES.flatMap((file) => routesOf(read(fi
  * one also named alone), and those only AGENTS.md or a skill routes to, may cite none.
  */
 const STANDARDS_ROUTES = routesOf(read('CODING_STANDARDS.md'));
-const ROUTED_FOLDERS = ROUTING_FILES.flatMap((file) => routesOf(read(file))).filter((route) => route.endsWith('/'));
+const ROUTED_FOLDERS = ROUTES.map(folderOf).filter((folder) => folder !== undefined);
 const CITING_DOCS = [
   'CODING_STANDARDS.md',
   ...STANDARDS_ROUTES.filter((route) => route.endsWith('.md') && !ROUTED_FOLDERS.some((folder) => route.startsWith(folder)))
@@ -89,6 +106,13 @@ describe('Paths cited by the agent docs', () => {
     expect(routesOf(doc)).toEqual(['docs/TESTING.md', 'docs/adr/', 'docs/RELEASE_WORKFLOW.md']);
     expect(docsOf('docs/adr/')).toContain('docs/adr/ADR-001-store-and-deliver-prompts-verbatim.md');
     expect(docsOf('docs/images/flow.png')).toEqual([]);
+  });
+
+  it('reads a folder route written without its slash as the folder, and keeps a route that names nothing', () => {
+    expect(folderOf('docs/adr')).toBe('docs/adr/');
+    expect(docsOf('docs/adr')).toEqual(docsOf('docs/adr/'));
+    expect(docsOf('docs/no-such-folder')).toEqual(['docs/no-such-folder']);
+    expect(existsSync(path.join(ROOT, 'docs/no-such-folder'))).toBe(false);
   });
 
   it('finds the paths a doc cites', () => {
