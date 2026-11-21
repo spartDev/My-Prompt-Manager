@@ -1,7 +1,7 @@
 ## [Unreleased]
 
 
-## [2.0.0] - 2026-11-20
+## [2.0.0] - 2026-11-21
 
 
 ### ✨ Added
@@ -33,6 +33,7 @@
 -  Development: `npm run live:check` runs the `//` and icon-placement checks on the live Platforms ([#588](https://github.com/spartDev/My-Prompt-Manager/pull/588))
 -  Development: agent skills and scripts: parallel-claude ([97a062d](https://github.com/spartDev/My-Prompt-Manager/commit/97a062dbf4829eae282404860e14747d1ebb5a77)), vercel-react-best-practices and web-design-guidelines ([41f39e7](https://github.com/spartDev/My-Prompt-Manager/commit/41f39e7fe98654c7225d476281886f6a3ee4d0e1)), `scripts/pr-review.sh` and a /codex-review skill ([#508](https://github.com/spartDev/My-Prompt-Manager/pull/508)), and triage-beads, where Jev judges each ticket and code ranks the backlog ([#580](https://github.com/spartDev/My-Prompt-Manager/pull/580))
 -  CI: each pull request's test coverage is posted as one comment, and the coverage floor rises to 80% ([#383](https://github.com/spartDev/My-Prompt-Manager/pull/383))
+-  CI: on a tag, `release.yml` uploads the attested zip and submits it to the Chrome Web Store through API V2 once the owner approves the `chrome-webstore` environment, and a manual run rehearses it without submitting, adding a read-only store status call on `main` ([#611](https://github.com/spartDev/My-Prompt-Manager/pull/611))
 
 
 ### 🔄 Changed
@@ -109,7 +110,7 @@
 
 ### 📦 Dependencies
 
--  90 dependency updates, most of them from Renovate, among them Vite 8 with Rolldown and @vitejs/plugin-react 6 ([#483](https://github.com/spartDev/My-Prompt-Manager/pull/483)), @crxjs/vite-plugin 3.0.0 ([#456](https://github.com/spartDev/My-Prompt-Manager/pull/456)), React 19.3.1, Tailwind CSS 4.3.5, Playwright 1.65.0, Vitest 4.1.12, Biome 2.6.8 and Node.js 22.23.5 ([#555](https://github.com/spartDev/My-Prompt-Manager/pull/555)). The full list is in the [compare view](https://github.com/spartDev/My-Prompt-Manager/compare/v1.9.0...v2.0.0)
+-  91 dependency updates, most of them from Renovate, among them Vite 8 with Rolldown and @vitejs/plugin-react 6 ([#483](https://github.com/spartDev/My-Prompt-Manager/pull/483)), @crxjs/vite-plugin 3.0.0 ([#456](https://github.com/spartDev/My-Prompt-Manager/pull/456)), React 19.3.1, Tailwind CSS 4.3.5, Playwright 1.65.0, Vitest 4.1.12, Biome 2.6.8, Node.js 22.23.5 ([#555](https://github.com/spartDev/My-Prompt-Manager/pull/555)) and lint-staged 17.6.1 ([#605](https://github.com/spartDev/My-Prompt-Manager/pull/605)). The full list is in the [compare view](https://github.com/spartDev/My-Prompt-Manager/compare/v1.9.0...v2.0.0)
 
 
 ### ⚠️ Known limitations
