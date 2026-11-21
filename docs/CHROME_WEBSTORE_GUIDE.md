@@ -199,6 +199,8 @@ Start supercharging your AI workflow today with My Prompt Manager!
 - Large promo tile: 920x680px
 - Marquee promo tile: 1400x560px
 
+`npm run store:images` makes the five screenshots, the small promo tile and the marquee of a Release from its build, in `store-assets/<version>/`: [store-assets/README.md](../store-assets/README.md).
+
 ## Submission Process
 
 ### 1. Developer Account Setup
