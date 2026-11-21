@@ -33,7 +33,7 @@
 -  Development: `npm run live:check` runs the `//` and icon-placement checks on the live Platforms ([#588](https://github.com/spartDev/My-Prompt-Manager/pull/588))
 -  Development: agent skills and scripts: parallel-claude ([97a062d](https://github.com/spartDev/My-Prompt-Manager/commit/97a062dbf4829eae282404860e14747d1ebb5a77)), vercel-react-best-practices and web-design-guidelines ([41f39e7](https://github.com/spartDev/My-Prompt-Manager/commit/41f39e7fe98654c7225d476281886f6a3ee4d0e1)), `scripts/pr-review.sh` and a /codex-review skill ([#508](https://github.com/spartDev/My-Prompt-Manager/pull/508)), and triage-beads, where Jev judges each ticket and code ranks the backlog ([#580](https://github.com/spartDev/My-Prompt-Manager/pull/580))
 -  CI: each pull request's test coverage is posted as one comment, and the coverage floor rises to 80% ([#383](https://github.com/spartDev/My-Prompt-Manager/pull/383))
--  CI: on a tag, `release.yml` uploads the attested zip and submits it to the Chrome Web Store through API V2 once the owner approves the `chrome-webstore` environment, and a manual run rehearses it without submitting, adding a read-only store status call on `main` ([#611](https://github.com/spartDev/My-Prompt-Manager/pull/611))
+-  CI: on a stable tag, `release.yml` submits the attested zip to the Chrome Web Store through API V2 once the owner approves the `chrome-webstore` environment; a manual run is a rehearsal that creates no GitHub Release and submits nothing, adding a read-only store status call on `main` ([#611](https://github.com/spartDev/My-Prompt-Manager/pull/611))
 
 
 ### 🔄 Changed
@@ -86,6 +86,7 @@
 -  Components: SearchBar drops a redundant onKeyDown ([#288](https://github.com/spartDev/My-Prompt-Manager/pull/288)); EditPromptForm drops unused refs ([#289](https://github.com/spartDev/My-Prompt-Manager/pull/289)); the Dropdown keyboard effect has the right dependencies ([#290](https://github.com/spartDev/My-Prompt-Manager/pull/290)); saveSettings, SiteCard and NotificationSection handlers are stable ([#320](https://github.com/spartDev/My-Prompt-Manager/pull/320), [#342](https://github.com/spartDev/My-Prompt-Manager/pull/342), [#346](https://github.com/spartDev/My-Prompt-Manager/pull/346))
 -  live:check: icon-steady measures the Prompts button from its anchor ([#597](https://github.com/spartDev/My-Prompt-Manager/pull/597)) and holds the anchor across typing ([#599](https://github.com/spartDev/My-Prompt-Manager/pull/599)); Gemini's field is found again when it is replaced before the click ([#600](https://github.com/spartDev/My-Prompt-Manager/pull/600)); `--stand-in` bypasses the service workers the profile holds ([#601](https://github.com/spartDev/My-Prompt-Manager/pull/601))
 -  Agent skills: parallel Claude sessions always create a pull request ([08725f5](https://github.com/spartDev/My-Prompt-Manager/commit/08725f502774e85d2b8a16c6b960e0eac764ee9a)), and a non-interactive cleanup no longer exits with code 1 ([53cc846](https://github.com/spartDev/My-Prompt-Manager/commit/53cc846353a5bdd489ffd609f4b77ecea6d4156d))
+-  CI: the GitHub Release carries the zip its installation notes point to, which no earlier GitHub Release had ([#611](https://github.com/spartDev/My-Prompt-Manager/pull/611))
 
 
 ### 🔒 Security
