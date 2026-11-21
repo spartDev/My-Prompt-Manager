@@ -37,7 +37,9 @@ The click sends `ELEMENT_SELECTED` with:
 - **`elementInfo`**, from `getElementInfo`: the tag, the selector, the position and size, `hasId`, `hasClasses`, the depth, the visibility, `blocked` and `securityLevel` (`high`, `medium` or `low`, as in section 2). Nothing reads `securityLevel`.
 - **`elementType`** (the tag) and **`hostname`**.
 
-No input's live `value` is read, so what the user typed in an `<input>` or a `<textarea>` is not sent. The `value` attribute is read: step 3 of section 1 and the fingerprint's filter test it as they test every attribute, and neither sends it. A React controlled input keeps that attribute equal to what the user typed, so typing `my account` there blocks the field. The text content of a contenteditable field is what the user typed in it, so a pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above.
+No field's live `value` is read, so what the user typed in an `<input>` is not sent. The `value` attribute is read: step 3 of section 1 and the fingerprint's filter test it as they test every attribute, and neither sends it. A React controlled input keeps that attribute equal to what the user typed, so typing `my account` there blocks the field.
+
+A pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above, in two cases: a contenteditable field, whose text content is what the user typed in it, and a React controlled `<textarea>`, whose text content is its default value, which React keeps equal to what the user typed.
 
 ## 4. Audit log
 
