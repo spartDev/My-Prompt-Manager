@@ -51,6 +51,17 @@ Linked from nowhere and out of date; kept for history, not as a reference for cu
 
 - `REACT_19_MIGRATION.md`: the log of the move to React 19 (commits, patterns, pitfalls). Its section "Why No Unit Tests for React 19 Hooks?" is wrong: `src/components/__tests__/PromptEditor.test.tsx` unit-tests the `useActionState` editor in happy-dom. The patterns live in the code now, `src/components/PromptEditor.tsx` (`useActionState`) and `src/App.tsx` (`useOptimistic`), and the rule in `CODING_STANDARDS.md`.
 
+### Reports and plans no pointer reached (archived 2026-11, My-Prompt-Manager-zgcb)
+
+No route led to them and no agent read them in 21 days, but they turned up in agents' searches of `docs/`. Their paths and numbers describe the code of the day they were written.
+
+- `POSITIONING_SOLUTION_ANALYSIS.md`: the comparison of three ways to position a Custom site's icon, which chose Floating UI. Current placement: `docs/PLATFORM_INTEGRATION.md` and `src/content/core/anchored-overlay.ts`.
+- `ELEMENT_FINGERPRINTING_IMPLEMENTATION.md`: the completion report of element fingerprinting. Current design: `docs/ELEMENT_FINGERPRINTING_DESIGN.md`; code: `src/content/utils/element-fingerprint.ts`.
+- `weakmap-to-map-icon-cleanup-fix.md`, formerly `docs/fixes/`: the November 2025 fix that moved the injector's icon cleanups from a `WeakMap` to a `Map` (`iconCleanups` in `src/content/core/injector.ts`).
+- `color-scheme-theme-detection.md`, formerly `docs/improvements/`: the November 2025 change that read Microsoft 365 Copilot's theme from its `color-scheme` property instead of parsing its background color.
+- `2025-01-15-team-libraries-design.md`, formerly `docs/plans/`: a design for Team Libraries shared through a synced folder. Never built.
+- `2026-01-12-usage-analytics-dashboard-design.md`, formerly `docs/plans/`: the design of Analytics, since built (`src/components/analytics/`).
+
 ## Current Documentation
 
 For up-to-date technical documentation, see:

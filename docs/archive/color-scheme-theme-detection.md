@@ -252,7 +252,7 @@ Inline changed to: dark
 
 ### Related Documentation
 - `docs/research-2025-11-15-weakmap-vs-map-icon-cleanup.md` - Research findings
-- `docs/fixes/weakmap-to-map-icon-cleanup-fix.md` - Phase 1 fix
+- `docs/archive/weakmap-to-map-icon-cleanup-fix.md` - Phase 1 fix
 
 ## Commit Message
 
