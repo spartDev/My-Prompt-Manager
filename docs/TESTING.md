@@ -1,6 +1,6 @@
 # Testing Guide
 
-How the tests are set up and run, and the gotchas the config files do not explain. For how to write a good test (behavior over implementation, accessible queries, mocked time), read [TESTING_BEST_PRACTICES.md](./TESTING_BEST_PRACTICES.md).
+How the tests are set up and run, and the gotchas the config files do not explain.
 
 ---
 
@@ -32,10 +32,15 @@ It runs before each test file and resets before each test:
 
 - **A fake `chrome`**: `chrome.storage.local` is an in-memory store (`src/test/utils/InMemoryStorage.ts`) that answers like Chrome, callbacks and promises, `getBytesInUse` included; `chrome.storage.session` is a second in-memory store (promises only), emptied before each test as a browser restart empties it; `runtime`, `tabs`, `permissions` and `scripting` are `vi.fn()` with neutral defaults (`tabs.getCurrent` resolves to undefined, as in the action popup and the side panel). A test sets `chrome.runtime.lastError` or overrides a mock for its own case.
 - **Spied singletons**: `StorageManager.getInstance()` and `PromptManager.getInstance()` return an instance whose methods are `vi.fn()` wrapping the real ones. Tests run the real storage logic on the fake storage, and can still assert calls or force a failure with `mockRejectedValueOnce`.
-- **DOM stubs**: `matchMedia`, the clipboard and the other browser APIs happy-dom lacks.
+- **DOM stubs**, new in each test: `matchMedia`, the clipboard, `localStorage`, `fetch` and the other browser APIs happy-dom lacks.
 - `@testing-library/jest-dom` matchers.
 
 Storage starts empty in every test: seed it through `StorageManager` or `chrome.storage.local.set`.
+
+What the test cleans up itself:
+
+- **Its own spies**: restore each with its `mockRestore()`; call history is already cleared before each test. `vi.restoreAllMocks()` restores the spies of `setup.ts` as well, so from the next test of the file on, `StorageManager.getInstance()` and `PromptManager.getInstance()` return the real singletons, whose methods are no longer `vi.fn()`.
+- **The classes of `<html>`**: `useTheme` sets `dark` there and leaves it after unmount, and `setup.ts` does not reset it. A test that renders the theme resets `document.documentElement.className` before and after each test, as `src/hooks/__tests__/useTheme.test.ts` does.
 
 ### Helpers
 
