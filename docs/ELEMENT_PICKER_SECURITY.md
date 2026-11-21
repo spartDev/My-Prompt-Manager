@@ -2,7 +2,7 @@
 
 The Element picker runs in the page the user picks on, so it keeps the user from picking a sensitive field, warns on a sensitive page, and sends back only what placing the Prompts button needs. All of it lives in `src/content/modules/element-picker.ts`, with the fingerprint in `src/content/utils/element-fingerprint.ts`. How a pick starts and travels: [ELEMENT_PICKER_IMPLEMENTATION.md](./ELEMENT_PICKER_IMPLEMENTATION.md).
 
-No test covers these safeguards yet: a change to them is checked by hand, on the pages each section names.
+One test covers a safeguard: "should ignore sensitive IDs and attributes" in `src/content/utils/__tests__/element-fingerprint.test.ts` checks that a sensitive `id` and `data-testid` are left out of the fingerprint (section 3). Nothing tests the rest, the other values the fingerprint filters included: a change to them is checked by hand, on the pages each section names.
 
 ## 1. Blocked elements
 
@@ -37,7 +37,7 @@ The click sends `ELEMENT_SELECTED` with:
 - **`elementInfo`**, from `getElementInfo`: the tag, the selector, the position and size, `hasId`, `hasClasses`, the depth, the visibility, `blocked` and `securityLevel` (`high`, `medium` or `low`, as in section 2). Nothing reads `securityLevel`.
 - **`elementType`** (the tag) and **`hostname`**.
 
-No input's `value` is read. The text content of a contenteditable field is what the user typed in it, so a pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above.
+No input's live `value` is read, so what the user typed in an `<input>` or a `<textarea>` is not sent. The `value` attribute is read: step 3 of section 1 and the fingerprint's filter test it as they test every attribute, and neither sends it. A React controlled input keeps that attribute equal to what the user typed, so typing `my account` there blocks the field. The text content of a contenteditable field is what the user typed in it, so a pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above.
 
 ## 4. Audit log
 
@@ -59,6 +59,7 @@ When the page's `localStorage` holds `prompt-library-debug` = `true`, each entry
 
 Load the build, add a test page as a Custom site, start the picker, and check:
 
-- a password field, a card number field (`autocomplete="cc-number"`), a field inside an `iframe`, and an element inside a blocked container: red, and a click shows the warning and picks nothing;
+- a password field, a card number field (`autocomplete="cc-number"`) and an element inside a blocked container: red, and a click shows the warning and picks nothing;
+- a field inside an `iframe`: the picker listens on the top page only, so it never sees the field, and the highlight keeps the last element the pointer crossed there. A click on the field goes to the frame's page: no warning, nothing picked, and the picker stays open. Over the `iframe`'s own border, when it has one, the highlight is red, and a click there shows the warning;
 - a login page over HTTPS: the Caution warning shows, and the pick arrives;
 - a page whose hostname matches `SENSITIVE_DOMAINS`: the picker opens, and the first click on an element that is not blocked shows the warning and closes it.

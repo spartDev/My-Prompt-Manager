@@ -154,12 +154,18 @@ src/
 
 Before creating your strategy, determine which base class to use:
 
-**🔍 Decision: Is the platform's input field powered by React?**
+**🔍 Decision: What is the platform's input field?** Ask in this order: a Lexical editor on a React page is still a Lexical editor.
 
 ```
-Is the platform using React for input management?
+Is the field a Lexical editor (data-lexical-editor on the field)?
 │
-├─ ✅ YES → Use ReactPlatformStrategy
+├─ ✅ YES → Use LexicalStrategy
+│   │
+│   └─ Examples:
+│       • Perplexity (www.perplexity.ai)
+│       • Microsoft 365 Copilot (m365.cloud.microsoft)
+│
+├─ A textarea that React manages? → Use ReactPlatformStrategy
 │   │
 │   ├─ How to detect:
 │   │   • Check DevTools: Look for __reactFiber$ or __reactProps$ on textarea
@@ -174,13 +180,7 @@ Is the platform using React for input management?
 │       • ✅ Built-in content type check
 │       • ✅ Consistent error handling
 │
-├─ A Lexical editor (data-lexical-editor on the field)? → Use LexicalStrategy
-│   │
-│   └─ Examples:
-│       • Perplexity (www.perplexity.ai)
-│       • Microsoft 365 Copilot (m365.cloud.microsoft)
-│
-└─ ❌ NO → Use PlatformStrategy
+└─ ❌ Neither → Use PlatformStrategy
     │
     ├─ Examples:
     │   • Claude (claude.ai) - ProseMirror editor
@@ -279,11 +279,11 @@ import type { UIElementFactory } from '../ui/element-factory';
 
 import { ReactPlatformStrategy } from './react-platform-strategy';
 
-export class YourReactPlatformStrategy extends ReactPlatformStrategy {
+export class YourPlatformStrategy extends ReactPlatformStrategy {
   constructor(hostname?: string) {
-    const platform = getPlatformById('yourreactplatform');
+    const platform = getPlatformById('yourplatform');
 
-    super('yourreactplatform', 85, {
+    super('yourplatform', 85, {
       selectors: platform?.selectors || [
         'textarea[data-testid="input"]',
         'textarea.react-input'
@@ -296,7 +296,7 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
    * Determines if this strategy should handle elements on this domain
    */
   canHandle(element: HTMLElement): boolean {
-    const isCorrectHostname = this.hostname === getPlatformById('yourreactplatform')?.hostname;
+    const isCorrectHostname = this.hostname === getPlatformById('yourplatform')?.hostname;
     const isTextarea = element.tagName === 'TEXTAREA';
 
     return isCorrectHostname && isTextarea;
@@ -322,7 +322,7 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
         element as HTMLTextAreaElement,
         content,
         'YourReactPlatform',
-        'yourreactplatform-textarea'
+        'yourplatform-textarea'
       );
     } catch (error) {
       this._warn('React insertion failed', error as Error);
