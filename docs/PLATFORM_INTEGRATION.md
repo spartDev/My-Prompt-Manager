@@ -1,8 +1,6 @@
 # Platform Integration Guide
 
-This guide explains how to add support for new LLM platforms (like Gemini, Mistral.ai, Anthropic Claude, etc.) to the My Prompt Manager extension.
-
-> **⚡ New in v1.3+**: Adding basic platform support now takes just **5 minutes** with our centralized configuration system!
+This guide explains how a Platform's content script works (`src/content`: where the Prompts button goes, `//`, Insertion) and how to add a Platform to the My Prompt Manager extension.
 
 ## Table of Contents
 
@@ -16,23 +14,29 @@ This guide explains how to add support for new LLM platforms (like Gemini, Mistr
 
 ## 🚀 Quick Start (New Method)
 
-Adding a new platform mostly takes **one file**, `src/config/platforms.ts`. One test must follow: add the new hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in `src/services/__tests__/siteSettings.test.ts` (never to `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/siteSettings.ts`, which is frozen), or that test fails. The `add-platform` skill (`.claude/skills/add-platform/SKILL.md`) lists every step.
+A new Platform is defined in `src/config/platforms.ts`, and its host must also go into `manifest.json`: in `host_permissions` and in the content script's `matches`, or the content script never runs there. Only the owner decides that change, because a host the published Release lacks disables the extension on update for every user ([PROGRAMMATIC_INJECTION.md](./PROGRAMMATIC_INJECTION.md), `src/test/guardrails/manifestHosts.test.ts`). Tests that must follow:
+
+- add the new hostname to `ADDED_AFTER_THE_PLATFORM_CHOICES` in `src/services/__tests__/siteSettings.test.ts`, never to `PLATFORMS_OF_THE_ENABLED_LIST` in `src/services/siteSettings.ts`, which is frozen;
+- update the count in `should have 7 total platforms` of `src/config/__tests__/platforms.test.ts`; its `manifest.json` test fails until the manifest holds the host;
+- `src/test/guardrails/manifestHosts.test.ts` fails on the new host until the owner's decision updates it.
+
+The `add-platform` skill (`.claude/skills/add-platform/SKILL.md`) lists every step.
 
 ### Step 1: Add Platform Configuration
 
 Edit `src/config/platforms.ts` and add your platform to the `SUPPORTED_PLATFORMS` object:
 
 ```typescript
-export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
+export const SUPPORTED_PLATFORMS: Readonly<Record<string, Readonly<PlatformDefinition>>> = Object.freeze({
   // ... existing platforms ...
 
   yourplatform: {
     id: 'yourplatform',
     hostname: 'your-ai-platform.com',
     displayName: 'Your AI Platform',
-    priority: 70, // Lower than existing platforms
+    priority: 70, // Orders the Platforms in lists; lower than existing platforms
     defaultEnabled: true, // On for every user who never switched it, existing users included
-    selectors: [
+    selectors: [ // Read only by the strategies that ask for them (Copilot, M365 Copilot): see the reference below
       'textarea[placeholder*="Ask"]',
       'div[contenteditable="true"]',
       '[role="textbox"]'
@@ -44,26 +48,26 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
         { find: 'button[type="submit"]', relation: 'before' }
       ]
     },
-    strategyClass: 'YourPlatformStrategy', // For future custom logic
-    hostnamePatterns: ['yourplatform'], // For hostname matching
+    strategyClass: 'YourPlatformStrategy', // Its key in STRATEGY_CONSTRUCTORS (strategy-constructors.ts)
     brandColors: {
       enabled: 'bg-[#123456] text-white shadow-xs' // Matches platform brand styling
     }
   }
-};
+});
 ```
 
 ### Step 2: Test Your Integration
 
 1. Build the extension: `npm run build`
 2. Load in Chrome and visit your platform
-3. The prompt library icon should appear automatically!
+3. With the host in `manifest.json`, Chrome runs the content script there, and the Prompts button shows in the composer.
 
-**That's it!** 🎉 The centralized config system handles:
-- ✅ Background script injection
-- ✅ Content script default settings
-- ✅ Platform detection and matching
-- ✅ Type definitions
+From the configuration alone, the extension takes:
+- the Site settings default (`defaultEnabled`);
+- the Platform's detection by hostname (`getPlatformByHostname`);
+- the strategy, through `strategyClass`.
+
+Written by hand: the Platform's row in Settings, with its logo (`siteConfigs` in `src/components/SettingsView.tsx`), and the `PlatformName` and `KnownPlatformType` unions (see [TypeScript Errors](#typescript-errors)).
 
 ## 📋 Configuration Reference
 
@@ -75,15 +79,16 @@ export const SUPPORTED_PLATFORMS: Record<string, PlatformDefinition> = {
 | `hostname` | string | ✅ | Exact hostname (e.g., 'claude.ai'): the one the Platform's row in Settings and its Platform choice go by |
 | `otherHostnames` | string[] | ❌ | Other hosts the same Platform is served on, such as the host a sign-in redirects to. None in 2.0.0: M365 Copilot's `copilot.cloud.microsoft` (`M365_WORK_ACCOUNT_HOSTNAME`) comes back with ticket My-Prompt-Manager-j74b. Each needs its origin in `host_permissions` and the content script `matches` of `manifest.json` (the test `manifest.json` in `src/config/__tests__/platforms.test.ts` fails otherwise), which only the owner decides: a new origin there disables the extension on update for every user (`src/test/guardrails/manifestHosts.test.ts`, ticket My-Prompt-Manager-totf), and its hostname in `ADDED_AFTER_THE_PLATFORM_CHOICES` of `src/services/__tests__/siteSettings.test.ts`. Without a choice of its own, a host follows the Platform choice of its Platform. Icon placement repairs treat each one as where `hostname` redirects to: a report from it drops a repair at `hostname` that no open tab holds, never the reverse (`redirectSourcesOf`) |
 | `displayName` | string | ✅ | Human-readable name shown in UI |
-| `priority` | number | ✅ | Strategy selection priority (100 = highest) |
+| `priority` | number | ✅ | Orders the Platforms, highest first: `getDefaultEnabledPlatforms()`, `getPlatformsByPriority()` and the Welcome's list of Platforms. The strategies are sorted by the priority each passes to `super()`, not by this field |
 | `defaultEnabled` | boolean | ✅ | On for every user who never switched it, existing users included (the Site settings store the user's Platform choices) |
-| `selectors` | string[] | ✅ | CSS selectors for finding text input elements. On a built-in Platform only a `textarea` or a `contenteditable` element they name is taken (`PlatformManager.getAllSelectors()` narrows every strategy's selectors, the fallback's included), so a search box (`input[type="text"]`) or a row whose class holds `input` gets no Prompts button; a custom site keeps every selector as it is |
+| `selectors` | string[] | ✅ | CSS selectors of the input field, read only by the strategies that ask for them (`CopilotStrategy`, `M365CopilotStrategy`) and by `npm run composers:capture`. The input field is found by each strategy's own `getSelectors()`. On a built-in Platform only a `textarea` or a `contenteditable` element they name is taken (`PlatformManager.getAllSelectors()` narrows every strategy's selectors, the fallback's included), so a search box (`input[type="text"]`) or a row whose class holds `input` gets no Prompts button; a custom site keeps every selector as it is |
 | `pagesWithoutComposer` | string[] | ❌ | Paths of the Platform's pages that have no composer (`/settings` covers `/settings/...`): no input field is looked for there, so a search box or a form field gets no Prompts button (ChatGPT: `/settings`). `PlatformManager.getAllSelectors()` returns none on those pages, read on each call, since the Platform moves between pages without reloading |
-| `iconPlacement` | `IconPlacement` | ❌ | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts`, and goes into the toolbar if the Platform renders it within `IconPlacementController.TOOLBAR_GRACE_MS` (`awaitToolbar`: a toolbar may render after its editor; the same holds for an icon at the element the user picked, which only the chain's first anchor takes the icon from, since a later one may show only at times, like a send button). Still not found by then, a warning is logged and the overlay is reported, so Settings offers to place the icon; the icon keeps looking for the chain's first anchor, or for the element the user picked, at most once a second (`LATE_TOOLBAR_CHECK_MS`), and goes there if it shows later, which replaces the overlay report. A later anchor does not count then: it may show only once the draft holds text (a send button), and would move the icon as the user types. A composer whose usual anchor is a later one (Fluent's `.fai-ChatInput__actions` on m365.cloud.microsoft) therefore keeps the icon on the overlay when its toolbar comes late. The picked element is looked for then by its selector only, not its fingerprint, which scores every element of its tag: a pick whose selector no longer matches is not found late |
-| `strategyClass` | string | ✅ | Class name for custom strategy (future use) |
-| `hostnamePatterns` | string[] | ❌ | Additional hostname patterns for detection |
+| `iconPlacement` | `IconPlacement` | ✅ (optional in the type, required by the test "Icon placement selectors") | Where the icon goes: `composer`, a selector found with `editor.closest()`, and `anchors`, each `{ find, relation }` with `relation` one of `before`, `after`, `inside-start`, `inside-end`, tried in order inside the composer; the first found wins. The one source: `PlatformManager.getIconPlacement()` reads it, no strategy keeps a copy. When no anchor is found, the icon is anchored inside the editor's bottom-end corner by `src/content/core/anchored-overlay.ts`, and goes into the toolbar if the Platform renders it within `IconPlacementController.TOOLBAR_GRACE_MS` (`awaitToolbar`: a toolbar may render after its editor; the same holds for an icon at the element the user picked, which only the chain's first anchor takes the icon from, since a later one may show only at times, like a send button). Still not found by then, a warning is logged and the overlay is reported, so Settings offers to place the icon; the icon keeps looking for the chain's first anchor, or for the element the user picked, at most once a second (`LATE_TOOLBAR_CHECK_MS`), and goes there if it shows later, which replaces the overlay report. A later anchor does not count then: it may show only once the draft holds text (a send button), and would move the icon as the user types. A composer whose usual anchor is a later one (Fluent's `.fai-ChatInput__actions` on m365.cloud.microsoft) therefore keeps the icon on the overlay when its toolbar comes late. The picked element is looked for then by its selector only, not its fingerprint, which scores every element of its tag: a pick whose selector no longer matches is not found late |
+| `strategyClass` | string | ✅ | The strategy's key in `STRATEGY_CONSTRUCTORS` (`src/content/platforms/strategy-constructors.ts`), from which `PlatformManager` builds its registry. An unknown name logs a warning, and the Platform gets only `DefaultStrategy` |
+| `hostnamePatterns` | string[] | ❌ | Read only by `getAllHostnamePatterns()` and `isHostnameSupported()`, which no detection code calls: a Platform is detected by `hostname` and `otherHostnames` |
 | `brandColors` | `{ enabled: string }` | ❌ | Tailwind classes of the logo square when the site is on; the accent (`bg-accent-subtle text-accent`) when omitted. Every site shares one disabled state (`bg-muted text-tertiary`, `src/constants/brandColors.ts`), so its logo component takes `disabled` and draws in `currentColor` |
-| `iconMethod` | PlatformIconMethod | ❌ | Optional UIElementFactory method for rendering a platform-specific icon (`createFloatingIcon` is used when omitted) |
+| `iconMethod` | PlatformIconMethod | ❌ | The UIElementFactory method that renders the icon. When omitted, each strategy's `createIcon()` is asked, highest priority first, and `createFloatingIcon()` is the last fallback |
+| `linkedPlatforms` | string[] | ❌ | Platform ids shown as one with this one (Copilot and M365 Copilot): the Welcome names the group once, and the Settings row lists the hosts of the group (`getLinkedPlatformHostnames()`). Each id must exist, checked when the module loads |
 
 #### Writing an anchor chain
 
@@ -95,8 +100,8 @@ A new Platform also saves a sanitized copy of its live composer as `tests/fixtur
 
 ### Priority Guidelines
 
-- **100**: Premium platforms (Claude, ChatGPT)
-- **80-90**: Major platforms (Perplexity, Mistral)
+- **100**: Claude
+- **80-90**: ChatGPT (90), Mistral and Gemini (85), Perplexity, Copilot and M365 Copilot (80)
 - **60-79**: Secondary platforms
 - **40-59**: Experimental/beta platforms
 - **< 40**: Custom/niche platforms
@@ -117,7 +122,7 @@ The Prompts button looks the same on every Platform (a pill with the extension's
 - `createCopilotIcon`
 - `createGeminiIcon`
 
-If `iconMethod` is omitted, the manager falls back to `createFloatingIcon`. This keeps icon selection fully data-driven without modifying `PlatformManager`.
+If `iconMethod` is omitted, the manager asks each strategy's `createIcon()`, highest priority first, and falls back to `createFloatingIcon` when none returns an icon.
 
 ### Architecture Overview
 
@@ -127,16 +132,20 @@ src/
 ├── content/platforms/
 │   ├── base-strategy.ts            # Base class with common functionality
 │   ├── react-platform-strategy.ts  # React-specific base class
-│   ├── claude-strategy.ts          # Claude.ai implementation
-│   ├── chatgpt-strategy.ts         # ChatGPT implementation
-│   ├── mistral-strategy.ts         # Mistral LeChat implementation
-│   ├── lexical-strategy.ts         # Insertion and Undo of a Lexical editor, as a paste
-│   ├── perplexity-strategy.ts      # Perplexity implementation
+│   ├── lexical-strategy.ts         # Base class: Insertion and Undo of a Lexical editor, as a paste
+│   ├── claude-strategy.ts          # Claude.ai (ProseMirror)
+│   ├── chatgpt-strategy.ts         # ChatGPT (ProseMirror)
+│   ├── gemini-strategy.ts          # Gemini (Quill)
+│   ├── mistral-strategy.ts         # Mistral LeChat
+│   ├── perplexity-strategy.ts      # Perplexity (extends Lexical)
 │   ├── copilot-strategy.ts         # Microsoft Copilot (extends React)
 │   ├── m365copilot-strategy.ts     # M365 Copilot (extends Lexical)
+│   ├── default-strategy.ts         # The fallback every page also gets
 │   ├── your-platform-strategy.ts   # Your custom strategy
-│   └── platform-manager.ts         # Registers and manages strategies
-└── background/background.ts        # Uses centralized config
+│   ├── strategy-constructors.ts    # strategyClass names to strategy classes
+│   ├── index.ts                    # Re-exports the strategies
+│   └── platform-manager.ts         # Builds its registry from strategy-constructors.ts and picks a strategy
+└── background/background.ts        # Reads the Site settings through src/services/siteSettings.ts
 ```
 
 ## Step-by-Step Guide
@@ -165,10 +174,16 @@ Is the platform using React for input management?
 │       • ✅ Built-in content type check
 │       • ✅ Consistent error handling
 │
+├─ A Lexical editor (data-lexical-editor on the field)? → Use LexicalStrategy
+│   │
+│   └─ Examples:
+│       • Perplexity (www.perplexity.ai)
+│       • Microsoft 365 Copilot (m365.cloud.microsoft)
+│
 └─ ❌ NO → Use PlatformStrategy
     │
     ├─ Examples:
-    │   • Claude (claude.ai) - Custom contenteditable
+    │   • Claude (claude.ai) - ProseMirror editor
     │   • ChatGPT (chatgpt.com) - ProseMirror editor
     │   • Gemini (gemini.google.com) - Quill editor
     │
@@ -189,15 +204,22 @@ import type { UIElementFactory } from '../ui/element-factory';
 import { PlatformStrategy } from './base-strategy';
 
 export class YourPlatformStrategy extends PlatformStrategy {
-  constructor() {
-    super('your-platform', 90, {
+  constructor(hostname?: string) {
+    super('YourPlatform', 90, {
       selectors: [
         // CSS selectors for finding text input elements
         'textarea[placeholder*="Enter your message"]',
         'div[contenteditable="true"][role="textbox"]'
       ],
       priority: 90 // Higher = more priority (Claude: 100, ChatGPT: 90, Perplexity: 80)
-    });
+    }, hostname);
+  }
+
+  /**
+   * The selectors PlatformManager finds the input field with (required: abstract in PlatformStrategy)
+   */
+  getSelectors(): string[] {
+    return this.config?.selectors || [];
   }
 
   /**
@@ -248,7 +270,7 @@ export class YourPlatformStrategy extends PlatformStrategy {
 
 ### Step 2b: Create Strategy (React Platform)
 
-**For React-based platforms**, create: `src/content/platforms/your-react-platform-strategy.ts`
+**For React-based platforms**, create: `src/content/platforms/your-platform-strategy.ts`
 
 ```typescript
 import { getPlatformById } from '../../config/platforms';
@@ -322,9 +344,9 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
    * Creates platform-specific icon (optional)
    */
   createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    const { element, cleanup } = uiFactory.createFloatingIcon();
-    (element as HTMLElement & { __cleanup?: () => void }).__cleanup = cleanup;
-    return element;
+    return uiFactory.createFloatingIcon();
+    // createCopilotIcon() alone returns { element, cleanup }: CopilotStrategy stores the cleanup
+    // on the element as __cleanup
   }
 }
 ```
@@ -345,13 +367,7 @@ export class YourReactPlatformStrategy extends ReactPlatformStrategy {
 
 ### Step 3: Register the Strategy
 
-#### 3a. Add to exports in `src/content/platforms/index.ts`:
-
-```typescript
-export { YourPlatformStrategy } from './your-platform-strategy';
-```
-
-#### 3b. Register in `src/content/platforms/strategy-constructors.ts`:
+#### 3a. Register in `src/content/platforms/strategy-constructors.ts`:
 
 ```typescript
 // Add import at top
@@ -365,6 +381,14 @@ export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => Pl
 };
 ```
 
+#### 3b. Re-export it from `src/content/platforms/index.ts`, beside the other strategies:
+
+```typescript
+export { YourPlatformStrategy } from './your-platform-strategy';
+```
+
+The registration is 3a alone: nothing in `src/` imports the strategies through this index.
+
 ### Step 4: Test the Integration
 
 1. **Build the extension**: `npm run build`
@@ -375,22 +399,24 @@ export const STRATEGY_CONSTRUCTORS: Record<string, new (hostname?: string) => Pl
 
 ### Step 5: Debug and Refine
 
-Use the browser console to debug:
+Use the browser console to debug. `window.__promptLibraryDebug` lives in the content script's isolated world: pick the extension's context in the DevTools console's context menu first, or the page's console does not see it.
 
 ```javascript
-// Check if your strategy is loaded
-window.__promptLibraryDebug?.strategies
+// Is the content script running?
+window.__promptLibraryDebug?.isInitialized()
 
-// Test selectors manually
+// The injector, and through it the platform manager and its strategies
+window.__promptLibraryDebug?.getInstance()
+
+// Test selectors manually (works in the page's own context too)
 document.querySelectorAll('your-selector-here')
-
-// Check what strategy is active
-window.__promptLibraryDebug?.activeStrategy
 ```
+
+The API also has `reinitialize()`, `cleanup()` and `getLogger()` (`src/content/index.ts`).
 
 ## Platform Strategy Patterns
 
-**The rule every pattern follows:** an Insertion puts the Prompt where the caret of the input field is, in place of the text selected there. The text before and after stays, and a field with no caret takes the Prompt at its end (see `CONTEXT.md`, Insertion). A strategy never sets the whole value of the field and never clears it: it calls `insertIntoTextControl()` for a `<textarea>` or an `<input>`, `insertEditableText()` for a contenteditable editor, or `insertIntoReactTextarea()` in a `ReactPlatformStrategy`. The selector controller selects the caret again right before it calls the strategy, so a strategy inserts at the field's current selection and does not look for the caret itself. Only `restore()`, which Undo calls, replaces the whole field. When you add a Platform, add it to `PLATFORMS` in `src/content/platforms/__tests__/caret-insertion.test.ts` and to the stand-in pages that `tests/e2e/content/caret-insertion.spec.ts` runs on (`tests/e2e/fixtures/platform-pages.ts`).
+**The rule every pattern follows:** an Insertion puts the Prompt where the caret of the input field is, in place of the text selected there. The text before and after stays, and a field with no caret takes the Prompt at its end (see `CONTEXT.md`, Insertion). A strategy never sets the whole value of the field and never clears it: it calls `insertIntoTextControl()` for a `<textarea>` or an `<input>`, `insertEditableText()` for a contenteditable editor, or `insertIntoReactTextarea()` in a `ReactPlatformStrategy`. Some strategies first take the editor's own path, at the editor's selection, and fall back on those helpers: `LexicalStrategy` pastes, `GeminiStrategy` goes through its Quill instance, and `ClaudeStrategy` through ProseMirror. The selector controller selects the caret again right before it calls the strategy, so a strategy inserts at the field's current selection and does not look for the caret itself. Only `restore()`, which Undo calls, replaces the whole field. When you add a Platform, add it to `PLATFORMS` in `src/content/platforms/__tests__/caret-insertion.test.ts` and to the stand-in pages that `tests/e2e/content/caret-insertion.spec.ts` runs on (`tests/e2e/fixtures/platform-pages.ts`).
 
 ### Pattern 1: Simple Textarea Platform
 
@@ -462,20 +488,14 @@ The Debug mode switch in Settings → Advanced turns on the same logging on ever
 
 ### Debug Interface
 
-Access the debug interface:
+`window.__promptLibraryDebug` (`src/content/index.ts`), from the extension's context of the DevTools console (see [Step 5](#step-5-debug-and-refine)):
 
 ```javascript
-// Check loaded strategies
-console.log(window.__promptLibraryDebug?.strategies);
-
-// Check active strategy  
-console.log(window.__promptLibraryDebug?.activeStrategy);
-
-// Check found input elements
-console.log(window.__promptLibraryDebug?.foundElements);
-
-// Manual insertion test
-window.__promptLibraryDebug?.testInsertion?.('test content');
+window.__promptLibraryDebug?.isInitialized();  // the content script started
+window.__promptLibraryDebug?.getInstance();    // the injector
+window.__promptLibraryDebug?.reinitialize();   // cleanup, then start again
+window.__promptLibraryDebug?.cleanup();        // remove the button and stop
+window.__promptLibraryDebug?.getLogger();      // error, warn, info, debug
 ```
 
 ### Testing Checklist
@@ -493,9 +513,11 @@ window.__promptLibraryDebug?.testInsertion?.('test content');
 ### Common Issues
 
 **Button doesn't appear:**
-- Check `canHandle()` method returns true
-- Verify `selectors` match actual DOM elements
+- Check the host is in `manifest.json` (`host_permissions` and the content script's `matches`)
+- Verify the strategy's `getSelectors()` match actual DOM elements (`PlatformManager.getAllSelectors()` finds the field with them)
+- Check the strategy's `createIcon()`, or the `iconMethod` of the config, returns an icon
 - Check strategy is registered in strategy-constructors.ts
+- `canHandle()` decides only which strategy inserts and undoes, not whether the button shows
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
@@ -584,220 +606,25 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
 
 ### 5. Theme Detection and Styling
 
-Different platforms handle theme switching in different ways. Use Tailwind's `dark:` prefix for automatic theme support:
-
-```typescript
-// ✅ RECOMMENDED: Tailwind dark mode (automatic)
-icon.className = 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300';
-```
-
-**Theme Detection Methods by Platform:**
-
-| Platform | Method | Implementation |
-|----------|--------|----------------|
-| **Copilot** | Tailwind `dark:` prefix | Adapts to system `prefers-color-scheme` or explicit `dark` class |
-| **Claude** | Tailwind `dark:` prefix | Automatic detection via Tailwind config |
-| **ChatGPT** | Tailwind `dark:` prefix | Standard Tailwind dark mode |
-| **Gemini** | Tailwind `dark:` prefix | Matches Google's theme system |
-| **Perplexity** | Tailwind `dark:` prefix | Standard implementation |
-
-**Why Tailwind `dark:` prefix?**
-- ✅ No custom CSS required
-- ✅ Works with both media queries and class-based dark mode
-- ✅ Consistent across all platforms
-- ✅ Automatically handles theme changes
-- ✅ Easier to maintain and test
-
-**Example Icon with Theme Support:**
-
-```typescript
-createPlatformIcon(): HTMLElement {
-  const icon = document.createElement('button');
-
-  // Theme-aware styling using Tailwind classes
-  icon.className = `
-    prompt-library-integrated-icon
-    flex items-center gap-2 px-3 h-10
-    rounded-2xl border
-    border-gray-200 dark:border-gray-700
-    bg-transparent
-    hover:bg-gray-100 dark:hover:bg-gray-800
-    text-gray-700 dark:text-gray-300
-    transition-all duration-200
-  `.trim().replace(/\s+/g, ' ');
-
-  return icon;
-}
-```
-
-**Key Points:**
-- Light mode: Use gray-200/300/700 for borders and text
-- Dark mode: Use gray-700/800/300 for contrast
-- Always test both themes before deploying
-- Background should be `transparent` or semi-transparent for integration
-- Hover states must work in both themes
+The Prompts button looks the same on every Platform and follows the extension's theme, not the Platform's. `ThemeManager` (`src/content/utils/theme-manager.ts`) reads the theme the user chose (`settings.theme` in `chrome.storage.local`, `system` resolved through `prefers-color-scheme`) and sets `dark-theme` or `light-theme` on every `.prompt-library-pill`. The colors are CSS variables in `getCSS()` of `src/content/utils/styles.ts`, light on `.prompt-library-pill` and dark on `.prompt-library-pill.dark-theme`, injected into the page. No Tailwind class reaches the Platform's page. The Prompt selector carries its own stylesheet in its shadow root (`src/content/selector/selectorStyles.ts`).
 
 ## Examples
 
-### Example 1: Gemini (Google AI)
+The real strategies are the examples: start from the one whose editor is closest to your Platform's.
 
-```typescript
-export class GeminiStrategy extends PlatformStrategy {
-  constructor(hostname?: string) {
-    super('gemini', 85, {
-      selectors: [
-        'div.ql-editor[contenteditable="true"][role="textbox"]',
-        'rich-textarea .ql-editor',
-        '[data-placeholder*="Gemini"]',
-        'div[contenteditable="true"]'
-      ],
-      priority: 85
-    }, hostname);
-  }
+| Platform | Strategy | Base class | Insertion |
+|----------|----------|------------|-----------|
+| Gemini | `src/content/platforms/gemini-strategy.ts` | `PlatformStrategy` | its Quill instance's API first (`gemini-quill-api`), then the browser's editing command at the caret |
+| Microsoft Copilot | `src/content/platforms/copilot-strategy.ts` | `ReactPlatformStrategy` | `validateContent()`, then `insertIntoReactTextarea()` in its textarea |
+| Mistral LeChat | `src/content/platforms/mistral-strategy.ts` | `PlatformStrategy` | `insertIntoTextControl()` in a textarea, else `insertEditableText()` in its ProseMirror editor |
+| Perplexity, M365 Copilot | `src/content/platforms/perplexity-strategy.ts`, `src/content/platforms/m365copilot-strategy.ts` | `LexicalStrategy` | a paste |
 
-  canHandle(_element: HTMLElement): boolean {
-    return this.hostname === getPlatformById('gemini')?.hostname;
-  }
+Each one's `canHandle()` checks the hostname and the kind of field: Gemini a Quill editor, Copilot a `textarea`, Mistral a chat textarea, its ProseMirror editor or a `role="textbox"`.
 
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    try {
-      element.focus();
-      await new Promise(resolve => setTimeout(resolve, 50));
+Two anchor chains of `src/config/platforms.ts`, as examples:
 
-      // Gemini uses Quill editor with contenteditable
-      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-        // Where the caret is, through execCommand for Quill compatibility.
-        // The method in the result is 'gemini-execCommand' or 'gemini-dom'
-        return this.insertEditableText(element, content, 'gemini');
-      }
-
-      return { success: false, error: 'Unsupported element type' };
-    } catch (error) {
-      this._error('Insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
-    }
-  }
-
-  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    return uiFactory.createGeminiIcon();
-  }
-}
-```
-
-**Key Points:**
-- Gemini uses Quill editor (`.ql-editor` class)
-- Requires `execCommand` for proper Quill integration; `insertEditableText()` calls it at the caret
-- The real `GeminiStrategy` first tries the Quill instance's own API, at Quill's selection
-- Material Design 3 icon styling
-- Multiple selector fallbacks for robustness
-
-### Example 2: Microsoft Copilot
-
-```typescript
-export class CopilotStrategy extends PlatformStrategy {
-  constructor(hostname?: string) {
-    super('copilot', 80, {
-      selectors: [
-        'textarea[data-testid="composer-input"]', // Primary selector
-        'textarea#userInput', // Fallback ID selector
-        'textarea[placeholder*="Message"]', // Pattern match fallback
-        'textarea[placeholder*="Copilot"]'
-      ],
-      priority: 80
-    }, hostname);
-  }
-
-  canHandle(_element: HTMLElement): boolean {
-    return this.hostname === getPlatformById('copilot')?.hostname;
-  }
-
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    try {
-      element.focus();
-      element.click();
-      await new Promise(resolve => setTimeout(resolve, 50));
-
-      // Copilot uses standard textarea
-      if (element instanceof HTMLTextAreaElement) {
-        // Where the caret is, through the native value setter; dispatches input and change
-        return this.insertIntoTextControl(element, content)
-          ? { success: true, method: 'copilot-textarea' }
-          : { success: false, error: 'The input field did not keep the text' };
-      }
-
-      return { success: false, error: 'Unsupported element type' };
-    } catch (error) {
-      this._error('Insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
-    }
-  }
-
-  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    return uiFactory.createCopilotIcon();
-  }
-}
-```
-
-**Key Points:**
-- Uses standard textarea (simpler than Gemini)
-- Icon placed before the audio call button (`button[data-testid="audio-call-button"]`), then before the submit button
-- Custom icon with Microsoft brand styling
-
-### Example 3: Mistral LeChat
-
-```typescript
-export class MistralStrategy extends PlatformStrategy {
-  constructor(hostname?: string) {
-    super('mistral', 85, {
-      selectors: [
-        'div[contenteditable="true"]',
-        'textarea[placeholder*="chat"]',
-        '[role="textbox"]'
-      ],
-      priority: 85
-    }, hostname);
-  }
-
-  canHandle(_element: HTMLElement): boolean {
-    return this.hostname === getPlatformById('mistral')?.hostname;
-  }
-
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    try {
-      element.focus();
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Try contenteditable first (primary method)
-      if (element.isContentEditable || element.getAttribute('contenteditable') === 'true') {
-        // Where the caret is, so ProseMirror builds its paragraphs from the line breaks
-        return this.insertEditableText(element, content, 'mistral');
-      }
-
-      // Fallback to textarea, where its caret is
-      if (element instanceof HTMLTextAreaElement) {
-        return this.insertIntoTextControl(element, content)
-          ? { success: true, method: 'mistral-textarea' }
-          : { success: false, error: 'The input field did not keep the text' };
-      }
-
-      return { success: false, error: 'Unsupported element type' };
-    } catch (error) {
-      this._error('Insertion failed', error as Error);
-      return { success: false, error: (error as Error).message };
-    }
-  }
-
-  createIcon(uiFactory: UIElementFactory): HTMLElement | null {
-    return uiFactory.createMistralIcon();
-  }
-}
-```
-
-**Key Points:**
-- Icon placed before the voice button, then after the settings button (English ARIA labels: another locale falls to the anchor on the editor)
-- Longer timeout (100ms) for initialization
-- Both contenteditable and textarea support
-- Icon styled to match Mistral's Research/Think buttons
+- Copilot: before the audio call button (`button[data-testid="audio-call-button"]`), then before the submit button.
+- Mistral: before the `<div>` that holds the voice button alone, then before the voice button, then after the settings button. The ARIA labels are English: in another locale the icon falls to the Anchored overlay.
 
 ## 🐛 Troubleshooting
 
@@ -806,9 +633,9 @@ export class MistralStrategy extends PlatformStrategy {
 **Symptoms:** Icon doesn't show up on the target platform
 
 **Possible Causes:**
-1. `canHandle()` returns false for the domain
-2. Selectors don't match actual DOM elements
-3. Strategy not registered in platform-manager.ts
+1. The host is missing from `manifest.json`, so the content script never runs
+2. The strategy's selectors don't match actual DOM elements
+3. Strategy not registered in strategy-constructors.ts
 4. Content script not injected properly
 
 **Solutions:**
@@ -816,8 +643,8 @@ export class MistralStrategy extends PlatformStrategy {
 // In browser console, test your selectors:
 document.querySelectorAll('your-selector-here')
 
-// Check if strategy is loaded:
-window.__promptLibraryDebug?.strategies
+// From the extension's context of the console: is the content script running?
+window.__promptLibraryDebug?.isInitialized()
 
 // Verify hostname matching:
 window.location.hostname
@@ -844,7 +671,8 @@ iconPlacement: {
 }
 
 // When no anchor is found, the icon is anchored inside the editor's bottom-end corner
-// (src/content/core/anchored-overlay.ts), and goes into the toolbar if the Platform renders it, even after the grace period.
+// (src/content/core/anchored-overlay.ts), and goes into the toolbar if the Platform renders it; after the
+// grace period, only the chain's first anchor, or the element the user picked, takes the icon from there.
 // Still not found 5 seconds after that placement (IconPlacementController.TOOLBAR_GRACE_MS), the console shows a warning:
 // "No anchor of this Platform found in its composer, the icon is anchored on the editor instead".
 // If the Platform re-renders its Toolbar, src/content/core/icon-placement.ts places the icon again on its own.
@@ -882,7 +710,7 @@ async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
 
 // Trigger comprehensive events:
 private _triggerEvents(element: HTMLElement): void {
-  const events = ['input', 'change', 'keyup', 'compositionend', 'blur-sm', 'focus'];
+  const events = ['input', 'change', 'keyup', 'compositionend', 'blur', 'focus'];
   events.forEach(eventType => {
     element.dispatchEvent(new Event(eventType, { bubbles: true }));
   });
@@ -917,8 +745,11 @@ element.dispatchEvent(new CompositionEvent('compositionend'));
 
 **Solutions:**
 ```typescript
-// 1. Add platform to PlatformName type in src/content/types/platform.ts:
-export type PlatformName = 'claude' | 'chatgpt' | 'mistral' | 'perplexity' | 'gemini' | 'copilot' | 'yourplatform' | 'default';
+// 1. Add the platform's id to the hand-written unions: KnownPlatformType in src/types/index.ts,
+//    and the PlatformName of src/content/types/platform.ts and of src/config/platforms.ts
+//    (deprecated). Only KnownPlatformType is read by the code; leaving the other two out
+//    breaks no build (m365copilot is missing from the first one today).
+export type KnownPlatformType = 'claude' | 'chatgpt' | 'gemini' | 'perplexity' | 'copilot' | 'mistral' | 'm365copilot' | 'yourplatform' | 'custom';
 
 // 2. Ensure strategy extends PlatformStrategy properly:
 export class YourPlatformStrategy extends PlatformStrategy {
@@ -972,8 +803,8 @@ describe('insert', () => {
 // 3. Platform missing from the caret tests - add it to PLATFORMS in
 // src/content/platforms/__tests__/caret-insertion.test.ts
 
-// 4. Strategy not properly mocked:
-vi.mock('../../config/platforms', () => ({
+// 4. Strategy not properly mocked (the path from src/content/platforms/__tests__/):
+vi.mock('../../../config/platforms', () => ({
   getPlatformById: vi.fn((id) => {
     if (id === 'yourplatform') {
       return { hostname: 'your-platform.com' };
@@ -992,5 +823,5 @@ vi.mock('../../config/platforms', () => ({
 
 ---
 
-**Last Updated:** 2026-10-12
+**Last Updated:** 2026-11-21
 **Version:** 2.0.0 (Centralized Configuration)

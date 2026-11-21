@@ -1,94 +1,62 @@
-# Element Picker Implementation - Popup Persistence Solution
+# Element Picker Implementation
 
-## Problem Solved
-Chrome automatically closes the extension popup when it loses focus (e.g., when clicking on another tab or window). This made it impossible to select elements on webpages while keeping the settings visible.
+The Element picker lets the user click the element of a page where the Prompts button goes: on a Custom site, and on a Platform whose Toolbar the chain no longer finds ("Place the icon"). Its safeguards against sensitive fields are in [ELEMENT_PICKER_SECURITY.md](./ELEMENT_PICKER_SECURITY.md).
 
-## Solution Architecture
+## Problem solved
 
-### 1. **Window-Based Approach**
-Instead of trying to keep the popup open (which Chrome doesn't allow), we open the settings in a separate window that persists independently.
+Chrome closes the action popup when it loses focus, so the popup cannot stay open while the user clicks in the page. In popup mode the picker therefore runs from a separate window, which stays open. The side panel stays open on its own.
 
-### 2. **Implementation Flow**
+## How a pick starts
 
-#### When User Clicks "Pick Element":
-1. **From Regular Popup:**
-   - Detects current active tab
-   - Opens settings in a new window with `?picker=true` query parameter
-   - Closes original popup
-   - New window stays open during element selection
+`startElementPicker` in `src/hooks/usePickerWindow.ts` first asks for the host permission when the tab needs it (see [PROGRAMMATIC_INJECTION.md](./PROGRAMMATIC_INJECTION.md)), then:
 
-2. **From Picker Window:**
-   - Directly starts element picker on the stored target tab
-   - Switches focus to the target webpage
-   - User can select elements while window remains open
+- **In the side panel**: sends `START_ELEMENT_PICKER` for the active tab.
+- **In the action popup**: sends `OPEN_PICKER_WINDOW` and closes itself. The service worker opens `src/popup.html` in a window of type `popup` (400 x 600, at 100, 100), with the URL parameters `picker=true`, `originalTabId`, `originalUrl` and `originalHostname`. The window opens on Settings (`src/App.tsx`, which skips the launch screen there). It does not start the picker: the user opens the form again and clicks Pick Element, and the window then sends `START_ELEMENT_PICKER` for `originalTabId`.
+- **From "Place the icon"** (`src/hooks/useIconPlacementRepairs.ts`): sends `START_ELEMENT_PICKER` with the Platform's tab and a `repairHostname`, then closes the action popup.
 
-### 3. **Key Components**
+"Add a custom site", in the "AI sites" group of `src/components/settings/SiteIntegrationSection.tsx`, is disabled on a site already integrated, except in the picker window. There, Manual Configuration opens `src/components/settings/AddCustomSiteForm.tsx` with the original tab's URL and a name filled in. The form's Custom Positioning card holds the Pick Element button, and a site saved with a selector gets the positioning mode `custom`.
 
-#### Background Script (`src/background/background.ts`)
-- Manages picker sessions and window tracking: a session is kept in `chrome.storage.session` under `pickerSession:<tabId>`, and the picker window and its tab under `pickerWindow`, so a pick, and the picker window closing, survive the service worker stopping while the user hovers the page. A session is stored only once the picker is active in its tab, so a start that fails stores none; its changes run one after the other, a pick takes it in one step, and a stop removes only the sessions it saw. A stop also marks the starts still in flight (for the picker window closing, those in flight once it has read that the window closed was the picker window): each stores no session, and one that already sent its activation ends its picker, so a picker window closed before the page answered leaves no picker active. Of two starts on one tab, the session stored is the one of the last activation sent that the page answered, the one the page holds, whatever the order the answers come back in. Each start names its activation with its attempt, and the service worker's deactivations name the one they end: the page holds one picker per tab, so a deactivation sent for an earlier start leaves the picker of a later one active. It is forgotten when the page unloads (the content script sends `PICKER_CANCELLED` on `pagehide`, as it does on Escape; naming the start whose picker it cancels; it stops the starts still in flight in that tab, each ending its own picker, and ends that start's session or one of an activation sent no later than the latest of those it stopped, never one a later start stored in the tab since)
-- Coordinates messages between popup window and content scripts
-- Handles window lifecycle (creation, focus management, cleanup)
-- Tracks original tab ID for element selection
+## Key components
 
-#### Element Picker Module (`src/content/modules/element-picker.ts`)
-- Visual element selection with purple highlighting
-- Generates optimized CSS selectors
-- Sends selection back through background script
-- Provides real-time element information display
+### Background script (`src/background/background.ts`)
 
-#### Settings View (`src/components/SettingsView.tsx`)
-- Detects picker mode via URL parameter
-- Auto-expands relevant sections in picker mode
-- Handles both regular popup and picker window contexts
-- Shows appropriate UI hints based on context
+- Manages picker sessions and window tracking: a session is kept in `chrome.storage.session` under `pickerSession:<tabId>`, and the picker window and its tab under `pickerWindow`, so a pick, and the picker window closing, survive the service worker stopping while the user hovers the page. A session is stored only once the picker is active in its tab, so a start that fails stores none; its changes run one after the other, a pick takes it in one step, and a stop removes only the sessions it saw. A stop also marks the starts still in flight (for the picker window closing, those in flight once it has read that the window closed was the picker window): each stores no session, and one that already sent its activation ends its picker, so a picker window closed before the page answered leaves no picker active. Of two starts on one tab, the session stored is the one of the last activation sent that the page answered, the one the page holds, whatever the order the answers come back in. Each start names its activation with its attempt, and the service worker's deactivations name the one they end: the page holds one picker per tab, so a deactivation sent for an earlier start leaves the picker of a later one active. It is forgotten when the page unloads (the content script sends `PICKER_CANCELLED` on `pagehide`, as it does on Escape; naming the start whose picker it cancels; it stops the starts still in flight in that tab, each ending its own picker, and ends that start's session or one of an activation sent no later than the latest of those it stopped, never one a later start stored in the tab since), and when the tab closes.
+- Injects the content script into a tab that has none before it activates the picker.
+- Brokers the messages between the extension pages and the content script, opens the picker window and focuses it again after a pick.
 
-### 4. **Message Flow**
+### Element picker module (`src/content/modules/element-picker.ts`)
+
+- Highlights the element under the pointer: purple when it can be picked, red when it is blocked.
+- Shows the hovered element's information in a box.
+- On a click, builds the element's fingerprint (`src/content/utils/element-fingerprint.ts`), the identifier the content script places the button by, and a CSS selector as its fallback. The selector is the element's ID; else a unique `data-*` attribute, skipping names that look sensitive; else its first two simple class names, if they are unique; else a path of up to five levels with `:nth-of-type`.
+- Sends `ELEMENT_SELECTED` with the fingerprint, the selector, the element type, the element information and the hostname, then deactivates.
+
+### Settings (`src/hooks/usePickerWindow.ts`)
+
+Reads the picker mode and the original tab from the URL parameters, starts the pick as above, and listens for `ELEMENT_PICKER_RESULT` to fill in the form's selector and fingerprint.
+
+## Message flow
+
 ```
-User clicks "Pick Element" 
-→ Opens new window 
-→ Window sends START_ELEMENT_PICKER 
-→ Background activates picker on target tab
-→ User selects element
-→ Content script sends selection to background
-→ Background forwards to picker window
-→ Window updates selector field
+Pick Element in the form
+→ side panel: START_ELEMENT_PICKER
+  action popup: OPEN_PICKER_WINDOW, the window opens, Pick Element in it, START_ELEMENT_PICKER
+→ service worker: injects the content script if needed, sends ACTIVATE_ELEMENT_PICKER { source: 'background', attempt }
+→ the user clicks an element
+→ content script: ELEMENT_SELECTED
+→ service worker: ELEMENT_PICKER_RESULT to every extension page, then focuses the picker window
+  (for "Place the icon": stores the pick as the Platform's override, and sends no result)
+→ the form fills in its selector
 ```
 
-### 5. **Features**
-- ✅ **Popup never closes** - Uses separate window instead
-- ✅ **Visual feedback** - Purple border highlighting on hover
-- ✅ **Smart selector generation** - ID > unique class > path-based
-- ✅ **Auto-focus management** - Returns focus to picker window after selection
-- ✅ **Cleanup on close** - Properly handles window/tab closure
+Escape and `pagehide` send `PICKER_CANCELLED`; the service worker ends a picker with `DEACTIVATE_ELEMENT_PICKER`.
 
-### 6. **User Experience**
-1. Navigate to target webpage
-2. Open extension popup
-3. Go to Settings → Custom Sites
-4. Enable "Advanced Positioning Options"
-5. Select "Custom" mode
-6. Click "Pick Element" (opens new window)
-7. Click on desired element on webpage
-8. Selector auto-populates in settings window
-9. Window stays open for further configuration
+## Testing by hand
 
-## Testing Instructions
+1. Run `npm run build` and load `dist/` unpacked in `chrome://extensions`.
+2. Open a site that is not a Platform. On a Platform, "Add a custom site" is disabled ("Current site (claude.ai) is already integrated").
+3. Open the extension, then Settings, "AI sites", "Add a custom site", Manual Configuration.
+4. In Custom Positioning, click Pick Element. In the action popup, a window opens and the popup closes: open the form again in that window and click Pick Element there.
+5. Click an element of the page: the selector shows in the form, and the window stays open.
 
-1. Load extension from `dist` folder
-2. Navigate to any website (e.g., claude.ai)
-3. Click extension icon
-4. Go to Settings → Add Custom Site
-5. Enable Advanced Positioning → Custom mode
-6. Click "Pick Element" button
-7. Verify new window opens and stays open
-8. Click on any element on the webpage
-9. Verify selector appears in the window
-10. Verify window remains open after selection
-
-## Technical Notes
-
-- Uses Chrome's `windows.create()` API with `type: 'popup'`
-- Maintains state through URL parameters (`?picker=true`)
-- Background script acts as message broker
-- No need for complex focus hacks or port connections
-- Clean separation between regular popup and picker modes
+Automated: `src/content/modules/__tests__/element-picker.test.ts`, `src/background/__tests__/background.placement.test.ts`, and `tests/e2e/content/element-picker.spec.ts` on the built extension.
