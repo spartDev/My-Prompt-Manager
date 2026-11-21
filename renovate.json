@@ -192,6 +192,15 @@
         "@crxjs/vite-plugin"
       ],
       "automerge": false
+    },
+    {
+      "description": "Hold lexical at the version perplexity.ai serves: the e2e stand-ins load its CommonJS build from node_modules (0.53 is ESM in dist/), see docs/TESTING.md",
+      "matchPackageNames": [
+        "lexical",
+        "@lexical/**",
+        "@preact/signals-core"
+      ],
+      "enabled": false
     }
   ],
   "prConcurrentLimit": 5,
