@@ -28,8 +28,10 @@ A change to a count, limit or version updates every doc that states it: `grep` t
 - Adding or changing a service or hook → `docs/SERVICES_AND_HOOKS.md`
 - Building or reusing a component → `docs/COMPONENTS.md`
 - Writing tests → `docs/TESTING.md`
-- Changing a Platform's content script (`src/content`: the Prompts button's placement, `//`, Insertion) → `docs/PLATFORM_INTEGRATION.md`
+- Changing a Platform's content script (`src/content`: the Prompts button's placement, Insertion) → `docs/PLATFORM_INTEGRATION.md`
+- Changing the Prompt selector or its `//` trigger (`src/content/selector/`) → `docs/ARCHITECTURE.md` (Content Script Architecture), then `docs/adr/ADR-002-render-the-prompt-selector-with-react-in-a-shadow-root.md`
 - Changing the manifest's hosts or permissions, or how the content script is injected → `docs/PROGRAMMATIC_INJECTION.md`
-- Changing custom-site element detection or the Element picker → `docs/ELEMENT_FINGERPRINTING_DESIGN.md`, then for the picker `docs/ELEMENT_PICKER_IMPLEMENTATION.md` (its flow) and `docs/ELEMENT_PICKER_SECURITY.md` (its safeguards)
+- Changing custom-site element detection → `docs/ELEMENT_FINGERPRINTING_DESIGN.md`
+- Changing the Element picker → `docs/ELEMENT_PICKER_IMPLEMENTATION.md` (its flow) and `docs/ELEMENT_PICKER_SECURITY.md` (its safeguards)
 - Changing something an ADR decided → `docs/adr/`
 - Adding an AI platform → the `add-platform` skill

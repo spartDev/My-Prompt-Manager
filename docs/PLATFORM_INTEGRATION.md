@@ -1,6 +1,6 @@
 # Platform Integration Guide
 
-This guide explains how a Platform's content script works (`src/content`: where the Prompts button goes, `//`, Insertion) and how to add a Platform to the My Prompt Manager extension.
+This guide explains how a Platform's content script works (`src/content`: where the Prompts button goes, Insertion) and how to add a Platform to the My Prompt Manager extension.
 
 ## Table of Contents
 
