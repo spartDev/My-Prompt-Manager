@@ -39,7 +39,7 @@ The click sends `ELEMENT_SELECTED` with:
 
 No field's live `value` is read, so what the user typed in an `<input>` is not sent. The `value` attribute is read: step 3 of section 1 and the fingerprint's filter test it as they test every attribute, and neither sends it. A React controlled input keeps that attribute equal to what the user typed, so typing `my account` there blocks the field.
 
-A pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above, in two cases: a contenteditable field, whose text content is what the user typed in it, and a React controlled `<textarea>`, whose text content is its default value, which React keeps equal to what the user typed.
+A pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above, when the composer is a contenteditable field, whose text content is what the user typed in it, or a React controlled `<textarea>`, whose text content is its default value, which React keeps equal to what the user typed. A pick on an element that contains such a field, such as the composer's wrapper, carries the draft too: the picked element's text content includes the field's, and is kept when all of it is under 200 characters.
 
 ## 4. Audit log
 
