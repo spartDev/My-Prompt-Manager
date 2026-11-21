@@ -8,7 +8,7 @@ No test covers these safeguards yet: a change to them is checked by hand, on the
 
 `isElementBlocked(element)` runs on every hover, which colors the highlight red instead of purple, and again on the click. A blocked click shows a warning and picks nothing. The checks run in this order, and the first match blocks:
 
-1. **`BLOCKED_SELECTORS`**: the element matches one of them. They cover password, hidden, tel, email and ssn inputs, inputs marked `data-sensitive` or `data-private`, `autocomplete` values of cards, passwords, payments and one-time codes, the `.sensitive` class, IDs, names, test IDs and ARIA labels that name a password, a CVV, a PIN, a credit card or an SSN, and every `iframe`. Reason: `Sensitive field detected: <selector>`.
+1. **`BLOCKED_SELECTORS`**: the element matches one of them. They cover password, hidden, tel, email and ssn inputs, inputs marked `data-sensitive` or `data-private`, `autocomplete` values of cards, passwords, payments and one-time codes, the `.sensitive` class, a `data-testid` or an `aria-label` holding `password`, an `id` holding `cvv` or `pin`, a `name` holding `creditcard` or `ssn`, and every `iframe`. Reason: `Sensitive field detected: <selector>`. Step 3 catches the other spellings, such as `id="password"`.
 2. **A blocked ancestor**: `element.closest()` finds a match among the element's ancestors, so everything inside a sensitive field or container is blocked. A wrapper that only contains a sensitive field is not: nothing looks at descendants.
 3. **Attribute names and values**: each attribute's name, then its value, is tested against `/password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account/i`. Reasons: `Sensitive attribute detected: <name>`, or `Sensitive attribute value detected: <name>="[REDACTED]"`. The pattern is unanchored, so it also blocks ordinary elements such as `class="card"`, `keyboard`, `spinner` or `account-menu`.
 
@@ -32,12 +32,12 @@ To treat another site as sensitive, add a pattern to `SENSITIVE_DOMAINS`. The co
 
 The click sends `ELEMENT_SELECTED` with:
 
-- **`fingerprint`**, from `ElementFingerprintGenerator`: the identifier the content script places the button by. It holds the element's `id`, `data-testid`, `data-id`, `name`, `aria-label` and `placeholder`, its tag, `type` and `role`, its text content (the first 50 characters, for an element whose text is under 200), its parent's tag, `id` and `data-testid`, its stable attributes and class patterns, and the page URL (`meta.url`). A value matching the generator's `SENSITIVE_PATTERNS` is left out. A Custom site stores the whole fingerprint in its positioning (`src/components/settings/AddCustomSiteForm.tsx`).
+- **`fingerprint`**, from `ElementFingerprintGenerator`: the identifier the content script places the button by. It holds the element's `id`, `data-testid`, `data-id`, `name`, `aria-label` and `placeholder`, its tag, `type` and `role`, its text content (the first 50 characters, for an element whose text is under 200), its parent's tag, `id` and `data-testid`, its stable attributes and class patterns, and the page URL (`meta.url`). The generator's `SENSITIVE_PATTERNS` filters the identifiers, the placeholder, the text, the parent's identifiers and the stable attributes: a value that matches is left out. The tag, `type`, `role`, the class patterns and `meta.url` are kept as they are, the URL's path and query included. A Custom site stores the whole fingerprint in its positioning (`src/components/settings/AddCustomSiteForm.tsx`). Export (`handleExportCustomSite` in `src/components/settings/SiteIntegrationSection.tsx`) copies it whole into the share code (`configToPayload` in `src/services/configurationEncoder.ts`), which anyone holding the code can decode.
 - **`selector`**, the fallback: the element's `#id`, or `tag[data-x="<value>"]`, or classes, or a path (see [ELEMENT_PICKER_IMPLEMENTATION.md](./ELEMENT_PICKER_IMPLEMENTATION.md)).
 - **`elementInfo`**, from `getElementInfo`: the tag, the selector, the position and size, `hasId`, `hasClasses`, the depth, the visibility, `blocked` and `securityLevel` (`high`, `medium` or `low`, as in section 2). Nothing reads `securityLevel`.
 - **`elementType`** (the tag) and **`hostname`**.
 
-No form value is read. The fingerprint does carry page text and identifiers, within the limits above.
+No input's `value` is read. The text content of a contenteditable field is what the user typed in it, so a pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above.
 
 ## 4. Audit log
 
@@ -48,7 +48,7 @@ No form value is read. The fingerprint does carry page text and identifiers, wit
 
 Activation, Escape and deactivation are not recorded. The log keeps the last 50 entries (`MAX_AUDIT_ENTRIES`) in memory, and each entry copies it to the page's `sessionStorage` under `element-picker-audit`. That storage belongs to the page's origin, so the page's own scripts can read it. Each page load starts an empty log, whose first entry overwrites the stored one, and nothing reads the key back.
 
-When the page's `localStorage` holds `prompt-library-debug` = `true`, each entry is also printed to the console, sanitized to categories: `reasonType`, `selectorType`, `domainType`, `protocol`, `hasSensitivePath`, and for a pick `elementType` and `secure`. The debug logger separately prints the raw fingerprint and selector of a pick.
+When the page's `localStorage` holds `prompt-library-debug` = `true`, each entry is also printed to the console, reduced by `sanitizeAuditDetailsForLogging` to categories: `reasonType`, `selectorType` and `domainType` for a warning; `elementType`, `secure`, `selectorType` and `domainType` for a pick. The sanitizer's branch for a URL (`protocol`, `hasSensitivePath`) never runs, since `logAudit` adds the URL to the stored entry only. The debug logger separately prints the raw fingerprint and selector of a pick.
 
 ## 5. Visual feedback
 

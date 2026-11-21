@@ -9,7 +9,7 @@ How the content script reaches a tab: what `manifest.json` grants, when the serv
 - `optional_host_permissions`: `https://*/*` and `http://*/*`. A Custom site's origin is requested from these at run time.
 - `web_accessible_resources`, for `https://*/*` and `http://*/*`, lists by name pattern the chunks the content script imports. Chrome serves a chunk to a Custom site's page only if it is listed there, while crxjs lists every chunk for the Platforms' hosts itself. `npm run build` checks the list: `postbuild` runs `scripts/custom-site-chunks.mjs`, which fails on a chunk no pattern matches. `tests/e2e/content/custom-site-chunks.spec.ts` asks Chrome for each chunk.
 
-**The hosts and permissions are pinned.** `src/test/guardrails/manifestHosts.test.ts` holds `host_permissions`, the `matches` and `permissions` equal to those of 1.9.0, the Release on the Chrome Web Store. If an update adds a host, or a permission that shows a warning, Chrome disables the extension for every user until each one accepts the change (ticket My-Prompt-Manager-totf). A change to these lists therefore needs the owner's decision. A new host is reached through the optional host permission the user grants, as ticket My-Prompt-Manager-j74b does for copilot.cloud.microsoft.
+**The hosts and permissions are pinned.** `src/test/guardrails/manifestHosts.test.ts` holds `host_permissions`, the `matches` and `permissions` equal to those of 1.9.0, the Release on the Chrome Web Store. If an update adds a host, or a permission that shows a warning, Chrome disables the extension for every user until each one accepts the change (ticket My-Prompt-Manager-totf). A change to these lists therefore needs the owner's decision. A new host is reached through the optional host permission the user grants, as ticket My-Prompt-Manager-j74b, still open, plans for copilot.cloud.microsoft.
 
 ## ContentScriptInjector
 
@@ -31,7 +31,7 @@ The service worker holds one `ContentScriptInjector`, named `injector`. It track
 4. `shouldInjectForSite` checks the host permission first: `hasPermissionForHostname` asks `chrome.permissions.contains` for `https://<host>/*`, then `http://<host>/*`. Then it checks the Site settings: `isHostnameEnabled(await readSiteSettings(), hostname)` of `src/services/siteSettings.ts`, the same rule the content script applies when it starts.
 5. `injectContentScript` checks the permission again and throws `No permission to inject into <host>` without it. It probes the tab (`canInjectIntoTab`), reads the page marker (`isContentScriptInjected`), and only then runs `chrome.scripting.executeScript` with the loader file. The marker is `window.__promptLibraryInjected`, which `src/content/index.ts` sets. The same probe removes the icons and Prompt selectors an earlier injection left behind.
 
-`_injectIfNeededInternal` swallows every failure. `forceInjectContentScript` skips steps 1 to 4: it forgets the tab and calls `injectContentScript`, so the permission check and the marker still apply. It returns `{ success, error }`.
+`_injectIfNeededInternal` swallows every failure. `forceInjectContentScript` skips steps 1, 2 and 4: it forgets the tab and calls `injectContentScript`, so the permission check, the probe and the marker still apply, and the probe's `canInjectIntoTab` refuses a restricted URL as step 3 does. It returns `{ success, error }`.
 
 Whatever the caller, the click included, `injectContentScript` requires the host permission that `chrome.permissions.contains` reports. The click therefore injects on a Platform, or on a Custom site whose origin the user granted. Elsewhere it fails with the permission error.
 
@@ -73,20 +73,7 @@ Nothing watches for a permission the user revokes in Chrome: each injection asks
 
 ## The loader file
 
-```typescript
-// The loader the manifest names (assets/index.ts-loader-<hash>.js)
-private async getContentScriptFilename(): Promise<string> {
-  const contentScriptPath = chrome.runtime.getManifest().content_scripts?.[0]?.js?.[0];
-  // ... throw if the manifest declares none
-  try {
-    await fetch(chrome.runtime.getURL(contentScriptPath));
-    return contentScriptPath;
-  } catch {
-    // Not on disk: dist/ was rebuilt after Chrome loaded the extension
-    throw new Error(STALE_BUILD_ERROR); // "Reload it in chrome://extensions..."
-  }
-}
-```
+`injectContentScript` runs the loader the manifest names, the first file of its first content script (crxjs writes it as `assets/index.ts-loader-<hash>.js`). `getContentScriptFilename` fetches that file first. When the fetch fails it logs a warning and throws `STALE_BUILD_ERROR`, which asks the user to reload the extension in `chrome://extensions`.
 
 Chrome reads the manifest once, when it loads the extension. A rebuild writes the loader under a
 new hashed name, so until the extension is reloaded the manifest names a file that is gone; the
@@ -94,7 +81,19 @@ error asks for that reload (`tests/e2e/content/picker-stale-build.spec.ts`).
 
 ## Errors
 
-`classifyInjectionError` sorts a failure by its message into `permission`, `tab_access_denied`, `orphaned_tab`, `network`, `tab_closed`, `security` or `unknown`. `injectContentScript` logs each type through `Logger.warn` or `Logger.error` and rethrows. `chrome.tabs.get` on a closed tab is caught and ends the injection.
+`classifyInjectionError` sorts a failure by its message. `injectContentScript` logs by type, then rethrows every type:
+
+| Type | The message holds | `injectContentScript` |
+|---|---|---|
+| `orphaned_tab` | `tab access denied`, within 10 s of the service worker's start (`ORPHANED_TAB_DETECTION_WINDOW_MS`) | logs nothing; adds the tab to `orphanedTabs` |
+| `permission` | `No permission to inject into` | logs nothing |
+| `tab_access_denied` | `tab access denied`, after those 10 s | `Logger.warn` |
+| `network` | `interrupted by user` | logs nothing |
+| `tab_closed` | `No tab with id` (the tab closed during the injection) | logs nothing |
+| `security` | `violates CSP` | `Logger.error` |
+| `unknown` | anything else, `STALE_BUILD_ERROR` included | `Logger.error` |
+
+`forceInjectContentScript` classifies the error again for its `error` text. For `permission`, `orphaned_tab`, `tab_access_denied` and `tab_closed` it returns a message of its own and logs nothing more. For the other types it returns the error's message and logs it with `Logger.error`, so a `network` failure is logged once, and a `security` or `unknown` one twice.
 
 ## Tests
 

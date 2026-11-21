@@ -28,7 +28,7 @@ Chrome closes the action popup when it loses focus, so the popup cannot stay ope
 
 - Highlights the element under the pointer: purple when it can be picked, red when it is blocked.
 - Shows the hovered element's information in a box.
-- On a click, builds the element's fingerprint (`src/content/utils/element-fingerprint.ts`), the identifier the content script places the button by, and a CSS selector as its fallback. The selector is the element's ID; else a unique `data-*` attribute, skipping names that look sensitive; else its first two simple class names, if they are unique; else a path of up to five levels with `:nth-of-type`.
+- On a click, builds the element's fingerprint (`src/content/utils/element-fingerprint.ts`), the identifier the content script places the button by, and a CSS selector as its fallback. The selector is the element's ID; else `tag[data-x="<value>"]` for its first `data-*` attribute whose name does not look sensitive, if that selector is unique (the later ones are not tried); else its first two simple class names, if they are unique; else a path of up to five levels with `:nth-of-type`.
 - Sends `ELEMENT_SELECTED` with the fingerprint, the selector, the element type, the element information and the hostname, then deactivates.
 
 ### Settings (`src/hooks/usePickerWindow.ts`)
