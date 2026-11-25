@@ -91,12 +91,12 @@ A Release's zip is made, attested and submitted by `.github/workflows/release.ym
 
 The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md`](../chrome-web-store-listing.md): the detailed description, the category and language, and the Privacy practices (single purpose, one justification per permission and per host permission of `manifest.json`, remote code). The summary is not pasted: the store shows the `description` of the package's `manifest.json`, which the Dashboard cannot edit.
 
-**Screenshots** (the five store images, with their headlines):
+**Screenshots** (the five screenshots of the store images, with their headlines; upload 1 to 4 for now, see screenshot 5):
 1. **`//`**: "Stop retyping your prompts", a Platform composer with `//` typed and the Prompt selector open
 2. **Variables**: "Write it once. Reuse it everywhere.", the selector's Variables step, then the Insertion with its Undo confirmation
 3. **Platforms**: "One Library for every AI chat", the Prompts button in the composer of each Platform the listing names: Claude, ChatGPT, Gemini, Mistral and Perplexity, with no Copilot (ticket My-Prompt-Manager-1c88)
 4. **Library**: "A home for every prompt you write", the side panel Library with the Library filter, Categories and cards, and the line "Stays on your device. No account, no cloud."
-5. **Packs**: "Not sure where to start? Pick a Pack", the Welcome's Packs step
+5. **Packs**: "Not sure where to start? Pick a Pack", the Welcome's Packs step. Held while ticket My-Prompt-Manager-1c88 is open: it shows the real 2.0.0 Welcome, whose Packs step names Copilot among the Platforms (`src/components/welcome/PackPicker.tsx:10`, read from `src/config/platforms.ts`), while the listing says Copilot is not supported. Upload it once 1c88 is resolved; until then the four others are enough, since the store asks for at least one screenshot and takes up to five.
 
 **Promotional images:** the small promo tile, "Your prompts, one // away", and the marquee, "Write it once. Reuse it everywhere."
 
@@ -142,7 +142,7 @@ The Chrome Web Store API cannot create an item, so the first version of an item 
 1. **Item Details:**
    - Fill in the description (the summary is the `description` of `manifest.json`, which the Dashboard cannot edit)
    - Select category (Workflow & Planning)
-   - Add screenshots (5 recommended)
+   - Add screenshots (up to 5; for the 2.0 listing, 1 to 4 while ticket My-Prompt-Manager-1c88 is open, see Screenshots above)
    - Add promotional images (optional)
 
 2. **Privacy Practices:**
@@ -213,7 +213,7 @@ A refused Release is never submitted again:
 
 ### Listing-only Updates
 New text or images with no new Release, as for the 2.0 listing on the published 2.0.0 (`chrome-web-store-listing.md`):
-1. Edit the listing on the Developer Dashboard tabs and upload the images; no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata), [Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file))
+1. Edit the listing on the Developer Dashboard tabs and upload the images (for the 2.0 listing, all but screenshot 5 while ticket My-Prompt-Manager-1c88 is open); no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata), [Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file))
 2. Click Submit for review. Google reviews it like any submission, and the store keeps the published listing until it passes ([Review process](https://developer.chrome.com/docs/webstore/review-process#rejection)). If you untick the publish box in the submit dialog, the listing also waits after the review until you publish it, within 30 days, after which it goes back to a draft ([Deferred publishing option](https://developer.chrome.com/docs/webstore/update#deferred-publishing-option))
 3. Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item))
 
