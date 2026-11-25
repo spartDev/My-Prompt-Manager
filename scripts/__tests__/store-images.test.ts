@@ -4,22 +4,23 @@
  * codec that flattens Chromium's RGBA screenshots, the stale-build check, the options, the demo
  * Library the scenes are taken from, and the seven compositions with the owner's copy.
  */
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { admit } from '../../src/services/promptAdmission';
 import { DEFAULT_CATEGORY } from '../../src/types';
 import { extractVariables } from '../../src/utils/promptVariables';
 import { parseStoreImagesArgs } from '../store-images/args';
-import { IMAGE_PLATFORMS, PLATFORM_LABELS } from '../store-images/composers';
 import { LIBRARY_COPY, MARQUEE_COPY, PACKS_COPY, PLATFORMS_COPY, TILE_COPY, TRIGGER_COPY, TRUST_LINE, VARIABLES_COPY } from '../store-images/copy';
 import { DEMO_CATEGORIES, demoPrompts, demoStore, packsStore, VARIABLES_PROMPT } from '../store-images/demoLibrary';
-import { distProblem } from '../store-images/dist';
+import { BUILD_SOURCES, distProblem } from '../store-images/dist';
+import { launchReady } from '../store-images/launch';
 import { DARK_GROUND, storeImages, VIOLET_GROUND } from '../store-images/layouts';
+import { COMPOSER_PLATFORMS, IMAGE_PLATFORMS, listed, platformName } from '../store-images/platforms';
 import { decodePng, encodeRgbPng, flattenPng, pngInfo } from '../store-images/png';
 import type { Scene, Scenes } from '../store-images/scenes';
 
@@ -186,6 +187,84 @@ describe('dist.ts', () => {
     const { root, dist } = repository({ version: '2.0.0', after: -60 });
     expect(distProblem(root, dist)).toBe(`The build in ${dist} is older than ${path.join('src', 'popup', 'App.tsx')}: run npm run build first.`);
   });
+
+  it.each([
+    'tailwind.config.js',
+    'postcss.config.js',
+    'tsconfig.json',
+    path.join('node_modules', '.package-lock.json')
+  ])('says to build when %s, which the build reads, changed after it', (file) => {
+    const { root, dist } = repository({ version: '2.0.0', after: 60 });
+    // Written now, after the build of 2026-11-20
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), '{}');
+    expect(distProblem(root, dist)).toBe(`The build in ${dist} is older than ${file}: run npm run build first.`);
+  });
+
+  it('takes the build when only package-lock.json changed: the build reads what is installed, not the lockfile', () => {
+    const { root, dist } = repository({ version: '2.0.0', after: 60 });
+    writeFileSync(path.join(root, 'package-lock.json'), '{}');
+    expect(BUILD_SOURCES).not.toContain('package-lock.json');
+    expect(distProblem(root, dist)).toBeNull();
+  });
+});
+
+// --- launch.ts ---
+
+describe('launch.ts', () => {
+  const browser = () => ({ close: vi.fn(() => Promise.resolve()) });
+  const profileDir = (): string => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'store-images-profile-'));
+    temporary.push(dir);
+    return dir;
+  };
+
+  it('hands over the browser and what ready gave, the profile kept', async () => {
+    const profile = profileDir();
+    const context = browser();
+    const result = await launchReady({ profile, launch: () => Promise.resolve(context), ready: () => Promise.resolve('loaded'), timeoutMs: 1000 });
+    expect(result).toEqual({ context, ready: 'loaded' });
+    expect(context.close).not.toHaveBeenCalled();
+    expect(existsSync(profile)).toBe(true);
+  });
+
+  it('deletes the profile when the launch fails', async () => {
+    const profile = profileDir();
+    await expect(
+      launchReady({ profile, launch: () => Promise.reject(new Error('no Chromium')), ready: () => Promise.resolve(), timeoutMs: 1000 })
+    ).rejects.toThrow('no Chromium');
+    expect(existsSync(profile)).toBe(false);
+  });
+
+  it('closes the browser and deletes the profile when the extension fails to load', async () => {
+    const profile = profileDir();
+    const context = browser();
+    await expect(
+      launchReady({ profile, launch: () => Promise.resolve(context), ready: () => Promise.reject(new Error('no service worker')), timeoutMs: 1000 })
+    ).rejects.toThrow('no service worker');
+    expect(context.close).toHaveBeenCalledOnce();
+    expect(existsSync(profile)).toBe(false);
+  });
+
+  it('gives up after the timeout, closing the browser and deleting the profile, when the extension never loads', async () => {
+    const profile = profileDir();
+    const context = browser();
+    const never = new Promise<never>(() => undefined);
+    await expect(launchReady({ profile, launch: () => Promise.resolve(context), ready: () => never, timeoutMs: 20 })).rejects.toThrow(
+      'The extension did not load within 0.02 s'
+    );
+    expect(context.close).toHaveBeenCalledOnce();
+    expect(existsSync(profile)).toBe(false);
+  });
+
+  it('still deletes the profile, and keeps the first error, when closing the browser fails too', async () => {
+    const profile = profileDir();
+    const context = { close: vi.fn(() => Promise.reject(new Error('already gone'))) };
+    await expect(
+      launchReady({ profile, launch: () => Promise.resolve(context), ready: () => Promise.reject(new Error('no service worker')), timeoutMs: 1000 })
+    ).rejects.toThrow('no service worker');
+    expect(existsSync(profile)).toBe(false);
+  });
 });
 
 describe('args.ts', () => {
@@ -193,8 +272,13 @@ describe('args.ts', () => {
     expect(parseStoreImagesArgs([], '/repo/dist')).toEqual({ dist: '/repo/dist', headless: true });
   });
 
-  it('takes --dist, --out and --headed', () => {
-    expect(parseStoreImagesArgs(['--dist', '/a', '--out', '/b', '--headed'], '/repo/dist')).toEqual({ dist: '/a', out: '/b', headless: false });
+  it('takes --dist, --out, --texts and --headed', () => {
+    expect(parseStoreImagesArgs(['--dist', '/a', '--out', '/b', '--texts', '/c.txt', '--headed'], '/repo/dist')).toEqual({
+      dist: '/a',
+      out: '/b',
+      texts: '/c.txt',
+      headless: false
+    });
   });
 
   it('refuses an unknown option and a missing value', () => {
@@ -222,7 +306,7 @@ describe('the demo Library', () => {
 
   it('has Pinned Prompts and usage counts, the newest used a few hours ago', () => {
     expect(prompts.filter((prompt) => prompt.pinned).map((prompt) => prompt.title)).toEqual(['Weekly status update', 'Code review checklist']);
-    expect(prompts.filter((prompt) => prompt.usageCount > 0).length).toBeGreaterThan(prompts.length / 2);
+    expect(prompts.filter((prompt) => (prompt.usageCount ?? 0) > 0).length).toBeGreaterThan(prompts.length / 2);
     for (const prompt of prompts) {
       expect(prompt.createdAt).toBeLessThan(prompt.updatedAt);
       expect(prompt.updatedAt).toBeLessThan(NOW);
@@ -266,13 +350,14 @@ describe('the demo Library', () => {
 // --- copy.ts and layouts.ts ---
 
 describe('the seven images', () => {
-  const scene: Scene = { png: Buffer.from('scene'), width: 400, height: 300, content: { x: 36, y: 36, width: 328, height: 228 } };
+  const scene: Scene = { png: Buffer.from('scene'), width: 400, height: 300, content: { x: 36, y: 36, width: 328, height: 228 }, text: 'Prompts' };
+  const composer: Scene = { ...scene, width: 412, height: 192, content: { x: 36, y: 36, width: 340, height: 120 } };
   const scenes: Scenes = {
     selectorDark: scene,
     selectorLight: scene,
     variables: scene,
     inserted: scene,
-    platforms: Object.fromEntries(IMAGE_PLATFORMS.map((platform) => [platform, scene])) as Scenes['platforms'],
+    platforms: IMAGE_PLATFORMS.map((platform) => ({ platform, scene: composer })),
     library: scene,
     packs: scene
   };
@@ -306,7 +391,7 @@ describe('the seven images', () => {
     expect(said[1]).toContain('Write it once. Reuse it everywhere.');
     expect(said[1]).toContain('Variables fill in what changes each time.');
     expect(said[2]).toContain('One Library for every AI chat');
-    expect(said[2]).toContain('Claude, ChatGPT, Gemini, Mistral, Perplexity and Copilot.');
+    expect(said[2]).toContain('Claude, ChatGPT, Gemini, Mistral and Perplexity.');
     expect(said[3]).toContain('A home for every prompt you write');
     expect(said[3]).toContain('Categories, Pinned and Most Used, always one click away.');
     expect(said[3]).toContain('Stays on your device. No account, no cloud.');
@@ -314,7 +399,7 @@ describe('the seven images', () => {
     expect(said[4]).toContain('Ready-made prompts, added in one click.');
     expect(said[5]).toContain('Your prompts, one // away');
     expect(said[6]).toContain('Write it once. Reuse it everywhere.');
-    expect(said[6]).toContain('Your Library, inside Claude, ChatGPT, Gemini, Mistral, Perplexity and Copilot.');
+    expect(said[6]).toContain('Your Library, inside Claude, ChatGPT, Gemini, Mistral and Perplexity.');
     for (const text of said) {
       expect(text).toContain('My Prompt Manager');
     }
@@ -332,11 +417,48 @@ describe('the seven images', () => {
   });
 
   it('name each Platform of the Platforms image as text, in the order of its subline', () => {
-    expect(IMAGE_PLATFORMS.map((platform) => PLATFORM_LABELS[platform]).join(', ')).toBe('Claude, ChatGPT, Gemini, Mistral, Perplexity, Copilot');
+    expect(IMAGE_PLATFORMS.map(platformName)).toEqual(['Claude', 'ChatGPT', 'Gemini', 'Mistral', 'Perplexity']);
     const said = textOf(images[2].html);
     for (const platform of IMAGE_PLATFORMS) {
-      expect(said).toContain(` ${PLATFORM_LABELS[platform]} `);
+      expect(said).toContain(` ${platformName(platform)} `);
     }
+  });
+
+  it('name no Copilot while My-Prompt-Manager-1c88 is open, and name it as the owner wrote once it is shown again', () => {
+    for (const { html } of images) {
+      expect(textOf(html)).not.toContain('Copilot');
+    }
+    expect(COMPOSER_PLATFORMS.filter((platform) => !platform.shown).map((platform) => platform.id)).toEqual(['copilot']);
+    // Shown again, the two lists read as the owner wrote them
+    expect(`${listed(COMPOSER_PLATFORMS.map((platform) => platform.name))}.`).toBe('Claude, ChatGPT, Gemini, Mistral, Perplexity and Copilot.');
+    expect(listed(['Claude'])).toBe('Claude');
+  });
+
+  it('lay five composers out as a row of three over a row of two, each row centred on the image', () => {
+    const cells = [...images[2].html.matchAll(/<p class="name" style="left: ([\d.]+)px; top: ([\d.]+)px">([^<]+)<\/p>/g)].map((match) => ({
+      left: Number(match[1]) - 6,
+      top: Number(match[2]),
+      name: match[3]
+    }));
+    expect(cells.map((cell) => cell.name)).toEqual(['Claude', 'ChatGPT', 'Gemini', 'Mistral', 'Perplexity']);
+    const rows = [...new Set(cells.map((cell) => cell.top))].map((top) => cells.filter((cell) => cell.top === top));
+    expect(rows.map((row) => row.length)).toEqual([3, 2]);
+    // The cells are one width (the step between two of a row less the gap): each row's middle is the image's
+    const width = rows[0][1].left - rows[0][0].left - 32;
+    for (const row of rows) {
+      expect((row[0].left + row[row.length - 1].left + width) / 2).toBeCloseTo(640, 6);
+    }
+  });
+
+  it('keep each sentence of a headline on lines of its own', () => {
+    for (const index of [1, 6]) {
+      expect(images[index].html).toContain('<span class="sentence">Write it once.</span> <span class="sentence">Reuse it everywhere.</span>');
+    }
+    expect(images[4].html).toContain('<span class="sentence">Not sure where to start?</span> <span class="sentence">Pick a Pack</span>');
+  });
+
+  it('list the scenes they show, whose texts the claim check reads', () => {
+    expect(images.map((image) => image.scenes.length)).toEqual([1, 2, IMAGE_PLATFORMS.length, 1, 1, 1, 1]);
   });
 
   it('load nothing from the network: the font, the icon and the scenes are inline', () => {

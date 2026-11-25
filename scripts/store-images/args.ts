@@ -7,6 +7,8 @@ export interface StoreImagesOptions {
   dist: string;
   /** Where the images go: store-assets/<version> when not given */
   out?: string;
+  /** Where to write the words each image shows, its own and its scenes', when given */
+  texts?: string;
   headless: boolean;
 }
 
@@ -29,11 +31,14 @@ export function parseStoreImagesArgs(argv: readonly string[], defaultDist: strin
       case '--out':
         options.out = path.resolve(value());
         break;
+      case '--texts':
+        options.texts = path.resolve(value());
+        break;
       case '--headed':
         options.headless = false;
         break;
       default:
-        throw new Error(`Unknown option ${flag}: use --dist <dir>, --out <dir> or --headed`);
+        throw new Error(`Unknown option ${flag}: use --dist <dir>, --out <dir>, --texts <file> or --headed`);
     }
   }
   return options;

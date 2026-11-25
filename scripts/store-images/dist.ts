@@ -6,8 +6,25 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-/** What a build is made from: a change to any of them after the build makes it stale */
-export const BUILD_SOURCES = ['src', 'public', 'manifest.json', 'vite.config.ts', 'package.json'] as const;
+/**
+ * What a build is made from: a change to any of them after the build makes it stale. Besides the
+ * sources and vite.config.ts, the build reads tailwind.config.js (the @config of src/popup.css),
+ * postcss.config.js (Vite loads it: @tailwindcss/postcss), tsconfig.json (Vite's transform reads
+ * its compiler options, jsx among them) and the installed packages, which npm records in
+ * node_modules/.package-lock.json at each install. It does not read package-lock.json itself: a
+ * lockfile not installed yet changes no build (scripts/check-deps.mjs tells it apart).
+ */
+export const BUILD_SOURCES = [
+  'src',
+  'public',
+  'manifest.json',
+  'vite.config.ts',
+  'package.json',
+  'tailwind.config.js',
+  'postcss.config.js',
+  'tsconfig.json',
+  'node_modules/.package-lock.json'
+] as const;
 
 /** The newest modification time under `entry` (a file or a folder), 0 when it does not exist */
 const newestUnder = (entry: string): { time: number; file: string } => {

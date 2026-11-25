@@ -11,6 +11,7 @@
  *   npm run store:images                       write store-assets/<version>/
  *   npm run store:images -- --out /tmp/shots   write somewhere else, to compare two runs
  *   npm run store:images -- --dist /tmp/dist   take another build
+ *   npm run store:images -- --texts /tmp/t.txt write the words each image shows, to check its claims
  *   npm run store:images -- --headed           watch the browser take the scenes
  */
 
@@ -69,6 +70,7 @@ async function main(): Promise<void> {
   const images = storeImages(scenes, assetsOf(options.dist));
 
   mkdirSync(out, { recursive: true });
+  const texts: string[] = [];
   const browser = await chromium.launch({ channel: 'chromium', headless: true });
   try {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
@@ -76,6 +78,8 @@ async function main(): Promise<void> {
       await page.setViewportSize({ width: image.width, height: image.height });
       await page.setContent(image.html, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
+      const words = (await page.locator('body').innerText()).split('\n').map((line) => line.trim()).filter(Boolean);
+      texts.push([image.file, `  image: ${words.join(' | ')}`, ...image.scenes.map((scene) => `  ui: ${scene.text}`)].join('\n'));
       const png = flattenPng(await page.screenshot({ type: 'png', caret: 'hide', animations: 'disabled' }), image.ground);
       const info = pngInfo(png);
       if (info.width !== image.width || info.height !== image.height || info.hasAlpha) {
@@ -88,6 +92,10 @@ async function main(): Promise<void> {
     }
   } finally {
     await browser.close();
+  }
+  if (options.texts) {
+    writeFileSync(options.texts, `${texts.join('\n\n')}\n`);
+    process.stdout.write(`The words of each image: ${shown(options.texts)}\n`);
   }
   process.stdout.write(`Check them with: sips -g pixelWidth -g pixelHeight -g hasAlpha ${shown(out)}/*.png\n`);
 }

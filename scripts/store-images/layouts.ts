@@ -5,8 +5,8 @@
  * these pages by store-images.ts.
  */
 
-import { IMAGE_PLATFORMS, type ImagePlatform, PLATFORM_LABELS } from './composers';
 import { BRAND_NAME, type ImageCopy, LIBRARY_COPY, MARQUEE_COPY, PACKS_COPY, PLATFORMS_COPY, TILE_COPY, TRIGGER_COPY, TRUST_LINE, VARIABLES_COPY } from './copy';
+import { platformName } from './platforms';
 import type { Scene, Scenes } from './scenes';
 
 /** What every image draws besides the scenes */
@@ -26,6 +26,8 @@ export interface StoreImage {
   /** The image's ground: what the flattened PNG lays every pixel over */
   ground: string;
   html: string;
+  /** The scenes it shows, whose texts are words it shows too */
+  scenes: readonly Scene[];
 }
 
 /** The dark ground of the screenshots and the marquee, the violet one of the tile */
@@ -48,6 +50,13 @@ const withTrigger = (text: string): string =>
     escapeHtml(text).replace(/\/\//g, '<span class="tok">//</span>')
   );
 
+/** A headline, each of its sentences starting a line of its own: "Write it once." / "Reuse it everywhere." */
+const headline = (text: string): string =>
+  text
+    .split(/(?<=[.?!])\s+/)
+    .map((sentence) => `<span class="sentence">${withTrigger(sentence)}</span>`)
+    .join(' ');
+
 const dataUri = (type: string, bytes: Buffer): string => `data:${type};base64,${bytes.toString('base64')}`;
 
 const LOCK = '<svg viewBox="0 0 16 16" width="1em" height="1em" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.8" fill="currentColor"/><path d="M5.2 7V5.3a2.8 2.8 0 0 1 5.6 0V7" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
@@ -65,6 +74,7 @@ const page = (size: { width: number; height: number }, ground: string, assets: A
       .hl { font-weight: 800; letter-spacing: -.028em; line-height: 1.02; text-wrap: balance; }
       .tok { color: #a78bfa; }
       .whole { white-space: nowrap; }
+      .hl .sentence { display: block; }
       .sl { line-height: 1.35; text-wrap: balance; color: #b9aed6; }
       .brand { position: absolute; display: flex; align-items: center; gap: .6em; font-weight: 700; white-space: nowrap; }
       .brand img, .brand svg { display: block; flex: none; }
@@ -136,14 +146,15 @@ const SIDE_CSS = /* css */ `
 `;
 
 /** A screenshot with its text on the left, its scene on the right */
-const sideScreenshot = (file: string, copy: ImageCopy, scene: string, assets: Assets, trust = false): StoreImage => ({
+const sideScreenshot = (file: string, copy: ImageCopy, scene: string, shown: readonly Scene[], assets: Assets, trust = false): StoreImage => ({
   file,
   ...SCREENSHOT,
   ground: DARK_GROUND,
+  scenes: shown,
   html: page(SCREENSHOT, DARK_GROUND, assets, SIDE_CSS, /* html */ `
     <div class="glyph">//</div>
     <div class="copy">
-      <h1 class="hl">${withTrigger(copy.headline)}</h1>
+      <h1 class="hl">${headline(copy.headline)}</h1>
       ${copy.subline ? `<p class="sl">${withTrigger(copy.subline)}</p>` : ''}
       ${trust ? `<p class="trust">${LOCK} ${escapeHtml(TRUST_LINE)}</p>` : ''}
     </div>
@@ -153,7 +164,7 @@ const sideScreenshot = (file: string, copy: ImageCopy, scene: string, assets: As
 
 /** 1. The // trigger: the selector opened over the composer */
 export const triggerImage = (scenes: Scenes, assets: Assets): StoreImage =>
-  sideScreenshot('screenshot-1-trigger.png', TRIGGER_COPY, centred(scenes.selectorDark, SIDE_SCENE, SIDE_SCALE), assets);
+  sideScreenshot('screenshot-1-trigger.png', TRIGGER_COPY, centred(scenes.selectorDark, SIDE_SCENE, SIDE_SCALE), [scenes.selectorDark], assets);
 
 /** 2. Variables: the Variables step above, the composer after the Insertion with its Undo below */
 export const variablesImage = (scenes: Scenes, assets: Assets): StoreImage => {
@@ -167,23 +178,42 @@ export const variablesImage = (scenes: Scenes, assets: Assets): StoreImage => {
     placed(variables, { x: SIDE_SCENE.x, y: top, scale }),
     placed(inserted, { x: insertedX, y: top + variables.content.height * scale + gap, scale })
   ].join('');
-  return sideScreenshot('screenshot-2-variables.png', VARIABLES_COPY, scene, assets);
+  return sideScreenshot('screenshot-2-variables.png', VARIABLES_COPY, scene, [variables, inserted], assets);
 };
 
-/** 3. The Platforms: text on top, the composer of each Platform with its Prompts button below */
+/** Where screenshot 3 lays out its composers: below its text, to the bottom edge */
+const PLATFORMS_AREA = { x: 48, y: 196, width: 1184, height: 572 };
+/** How much screenshot 3 enlarges its composers, at most */
+const PLATFORMS_SCALE = 1.2;
+
+/**
+ * 3. The Platforms: the text on top, below it the composer of each Platform with its Prompts
+ * button, its name above it. Two columns for up to four, else three, each row centred, the last
+ * one too: five are a row of three over a row of two. As large as the area allows, centred in it.
+ */
 export const platformsImage = (scenes: Scenes, assets: Assets): StoreImage => {
-  const scale = 1.1;
-  const columns = 2;
-  const columnGap = 40;
-  const rowGap = 18;
+  const shown = scenes.platforms;
+  const columns = shown.length > 4 ? 3 : 2;
+  const rows = Math.ceil(shown.length / columns);
+  const columnGap = 32;
+  const rowGap = 22;
   const label = 32;
-  const first = scenes.platforms[IMAGE_PLATFORMS[0]];
-  const cell = { width: first.content.width * scale, height: Math.max(...IMAGE_PLATFORMS.map((platform) => scenes.platforms[platform].content.height)) * scale };
-  const left = (SCREENSHOT.width - (columns * cell.width + (columns - 1) * columnGap)) / 2;
-  const cells = IMAGE_PLATFORMS.map((platform: ImagePlatform, index) => {
-    const x = left + (index % columns) * (cell.width + columnGap);
-    const y = 240 + Math.floor(index / columns) * (label + cell.height + rowGap);
-    return `<p class="name" style="left: ${String(x + 6)}px; top: ${String(y)}px">${escapeHtml(PLATFORM_LABELS[platform])}</p>${placed(scenes.platforms[platform], { x, y: y + label, scale })}`;
+  const contentWidth = Math.max(...shown.map(({ scene }) => scene.content.width));
+  const contentHeight = Math.max(...shown.map(({ scene }) => scene.content.height));
+  const scale = Math.min(
+    PLATFORMS_SCALE,
+    (PLATFORMS_AREA.width - (columns - 1) * columnGap) / (columns * contentWidth),
+    (PLATFORMS_AREA.height - rows * label - (rows - 1) * rowGap) / (rows * contentHeight)
+  );
+  const cell = { width: contentWidth * scale, height: label + contentHeight * scale };
+  const top = PLATFORMS_AREA.y + (PLATFORMS_AREA.height - (rows * cell.height + (rows - 1) * rowGap)) / 2;
+  const cells = shown.map(({ platform, scene }, index) => {
+    const row = Math.floor(index / columns);
+    const inRow = Math.min(columns, shown.length - row * columns);
+    const rowLeft = PLATFORMS_AREA.x + (PLATFORMS_AREA.width - (inRow * cell.width + (inRow - 1) * columnGap)) / 2;
+    const x = rowLeft + (index % columns) * (cell.width + columnGap);
+    const y = top + row * (cell.height + rowGap);
+    return `<p class="name" style="left: ${String(x + 6)}px; top: ${String(y)}px">${escapeHtml(platformName(platform))}</p>${placed(scene, { x, y: y + label, scale })}`;
   });
   const css = /* css */ `
     .glyph { font-size: 704px; right: -35px; bottom: -127px; color: rgba(167, 139, 250, .08); }
@@ -197,11 +227,12 @@ export const platformsImage = (scenes: Scenes, assets: Assets): StoreImage => {
     file: 'screenshot-3-platforms.png',
     ...SCREENSHOT,
     ground: DARK_GROUND,
+    scenes: shown.map(({ scene }) => scene),
     html: page(SCREENSHOT, DARK_GROUND, assets, css, /* html */ `
       <div class="glyph">//</div>
       <div class="brand">${brandIcon(assets, 24)}${escapeHtml(BRAND_NAME)}</div>
       <div class="copy">
-        <h1 class="hl">${withTrigger(PLATFORMS_COPY.headline)}</h1>
+        <h1 class="hl">${headline(PLATFORMS_COPY.headline)}</h1>
         <p class="sl">${withTrigger(PLATFORMS_COPY.subline ?? '')}</p>
       </div>
       ${cells.join('\n      ')}`)
@@ -210,11 +241,11 @@ export const platformsImage = (scenes: Scenes, assets: Assets): StoreImage => {
 
 /** 4. The Library in the side panel, with the trust line */
 export const libraryImage = (scenes: Scenes, assets: Assets): StoreImage =>
-  sideScreenshot('screenshot-4-library.png', LIBRARY_COPY, centred(scenes.library, SIDE_SCENE, SIDE_SCALE, 'window'), assets, true);
+  sideScreenshot('screenshot-4-library.png', LIBRARY_COPY, centred(scenes.library, SIDE_SCENE, SIDE_SCALE, 'window'), [scenes.library], assets, true);
 
 /** 5. The Welcome's Packs step */
 export const packsImage = (scenes: Scenes, assets: Assets): StoreImage =>
-  sideScreenshot('screenshot-5-packs.png', PACKS_COPY, centred(scenes.packs, SIDE_SCENE, SIDE_SCALE, 'window'), assets);
+  sideScreenshot('screenshot-5-packs.png', PACKS_COPY, centred(scenes.packs, SIDE_SCENE, SIDE_SCALE, 'window'), [scenes.packs], assets);
 
 /** The small promo tile: violet, the light selector over a composer showing //, tilted at the bottom right */
 export const tileImage = (scenes: Scenes, assets: Assets): StoreImage => {
@@ -234,10 +265,11 @@ export const tileImage = (scenes: Scenes, assets: Assets): StoreImage => {
     file: 'small-promo-tile.png',
     ...TILE,
     ground: VIOLET_GROUND,
+    scenes: [scene],
     html: page(TILE, VIOLET_GROUND, assets, css, /* html */ `
       <div class="glyph">//</div>
       <div class="brand">${invertedIcon(assets, 24)}${escapeHtml(BRAND_NAME)}</div>
-      <h1 class="hl">${withTrigger(TILE_COPY.headline)}</h1>
+      <h1 class="hl">${headline(TILE_COPY.headline)}</h1>
       ${placed(scene, { x, y, scale, transform: 'rotate(-4deg)', origin: 'bottom right' })}`)
   };
 };
@@ -256,12 +288,13 @@ export const marqueeImage = (scenes: Scenes, assets: Assets): StoreImage => {
     file: 'marquee.png',
     ...MARQUEE,
     ground: DARK_GROUND,
+    scenes: [scenes.selectorDark],
     html: page(MARQUEE, DARK_GROUND, assets, css, /* html */ `
       <div class="glow"></div>
       <div class="glyph">//</div>
       <div class="copy">
         <div class="brand">${brandIcon(assets, 32)}${escapeHtml(BRAND_NAME)}</div>
-        <h1 class="hl">${withTrigger(MARQUEE_COPY.headline)}</h1>
+        <h1 class="hl">${headline(MARQUEE_COPY.headline)}</h1>
         <p class="sl">${withTrigger(MARQUEE_COPY.subline ?? '')}</p>
       </div>
       ${placed(scenes.selectorDark, { x: 752, y: 56, scale: 1.1, transform: 'rotate(-3deg)', origin: 'top left' })}`)

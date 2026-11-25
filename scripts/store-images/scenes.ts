@@ -16,8 +16,10 @@ import { createStorageController, type ExtensionStorage, waitForBackgroundTarget
 import { insertionPill } from '../../tests/e2e/fixtures/insertion-flow';
 import { promptRow, promptSelector, promptsButton } from '../../tests/e2e/fixtures/platform-pages';
 
-import { composerPage, IMAGE_PLATFORMS, type ImagePlatform, platformUrl } from './composers';
+import { composerPage, platformUrl } from './composers';
 import { type DemoTheme, demoStore, packsStore, VARIABLES_PROMPT } from './demoLibrary';
+import { EXTENSION_READY_TIMEOUT, launchReady } from './launch';
+import { IMAGE_PLATFORMS, type ImagePlatform } from './platforms';
 
 /** Device pixels per CSS pixel of every scene */
 export const SCENE_SCALE = 2;
@@ -30,6 +32,8 @@ export interface Scene {
   height: number;
   /** Where the UI is in it, in CSS px: the rest is the room kept for its shadows */
   content: Box;
+  /** The words its UI holds, " | " between the texts of its elements: what a check of the images' claims reads */
+  text: string;
 }
 
 export interface Scenes {
@@ -41,8 +45,8 @@ export interface Scenes {
   variables: Scene;
   /** Claude's composer after that Insertion, with the confirmation and its Undo */
   inserted: Scene;
-  /** Each Platform's composer with the Prompts button the content script placed in it */
-  platforms: Record<ImagePlatform, Scene>;
+  /** The composer of each Platform of IMAGE_PLATFORMS, in its order, with the Prompts button the content script placed in it */
+  platforms: readonly { platform: ImagePlatform; scene: Scene }[];
   /** The side panel's Library */
   library: Scene;
   /** The Welcome's last step, the Packs, in the popup */
@@ -63,8 +67,9 @@ const SELECTOR_PLATFORM: ImagePlatform = 'claude';
 const SELECTOR_COMPOSER_WIDTH = 500;
 /** The page the selector scenes are taken in: room above the composer for the whole selector */
 const SELECTOR_VIEWPORT = { width: 620, height: 620 };
-const PLATFORM_COMPOSER_WIDTH = 400;
-const PLATFORM_VIEWPORT = { width: 520, height: 260 };
+/** Three of them side by side in screenshot 3 */
+const PLATFORM_COMPOSER_WIDTH = 340;
+const PLATFORM_VIEWPORT = { width: 460, height: 260 };
 /** The side panel at the width Chrome opens it, as high as the image shows it */
 const SIDE_PANEL_VIEWPORT = { width: 400, height: 640 };
 /** The popup, at the size the Welcome is drawn for */
@@ -115,12 +120,42 @@ const settled = (page: Page): Promise<void> =>
     }
   });
 
+/**
+ * The texts of `root` and of the elements under it, their shadow roots included, each element
+ * rendered (not display: none, hidden or transparent), and the values of its fields. Text scrolled
+ * out of view counts too, so that no word an image shows is missed. Runs in the page: no named
+ * function inside, which the transpiler would wrap in a helper the page does not have.
+ */
+const wordsIn = (root: Element): string => {
+  const words: string[] = [];
+  const stack: Node[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (node === undefined || node instanceof HTMLStyleElement || node instanceof HTMLScriptElement) {
+      continue;
+    }
+    const text = node.nodeType === Node.TEXT_NODE ? (node.textContent ?? '').replace(/\s+/g, ' ').trim() : '';
+    if (text && node.parentElement?.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) {
+      words.push(text);
+    }
+    if ((node instanceof HTMLTextAreaElement || node instanceof HTMLInputElement) && node.value.trim() && node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) {
+      words.push(node.value.replace(/\s+/g, ' ').trim());
+    }
+    const children = [...(node instanceof Element && node.shadowRoot ? node.shadowRoot.childNodes : []), ...node.childNodes];
+    for (let index = children.length - 1; index >= 0; index--) {
+      stack.push(children[index]);
+    }
+  }
+  return words.join(' | ');
+};
+
 /** The whole viewport, opaque: an extension page */
 const shootPage = async (page: Page): Promise<Scene> => {
   await settled(page);
   const { width, height } = viewportOf(page);
   const png = await page.screenshot({ caret: 'hide', animations: 'disabled', scale: 'device' });
-  return { png, width, height, content: { x: 0, y: 0, width, height } };
+  const text = await page.locator('body').evaluate(wordsIn);
+  return { png, width, height, content: { x: 0, y: 0, width, height }, text };
 };
 
 /**
@@ -147,7 +182,8 @@ const shootAround = async (page: Page, parts: readonly Locator[]): Promise<Scene
     height: Math.min(viewport.height, Math.ceil(ui.bottom + SHADOW_MARGIN)) - top
   };
   const png = await page.screenshot({ clip, omitBackground: true, caret: 'hide', animations: 'disabled', scale: 'device' });
-  return { png, width: clip.width, height: clip.height, content: { x: ui.left - left, y: ui.top - top, width: ui.right - ui.left, height: ui.bottom - ui.top } };
+  const text = (await Promise.all(parts.map((part) => part.evaluate(wordsIn)))).join(' | ');
+  return { png, width: clip.width, height: clip.height, content: { x: ui.left - left, y: ui.top - top, width: ui.right - ui.left, height: ui.bottom - ui.top }, text };
 };
 
 class Session {
@@ -159,28 +195,41 @@ class Session {
     private readonly options: CaptureOptions
   ) {}
 
+  /** Chromium on a new profile with the build loaded, once the extension has recorded its first install */
   static async open(options: CaptureOptions): Promise<Session> {
     const profile = mkdtempSync(path.join(tmpdir(), 'mpm-store-images-'));
-    const context = await chromium.launchPersistentContext(profile, {
-      channel: 'chromium',
-      headless: options.headless,
-      deviceScaleFactor: SCENE_SCALE,
-      // No motion: every scene is taken at rest, the same at each run
-      reducedMotion: 'reduce',
-      args: [`--disable-extensions-except=${options.dist}`, `--load-extension=${options.dist}`, '--no-first-run', '--no-default-browser-check']
+    // A failure here closes Chromium and deletes the profile (launch.ts): the command then exits
+    const { context, ready } = await launchReady({
+      profile,
+      launch: (directory) =>
+        chromium.launchPersistentContext(directory, {
+          channel: 'chromium',
+          headless: options.headless,
+          deviceScaleFactor: SCENE_SCALE,
+          // No motion: every scene is taken at rest, the same at each run
+          reducedMotion: 'reduce',
+          args: [`--disable-extensions-except=${options.dist}`, `--load-extension=${options.dist}`, '--no-first-run', '--no-default-browser-check']
+        }),
+      ready: async (launched) => {
+        for (const page of launched.pages()) {
+          await page.close();
+        }
+        const background = await waitForBackgroundTarget(launched);
+        const storage = createStorageController(background);
+        await waitForFirstInstallRecords(storage);
+        return { storage, extensionId: new URL(background.url()).host };
+      },
+      timeoutMs: EXTENSION_READY_TIMEOUT
     });
-    for (const page of context.pages()) {
-      await page.close();
-    }
-    const background = await waitForBackgroundTarget(context);
-    const storage = createStorageController(background);
-    await waitForFirstInstallRecords(storage);
-    return new Session(context, storage, new URL(background.url()).host, profile, options);
+    return new Session(context, ready.storage, ready.extensionId, profile, options);
   }
 
   async close(): Promise<void> {
-    await this.context.close();
-    rmSync(this.profile, { recursive: true, force: true });
+    try {
+      await this.context.close();
+    } finally {
+      rmSync(this.profile, { recursive: true, force: true });
+    }
   }
 
   async seed(store: Record<string, unknown>): Promise<void> {
@@ -320,9 +369,9 @@ export async function captureScenes(options: CaptureOptions, now: number): Promi
     await session.seed(demoStore(now, 'dark', options.version));
     const selectorDark = await take('the Prompt selector opened by //, dark', () => selectorScene(session, 'dark', 'Summarize this thread for '));
     const { variables, inserted } = await take('the Variables step and the Insertion with Undo', () => variablesScenes(session));
-    const platforms = {} as Record<ImagePlatform, Scene>;
+    const platforms: { platform: ImagePlatform; scene: Scene }[] = [];
     for (const platform of IMAGE_PLATFORMS) {
-      platforms[platform] = await take(`the Prompts button on ${platform}`, () => platformScene(session, platform));
+      platforms.push({ platform, scene: await take(`the Prompts button on ${platform}`, () => platformScene(session, platform)) });
     }
     // Seeded again: the Insertion above counted a use
     await session.seed(demoStore(now, 'dark', options.version));

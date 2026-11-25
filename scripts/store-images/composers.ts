@@ -13,20 +13,7 @@ import path from 'node:path';
 import { SUPPORTED_PLATFORMS } from '../../src/config/platforms';
 
 import type { DemoTheme } from './demoLibrary';
-
-/** The Platforms the images name, in the order of the Platforms image */
-export const IMAGE_PLATFORMS = ['claude', 'chatgpt', 'gemini', 'mistral', 'perplexity', 'copilot'] as const;
-export type ImagePlatform = (typeof IMAGE_PLATFORMS)[number];
-
-/** The name each one goes by in the images: as the listing's copy names them, in text only */
-export const PLATFORM_LABELS: Record<ImagePlatform, string> = {
-  claude: 'Claude',
-  chatgpt: 'ChatGPT',
-  gemini: 'Gemini',
-  mistral: 'Mistral',
-  perplexity: 'Perplexity',
-  copilot: 'Copilot'
-};
+import { type ImagePlatform, platformName } from './platforms';
 
 /** Where each Platform's page is served: its own host, where the manifest runs the content script */
 export const platformUrl = (platform: ImagePlatform): string => `https://${SUPPORTED_PLATFORMS[platform].hostname}/`;
@@ -122,7 +109,7 @@ export function composerPage(root: string, platform: ImagePlatform, options: Com
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>${PLATFORM_LABELS[platform]}</title>
+    <title>${platformName(platform)}</title>
     <style>
       html, body { margin: 0; background: transparent; }
       body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; color: ${colors.ink}; }

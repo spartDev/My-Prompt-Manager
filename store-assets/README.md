@@ -16,27 +16,41 @@ All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screens
 
 ## Make the images of a Release
 
-1. Set the Release in `package.json` and `manifest.json`, then build it: `npm run build`. The script never builds: it stops and says so when `dist/` is missing, of another version, or older than a file of `src/`, `public/`, `manifest.json`, `vite.config.ts` or `package.json`.
-2. `npm run store:images`. It writes the seven files to `store-assets/<version>/` and prints each one's size and sha256. `npm run store:images -- --out <dir>` writes them elsewhere, to compare two runs; `--headed` shows the browser while it takes the scenes. It takes about a minute.
+1. Set the Release in `package.json` and `manifest.json`, then build it: `npm run build`. The script never builds. It stops and says so when `dist/` is missing, of another version, or older than a file the build reads: `src/`, `public/`, `manifest.json`, `vite.config.ts`, `package.json`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, or the installed packages (`node_modules/.package-lock.json`).
+2. `npm run store:images`. It writes the seven files to `store-assets/<version>/` and prints each one's size and sha256. It took 9 s on an Apple-silicon Mac (2026-11-25, `time npm run store:images`).
+   - `npm run store:images -- --out <dir>` writes them elsewhere, to compare two runs.
+   - `--texts <file>` writes the words each image shows, its own and those of the UI in its scenes, to check the images' claims with `grep`.
+   - `--headed` shows the browser while it takes the scenes.
+   - If the extension does not load (a broken build), the script stops within a minute, closes Chromium and deletes its temp profile.
 3. Check them: `sips -g pixelWidth -g pixelHeight -g hasAlpha store-assets/<version>/*.png` gives the sizes above and `hasAlpha: no`. Then look at each one.
 4. Commit the folder. Keep the folders of earlier Releases: they are what the Store showed then.
 
-Two runs on the same build write the same bytes, so a changed file means a changed image.
+On macOS with the same Playwright version, two runs on the same build write the same bytes, so a changed file means a changed image. Make the images on macOS. On Linux they change: the side panel shows "Ctrl K" where macOS shows "⌘K" (`src/utils/modifierKey.ts`), and the composers' text falls back from the system font (`-apple-system`, Helvetica Neue) to another one. A Playwright update can also change pixels, through its Chromium.
 
 ## How they are made
 
-`scripts/store-images.ts` loads `dist/` into Playwright's Chromium, in a new profile with no account, the way the e2e tests do, and seeds `chrome.storage.local` with a demo Library: eight English Prompts in Product, Engineering, Writing and Hiring, two Pinned, two with Variables, usage counts, no person or account named (`scripts/store-images/demoLibrary.ts`). Then it takes each scene from the real UI (`scripts/store-images/scenes.ts`):
+`scripts/store-images.ts` loads `dist/` into Playwright's Chromium the way the e2e tests do: a new profile with no account. It seeds `chrome.storage.local` with a demo Library (`scripts/store-images/demoLibrary.ts`):
 
-- The Platforms' composers are the sanitized copies in `tests/fixtures/composers/`, served at each Platform's own address, so the built content script runs on them as it does on the Platform: it places the Prompts button, opens the Prompt selector on `//`, shows the Variables step and inserts the Prompt. Around each copy, `scripts/store-images/composers.ts` draws a plain card in neutral colors with simple button glyphs: no Platform's styles, logo or mark.
-- The selector removes the `//` it was opened with. For screenshot 1, the tile and the marquee, the script writes `//` back at the end of the field, in the page, after the selector opened, so the image shows the keys that opened it.
-- The side panel's Library and the Welcome are the built `sidepanel.html` and `popup.html`.
+- eight English Prompts in Product, Engineering, Writing and Hiring;
+- two of them Pinned and two with Variables, with usage counts;
+- no person or account named.
 
-Then it sets the scenes in the compositions (`scripts/store-images/layouts.ts`, in px at the final size) with the copy of `scripts/store-images/copy.ts`, in Schibsted Grotesk from the build, and takes each image at its exact size.
+Then it takes each scene from the real UI (`scripts/store-images/scenes.ts`):
+
+- **The Platforms' composers.** They are the sanitized copies in `tests/fixtures/composers/`, served at each Platform's own address. The built content script runs on them as it does on the Platform: it places the Prompts button, opens the Prompt selector on `//`, shows the Variables step and inserts the Prompt. Around each copy, `scripts/store-images/composers.ts` draws a plain card in neutral colors with simple button glyphs: no Platform's styles, logo or mark.
+- **The `//` in the field.** The selector removes the `//` it was opened with. For screenshot 1, the tile and the marquee, the script writes `//` back at the end of the field, in the page, after the selector opened, so the image shows the keys that opened it.
+- **The Library and the Welcome.** The side panel's Library and the Welcome are the built `sidepanel.html` and `popup.html`.
+
+Then it sets the scenes in the compositions (`scripts/store-images/layouts.ts`, in px at the final size) with the copy of `scripts/store-images/copy.ts`, in Schibsted Grotesk from the build. Finally it takes each image at its exact size.
 
 ## What to change, and where
 
-- The words: `scripts/store-images/copy.ts`. Check each claim against the code before it goes on an image.
-- The layout of an image: its function in `scripts/store-images/layouts.ts`.
-- The demo Library: `scripts/store-images/demoLibrary.ts`; `scripts/__tests__/store-images.test.ts` checks it stays admitted as it is, with its Categories, Pinned Prompts and Variables.
-- A Platform added or removed: `IMAGE_PLATFORMS`, `PLATFORM_LABELS` and the button glyphs in `scripts/store-images/composers.ts`, and the Platforms named in `copy.ts`. Screenshot 3 shows the six Platforms its subline names, as the Welcome names them (`welcomePlatformNames`, src/welcome/platforms.ts: Copilot and Microsoft 365 Copilot are linked, and named once, Copilot). Microsoft 365 Copilot has no composer of its own there: in 2.0.0 a work account lands at copilot.cloud.microsoft, where the extension does not run (CHANGELOG.md, 2.0.0, Known limitations).
-- A UI change needs no change here: the next run takes the new UI. Look at the images, though: a taller selector or a wider card can need a scene's size or scale changed in `scenes.ts` or `layouts.ts`.
+- **The words:** `scripts/store-images/copy.ts`. Check each claim against the code before it goes on an image, and against the Platforms as their users reach them today: `--texts` lists every word an image shows.
+- **The layout of an image:** its function in `scripts/store-images/layouts.ts`.
+- **The demo Library:** `scripts/store-images/demoLibrary.ts`. `scripts/__tests__/store-images.test.ts` checks it stays admitted as it is, with its Categories, Pinned Prompts and Variables.
+- **The Platforms the images show and name:** the list in `scripts/store-images/platforms.ts`. It gives screenshot 3's composers and both Platform lists of the copy (screenshot 3's subline, the marquee's). A Platform is shown only while the Release runs where its users land.
+  - **Copilot.** Its entry is there, with `shown: false`, until ticket My-Prompt-Manager-1c88 settles copilot.microsoft.com: that address now sends users to copilot.com, a host 2.0.0 does not run on. Once Copilot works there, `shown: true` brings back its composer, and both lists read again as the owner wrote them ("…, Perplexity and Copilot").
+  - **Microsoft 365 Copilot.** It has no composer of its own: in 2.0.0 a work account lands at copilot.cloud.microsoft, where the extension does not run (CHANGELOG.md, 2.0.0, Known limitations).
+  - **A new Platform.** It also needs a composer fixture and its button glyphs in `scripts/store-images/composers.ts`.
+- **Screenshot 5 names Copilot.** It shows the Welcome as 2.0.0 ships it, and that Welcome names Copilot among the Platforms (`welcomePlatformNames`, `src/welcome/platforms.ts`). The image follows what My-Prompt-Manager-1c88 decides for the Welcome: it changes when the Welcome does.
+- **A change to the UI:** nothing to change here, because the next run takes the new UI. Look at the images, though: a taller selector or a wider card can need a scene's size or scale changed in `scenes.ts` or `layouts.ts`.
