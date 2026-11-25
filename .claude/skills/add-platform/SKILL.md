@@ -393,30 +393,7 @@ export const YourPlatformIcon: React.FC<{ className?: string; disabled?: boolean
 
 **File:** `docs/PLATFORM_INTEGRATION.md`
 
-**Action:** Add your platform to the examples section:
-
-```markdown
-### Example: Your Platform
-
-\`\`\`typescript
-export class YourPlatformStrategy extends PlatformStrategy {
-  constructor() {
-    super('yourplatform', 70, {
-      selectors: ['textarea[data-testid="input"]'],
-      priority: 70
-    });
-  }
-
-  canHandle(_element: HTMLElement): boolean {
-    return this.hostname === 'your-ai-platform.com';
-  }
-
-  async insert(element: HTMLElement, content: string): Promise<InsertionResult> {
-    // Implementation details...
-  }
-}
-\`\`\`
-```
+**Action:** Add your Platform's row to the table of its Examples section: its strategy file, its base class, and how it inserts.
 
 **File:** `README.md`
 
@@ -634,7 +611,7 @@ Use this checklist when adding a new platform:
 ## Related Documentation
 
 - **Architecture Deep Dive:** `docs/ARCHITECTURE.md`
-- **Platform Integration Guide:** `docs/PLATFORM_INTEGRATION.md` (comprehensive examples)
+- **Platform Integration Guide:** `docs/PLATFORM_INTEGRATION.md` (the strategies step by step, and a table of the real ones to start from)
 - **Testing Guide:** `docs/TESTING.md`
 - **Component Catalog:** `docs/COMPONENTS.md`
 

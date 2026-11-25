@@ -1,163 +1,41 @@
 # Programmatic Content Script Injection
 
-## Overview
+How the content script reaches a tab: what `manifest.json` grants, when the service worker injects the script itself (`ContentScriptInjector` in `src/background/background.ts`), and how a Custom site gets its host permission. Before this design the manifest held `<all_urls>` in `host_permissions` and in the content script's `matches`. Now it holds the Platforms' hosts, and the extension asks for any other site at run time.
 
-This document describes the migration from global content script injection to programmatic injection, implemented to eliminate the `<all_urls>` permission overreach while maintaining full functionality across all supported AI platforms.
+## The manifest
 
-## Problem Statement
+- `host_permissions` and the `matches` of the one content script list the same seven hosts: claude.ai, chatgpt.com, gemini.google.com, www.perplexity.ai, chat.mistral.ai, copilot.microsoft.com and m365.cloud.microsoft. Chrome injects `src/content/index.ts` into them at `document_idle`, in the top frame only (`all_frames: false`). The seven Platforms of `src/config/platforms.ts` are on by default.
+- `permissions`: `storage`, `activeTab`, `tabs`, `sidePanel`, `scripting`.
+- `optional_host_permissions`: `https://*/*` and `http://*/*`. A Custom site's origin is requested from these at run time.
+- `web_accessible_resources`, for `https://*/*` and `http://*/*`, lists by name pattern the chunks the content script imports. Chrome serves a chunk to a Custom site's page only if it is listed there, while crxjs lists every chunk for the Platforms' hosts itself. `npm run build` checks the list: `postbuild` runs `scripts/custom-site-chunks.mjs`, which fails on a chunk no pattern matches. `tests/e2e/content/custom-site-chunks.spec.ts` asks Chrome for each chunk.
 
-The previous implementation used `<all_urls>` in the manifest's `host_permissions` and `content_scripts` configuration, which:
+**The hosts and permissions are pinned.** `src/test/guardrails/manifestHosts.test.ts` holds `host_permissions`, the `matches` and `permissions` equal to those of 1.9.0, the Release on the Chrome Web Store. If an update adds a host, or a permission that shows a warning, Chrome disables the extension for every user until each one accepts the change (ticket My-Prompt-Manager-totf). A change to these lists therefore needs the owner's decision. A new host is reached through the optional host permission the user grants, as ticket My-Prompt-Manager-j74b, still open, plans for copilot.cloud.microsoft.
 
-- **Security Risk**: Granted unnecessary permissions to all websites
-- **Privacy Concern**: Extension could access any website user visits
-- **Store Compliance**: Chrome Web Store prefers minimal permissions
-- **User Trust**: Users see "Read and change all your data on all websites" warning
+## ContentScriptInjector
 
-## Solution: Programmatic Injection
+The service worker holds one `ContentScriptInjector`, named `injector`. It tracks tabs in `injectedTabs` (a `Set<number>`) and the injections in progress in `injectionPromises` (a `Map<number, Promise<void>>`).
 
-### Architecture Changes
+### What calls it
 
-#### 1. Manifest Updates
+- `chrome.tabs.onUpdated`, with `status: 'complete'` and a URL: `injectIfNeeded(tabId)`. `chrome.tabs.onRemoved` calls `cleanup(tabId)`, which forgets the tab.
+- `chrome.runtime.onInstalled`, at an install and at an update: `injectIntoOpenTabs` (see [Site settings](#site-settings)).
+- `chrome.action.onClicked`: `forceInjectContentScript(tab.id)`. Chrome fires this event only in side panel mode, the default, where `updateActionBehavior` sets the action's popup to `""`. A second `onClicked` listener opens the side panel. In popup mode Chrome opens the popup instead, and the click injects nothing.
+- A `REQUEST_INJECTION` message: `forceInjectContentScript`. `handleRequestInjection` answers `success: true` once the call returns, even when the injection failed, because `forceInjectContentScript` reports a failure in its result instead of throwing.
+- The Element picker: `forceInjectContentScript`, when the tab has no content script yet.
 
-**Before:**
-```json
-{
-  "host_permissions": ["<all_urls>"],
-  "content_scripts": [{
-    "matches": ["<all_urls>"],
-    "js": ["src/content/index.ts"],
-    "run_at": "document_idle"
-  }]
-}
-```
+### What `injectIfNeeded` checks, in order
 
-**After:**
-```json
-{
-  "host_permissions": [
-    "https://claude.ai/*",
-    "https://chatgpt.com/*", 
-    "https://www.perplexity.ai/*"
-  ],
-  "content_scripts": [{
-    "matches": [
-      "https://claude.ai/*",
-      "https://chatgpt.com/*",
-      "https://www.perplexity.ai/*"
-    ],
-    "js": ["src/content/index.ts"],
-    "run_at": "document_idle",
-    "all_frames": false
-  }],
-  "optional_host_permissions": [
-    "https://*/*",
-    "http://*/*"
-  ]
-}
-```
+1. A second call for a tab that is already being injected gets the pending promise (`injectionPromises`).
+2. A tab in `injectedTabs` is trusted on a Platform. On a Custom site, the page marker is read again, since a reload clears it.
+3. `isRestrictedUrl` skips `chrome://`, `chrome-extension://`, `moz-extension://`, `edge-extension://`, `about:`, `data:`, `file://` and `ftp://` pages.
+4. `shouldInjectForSite` checks the host permission first: `hasPermissionForHostname` asks `chrome.permissions.contains` for `https://<host>/*`, then `http://<host>/*`. Then it checks the Site settings: `isHostnameEnabled(await readSiteSettings(), hostname)` of `src/services/siteSettings.ts`, the same rule the content script applies when it starts.
+5. `injectContentScript` checks the permission again and throws `No permission to inject into <host>` without it. It probes the tab (`canInjectIntoTab`), and when the probe fails (a restricted URL, a tab still loading, or a test script Chrome refuses) throws its own message, `Cannot inject into tab <id> for <host> - tab access denied`, not one of Chrome's. It reads the page marker (`isContentScriptInjected`), and only then runs `chrome.scripting.executeScript` with the loader file. The marker is `window.__promptLibraryInjected`, which `src/content/index.ts` sets. When the marker is missing, `isContentScriptInjected` also removes the icons and Prompt selectors an earlier injection left behind.
 
-#### 2. ContentScriptInjector Class
+`_injectIfNeededInternal` swallows every failure. `forceInjectContentScript` skips steps 1, 2 and 4: it forgets the tab and calls `injectContentScript`, so the permission check, the probe and the marker still apply, and the probe's `canInjectIntoTab` refuses a restricted URL as step 3 does. It returns `{ success, error }`.
 
-New background script component that handles intelligent content script injection:
+Whatever the caller, the click included, `injectContentScript` requires the host permission that `chrome.permissions.contains` reports. The click therefore injects on a Platform, or on a Custom site whose origin the user granted. Elsewhere it fails with the permission error.
 
-```typescript
-class ContentScriptInjector {
-  private injectedTabs: Set<number> = new Set();
-  private injectionPromises: Map<number, Promise<void>> = new Map();
-
-  async injectIfNeeded(tabId: number): Promise<void>
-  async forceInjectContentScript(tabId: number): Promise<{success: boolean; error?: string}>
-  async isContentScriptInjected(tabId: number): Promise<boolean>
-  private async shouldInjectForSite(hostname: string): Promise<boolean>
-  private async hasPermissionForHostname(hostname: string): Promise<boolean>
-}
-```
-
-#### 3. Permission Management
-
-**Default Sites (Always Available):**
-- claude.ai
-- chatgpt.com 
-- www.perplexity.ai
-
-**Custom Sites:**
-- Use `optional_host_permissions` for additional sites
-- Dynamic permission requests via `chrome.permissions.request()`
-- Permission granted only when user adds custom site
-
-### Key Features
-
-#### 1. Smart Injection Logic
-
-- **Tab Lifecycle**: Inject on `chrome.tabs.onUpdated` when status is 'complete'
-- **Site Enablement**: Check user settings before injection
-- **Permission Validation**: Verify permissions before injection attempts
-- **Duplicate Prevention**: Track injected tabs to avoid re-injection
-- **Error Handling**: Graceful handling of permission denials and injection failures
-
-#### 2. Permission Model
-
-```typescript
-// Check permission for hostname
-const hasPermission = await chrome.permissions.contains({
-  origins: [`https://${hostname}/*`]
-});
-
-// Request permission dynamically
-const granted = await chrome.permissions.request({
-  origins: [origin]
-});
-```
-
-#### 3. ActiveTab Integration
-
-- Extension icon click triggers `activeTab` permission
-- Temporary access for any site user explicitly allows
-- No permanent permission storage for one-time use
-
-#### 4. Settings Integration
-
-```typescript
-// Settings determine injection eligibility
-const shouldInject = await this.shouldInjectForSite(hostname);
-
-// A Platform the user turned on, or never switched and on by default, or a Custom site that is on
-// (src/services/siteSettings.ts)
-const enabled = isHostnameEnabled(await readSiteSettings(), hostname);
-```
-
-## Implementation Details
-
-### Background Script Changes
-
-#### 1. Tab Lifecycle Management
-
-```typescript
-// Inject when tab navigation completes
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    void injector.injectIfNeeded(tabId);
-  }
-});
-
-// Cleanup when tab closes
-chrome.tabs.onRemoved.addListener((tabId) => {
-  injector.cleanup(tabId);
-});
-```
-
-#### 2. Extension Icon Click Handler
-
-```typescript
-chrome.action.onClicked.addListener((tab) => {
-  if (tab.id) {
-    // Use activeTab permission for injection
-    void injector.forceInjectContentScript(tab.id);
-  }
-});
-```
-
-#### 3. Site settings
+### Site settings
 
 The service worker decides whether a tab gets the content script from the Site settings, read with
 `readSiteSettings()` and `isHostnameEnabled()` of `src/services/siteSettings.ts`, the same rule the
@@ -167,251 +45,62 @@ turns it off, and starts over when the Custom site of its hostname changes. No s
 a message for it.
 
 That needs a content script in the tab. A Platform's tabs get one from the manifest when they load,
-on or off (a tab open across an extension update while its Platform was off keeps only the old one,
-which no longer receives storage changes, until a click on the extension icon in side panel mode or
-an icon placement repair pick injects a fresh one). Chrome runs the manifest's content scripts only
-in pages loaded after the extension, so at a first install and at an update the service worker
-injects one into each open tab of a site that is on (`injectIntoOpenTabs`, from
+on or off. A tab left open across an extension update while its Platform was off keeps only the old
+script, which no longer receives storage changes. It gets a fresh one from a click on the extension
+icon in side panel mode, or from an icon placement repair pick. Chrome runs the manifest's content
+scripts only in pages loaded after the extension, so at a first install and at an update the service
+worker injects one into each open tab of a site that is on (`injectIntoOpenTabs`, from
 `chrome.runtime.onInstalled`): a chat open before the install answers `//` without a reload, as the
-Welcome tells a new user it will. Adding a Custom site asks the service worker
-to inject into its open tabs (`REQUEST_INJECTION` from `AddCustomSiteForm`). A Custom site that was
-off when its tab loaded has none, unless one was injected since: in side panel mode (the default) a
-click on the extension icon injects one into its tab, and so does the Element picker. Turning its switch back on
-injects none: a tab with no content script starts on the next page load.
+Welcome tells a new user it will.
 
-### Content Script Adaptation
+Adding a Custom site asks the service worker to inject into its open tabs (`REQUEST_INJECTION` from
+`AddCustomSiteForm`). Importing a site configuration does not, so its open tabs get the script on
+their next page load. A Custom site that was off when its tab loaded has no script unless one was
+injected since: in side panel mode (the default) a click on the extension icon injects one into its
+tab, and so does the Element picker. Turning its switch back on injects nothing: a tab with no
+content script starts on the next page load.
 
-#### 1. Injection Detection
+## Host permission for a Custom site
 
-```typescript
-// Mark script as injected to prevent duplicates
-(window as any).__promptLibraryInjected = true;
+Each request goes through `src/hooks/useSitePermissions.ts`. `requestPermissionForOrigin` calls `chrome.permissions.request` and returns `false` on a refusal. After a grant it sends `REQUEST_PERMISSION`: the service worker requests the origins again, records them under `grantedPermissions` in `chrome.storage.local` (nothing reads that list), and runs `injectIfNeeded` on the matching tabs.
 
-// Allow background script to check injection status
-const isInjected = window.__promptLibraryInjected === true;
-```
+- **Adding a site** (`src/components/settings/AddCustomSiteForm.tsx`) requests `https://<host>/*`. On a refusal the form shows "Permission denied. Cannot add custom site without permission." and saves nothing.
+- **Importing a configuration** (`handleConfirmImport` in `src/components/settings/SiteIntegrationSection.tsx`) requests the site's permission too. On a refusal it shows "Permission denied. Please allow access to the site and try again."
+- **The Element picker** (`src/hooks/usePickerWindow.ts`) checks, then requests, `<protocol>//<host>/*` for a tab outside `BUILT_IN_ORIGINS`. That list holds claude.ai, chatgpt.com, www.perplexity.ai and chat.mistral.ai; the other three Platforms pass the check through the manifest's grant. On a refusal it throws "Permission denied. Please grant access to use the element picker on this site."
+- **An icon placement repair pick** (`src/hooks/useIconPlacementRepairs.ts`) asks for no permission: it starts the picker on a Platform's tab.
 
-#### 2. Dynamic Loading Support
+Nothing watches for a permission the user revokes in Chrome: each injection asks `chrome.permissions.contains` again.
 
-```typescript
-// Handle cases where script is injected after page load
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
-} else {
-  initialize();
-}
-```
+## The loader file
 
-### Settings UI Updates
-
-#### 1. Permission Request Integration
-
-```typescript
-// Request permission when adding custom site
-const granted = await chrome.permissions.request({
-  origins: [origin]
-});
-
-if (!granted) {
-  throw new Error('Permission denied for site');
-}
-```
-
-#### 2. Element Picker Permission Handling
-
-```typescript
-// Check permission before starting element picker
-if (!isAllowedOrigin) {
-  const hasPermission = await chrome.permissions.contains({
-    origins: [origin]
-  });
-  
-  if (!hasPermission) {
-    const granted = await chrome.permissions.request({
-      origins: [origin]
-    });
-    if (!granted) {
-      throw new Error('Permission required for element picker');
-    }
-  }
-}
-```
-
-## Security Benefits
-
-### 1. Minimal Permissions
-
-- **Before**: Access to ALL websites (`<all_urls>`)
-- **After**: Access only to 3 specific AI platforms by default
-
-### 2. User Control
-
-- **Explicit Consent**: Users must explicitly grant permission for custom sites
-- **Transparency**: Clear understanding of which sites have access
-- **Revocable**: Users can revoke permissions through Chrome settings
-
-### 3. Defensive Programming
-
-```typescript
-// Validate URL before injection attempts
-if (this.isRestrictedUrl(tab.url)) {
-  return; // Skip chrome://, extension pages, etc.
-}
-
-// Double-check permissions before injection
-const hasPermission = await this.hasPermissionForHostname(hostname);
-if (!hasPermission) {
-  throw new Error('Permission denied');
-}
-```
-
-## Performance Optimizations
-
-### 1. Injection Tracking
-
-- Track injected tabs to avoid redundant injections
-- Use `Set<number>` for O(1) lookup performance
-- Clean up tracking on tab close
-
-### 2. Concurrent Injection Prevention
-
-```typescript
-// Prevent multiple concurrent injections for same tab
-if (this.injectionPromises.has(tabId)) {
-  return this.injectionPromises.get(tabId);
-}
-```
-
-### 3. Permission Caching
-
-- Chrome automatically caches permission checks
-- Minimize permission API calls through smart checking
-- Use settings to pre-filter injection attempts
-
-## Error Handling
-
-### 1. Permission Errors
-
-```typescript
-try {
-  await this.injectContentScript(tabId);
-} catch (error) {
-  if (error.message.includes('No permission')) {
-    // Expected for most sites - silent handling
-  } else {
-    // Unexpected error - log for debugging
-    console.error('Injection failed:', error);
-  }
-}
-```
-
-### 2. Tab Access Errors
-
-```typescript
-// Graceful handling of closed/inaccessible tabs
-try {
-  const tab = await chrome.tabs.get(tabId);
-} catch {
-  // Tab was closed or is inaccessible
-  return;
-}
-```
-
-### 3. Build Manifest Resolution
-
-```typescript
-// The loader the manifest names (assets/index.ts-loader-<hash>.js)
-private async getContentScriptFilename(): Promise<string> {
-  const contentScriptPath = chrome.runtime.getManifest().content_scripts?.[0]?.js?.[0];
-  // ... throw if the manifest declares none
-  try {
-    await fetch(chrome.runtime.getURL(contentScriptPath));
-    return contentScriptPath;
-  } catch {
-    // Not on disk: dist/ was rebuilt after Chrome loaded the extension
-    throw new Error(STALE_BUILD_ERROR); // "Reload it in chrome://extensions..."
-  }
-}
-```
+`injectContentScript` runs the loader the manifest names, the first file of its first content script (crxjs writes it as `assets/index.ts-loader-<hash>.js`). `getContentScriptFilename` fetches that file first. When the fetch fails it logs a warning and throws `STALE_BUILD_ERROR`, which asks the user to reload the extension in `chrome://extensions`.
 
 Chrome reads the manifest once, when it loads the extension. A rebuild writes the loader under a
 new hashed name, so until the extension is reloaded the manifest names a file that is gone; the
-error asks for that reload (tests/e2e/content/picker-stale-build.spec.ts).
+error asks for that reload (`tests/e2e/content/picker-stale-build.spec.ts`).
 
-## Testing Considerations
+## Errors
 
-### 1. Permission Scenarios
+`classifyInjectionError` sorts a failure by its message. `injectContentScript` logs by type, then rethrows every type:
 
-- ✅ Default sites work without additional permissions
-- ✅ Custom sites prompt for permission appropriately
-- ✅ Permission denial handled gracefully
-- ✅ Permission revocation detected
+| Type | The message holds | `injectContentScript` |
+|---|---|---|
+| `orphaned_tab` | `tab access denied`, within 10 s of the service worker's start (`ORPHANED_TAB_DETECTION_WINDOW_MS`) | logs nothing; adds the tab to `orphanedTabs` |
+| `permission` | `No permission to inject into` | logs nothing |
+| `tab_access_denied` | `tab access denied`, after those 10 s | `Logger.warn` |
+| `network` | `interrupted by user` | logs nothing |
+| `tab_closed` | `No tab with id` (the tab closed during the injection) | logs nothing |
+| `security` | `violates CSP` | `Logger.error` |
+| `unknown` | anything else, `STALE_BUILD_ERROR` included | `Logger.error` |
 
-### 2. Injection Scenarios
+`forceInjectContentScript` classifies the error again for its `error` text. For `permission`, `orphaned_tab`, `tab_access_denied` and `tab_closed` it returns a message of its own and logs nothing more. For the other types it returns the error's message and logs it with `Logger.error`, so a `network` failure is logged once, and a `security` or `unknown` one twice.
 
-- ✅ Fresh page loads trigger injection
-- ✅ SPA navigation triggers re-injection
-- ✅ Extension icon click forces injection
-- ✅ Duplicate injections prevented
+## Tests
 
-### 3. Error Scenarios
+- `src/background/__tests__/background.injector.test.ts`: injection with and without the permission, restricted URLs, a Custom site on, off or malformed, `cleanup`, and the error classification.
+- `src/background/__tests__/background.update.test.ts`: the injection into open tabs at an install and at an update, a Platform the user turned off left out, and a tab that already has the script left as it is.
+- `src/test/guardrails/manifestHosts.test.ts`: the pinned hosts and permissions.
+- `src/components/settings/__tests__/AddCustomSiteForm.test.tsx`: the permission request when a Custom site is added, and its refusal.
+- On the built extension: `tests/e2e/content/injection.spec.ts` (the manifest's content script on the Platforms' stand-ins), `tests/e2e/content/custom-site-chunks.spec.ts` and `tests/e2e/content/picker-stale-build.spec.ts`.
 
-- ✅ Restricted URLs (chrome://) properly skipped
-- ✅ Network errors don't crash injection
-- ✅ Tab closure during injection handled gracefully
-- ✅ Build file changes don't break injection
-
-## Migration Impact
-
-### User Experience
-
-- **Improved**: Reduced permission warnings in Chrome Web Store
-- **Maintained**: All existing functionality preserved
-- **Enhanced**: More explicit control over site access
-
-### Developer Experience
-
-- **Complexity**: Slightly increased due to permission management
-- **Debugging**: Better error messages and injection tracking
-- **Maintenance**: More robust error handling
-
-### Performance
-
-- **Memory**: Reduced global listener overhead
-- **CPU**: Smarter injection logic reduces unnecessary work
-- **Network**: No impact on content script functionality
-
-## Future Considerations
-
-### 1. Permission Management UI
-
-Consider adding:
-- Permission status indicator in settings
-- One-click permission revocation
-- Bulk permission management
-
-### 2. Advanced Injection Strategies
-
-Potential improvements:
-- Lazy loading of content script modules
-- Platform-specific injection optimization
-- Content script hot-reloading in development
-
-### 3. Analytics and Monitoring
-
-Useful metrics:
-- Injection success/failure rates
-- Permission grant/denial rates
-- Performance impact measurement
-
-## Conclusion
-
-The migration to programmatic injection successfully:
-
-✅ **Eliminates** `<all_urls>` permission overreach  
-✅ **Maintains** full functionality for all supported platforms  
-✅ **Enhances** security through minimal permission principle  
-✅ **Improves** user trust through transparent permission model  
-✅ **Preserves** performance through intelligent injection logic  
-
-This change positions the extension for better Chrome Web Store compliance while maintaining the excellent user experience that makes My Prompt Manager valuable for AI platform users.
+No test covers the `onUpdated` and `onClicked` listeners, or the guard against concurrent injections.

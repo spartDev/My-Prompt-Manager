@@ -1,617 +1,67 @@
 # Element Picker Security Safeguards
 
-## Overview
+The Element picker runs in the page the user picks on, so it keeps the user from picking a sensitive field, warns on a sensitive page, and sends back only what placing the Prompts button needs. All of it lives in `src/content/modules/element-picker.ts`, with the fingerprint in `src/content/utils/element-fingerprint.ts`. How a pick starts and travels: [ELEMENT_PICKER_IMPLEMENTATION.md](./ELEMENT_PICKER_IMPLEMENTATION.md).
 
-The Element Picker module has been enhanced with comprehensive security safeguards to prevent interaction with sensitive form fields and minimize data exposure. This document provides detailed technical documentation of the security implementation, rationale, and operational behavior.
+One test covers a safeguard: "should ignore sensitive IDs and attributes" in `src/content/utils/__tests__/element-fingerprint.test.ts` checks that a sensitive `id` and `data-testid` are left out of the fingerprint (section 3). Nothing tests the rest, the other values the fingerprint filters included: a change to them is checked by hand, on the pages each section names.
 
-## Security Architecture
+## 1. Blocked elements
 
-### Core Security Principles
+`isElementBlocked(element)` runs on every hover, which colors the highlight red instead of purple, and again on the click. A blocked click shows a warning and picks nothing. The checks run in this order, and the first match blocks:
 
-1. **Defense in Depth**: Multiple layers of validation prevent sensitive field selection
-2. **Data Minimization**: Zero extraction of potentially sensitive content from DOM elements
-3. **Audit Transparency**: Complete logging of all picker interactions for security monitoring
-4. **Graduated Response**: Different security levels based on domain sensitivity and field types
-5. **User Awareness**: Clear visual feedback and warnings for security decisions
+1. **`BLOCKED_SELECTORS`**: the element matches one of them. They cover password, hidden, tel, email and ssn inputs, inputs marked `data-sensitive` or `data-private`, `autocomplete` values of cards, passwords, payments and one-time codes, the `.sensitive` class, a `data-testid` or an `aria-label` holding `password`, an `id` holding `cvv` or `pin`, a `name` holding `creditcard` or `ssn`, and every `iframe`. Reason: `Sensitive field detected: <selector>`. Step 3 catches the other spellings, such as `id="password"`.
+2. **A blocked ancestor**: `element.closest()` finds a match among the element's ancestors, so everything inside a sensitive field or container is blocked. A wrapper that only contains a sensitive field is not: nothing looks at descendants.
+3. **Attribute names and values**: each attribute's name, then its value, is tested against `/password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account/i`. Reasons: `Sensitive attribute detected: <name>`, or `Sensitive attribute value detected: <name>="[REDACTED]"`. The pattern is unanchored, so it also blocks ordinary elements such as `class="card"`, `keyboard`, `spinner` or `account-menu`.
 
-## Implementation Details
+Two later checks, of the placeholder and of `aria-label`, never decide anything: step 3 has already tested those values.
 
-### 1. Sensitive Field Detection System
+To block another kind of field, add a selector to `BLOCKED_SELECTORS`.
 
-#### 1.1 Blocked Selectors Constant
+## 2. Sensitive pages
 
-**Location**: `src/content/modules/element-picker.ts:9-29`
+`isDomainSensitive()` tests the patterns of `SENSITIVE_DOMAINS` (banks, `.gov`, health, insurance, tax, payment processors, crypto exchanges, brokers) against the hostname and the full URL. The patterns are unanchored substrings: `/\.tax/` matches `x.taxi.com`, `/chase\./` matches `purchase.example.com`, and `/medical/` matches a URL with "medical" anywhere in it.
 
-```typescript
-const BLOCKED_SELECTORS = [
-  'input[type="password"]',
-  'input[type="hidden"]',
-  'input[type="tel"]',
-  'input[type="email"]',
-  'input[type="ssn"]',
-  'input[data-sensitive]',
-  'input[data-private]',
-  '[autocomplete*="cc-"]',           // Credit card fields
-  '[autocomplete*="password"]',       // Password managers
-  '[autocomplete*="transaction-"]',   // Payment fields
-  '[autocomplete*="one-time-code"]',  // 2FA codes
-  '.sensitive',                        // Custom sensitive class
-  '[data-testid*="password"]',        // Common test IDs
-  '[id*="cvv"]',                      // CVV fields
-  '[id*="pin"]',                      // PIN fields
-  '[name*="creditcard"]',             // Credit card by name
-  '[name*="ssn"]',                    // SSN by name
-  '[aria-label*="password"]',         // Accessibility labels
-  'iframe'                             // Prevent iframe interaction
-];
-```
+The check runs on a click on an element that is not blocked, never at activation: on a sensitive page the picker opens and highlights as on any other.
 
-**Design Rationale**:
-- **HTML5 Input Types**: Direct blocking of sensitive input types (password, hidden, tel, email)
-- **Autocomplete Standards**: Uses HTML5 autocomplete specification for credit card and authentication fields
-- **Common Naming Patterns**: Covers typical field naming conventions (cvv, pin, ssn, creditcard)
-- **Accessibility-Aware**: Includes ARIA label detection for screen reader compatibility
-- **Test Environment Support**: Recognizes common test identifiers (data-testid)
-- **Custom Field Support**: Allows developers to mark fields as sensitive via data attributes
-- **Container Security**: Blocks iframe interaction to prevent cross-origin security issues
+- **High** (a `SENSITIVE_DOMAINS` match): the warning "Warning: You are on a sensitive website. Element picker has been disabled for security reasons." shows, and the picker deactivates without a pick.
+- **Medium** (an `https:` URL matching `/login|signin|checkout|payment|account|profile|banking|financial/i`): the warning "Caution: This appears to be a sensitive page. Please ensure you are not selecting private information." shows, and the pick is sent in the same click. Nothing asks for a confirmation.
+- **Low**: the pick is sent.
 
-#### 1.2 Element Blocking Validation
+To treat another site as sensitive, add a pattern to `SENSITIVE_DOMAINS`. The console sanitizer of section 4 reads the same list.
 
-**Location**: `src/content/modules/element-picker.ts:81-151`
+## 3. What a pick sends
 
-```typescript
-private isElementBlocked(element: Element): { blocked: boolean; reason?: string }
-```
+The click sends `ELEMENT_SELECTED` with:
 
-**Multi-Layer Validation Process**:
+- **`fingerprint`**, from `ElementFingerprintGenerator`: the identifier the content script places the button by. It holds the element's `id`, `data-testid`, `data-id`, `name`, `aria-label` and `placeholder`, its tag, `type` and `role`, its text content (the first 50 characters, for an element whose text is under 200), its parent's tag, `id` and `data-testid`, its stable attributes and class patterns, and the page URL (`meta.url`). The generator's `SENSITIVE_PATTERNS` filters the identifiers, the placeholder, the text, the parent's identifiers and the stable attributes: a value that matches is left out. The tag, `type`, `role`, the class patterns and `meta.url` are kept as they are, the URL's path and query included. A Custom site stores the whole fingerprint in its positioning (`src/components/settings/AddCustomSiteForm.tsx`). Export (`handleExportCustomSite` in `src/components/settings/SiteIntegrationSection.tsx`) copies it whole into the share code (`configToPayload` in `src/services/configurationEncoder.ts`), which anyone holding the code can decode.
+- **`selector`**, the fallback: the element's `#id`, or `tag[data-x="<value>"]`, or classes, or a path (see [ELEMENT_PICKER_IMPLEMENTATION.md](./ELEMENT_PICKER_IMPLEMENTATION.md)).
+- **`elementInfo`**, from `getElementInfo`: the tag, the selector, the position and size, `hasId`, `hasClasses`, the depth, the visibility, `blocked` and `securityLevel` (`high`, `medium` or `low`, as in section 2). Nothing reads `securityLevel`.
+- **`elementType`** (the tag) and **`hostname`**.
 
-1. **Direct Selector Matching**
-   ```typescript
-   for (const selector of BLOCKED_SELECTORS) {
-     if (element.matches(selector)) {
-       return { blocked: true, reason: `Sensitive field detected: ${selector}` };
-     }
-   }
-   ```
-   - Tests element against all blocked selectors
-   - Provides specific reason for blocking
-   - Handles invalid selectors gracefully
+No field's live `value` is read, so what the user typed in an `<input>` is not sent from there. The `value` attribute is read: step 3 of section 1 and the fingerprint's filter test it as they test every attribute, and neither sends it. A React-controlled input keeps that attribute equal to what the user typed, so typing `my account` there blocks the field. A copy the page makes in another attribute can be sent, though. The fingerprint keeps up to 10 stable attributes: those whose name starts with `data-` (except the names that start `data-sensitive`, `data-private`, `data-password`, `data-token`, `data-key` or `data-secret`), `aria-` (except `aria-label`), `ng-`, `v-` or `react-`, each with its whole value, once `SENSITIVE_PATTERNS` lets its name and value through. A `data-` attribute can also make the `selector`, whose value is not filtered. A page that mirrors the draft into `data-draft` can send it in both, unless the draft matches the pattern of step 3, which blocks the field.
 
-2. **Parent Container Analysis**
-   ```typescript
-   const sensitiveParent = element.closest(BLOCKED_SELECTORS.join(','));
-   if (sensitiveParent) {
-     return { blocked: true, reason: 'Element is within a sensitive container' };
-   }
-   ```
-   - Prevents selection of elements within sensitive containers
-   - Covers cases where wrapper elements contain sensitive fields
-   - Uses efficient `closest()` DOM traversal
+A pick on a composer that holds a draft carries the draft's first 50 characters, within the limits above, when the composer is a contenteditable field, whose text content is what the user typed in it, or a React-controlled `<textarea>`, whose text content is its default value, which React keeps equal to what the user typed. A pick on an element that contains such a field, such as the composer's wrapper, carries the draft too: the picked element's text content includes the field's, and is kept when all of it is under 200 characters.
 
-3. **Attribute Pattern Matching**
-   ```typescript
-   const sensitivePatterns = /password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account/i;
-   for (const attr of attributes) {
-     if (sensitivePatterns.test(attr) || sensitivePatterns.test(attrValue)) {
-       return { blocked: true, reason: `Sensitive attribute detected: ${attr}` };
-     }
-   }
-   ```
-   - Scans all element attributes for sensitive keywords
-   - Case-insensitive pattern matching
-   - Checks both attribute names and values
+## 4. Audit log
 
-4. **Semantic Content Analysis**
-   - **Placeholder Text**: Analyzes placeholder attributes for sensitive indicators
-   - **ARIA Labels**: Examines accessibility labels for security-related content
-   - **Combined Approach**: Multiple indicators increase detection accuracy
+`logAudit` records two actions, each with the page URL and a timestamp:
 
-**Why This Approach**:
-- **Comprehensive Coverage**: Catches sensitive fields regardless of implementation approach
-- **False Positive Minimization**: Multiple validation layers reduce incorrect blocking
-- **Performance Optimized**: Early returns and efficient DOM queries
-- **Maintainability**: Clear separation of validation logic
+- `blocked_selection`, at each warning, the Caution of a medium page included, with the reason, the selector and the hostname;
+- `element_selected`, with the selector, the tag, the hostname, `secure` (a low page), `hasFingerprintId` and `fingerprintConfidence`.
 
-### 2. Domain Sensitivity Classification
+Activation, Escape and deactivation are not recorded. The log keeps the last 50 entries (`MAX_AUDIT_ENTRIES`) in memory, and each entry copies it to the page's `sessionStorage` under `element-picker-audit`. That storage belongs to the page's origin, so the page's own scripts can read it. Each page load starts an empty log, whose first entry overwrites the stored one, and nothing reads the key back.
 
-#### 2.1 Sensitive Domain Patterns
+When the page's `localStorage` holds `prompt-library-debug` = `true`, each entry is also printed to the console, reduced by `sanitizeAuditDetailsForLogging` to categories: `reasonType`, `selectorType` and `domainType` for a warning; `elementType`, `secure`, `selectorType` and `domainType` for a pick. The sanitizer's branch for a URL (`protocol`, `hasSensitivePath`) never runs, since `logAudit` adds the URL to the stored entry only. The debug logger separately prints the raw fingerprint and selector of a pick.
 
-**Location**: `src/content/modules/element-picker.ts:31-55`
+## 5. Visual feedback
 
-```typescript
-const SENSITIVE_DOMAINS = [
-  /\.bank/i,           // Generic banking TLD
-  /banking\./i,        // Banking subdomains
-  /\.gov/i,            // Government domains
-  /healthcare/i,       // Healthcare providers
-  /medical/i,          // Medical institutions
-  /paypal\./i,         // Payment processors
-  /stripe\./i,         // Financial services
-  /coinbase\./i,       // Cryptocurrency exchanges
-  /\.tax/i,            // Tax preparation
-  /insurance/i,        // Insurance companies
-  // ... Major financial institutions
-];
-```
+- The highlight box is purple (`#7c3aed` border) over an element that can be picked, red (`#dc2626`) over a blocked one. The box ignores the pointer, so the page keeps the picker's crosshair cursor.
+- A warning is a red box fixed at the center of the page (`#mpm-security-warning`, z-index 2147483647), removed after 3 seconds. Its text is the reason, as in sections 1 and 2.
 
-**Classification Strategy**:
-- **Regex Patterns**: Flexible matching for domain variations
-- **TLD-Based**: Covers industry-specific top-level domains (.bank, .gov, .tax)
-- **Subdomain Aware**: Detects banking subdomains (banking.example.com)
-- **Major Institutions**: Explicit patterns for well-known financial services
-- **Industry Coverage**: Healthcare, insurance, government, cryptocurrency
+## Checking a change by hand
 
-#### 2.2 Domain Sensitivity Detection
+Load the build, add a test page as a Custom site, start the picker, and check:
 
-**Location**: `src/content/modules/element-picker.ts:157-176`
-
-```typescript
-private isDomainSensitive(): { sensitive: boolean; requiresConfirmation: boolean }
-```
-
-**Security Levels**:
-
-1. **High Sensitivity (Block)**
-   - Domain matches sensitive patterns
-   - Complete picker deactivation
-   - Clear warning message to user
-
-2. **Medium Sensitivity (Warn)**
-   - HTTPS sites with suspicious URL patterns
-   - Common sensitive page indicators: `login`, `signin`, `checkout`, `payment`, `account`, `profile`
-   - Allow usage with confirmation warning
-
-3. **Low Sensitivity (Allow)**
-   - Regular domains without sensitive indicators
-   - No additional restrictions or warnings
-
-**Implementation Logic**:
-```typescript
-// High sensitivity check
-for (const pattern of SENSITIVE_DOMAINS) {
-  if (pattern.test(hostname) || pattern.test(href)) {
-    return { sensitive: true, requiresConfirmation: true };
-  }
-}
-
-// Medium sensitivity check
-if (window.location.protocol === 'https:') {
-  const sensitiveIndicators = /login|signin|checkout|payment|account|profile|banking|financial/i;
-  if (sensitiveIndicators.test(href)) {
-    return { sensitive: false, requiresConfirmation: true };
-  }
-}
-```
-
-**Why Domain-Based Security**:
-- **Contextual Awareness**: Different security postures for different site types
-- **Graduated Response**: Proportional restrictions based on risk level
-- **User Experience Balance**: Maintains usability while enforcing security
-- **Industry Standards**: Aligns with common security practices for financial sites
-
-### 3. Data Minimization Implementation
-
-#### 3.1 Secure Element Information Extraction
-
-**Location**: `src/content/modules/element-picker.ts:772-795`
-
-**Before (Insecure)**:
-```typescript
-return {
-  tagName: element.tagName.toLowerCase(),
-  id: element.id || null,                    // ❌ Potentially sensitive
-  className: element.className || null,      // ❌ May contain sensitive info
-  innerText: element.innerText?.substring(0, 100), // ❌ High risk data exposure
-  position: { /* ... */ },
-  style: { /* ... */ }
-};
-```
-
-**After (Secure)**:
-```typescript
-return {
-  // Only structural information, no content
-  tagName: element.tagName.toLowerCase(),
-  selector: this.generateSelector(element),
-  position: {
-    x: rect.left,
-    y: rect.top,
-    width: rect.width,
-    height: rect.height
-  },
-  // Add safe metadata only
-  hasId: !!element.id,                      // ✅ Boolean only
-  hasClasses: !!element.className,          // ✅ Boolean only
-  depth: this.getElementDepth(element),     // ✅ Structural info
-  isVisible: this.isElementVisible(element), // ✅ Display state
-  // Security context
-  blocked: this.isElementBlocked(element).blocked,
-  securityLevel: this.isDomainSensitive().sensitive ? 'high' : 
-                this.isDomainSensitive().requiresConfirmation ? 'medium' : 'low'
-};
-```
-
-**Security Improvements**:
-- **No Content Extraction**: Eliminates `innerText` and element values
-- **Metadata Only**: Provides structural information without sensitive data
-- **Boolean Flags**: Uses existence checks instead of actual values
-- **Security Context**: Includes blocking status and security level
-- **Minimal Footprint**: Reduces data transmission and storage
-
-**Why Data Minimization Matters**:
-- **Privacy Protection**: Prevents accidental sensitive data collection
-- **Compliance**: Aligns with data protection regulations (GDPR, CCPA)
-- **Attack Surface Reduction**: Less data means fewer security vulnerabilities
-- **Performance**: Smaller payloads improve extension performance
-
-### 4. Audit Logging System
-
-#### 4.1 Comprehensive Event Logging
-
-**Location**: `src/content/modules/element-picker.ts:226-257`
-
-```typescript
-private logAudit(action: string, details: unknown): void {
-  const entry = {
-    timestamp: Date.now(),
-    action,
-    details: {
-      ...details as Record<string, unknown>,
-      url: window.location.href,
-      timestamp: new Date().toISOString()
-    }
-  };
-
-  this.auditLog.push(entry);
-
-  // Store last 50 entries in session storage
-  if (this.auditLog.length > 50) {
-    this.auditLog.shift();
-  }
-
-  try {
-    sessionStorage.setItem('element-picker-audit', JSON.stringify(this.auditLog));
-  } catch (error) {
-    debug('[ElementPicker] Audit log storage failed:', error);
-  }
-}
-```
-
-**Audit Events Tracked**:
-
-1. **Blocked Selection Attempts**
-   ```typescript
-   this.logAudit('blocked_selection', {
-     reason: message,
-     selector: this.generateSelector(element),
-     domain: window.location.hostname
-   });
-   ```
-
-2. **Successful Element Selections**
-   ```typescript
-   this.logAudit('element_selected', {
-     selector,
-     elementType: element.tagName.toLowerCase(),
-     domain: window.location.hostname,
-     secure: !domainCheck.requiresConfirmation && !domainCheck.sensitive
-   });
-   ```
-
-**Storage and Retrieval**:
-- **Session Storage**: Persists audit log across page navigation
-- **Circular Buffer**: Maintains last 50 entries to prevent memory issues
-- **JSON Serialization**: Structured data for easy analysis
-- **Debug Mode**: Console logging when debug flag is enabled
-
-**Security Benefits**:
-- **Incident Response**: Enables security teams to investigate suspicious activity
-- **Compliance**: Provides audit trail for security reviews
-- **Pattern Detection**: Identifies potential abuse or attack patterns
-- **User Awareness**: Debug mode shows users what data is being logged
-
-### 5. Visual Security Feedback System
-
-#### 5.1 Color-Coded Element Highlighting
-
-**Location**: `src/content/modules/element-picker.ts:594-616`
-
-```typescript
-private highlightElement(element: Element, isBlocked = false): void {
-  if (isBlocked) {
-    // Red highlight for blocked elements
-    this.highlightBox.style.backgroundColor = 'rgba(239, 68, 68, 0.3)';
-    this.highlightBox.style.borderColor = '#dc2626';
-    this.highlightBox.style.cursor = 'not-allowed';
-    this.highlightBox.style.boxShadow = '0 0 0 1px rgba(220, 38, 38, 0.5)';
-  } else {
-    // Purple highlight for allowed elements
-    this.highlightBox.style.backgroundColor = 'rgba(124, 58, 237, 0.1)';
-    this.highlightBox.style.borderColor = '#7c3aed';
-    this.highlightBox.style.cursor = 'pointer';
-    this.highlightBox.style.boxShadow = '0 0 0 1px rgba(124, 58, 237, 0.3)';
-  }
-}
-```
-
-**Visual Indicators**:
-- **Red Highlighting**: Immediate visual feedback for blocked elements
-- **Purple Highlighting**: Standard highlight for selectable elements
-- **Cursor Changes**: `not-allowed` cursor reinforces blocking status
-- **Box Shadow**: Additional visual emphasis for security states
-
-#### 5.2 Security Warning Messages
-
-**Location**: `src/content/modules/element-picker.ts:182-220`
-
-```typescript
-private showWarning(message: string, element: Element): boolean {
-  const warning = document.createElement('div');
-  warning.style.cssText = `
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #dc2626;
-    color: white;
-    padding: 16px 24px;
-    border-radius: 8px;
-    z-index: 2147483647;
-    font-size: 14px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    max-width: 400px;
-    text-align: center;
-  `;
-}
-```
-
-**Warning Types**:
-1. **Blocked Element Warning**: "Cannot select this element: [reason]. For security reasons, sensitive fields cannot be selected."
-2. **Sensitive Domain Warning**: "Warning: You are on a sensitive website. Element picker has been disabled for security reasons."
-3. **Confirmation Warning**: "Caution: This appears to be a sensitive page. Please ensure you are not selecting private information."
-
-**User Experience Features**:
-- **Auto-Dismiss**: Warnings disappear after 3 seconds
-- **High Z-Index**: Ensures visibility above all page content
-- **Clear Messaging**: Specific reasons for security decisions
-- **Non-Intrusive**: Centered overlay doesn't break page layout
-
-### 6. Enhanced Click Handler Security
-
-#### 6.1 Security-First Click Processing
-
-**Location**: `src/content/modules/element-picker.ts:484-553`
-
-**Security Flow**:
-
-1. **Element Validation**
-   ```typescript
-   const blockCheck = this.isElementBlocked(this.currentElement);
-   if (blockCheck.blocked) {
-     this.showWarning(/* ... */);
-     return; // Early exit, no selection
-   }
-   ```
-
-2. **Domain Security Check**
-   ```typescript
-   const domainCheck = this.isDomainSensitive();
-   if (domainCheck.sensitive) {
-     this.showWarning(/* ... */);
-     this.deactivate(); // Complete picker shutdown
-     return;
-   }
-   ```
-
-3. **Confirmation Handling**
-   ```typescript
-   if (domainCheck.requiresConfirmation) {
-     this.showWarning('Caution: This appears to be a sensitive page...');
-     // Continue with selection but warn user
-   }
-   ```
-
-4. **Secure Selection Processing**
-   ```typescript
-   const selector = this.generateSelector(this.currentElement);
-   const elementInfo = this.getElementInfo(this.currentElement);
-   
-   this.logAudit('element_selected', {
-     selector,
-     elementType: this.currentElement.tagName.toLowerCase(),
-     domain: window.location.hostname,
-     secure: !domainCheck.requiresConfirmation && !domainCheck.sensitive
-   });
-   ```
-
-**Security Guarantees**:
-- **Zero False Positives**: Blocked elements cannot be selected under any circumstances
-- **Audit Trail**: All interactions logged before processing
-- **Graceful Degradation**: Clear feedback for blocked attempts
-- **Context Preservation**: Security decisions based on complete element and domain context
-
-## Security Testing and Validation
-
-### 1. Attack Vector Coverage
-
-The security implementation has been designed to prevent the following attack vectors:
-
-#### 1.1 Direct Sensitive Field Selection
-- **Password Fields**: `input[type="password"]` directly blocked
-- **Hidden Inputs**: `input[type="hidden"]` cannot be selected
-- **Credit Card Fields**: Autocomplete-based detection prevents selection
-- **2FA Codes**: One-time-code fields blocked
-- **Personal Information**: SSN, phone, email fields protected
-
-#### 1.2 Indirect Selection Attempts
-- **Container Selection**: Parent elements of sensitive fields blocked
-- **CSS Class Exploitation**: Generic `.sensitive` class detection
-- **Custom Attributes**: `data-sensitive` and `data-private` respected
-- **ARIA Label Bypass**: Accessibility labels scanned for sensitive content
-
-#### 1.3 Domain-Based Attacks
-- **Banking Site Exploitation**: Major financial institutions specifically blocked
-- **Government Site Abuse**: .gov domains completely restricted
-- **Payment Processor Abuse**: PayPal, Stripe, Square explicitly blocked
-- **Cryptocurrency Exchanges**: Coinbase, Kraken, Binance protected
-
-### 2. Real-World Testing Scenarios
-
-#### 2.1 Banking Websites
-- **Test Sites**: chase.com, wellsfargo.com, bankofamerica.com
-- **Expected Behavior**: Complete picker deactivation with security warning
-- **Verification**: No element selection possible, audit log records attempt
-
-#### 2.2 E-Commerce Checkout
-- **Test Sites**: Sites with credit card forms
-- **Expected Behavior**: Red highlighting for payment fields, selection blocked
-- **Verification**: CVV, credit card number, and expiry fields cannot be selected
-
-#### 2.3 Government Portals
-- **Test Sites**: IRS.gov, other .gov domains
-- **Expected Behavior**: Immediate picker shutdown on activation
-- **Verification**: Security warning displayed, no element interaction possible
-
-#### 2.4 Login Pages
-- **Test Sites**: Various login forms
-- **Expected Behavior**: Password fields blocked, confirmation warning for page
-- **Verification**: Username fields may be selectable, password fields always blocked
-
-## Performance Impact Assessment
-
-### 1. Runtime Performance
-
-**Element Validation Overhead**:
-- **Selector Matching**: O(n) where n = number of blocked selectors (19)
-- **Attribute Scanning**: O(m) where m = number of element attributes
-- **Pattern Matching**: Compiled regex patterns for efficient execution
-- **DOM Traversal**: Single `closest()` call for parent checking
-
-**Optimization Strategies**:
-- **Early Returns**: Validation stops at first match
-- **Compiled Patterns**: Regex patterns compiled once at module load
-- **Efficient Selectors**: CSS selectors optimized for browser engines
-- **Minimal DOM Queries**: Reduces expensive DOM operations
-
-### 2. Memory Usage
-
-**Audit Log Management**:
-- **Circular Buffer**: Maximum 50 entries to prevent memory growth
-- **Session Storage**: Offloads data from runtime memory
-- **Structured Logging**: Consistent data structure for efficient serialization
-- **Cleanup on Deactivation**: All references cleared when picker disabled
-
-### 3. Network Impact
-
-**Data Transmission Reduction**:
-- **Before**: Element content, IDs, classes transmitted to background script
-- **After**: Only CSS selectors and boolean flags transmitted
-- **Reduction**: ~60-80% decrease in data payload size
-- **Benefits**: Faster message passing, reduced bandwidth usage
-
-## Security Configuration and Extensibility
-
-### 1. Adding New Sensitive Field Patterns
-
-To add additional sensitive field detection patterns:
-
-```typescript
-// Add to BLOCKED_SELECTORS array
-const BLOCKED_SELECTORS = [
-  // ... existing patterns
-  'input[name*="yourNewPattern"]',
-  '[data-your-custom-attribute]',
-  // New patterns here
-];
-```
-
-### 2. Domain Pattern Extension
-
-To add new sensitive domains:
-
-```typescript
-// Add to SENSITIVE_DOMAINS array
-const SENSITIVE_DOMAINS = [
-  // ... existing patterns
-  /yournewbank\./i,
-  /\.yourfinancialTLD/i,
-  // New domain patterns here
-];
-```
-
-### 3. Custom Security Levels
-
-The system supports custom security levels through the `securityLevel` property:
-
-```typescript
-// In getElementInfo() method
-securityLevel: this.isDomainSensitive().sensitive ? 'high' : 
-              this.isDomainSensitive().requiresConfirmation ? 'medium' : 'low'
-```
-
-## Compliance and Regulatory Alignment
-
-### 1. Data Protection Regulations
-
-**GDPR Compliance**:
-- **Data Minimization**: Article 5(1)(c) - only necessary data collected
-- **Purpose Limitation**: Article 5(1)(b) - data used only for element selection
-- **Storage Limitation**: Article 5(1)(e) - audit logs automatically pruned
-
-**CCPA Compliance**:
-- **Transparency**: Clear indication of what data is collected
-- **Minimal Collection**: No sensitive personal information extracted
-- **User Control**: Audit logging provides visibility into data handling
-
-### 2. Industry Standards
-
-**PCI DSS Alignment**:
-- **Requirement 3**: Credit card field detection prevents data exposure
-- **Requirement 7**: Principle of least privilege in data access
-- **Requirement 10**: Comprehensive audit logging implemented
-
-**OWASP Guidelines**:
-- **Input Validation**: All element data validated before processing
-- **Output Encoding**: Safe DOM manipulation practices
-- **Security Logging**: Detailed audit trail for security events
-
-## Maintenance and Monitoring
-
-### 1. Security Updates
-
-**Regular Review Requirements**:
-- **Quarterly Pattern Review**: Update blocked selectors for new sensitive field patterns
-- **Annual Domain Review**: Add new financial institutions and sensitive sites
-- **Vulnerability Assessment**: Regular security testing of detection mechanisms
-
-### 2. Monitoring and Alerting
-
-**Audit Log Analysis**:
-- **Blocked Attempt Patterns**: Monitor for unusual blocking patterns
-- **Domain Analysis**: Track selection attempts on sensitive domains
-- **User Behavior**: Identify potential security training needs
-
-**Debug Mode Monitoring**:
-```typescript
-// Enable debug logging
-localStorage.setItem('prompt-library-debug', 'true');
-
-// Monitor console for security events
-// [ElementPicker Audit] blocked_selection: { reason: "...", domain: "..." }
-```
-
-### 3. Performance Monitoring
-
-**Key Metrics**:
-- **Validation Time**: Time spent in security checks
-- **Memory Usage**: Audit log memory consumption
-- **False Positive Rate**: Legitimate fields incorrectly blocked
-- **False Negative Rate**: Sensitive fields not properly detected
-
-## Conclusion
-
-The Element Picker security implementation provides enterprise-grade protection against sensitive data exposure while maintaining usability for legitimate use cases. The multi-layered approach ensures comprehensive coverage of attack vectors while providing clear feedback to users about security decisions.
-
-The system balances security with user experience through graduated responses, clear visual feedback, and comprehensive audit logging. Regular maintenance and monitoring ensure the security measures remain effective against evolving threats and new sensitive field patterns.
-
-This implementation serves as a model for secure DOM interaction in browser extensions and can be adapted for other similar security-sensitive applications.
+- a password field, a card number field (`autocomplete="cc-number"`) and an element inside a blocked container: red, and a click shows the warning and picks nothing;
+- a field inside an `iframe`: the picker listens on the top page only, so it never sees the field, and the highlight keeps the last element the pointer crossed there. A click on the field goes to the frame's page: no warning, nothing picked, and the picker stays open. Over the `iframe`'s own border, when it has one, the highlight is red, and a click there shows the warning;
+- a login page over HTTPS: the Caution warning shows, and the pick arrives;
+- a page whose hostname matches `SENSITIVE_DOMAINS`: the picker opens, and the first click on an element that is not blocked shows the warning and closes it.
