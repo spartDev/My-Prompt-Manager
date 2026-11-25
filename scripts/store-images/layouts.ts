@@ -26,7 +26,7 @@ export interface StoreImage {
   /** The image's ground: what the flattened PNG lays every pixel over */
   ground: string;
   html: string;
-  /** The scenes it shows, whose texts are words it shows too */
+  /** The scenes it shows, whose UI text (Scene.text) goes with its own in --texts */
   scenes: readonly Scene[];
 }
 

@@ -32,7 +32,7 @@ export interface Scene {
   height: number;
   /** Where the UI is in it, in CSS px: the rest is the room kept for its shadows */
   content: Box;
-  /** The words its UI holds, " | " between the texts of its elements: what a check of the images' claims reads */
+  /** The text of its UI, " | " between the texts of its elements (wordsIn): what a check of the images' claims greps */
   text: string;
 }
 
@@ -121,10 +121,11 @@ const settled = (page: Page): Promise<void> =>
   });
 
 /**
- * The texts of `root` and of the elements under it, their shadow roots included, each element
- * rendered (not display: none, hidden or transparent), and the values of its fields. Text scrolled
- * out of view counts too, so that no word an image shows is missed. Runs in the page: no named
- * function inside, which the transpiler would wrap in a helper the page does not have.
+ * The texts of `root` and of the elements under it, their shadow roots included, of each element
+ * rendered (not display: none, visibility: hidden or transparent), and the values of its fields.
+ * The page's text, not the pixels: a placeholder drawn by CSS or by an attribute is left out, and
+ * text off screen or visually hidden (scrolled away, cut, for screen readers) is in. Runs in the
+ * page: no named function inside, which the transpiler would wrap in a helper the page lacks.
  */
 const wordsIn = (root: Element): string => {
   const words: string[] = [];

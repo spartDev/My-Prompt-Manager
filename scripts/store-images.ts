@@ -11,7 +11,7 @@
  *   npm run store:images                       write store-assets/<version>/
  *   npm run store:images -- --out /tmp/shots   write somewhere else, to compare two runs
  *   npm run store:images -- --dist /tmp/dist   take another build
- *   npm run store:images -- --texts /tmp/t.txt write the words each image shows, to check its claims
+ *   npm run store:images -- --texts /tmp/t.txt write the text of each image and of its UI, to grep its claims
  *   npm run store:images -- --headed           watch the browser take the scenes
  */
 
@@ -95,7 +95,7 @@ async function main(): Promise<void> {
   }
   if (options.texts) {
     writeFileSync(options.texts, `${texts.join('\n\n')}\n`);
-    process.stdout.write(`The words of each image: ${shown(options.texts)}\n`);
+    process.stdout.write(`The text of each image and of its UI: ${shown(options.texts)}\n`);
   }
   process.stdout.write(`Check them with: sips -g pixelWidth -g pixelHeight -g hasAlpha ${shown(out)}/*.png\n`);
 }

@@ -7,7 +7,7 @@ export interface StoreImagesOptions {
   dist: string;
   /** Where the images go: store-assets/<version> when not given */
   out?: string;
-  /** Where to write the words each image shows, its own and its scenes', when given */
+  /** Where to write the text of each image and of the UI in its scenes, when given */
   texts?: string;
   headless: boolean;
 }
