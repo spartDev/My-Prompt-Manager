@@ -58,7 +58,7 @@ The description is stored in `chrome.storage.local`: with the Custom site in the
 
 ## What the extension reads on a site
 
-The extension has access to the seven Platforms listed under [Permissions](#permissions), and works on five of them: Microsoft Copilot is not supported in this version (see the host permissions there). It also works on the sites you add and allow. On each site it works on, while the site is turned on in Settings:
+The extension has access to the seven Platforms listed under [Permissions](#permissions), and works on five of them: Microsoft Copilot is not supported in this version (see the host permissions there). It also works on the sites you add and allow. On any page that opens at Copilot's two addresses, its script still loads and looks for a chat box, as on the other Platforms. On each of these sites, while the site is turned on in Settings:
 
 - it reads the page's structure to find the chat box and its toolbar, and places the Prompts button there;
 - of what you write, it reads only the chat box: the text just before your cursor, to notice `//`, and the text in the box around an Insertion, to check that the Prompt went in and to put the earlier text back if you click Undo. It keeps this in memory, never stores it, and never sends it;
@@ -121,7 +121,7 @@ Optional host permissions: never granted at install, and asked for one site at a
 | `https://*/*` | When you add a site in Settings, by hand or from a configuration code, or start the Element picker on a site that is not a Platform. |
 | `http://*/*` | When you start the Element picker on a site served over `http` rather than `https`. |
 
-The extension does not ask for access to all sites: beyond the addresses of the seven Platforms, it has access only to the sites you allow one by one.
+The extension does not ask for access to all sites: beyond the addresses of the seven Platforms, its host permissions cover only the sites you allow one by one.
 
 ## Your control over your data
 
