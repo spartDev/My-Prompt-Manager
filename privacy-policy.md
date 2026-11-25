@@ -7,7 +7,7 @@ This policy describes My Prompt Manager 2.0.0: what the extension stores, where,
 
 ## In short
 
-- **No account, no server.** My Prompt Manager has no sign-in and no server of its own. It sends nothing to the developer or to anyone else: no telemetry, no usage analytics, no crash reports, no ads.
+- **No account, no server.** My Prompt Manager has no sign-in and no server of its own. It sends nothing to the developer or to anyone else: no telemetry, no analytics service, no crash reports, no ads.
 - **Everything stays on your device.** What the extension keeps is in Chrome's storage on your computer, which Chrome does not sync, but for a short log that the Element picker leaves in the page you use it on, where that site can read it (see [The page's own session storage](#the-pages-own-session-storage)).
 - **Analytics is local.** The Analytics section counts your insertions on your device, from a usage history kept in that same local storage. Nothing about your use is sent anywhere.
 - **You decide what leaves.** The extension itself sends nothing. A Prompt you insert in a chat goes to that site, as anything you type there does. What the extension shows inside a site's page, such as the titles and Categories of your Prompts in the Prompt selector, can be read by that site's own scripts (see [The chat sites](#the-chat-sites)). A Share code, a configuration code or a Backup file leaves your device only where you put it.
@@ -64,7 +64,7 @@ The extension has access to the seven Platforms listed under [Permissions](#perm
 - of what you write, it reads only the chat box: the text just before your cursor, to notice `//`, and the text in the box around an Insertion, to check that the Prompt went in and to put the earlier text back if you click Undo. It keeps this in memory, never stores it, and never sends it;
 - when you use the Element picker, it describes the element you click, as above.
 
-On a site you turned off, the extension's script stays idle. It does not read your browsing history, and it does not run on sites you have not allowed.
+On a site you turned off, the extension's script stays idle, and it does not run on sites you have not allowed. The extension never reads Chrome's own history of the pages you visited (it has no `history` permission). It does read the addresses of your tabs, and the title of the tab you are on, for the uses that `tabs` lists under [Permissions](#permissions); on the sites it works on, its script also reads the address of its page, to notice when the page changes. The addresses it keeps are those listed under [What the extension stores on your device](#what-the-extension-stores-on-your-device), [Usage history and Analytics](#usage-history-and-analytics) and [Element picker](#element-picker).
 
 ## What leaves your device
 
