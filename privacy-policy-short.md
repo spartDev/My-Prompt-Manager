@@ -1,39 +1,37 @@
 # Privacy Policy Summary - My Prompt Manager
 
-## What We Collect
-**Nothing.** My Prompt Manager stores your prompts and settings locally on your device only. No personal data is collected, transmitted, or stored on external servers.
+A summary of [the full privacy policy](./privacy-policy.md) for Release 2.0.0. Where the two differ, the full policy applies.
 
-## Why We Need Permissions
+## What the developer collects
 
-- **`<all_urls>`**: To detect AI platforms (Claude, ChatGPT, Perplexity) and inject our prompt library icon
-- **`storage`**: To save your prompts locally on your device using Chrome's storage API
-- **`activeTab`** & **`tabs`**: To interact with the current tab on supported AI platforms
-- **`scripting`**: To inject our prompt library interface into AI platform pages
+**Nothing.** There is no account and no server. The extension sends nothing to the developer or to anyone else: no telemetry, no usage analytics, no crash reports, no ads.
 
-## How We Protect Your Privacy
+## What stays on your device
 
-✅ **Local Storage Only** - All data stays on your device  
-✅ **No External Requests** - Zero network connections to outside servers  
-✅ **No Analytics** - No usage tracking or data collection  
-✅ **No Third-Party Access** - Your data never leaves your device  
-✅ **Complete Control** - Export, delete, or modify your data anytime  
+- **Stored:** your Prompts, Categories and preferences, the Site settings and Custom sites, and the usage history that the Analytics section counts, in Chrome's local storage (`chrome.storage.local`), which Chrome does not sync. Short-lived state goes in `chrome.storage.session`, emptied when Chrome closes.
+- **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored until the history holds 9,000 entries; it never holds more than 10,000.
+- **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box.
 
-## Your Rights
-- Own all your prompt data
-- Export your data in JSON format anytime
-- Delete individual prompts or all data instantly
-- Uninstall removes all extension data automatically
+## What leaves your device, and only through you
 
-## Data Handling
-- **Collected**: Your prompts, categories, and extension settings
-- **Stored**: Locally on your device using Chrome's encrypted storage
-- **Shared**: Never - no external connections or third-party access
-- **Retained**: Until you delete it or uninstall the extension
+- A Prompt you insert into a chat and send.
+- A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted.
+- A Backup file of your Prompts and Categories, made only when you click Export in Settings.
 
-## Compliance
-Complies with GDPR, CCPA, and Chrome Web Store policies through our privacy-by-design approach of not collecting personal data.
+## Permissions
 
-**Contact**: [INSERT EMAIL]  
-**Full Policy**: [INSERT WEBSITE URL]
+- **`storage`:** keeps the data above on your device.
+- **`activeTab`:** a click on the toolbar icon, in side panel mode, adds the Prompts button to the tab you are on, only on a site the extension already has access to.
+- **`tabs`:** reads tab addresses, to find the tabs that show a Platform or a site you added, and the current tab's title, to offer it when you add a site. Never sent anywhere.
+- **`sidePanel`:** opens the extension in Chrome's side panel.
+- **`scripting`:** adds the extension's own packaged script to the tabs of the Platforms and of the sites you allowed.
+- **Host permissions:** the seven Platforms: `https://claude.ai/*`, `https://chatgpt.com/*`, `https://gemini.google.com/*`, `https://www.perplexity.ai/*`, `https://chat.mistral.ai/*`, `https://copilot.microsoft.com/*`, `https://m365.cloud.microsoft/*`.
+- **Optional `https://*/*` and `http://*/*`:** never granted at install; Chrome asks you for one site at a time, when you add a site or use the Element picker on it.
 
-*This extension operates entirely offline and makes no external network requests.*
+## Your control
+
+- Delete any Prompt or Category, clear the usage history in Analytics, or use Clear All Data in Settings.
+- Export a Backup file in JSON at any time, and restore it from Settings.
+- Uninstalling the extension makes Chrome delete what it stored.
+
+**Full policy:** https://github.com/spartDev/My-Prompt-Manager/blob/main/privacy-policy.md
