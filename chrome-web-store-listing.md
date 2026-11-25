@@ -102,7 +102,7 @@ Adds the extension's own script, the one that shows the Prompts button and opens
 
 The Dashboard has a single field for all the hosts. Paste this paragraph, then the line under each heading, one line per host:
 
-On each of these sites the extension looks for the chat box and its toolbar, to place the Prompts button there. Of what you write, it reads only the chat box: the text just before your cursor, to notice //, and the text in the box, to put it back on Undo. What it reads stays on your device; only what you choose to export or share leaves it, such as a custom site's configuration code, which holds the page's address and up to 50 characters of the element you picked with the Element picker.
+On each of these sites the extension looks for the chat box and its toolbar, to place the Prompts button there. Of what you write, it reads only the chat box: the text just before your cursor, to notice //, and the text in the box, to put it back on Undo. What it reads stays on your device; only what you choose to export or share leaves it, such as a custom site's configuration code, which holds the page's address and what identifies the element you picked with the Element picker: attributes such as its id, label and class names, its parent's id and its place among its siblings, and up to 50 characters of its text.
 
 > Shorter fallback, if the field's counter stops short: paste the paragraph above, then this one line in place of the seven Platform lines, then the lines of the two optional hosts.
 >
