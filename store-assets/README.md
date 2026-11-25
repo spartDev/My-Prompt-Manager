@@ -14,7 +14,7 @@ The images of the Chrome Web Store listing, one folder per Release: `store-asset
 
 All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screenshots in their number order in the Developer Dashboard, under Store listing.
 
-**Hold screenshot 5 while My-Prompt-Manager-1c88 is open.** Screenshot 5 shows the 2.0.0 Welcome, which names Copilot among the Platforms where `//` works, and the listing says 2.0.0 does not support Copilot. While ticket 1c88 is open, upload screenshots 1 to 4, the small promo tile and the marquee, and hold screenshot 5. Upload it as the fifth screenshot once 1c88 shows that Copilot works at the address the Welcome names, or once a Release changes the Welcome and `npm run store:images` has remade the image. Google asks for at least one screenshot and allows up to five, so four are fine.
+**Hold screenshot 5 while My-Prompt-Manager-1c88 is open.** Screenshot 5 shows the 2.0.0 Welcome, which names Copilot among the Platforms where `//` works, and the listing says 2.0.0 does not support Copilot. While ticket 1c88 is open, upload screenshots 1 to 4, the small promo tile and the marquee, and hold screenshot 5. Upload it as the fifth screenshot once 1c88 shows that `//` works on Copilot, or once a Release changes the Welcome and `npm run store:images` has remade the image. Google asks for at least one screenshot and allows up to five, so four are fine.
 
 ## Make the images of a Release
 
@@ -27,7 +27,7 @@ All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screens
 3. Check them: `sips -g pixelWidth -g pixelHeight -g hasAlpha store-assets/<version>/*.png` gives the sizes above and `hasAlpha: no`. Then look at each one.
 4. Commit the folder. Keep the folders of earlier Releases: they are what the Store showed then.
 
-On macOS with the same Playwright version, two runs on the same build nearly always write the same bytes, so a changed file most likely means a changed image. Rarely, Chromium resamples an enlarged or reduced scene with another filter. That was 1 run in 8 on 2026-11-25: one composer of screenshot 3 differed by at most 4 of 255 per channel, which cannot be seen. A file that changed for that reason only can be left as committed. Make the images on macOS. On Linux they change: the side panel shows "Ctrl K" where macOS shows "⌘K" (`src/utils/modifierKey.ts`), and the composers' text falls back from the system font (`-apple-system`, Helvetica Neue) to another one. A Playwright update can also change pixels, through its Chromium.
+On macOS with the same Playwright version, two runs on the same build nearly always write the same bytes, so a changed file most likely means a changed image. The exception: in about one run in eight, one composer of screenshot 3 comes out different by at most 4 of 255 per channel, which cannot be seen. It comes with the taking of the scenes, not with the composition: composing the same scenes always gave the same bytes. To tell this variant from a real change, run `npm run store:images` again. A file that differs in two runs in a row is a real change: look at it. A file that differs once and then returns to the committed bytes was the variant. Make the images on macOS. On Linux they change: the side panel shows "Ctrl K" where macOS shows "⌘K" (`src/utils/modifierKey.ts`), and the composers' text falls back from the system font (`-apple-system`, Helvetica Neue) to another one. A Playwright update can also change pixels, through its Chromium.
 
 ## How they are made
 
