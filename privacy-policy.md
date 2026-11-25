@@ -1,7 +1,7 @@
 # Privacy Policy for My Prompt Manager
 
 **Effective Date:** 24/08/2025  
-**Last Updated:** 25/11/2026
+**Last Updated:** 26/11/2026
 
 This policy describes My Prompt Manager 2.0.0: what the extension stores, where, for how long, and what can leave your device. Every statement in it can be checked in the source code (see [Check it yourself](#check-it-yourself)).
 
