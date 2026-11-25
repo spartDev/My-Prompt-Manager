@@ -94,7 +94,7 @@ The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md
 **Screenshots** (the five store images, with their headlines):
 1. **`//`**: "Stop retyping your prompts", a Platform composer with `//` typed and the Prompt selector open
 2. **Variables**: "Write it once. Reuse it everywhere.", the selector's Variables step, then the Insertion with its Undo confirmation
-3. **Platforms**: "One Library for every AI chat", the Prompts button in the composer of each Platform
+3. **Platforms**: "One Library for every AI chat", the Prompts button in the composer of each Platform the listing names: Claude, ChatGPT, Gemini, Mistral and Perplexity, with no Copilot (ticket My-Prompt-Manager-1c88)
 4. **Library**: "A home for every prompt you write", the side panel Library with the Library filter, Categories and cards, and the line "Stays on your device. No account, no cloud."
 5. **Packs**: "Not sure where to start? Pick a Pack", the Welcome's Packs step
 
@@ -213,8 +213,8 @@ A refused Release is never submitted again:
 
 ### Listing-only Updates
 New text or images with no new Release, as for the 2.0 listing on the published 2.0.0 (`chrome-web-store-listing.md`):
-1. Edit the listing on the Developer Dashboard tabs and upload the images; no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata))
-2. Click Submit for review. Google reviews it like any submission, and the store keeps the published listing until it passes ([Review process](https://developer.chrome.com/docs/webstore/review-process#rejection))
+1. Edit the listing on the Developer Dashboard tabs and upload the images; no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata), [Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file))
+2. Click Submit for review. Google reviews it like any submission, and the store keeps the published listing until it passes ([Review process](https://developer.chrome.com/docs/webstore/review-process#rejection)). If you untick the publish box in the submit dialog, the listing also waits after the review until you publish it, within 30 days, after which it goes back to a draft ([Deferred publishing option](https://developer.chrome.com/docs/webstore/update#deferred-publishing-option))
 3. Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item))
 
 ### Monitoring

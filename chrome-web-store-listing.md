@@ -1,8 +1,8 @@
 # Chrome Web Store Listing - My Prompt Manager 2.0
 
-The text of the store listing since Release 2.0.0, in English. Each heading names the Developer Dashboard field its text goes in, except the summary, which is not pasted (see Summary). The copy agrees with the store images: five screenshots, the small promo tile and the marquee.
+The text of the store listing since Release 2.0.0, in English. Each heading names the Developer Dashboard field its text goes in, except the summary, which is not pasted (see Summary). The copy agrees with the store images of ticket My-Prompt-Manager-tuh.9 (five screenshots, the small promo tile and the marquee) once they drop Copilot, so submit the listing with those images.
 
-- **First, the privacy policy.** Update the privacy policy before the listing is submitted (ticket My-Prompt-Manager-nare). `privacy-policy.md:37` and `privacy-policy-short.md:8` still justify `<all_urls>`, which `manifest.json` does not declare, and `privacy-policy-short.md:17` says "No Analytics", while this listing describes Analytics and its usage history. Google wants the Privacy practices to be "consistent with the privacy policy URL that you provide" ([Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy#certify_your_data_use_practices)).
+- **First, the privacy policy.** Before you submit, check that the privacy policy agrees with this listing (ticket My-Prompt-Manager-nare). At 2.0.0, `privacy-policy.md:37` and `privacy-policy-short.md:8` justify `<all_urls>`, which `manifest.json` does not declare, and `privacy-policy-short.md:17` says "No Analytics", while this listing describes Analytics and its usage history. Google wants the Privacy practices to be "consistent with the privacy policy URL that you provide" ([Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy#certify_your_data_use_practices)).
 - **Now, for the published 2.0.0:** paste the text and upload the images on the Dashboard tabs ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata): "If you're changing anything about the Chrome Web Store listing for your item, its distribution, or details of your privacy policy, you must update the information on the developer dashboard"), then click Submit for review ([Submitting the update](https://developer.chrome.com/docs/webstore/update#submitting-the-update)). No new package is needed: one is required only "If you're changing any code, the manifest, or other assets packaged with your extension" ([Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file)). Google reviews the listing like any submission ([Review process](https://developer.chrome.com/docs/webstore/review-process#review-time): "all item submissions ... are subject to the same review process"). The store keeps the old listing until the review passes: a refused submission leaves "the description text, image assets, privacy disclosures, and published CRX all" unchanged ([Rejection](https://developer.chrome.com/docs/webstore/review-process#rejection)). Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item): "Cancel review: Use when your item is awaiting review. This review will be cancelled letting you make changes to your draft").
 - **With a later Release:** paste what changed and save the draft without submitting it, before `release.yml` makes the Submission, which sends the draft, listing included (`docs/CHROME_WEBSTORE_GUIDE.md`, Version Updates). Until that review passes, the published item stays as it is: "When you submit an update for review, it doesn't yet affect your published item" ([Submitting the update](https://developer.chrome.com/docs/webstore/update#submitting-the-update)).
 
@@ -16,7 +16,7 @@ Write a prompt once, then type // to insert it in Claude, ChatGPT, Gemini, Mistr
 
 119 characters. The limit is 132 ([Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing#item_summary): "132 characters or less").
 
-The store shows the `description` field of the uploaded package's `manifest.json` ([manifest `description`](https://developer.chrome.com/docs/extensions/reference/manifest/description): "no more than 132 characters"; [Prepare your extension](https://developer.chrome.com/docs/webstore/prepare#manifest): "After uploading your item, you won't be able to edit the metadata of your manifest in the developer dashboard"). The 2.0.0 package carries "Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click." (113 characters). The summary names five Platforms and no Copilot. The [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows five names in a list, and Copilot's work-account limit (see the description) does not fit in 132 characters. If that Release brings copilot.cloud.microsoft (ticket My-Prompt-Manager-j74b), Copilot can take one of the five places.
+The store shows the `description` field of the uploaded package's `manifest.json` ([manifest `description`](https://developer.chrome.com/docs/extensions/reference/manifest/description): "no more than 132 characters"; [Prepare your extension](https://developer.chrome.com/docs/webstore/prepare#manifest): "After uploading your item, you won't be able to edit the metadata of your manifest in the developer dashboard"). The 2.0.0 package carries "Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click." (113 characters). The summary names the five Platforms this version works on, the most that the [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows in a list. It names no Copilot: copilot.microsoft.com now redirects to copilot.com, and a work account lands on copilot.cloud.microsoft, two hosts that 2.0.0 does not declare (tickets My-Prompt-Manager-1c88 and My-Prompt-Manager-j74b).
 
 ## Detailed description
 
@@ -35,8 +35,8 @@ Write it once. Reuse it everywhere.
 • The rest arrives exactly as you saved it, line breaks included.
 
 One Library for every AI chat
-Works on Claude, ChatGPT, Gemini, Perplexity and Copilot, and on the other AI chats in the screenshots. Turn each one on or off in Settings.
-Copilot works at copilot.microsoft.com with a personal Microsoft account. A work account takes you to copilot.cloud.microsoft, which this version does not support yet.
+Works on Claude, ChatGPT, Gemini, Mistral and Perplexity. Turn each one on or off in Settings.
+Microsoft Copilot is not supported in this version: it now opens at copilot.com, or at copilot.cloud.microsoft with a work account.
 Another AI site? Add it as a custom site, and show where the Prompts button goes with the Element picker.
 
 A home for every prompt you write
@@ -57,7 +57,7 @@ Stays on your device. No account, no cloud.
 • Export a Backup file of your Library whenever you like, and restore it from Settings.
 ```
 
-2,701 characters. Google's documentation names no character limit for the detailed description ([Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#product_details), [Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing#item_description)); the Dashboard field is commonly reported to take 16,000 characters, which Google does not document. The summary and the description each name five Platforms, the most that the [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows in a list of supported sites ("When listing supported websites or brands in the description, do not list more than five"); screenshot 3 names the others, as the policy suggests. No Platform name appears five times.
+2,619 characters. Google's documentation names no character limit for the detailed description ([Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#product_details), [Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing#item_description)); the Dashboard field is commonly reported to take 16,000 characters, which Google does not document. The summary, the description and the single purpose name the same five Platforms, the most that the [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows in a list of supported sites ("When listing supported websites or brands in the description, do not list more than five"). No Platform name appears five times.
 
 ## Category and language
 
@@ -69,7 +69,7 @@ Stays on your device. No account, no cloud.
 ### Single purpose
 
 ```text
-Keep a personal Library of prompts and insert them into the chat box of AI chat sites, such as Claude, ChatGPT, Gemini, Perplexity and Copilot, and of the sites the user adds.
+Keep a personal Library of prompts and insert them into the chat box of AI chat sites, such as Claude, ChatGPT, Gemini, Mistral and Perplexity, and of the sites the user adds.
 ```
 
 ### Permission justifications
@@ -78,7 +78,7 @@ One field per permission that `manifest.json` declares under `permissions`.
 
 #### storage
 
-Keeps your Library on your computer: your prompts, Categories and settings, which sites the extension works on, and the history of your insertions that Analytics counts. They are kept in Chrome's local storage, which is not synced. Chrome's session storage, emptied when Chrome closes, holds short-lived state: where the Prompts button was placed in each tab, the progress of the Element picker, and a Review on its way to the side panel. Nothing stored is sent anywhere.
+Keeps your Library on your computer: your prompts, Categories and settings, which sites the extension works on, and the history of your insertions that Analytics counts. They are kept in Chrome's local storage, which is not synced. Chrome's session storage, emptied when Chrome closes, holds short-lived state: where the Prompts button was placed in each tab, the progress of the Element picker, and a Review on its way to the side panel. The extension sends nothing it stores anywhere.
 
 #### activeTab
 
@@ -88,7 +88,7 @@ When you click the extension's icon in Chrome's toolbar, with the extension set 
 
 #### tabs
 
-Lets the extension see the address of your open tabs, to know which ones show an AI chat site or a site you added. It uses this to add the Prompts button to the tabs already open when you install or update the extension or add a site, to apply a theme change to them, to bring the right tab forward when you use the Element picker, and to remember where the Prompts button was placed in each tab until the tab leaves the site or closes. It also reads the address and title of the tab you are on, to offer that site when you add one in Settings. Tab addresses are never sent anywhere.
+Lets the extension see the address of your open tabs, to know which ones show an AI chat site or a site you added. It uses this to add the Prompts button to the tabs already open when you install or update the extension or add a site, to apply a theme change to them, to bring the right tab forward when you use the Element picker, and to remember where the Prompts button was placed in each tab until the tab leaves the site or closes. It also reads the address and title of the tab you are on, to offer that site when you add one in Settings. The extension never sends tab addresses anywhere.
 
 #### sidePanel
 
@@ -102,11 +102,11 @@ Adds the extension's own script, the one that shows the Prompts button and opens
 
 The Dashboard has a single field for all the hosts. Paste this paragraph, then the line under each heading, one line per host:
 
-On each of these sites the extension looks for the chat box and its toolbar, to place the Prompts button there. Of what you write, it reads only the chat box: the text just before your cursor, to notice //, and the text in the box, to put it back on Undo. Nothing it reads leaves your computer.
+On each of these sites the extension looks for the chat box and its toolbar, to place the Prompts button there. Of what you write, it reads only the chat box: the text just before your cursor, to notice //, and the text in the box, to put it back on Undo. What it reads stays on your device; only what you choose to export or share leaves it, such as a custom site's configuration code, which holds the page's address and up to 50 characters of the element you picked with the Element picker.
 
 > Shorter fallback, if the field's counter stops short: paste the paragraph above, then this one line in place of the seven Platform lines, then the lines of the two optional hosts.
 >
-> Claude (claude.ai), ChatGPT (chatgpt.com), Google Gemini (gemini.google.com), Perplexity (www.perplexity.ai), Mistral LeChat (chat.mistral.ai), Microsoft Copilot (copilot.microsoft.com) and Microsoft 365 Copilot (m365.cloud.microsoft): on each, the extension shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+> Claude (claude.ai), ChatGPT (chatgpt.com), Google Gemini (gemini.google.com), Perplexity (www.perplexity.ai), Mistral LeChat (chat.mistral.ai), Microsoft Copilot (copilot.microsoft.com) and Microsoft 365 Copilot (m365.cloud.microsoft): on each, to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft now redirects copilot.microsoft.com to copilot.com, and a work account from either Copilot to copilot.cloud.microsoft, two hosts this version does not run on.
 
 #### `https://claude.ai/*`
 
@@ -130,11 +130,11 @@ Mistral LeChat: shows the Prompts button and opens your prompts on // in the cha
 
 #### `https://copilot.microsoft.com/*`
 
-Microsoft Copilot: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+Microsoft Copilot: to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft now redirects this address to copilot.com, which this version does not run on.
 
 #### `https://m365.cloud.microsoft/*`
 
-Microsoft 365 Copilot: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+Microsoft 365 Copilot: to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft redirects a work account from here to copilot.cloud.microsoft, which this version does not run on.
 
 #### Optional `https://*/*`
 
