@@ -90,6 +90,23 @@ These are made only when you ask for one, and they leave your device only throug
 
 The extension writes to your clipboard only when you click Copy, Share or Export, and never reads your clipboard: you paste a code into its field yourself.
 
+## Chrome Web Store User Data Policy: Limited Use
+
+The use of information received from Google APIs will adhere to the Chrome Web Store User Data Policy, including the Limited Use requirements.
+
+My Prompt Manager applies these requirements to all the data it handles, whether it comes from Chrome's extension APIs, from the pages it works on or from you. For this extension, their four elements mean:
+
+- **Allowed use.** The extension uses the data it reads and the data it keeps only to provide its single purpose, which is keeping your Library of Prompts and inserting them into the chat box of AI chat sites and of the sites you add, and to let you see what went wrong when it fails.
+  - It reads the addresses of your tabs, through the `tabs` permission: each time a tab loads a page, to decide whether to add the extension's script to it, and for the other uses that `tabs` lists under [Permissions](#permissions), such as sending a change of theme to the tabs that show a Platform or a site you added. To offer the site you are on when you add one, it also reads the title of the tab you are on.
+  - It reads the structure of the pages it works on, to find the chat box and place the Prompts button; the text in the chat box and the keys you press in it, to notice `//`, to check that an Insertion went in and to put your earlier text back on Undo; and, when you use the Element picker, what it describes of the element you click.
+  - It keeps, in Chrome's local storage, the addresses of your Custom sites and of the sites you allowed; the Element picker's description of the element you picked, with the full address of the page; the usage history, which holds for each insertion the Platform or Custom site, the Category and the time, and which Analytics reads; and each Prompt's use count and last use, which Most Used and Recent show you. In Chrome's session storage, until Chrome closes, it keeps where the Prompts button was placed in each open tab of a Platform (see [Chrome's session storage](#chromes-session-storage)).
+  - When an error happens on a site, the extension's script writes it in the browser's console on your device, with the address of the page and the first 100 characters of your browser's user agent, so that you can see what went wrong. In Debug mode it writes more messages there, with the address of the page.
+- **Allowed transfer.** The extension transfers no data to the developer: it has no account and no server, and makes no network request of its own (see [Network](#network)). Apart from what you export yourself, and from the fact that the extension is installed, which any website can detect (see [Any site you visit](#any-site-you-visit)), data reaches a third party only on a site where you use the extension, and only for its single purpose: a Prompt you insert goes into that site's chat box, where the site handles it as anything you type there. Because the extension works inside the site's page, that site's own scripts can also read what the extension shows or keeps there, such as the titles and Categories of your Prompts while the Prompt selector is open, what you type in its search field, a Prompt's whole text while you fill in its Variables, and the Element picker's log in that page's session storage (see [The chat sites](#the-chat-sites) and [The page's own session storage](#the-pages-own-session-storage)); the extension does not send it to them. A Prompt you copy, a Share code, a configuration code or a Backup file goes only where you put it (see [Share codes, configuration codes and Backup files](#share-codes-configuration-codes-and-backup-files)).
+- **No advertising.** The extension does not use or transfer your data for personalized, re-targeted or interest-based advertising, and shows no ads.
+- **No human reading.** The developer never receives your data, so no one at the developer reads it.
+
+The extension does not sell your data, and does not use or transfer it to determine creditworthiness or for lending.
+
 ## Permissions
 
 The extension asks for these permissions in its `manifest.json`, and uses each for the following only.

@@ -31,7 +31,7 @@ Transform your AI interactions with a powerful personal prompt library that inte
 ✅ **Side Panel Support:** Chrome 116+ dual interface mode (popup or side panel)
 
 ### Analytics Dashboard (New in v1.8)
-✅ **Usage Tracking:** Track prompt usage across all platforms
+✅ **Usage Tracking:** Count your own insertions of your prompts across all platforms, on your device only
 ✅ **Visual Analytics:** A full-page view with your most used prompts, daily use and time of day
 ✅ **Time Analysis:** View usage by day of week and time of day
 ✅ **Category Insights:** See which prompt categories you use most
@@ -325,20 +325,23 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 
 - **Content Security Policy (CSP):** Strict CSP prevents XSS attacks
 - **DOMPurify Integration:** Used for custom site configuration security only; Prompt text is stored as written (Hidden characters are removed once, when it is saved) and is never rewritten on read, on insertion or on display
-- **Minimal Permissions:** Only essential Chrome APIs requested
-- **Restricted Host Access:** No code execution on unrelated sites
+- **Permissions:** `storage`, `activeTab`, `tabs`, `sidePanel` and `scripting`, each explained in the [privacy policy](privacy-policy.md#permissions). The addresses of the seven Platforms are granted at install; any other site only when you allow it, one site at a time
+- **Restricted Host Access:** The extension's script is added only to the Platforms and the sites you allowed
 - **Chrome Web Store Compliance:** Follows security best practices
-- **Local Storage Only:** No data leaves your device
-- **No Analytics:** Zero tracking or telemetry
-- **Element Picker Security:** Comprehensive safeguards for sensitive fields
+- **Stored on your device:** What the extension keeps is in Chrome's storage on your computer, which Chrome does not sync, but for a short log that the Element picker leaves in the page you use it on, where that site can read it
+- **Nothing sent by the extension:** It sends nothing to the developer or to anyone else: no telemetry, no analytics service, no crash reports, no ads. A Prompt you insert goes into the chat box of the site you are on, and what the extension shows inside a site's page can be read by that site's own scripts. A Share code, a configuration code or a Backup file leaves your device only where you put it
+- **Analytics is local:** The Analytics section counts your insertions on your device, from a usage history kept in Chrome's local storage. Nothing about your use is sent anywhere
+- **Element Picker Security:** It cannot pick password, e-mail, phone, payment or one-time-code fields, and it turns itself off on some sites that look sensitive (the list does not recognize every one). Values that look sensitive are left out of its description of an element, but not out of its CSS selector, and the description can hold the first 50 characters of a draft in the chat box: see [Element picker](privacy-policy.md#element-picker)
 
 ### Privacy Commitment
 
-- All data stored locally on your device
-- No external servers or cloud storage
-- No user tracking or analytics
+- Everything stays on your device: what the extension keeps is in Chrome's storage on your computer, which Chrome does not sync, but for a short log that the Element picker leaves in the page you use it on, where that site can read it
+- No account, no server and no cloud storage
+- No analytics service and no telemetry: the Analytics section counts your insertions on your device, and nothing about your use is sent anywhere
 - Open source for transparency
 - Regular security updates
+
+The [privacy policy](privacy-policy.md) says what the extension stores, reads and sends, for how long, and what each permission is for. Its [Chrome Web Store User Data Policy: Limited Use](privacy-policy.md#chrome-web-store-user-data-policy-limited-use) section is the extension's Limited Use disclosure.
 
 ## 🌐 Browser Compatibility
 
