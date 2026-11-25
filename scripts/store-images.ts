@@ -31,6 +31,7 @@ import { distProblem } from './store-images/dist';
 import { type Assets, storeImages } from './store-images/layouts';
 import { flattenPng, pngInfo } from './store-images/png';
 import { captureScenes } from './store-images/scenes';
+import { steadyScreenshot } from './store-images/steady';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 /** A path as the report prints it: from the repository when it is in it */
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
       await page.evaluate(() => document.fonts.ready);
       const words = (await page.locator('body').innerText()).split('\n').map((line) => line.trim()).filter(Boolean);
       texts.push([image.file, `  image: ${words.join(' | ')}`, ...image.scenes.map((scene) => `  ui: ${scene.text}`)].join('\n'));
-      const png = flattenPng(await page.screenshot({ type: 'png', caret: 'hide', animations: 'disabled' }), image.ground);
+      const png = flattenPng(await steadyScreenshot(page, { type: 'png', caret: 'hide', animations: 'disabled' }), image.ground);
       const info = pngInfo(png);
       if (info.width !== image.width || info.height !== image.height || info.hasAlpha) {
         throw new Error(`${image.file} came out ${String(info.width)} x ${String(info.height)}${info.hasAlpha ? ' with alpha' : ''}`);

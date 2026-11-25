@@ -23,6 +23,7 @@ import { DARK_GROUND, storeImages, VIOLET_GROUND } from '../store-images/layouts
 import { COMPOSER_PLATFORMS, IMAGE_PLATFORMS, listed, platformName } from '../store-images/platforms';
 import { decodePng, encodeRgbPng, flattenPng, pngInfo } from '../store-images/png';
 import type { Scene, Scenes } from '../store-images/scenes';
+import { STEADY_ATTEMPTS, steadyScreenshot } from '../store-images/steady';
 
 // --- A PNG writer for the tests, with every filter, independent of png.ts ---
 
@@ -206,6 +207,35 @@ describe('dist.ts', () => {
     writeFileSync(path.join(root, 'package-lock.json'), '{}');
     expect(BUILD_SOURCES).not.toContain('package-lock.json');
     expect(distProblem(root, dist)).toBeNull();
+  });
+});
+
+// --- steady.ts ---
+
+describe('steady.ts', () => {
+  /** A page whose screenshots are `shots`, one per call */
+  const pageShowing = (...shots: string[]) => {
+    const screenshot = vi.fn((_options: { clip?: unknown }) => Promise.resolve(Buffer.from(shots.shift() ?? 'none')));
+    return { screenshot };
+  };
+
+  it('returns the first screenshot the next one agrees with, taken with the options given', async () => {
+    const page = pageShowing('a', 'a');
+    expect((await steadyScreenshot(page, { clip: 1 })).toString()).toBe('a');
+    expect(page.screenshot).toHaveBeenCalledTimes(2);
+    expect(page.screenshot).toHaveBeenCalledWith({ clip: 1 });
+  });
+
+  it('shoots again while a tile paints late: a band in one screenshot that the next does not have', async () => {
+    const page = pageShowing('band', 'whole', 'whole');
+    expect((await steadyScreenshot(page, {})).toString()).toBe('whole');
+    expect(page.screenshot).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails when no two screenshots in a row agree', async () => {
+    const page = pageShowing('1', '2', '3', '4', '5', '6');
+    await expect(steadyScreenshot(page, {})).rejects.toThrow(`The page changed between each of ${String(STEADY_ATTEMPTS)} screenshots`);
+    expect(page.screenshot).toHaveBeenCalledTimes(STEADY_ATTEMPTS);
   });
 });
 

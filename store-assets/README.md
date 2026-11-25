@@ -27,7 +27,7 @@ All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screens
 3. Check them: `sips -g pixelWidth -g pixelHeight -g hasAlpha store-assets/<version>/*.png` gives the sizes above and `hasAlpha: no`. Then look at each one.
 4. Commit the folder. Keep the folders of earlier Releases: they are what the Store showed then.
 
-On macOS with the same Playwright version, two runs on the same build write the same bytes, so a changed file means a changed image. Make the images on macOS. On Linux they change: the side panel shows "Ctrl K" where macOS shows "⌘K" (`src/utils/modifierKey.ts`), and the composers' text falls back from the system font (`-apple-system`, Helvetica Neue) to another one. A Playwright update can also change pixels, through its Chromium.
+On macOS with the same Playwright version, two runs on the same build nearly always write the same bytes, so a changed file most likely means a changed image. Rarely, Chromium resamples an enlarged or reduced scene with another filter. That was 1 run in 8 on 2026-11-25: one composer of screenshot 3 differed by at most 4 of 255 per channel, which cannot be seen. A file that changed for that reason only can be left as committed. Make the images on macOS. On Linux they change: the side panel shows "Ctrl K" where macOS shows "⌘K" (`src/utils/modifierKey.ts`), and the composers' text falls back from the system font (`-apple-system`, Helvetica Neue) to another one. A Playwright update can also change pixels, through its Chromium.
 
 ## How they are made
 
