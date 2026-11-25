@@ -89,7 +89,7 @@ A Release's zip is made, attested and submitted by `.github/workflows/release.ym
 
 ### Store Listing Information
 
-The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md`](../chrome-web-store-listing.md): the detailed description, the category and language, and the Privacy practices (single purpose, one justification per permission and per host permission of `manifest.json`, remote code). The summary is not pasted: the store shows the `description` of the package's `manifest.json`, which the Dashboard cannot edit.
+The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md`](../chrome-web-store-listing.md): the detailed description, the category and language, and the Privacy practices (single purpose, one justification per permission and per host permission of `manifest.json`, remote code). It does not hold the Data usage answers of the Privacy practices yet, the checkboxes of the data the extension collects and the certifications, which every update needs: submit nothing before ticket My-Prompt-Manager-cdfa drafts them. The summary is not pasted: the store shows the `description` of the package's `manifest.json`, which the Dashboard cannot edit.
 
 **Screenshots** (the five screenshots of the store images, with their headlines; upload 1 to 4 for now, see screenshot 5):
 1. **`//`**: "Stop retyping your prompts", a Platform composer with `//` typed and the Prompt selector open
