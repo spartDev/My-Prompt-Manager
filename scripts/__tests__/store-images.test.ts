@@ -4,7 +4,7 @@
  * codec that flattens Chromium's RGBA screenshots, the stale-build check, the options, the demo
  * Library the scenes are taken from, and the seven compositions with the owner's copy.
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { deflateSync } from 'node:zlib';
@@ -20,6 +20,7 @@ import { DEMO_CATEGORIES, demoPrompts, demoStore, packsStore, VARIABLES_PROMPT }
 import { BUILD_SOURCES, distProblem } from '../store-images/dist';
 import { launchReady } from '../store-images/launch';
 import { DARK_GROUND, storeImages, VIOLET_GROUND } from '../store-images/layouts';
+import { makeAllThenWrite } from '../store-images/output';
 import { COMPOSER_PLATFORMS, IMAGE_PLATFORMS, listed, platformName } from '../store-images/platforms';
 import { decodePng, encodeRgbPng, flattenPng, pngInfo } from '../store-images/png';
 import type { Scene, Scenes } from '../store-images/scenes';
@@ -294,6 +295,92 @@ describe('launch.ts', () => {
       launchReady({ profile, launch: () => Promise.resolve(context), ready: () => Promise.reject(new Error('no service worker')), timeoutMs: 1000 })
     ).rejects.toThrow('no service worker');
     expect(existsSync(profile)).toBe(false);
+  });
+});
+
+// --- output.ts ---
+
+describe('output.ts', () => {
+  const FILES = [
+    'screenshot-1-trigger.png',
+    'screenshot-2-variables.png',
+    'screenshot-3-platforms.png',
+    'screenshot-4-library.png',
+    'screenshot-5-packs.png',
+    'small-promo-tile.png',
+    'marquee.png'
+  ];
+  const images = FILES.map((file) => ({ file }));
+  const made = Object.fromEntries(FILES.map((file) => [file, `new ${file}`]));
+
+  /** The folder of an earlier run: each image's old bytes, and a file of the owner's beside them, as in a custom --out */
+  const earlierRun = (): string => {
+    const out = mkdtempSync(path.join(tmpdir(), 'store-images-out-'));
+    temporary.push(out);
+    for (const file of FILES) {
+      writeFileSync(path.join(out, file), `old ${file}`);
+    }
+    writeFileSync(path.join(out, 'notes.txt'), 'kept');
+    return out;
+  };
+  /** Each file of `dir`, with its bytes */
+  const contents = (dir: string): Record<string, string> =>
+    Object.fromEntries(readdirSync(dir).map((file) => [file, readFileSync(path.join(dir, file), 'latin1')]));
+  /** A browser that makes `new <file>` for each image, and throws on the image numbered `failing`, from 1 */
+  const maker = (failing?: number) => ({
+    make: vi.fn((image: { file: string }) =>
+      FILES.indexOf(image.file) + 1 === failing ? Promise.reject(new Error(`${image.file} came out 0 x 0`)) : Promise.resolve(Buffer.from(made[image.file]))
+    ),
+    close: vi.fn(() => Promise.resolve())
+  });
+
+  it('writes every image once all are made, after the browser is closed, and keeps the other files', async () => {
+    const out = earlierRun();
+    const before = contents(out);
+    const browser = maker();
+    let atClose: Record<string, string> = {};
+    browser.close.mockImplementation(() => {
+      atClose = contents(out);
+      return Promise.resolve();
+    });
+    const written = await makeAllThenWrite(out, images, browser);
+    expect(written.map(({ file, png }) => [file, png.toString('latin1')])).toEqual(FILES.map((file) => [path.join(out, file), made[file]]));
+    expect(contents(out)).toEqual({ ...made, 'notes.txt': 'kept' });
+    expect(browser.close).toHaveBeenCalledOnce();
+    expect(atClose).toEqual(before);
+  });
+
+  it.each([1, 2, 3, 4, 5, 6, 7])('leaves the folder as it was when image %i fails: the same files, the same bytes, nothing added', async (failing) => {
+    const out = earlierRun();
+    const before = contents(out);
+    const browser = maker(failing);
+    await expect(makeAllThenWrite(out, images, browser)).rejects.toThrow(`${FILES[failing - 1]} came out 0 x 0`);
+    expect(contents(out)).toEqual(before);
+    expect(browser.make).toHaveBeenCalledTimes(failing);
+    expect(browser.close).toHaveBeenCalledOnce();
+  });
+
+  it('creates no folder when an image fails', async () => {
+    const parent = mkdtempSync(path.join(tmpdir(), 'store-images-out-'));
+    temporary.push(parent);
+    await expect(makeAllThenWrite(path.join(parent, 'store-assets', '2.1.0'), images, maker(7))).rejects.toThrow('marquee.png came out 0 x 0');
+    expect(readdirSync(parent)).toEqual([]);
+  });
+
+  it('writes nothing when the browser fails to close, every image made', async () => {
+    const out = earlierRun();
+    const before = contents(out);
+    const browser = maker();
+    browser.close.mockImplementation(() => Promise.reject(new Error('already gone')));
+    await expect(makeAllThenWrite(out, images, browser)).rejects.toThrow('already gone');
+    expect(contents(out)).toEqual(before);
+  });
+
+  it("keeps the image's error when closing the browser fails too", async () => {
+    const browser = maker(3);
+    browser.close.mockImplementation(() => Promise.reject(new Error('already gone')));
+    await expect(makeAllThenWrite(earlierRun(), images, browser)).rejects.toThrow('screenshot-3-platforms.png came out 0 x 0');
+    expect(browser.close).toHaveBeenCalledOnce();
   });
 });
 

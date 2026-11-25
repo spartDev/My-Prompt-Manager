@@ -24,6 +24,7 @@ All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screens
    - `--texts <file>` writes, for each image, the text the script puts in it and the text of the UI in its scenes, to check the images' claims with `grep`. It reads the pages' text, not the pixels. It leaves out placeholders drawn by CSS or by an attribute, such as the composers' "Ask anything". It includes text that is off screen or hidden, such as Prompts below the fold, a tab cut at the edge, or text for screen readers.
    - `--headed` shows the browser while it takes the scenes.
    - If the extension does not load (a broken build), the script stops within a minute, closes Chromium and deletes its temp profile.
+   - It writes the images only once all seven are made. If one fails, the folder and the `--texts` file stay as they were.
 3. Check them: `sips -g pixelWidth -g pixelHeight -g hasAlpha store-assets/<version>/*.png` gives the sizes above and `hasAlpha: no`. Then look at each one.
 4. Commit the folder. Keep the folders of earlier Releases: they are what the Store showed then.
 

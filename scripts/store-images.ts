@@ -16,11 +16,11 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { chromium } from 'playwright';
+import { chromium, type Page } from 'playwright';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -29,6 +29,7 @@ import { LogoIcon } from '../src/components/icons/HeaderIcons';
 import { parseStoreImagesArgs } from './store-images/args';
 import { distProblem } from './store-images/dist';
 import { type Assets, storeImages } from './store-images/layouts';
+import { makeAllThenWrite } from './store-images/output';
 import { flattenPng, pngInfo } from './store-images/png';
 import { captureScenes } from './store-images/scenes';
 import { steadyScreenshot } from './store-images/steady';
@@ -70,12 +71,13 @@ async function main(): Promise<void> {
   );
   const images = storeImages(scenes, assetsOf(options.dist));
 
-  mkdirSync(out, { recursive: true });
+  // Nothing is written until every image is made: a failure leaves `out` and the texts file as they were
   const texts: string[] = [];
   const browser = await chromium.launch({ channel: 'chromium', headless: true });
-  try {
-    const page = await browser.newPage({ deviceScaleFactor: 1 });
-    for (const image of images) {
+  let page: Page | undefined;
+  const written = await makeAllThenWrite(out, images, {
+    make: async (image) => {
+      page ??= await browser.newPage({ deviceScaleFactor: 1 });
       await page.setViewportSize({ width: image.width, height: image.height });
       await page.setContent(image.html, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
@@ -86,13 +88,14 @@ async function main(): Promise<void> {
       if (info.width !== image.width || info.height !== image.height || info.hasAlpha) {
         throw new Error(`${image.file} came out ${String(info.width)} x ${String(info.height)}${info.hasAlpha ? ' with alpha' : ''}`);
       }
-      const file = path.join(out, image.file);
-      writeFileSync(file, png);
-      const sha256 = createHash('sha256').update(png).digest('hex');
-      process.stdout.write(`  ${shown(file)}  ${String(info.width)} x ${String(info.height)}, no alpha, sha256 ${sha256}\n`);
-    }
-  } finally {
-    await browser.close();
+      return png;
+    },
+    close: () => browser.close()
+  });
+  for (const { file, png } of written) {
+    const info = pngInfo(png);
+    const sha256 = createHash('sha256').update(png).digest('hex');
+    process.stdout.write(`  ${shown(file)}  ${String(info.width)} x ${String(info.height)}, no alpha, sha256 ${sha256}\n`);
   }
   if (options.texts) {
     writeFileSync(options.texts, `${texts.join('\n\n')}\n`);
