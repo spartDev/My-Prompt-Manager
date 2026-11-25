@@ -1,115 +1,151 @@
-# Chrome Web Store Listing - My Prompt Manager
+# Chrome Web Store Listing - My Prompt Manager 2.0
 
-## Detailed Description (1,467 characters)
+The text of the store listing since Release 2.0.0, in English. Each heading names the Developer Dashboard field its text goes in, except the summary, which is not pasted (see Summary). The copy agrees with the store images of ticket My-Prompt-Manager-tuh.9, so submit the listing with four screenshots for now, 1 to 4, and the small promo tile and the marquee. Add screenshot 5, the Welcome's Packs step, once ticket My-Prompt-Manager-1c88 is resolved: it shows the real 2.0.0 Welcome, which names Copilot (`src/components/welcome/PackPicker.tsx:10`), while this listing says Copilot is not supported. Four is enough: Google asks for "At least one 1280x800 px or 640x400 px screenshot, up to 5 total" ([Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#graphic-assets)).
 
-**My Prompt Manager - Organize & Access Your AI Prompts Instantly**
+- **First, the privacy policy.** Before you submit, check that the privacy policy agrees with this listing (ticket My-Prompt-Manager-nare). At 2.0.0, `privacy-policy.md:37` and `privacy-policy-short.md:8` justify `<all_urls>`, which `manifest.json` does not declare, and `privacy-policy-short.md:17` says "No Analytics", while this listing describes Analytics and its usage history. Google wants the Privacy practices to be "consistent with the privacy policy URL that you provide" ([Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy#certify_your_data_use_practices)).
+- **Second, the Data usage answers.** This listing does not hold them yet: the checkboxes of the Privacy practices tab that disclose the data the extension collects, and its certifications. Do not submit before ticket My-Prompt-Manager-cdfa drafts them here. Google asks for them with every update ("Every item will need to provide these data collection disclosures and limited use certification in order to be updated or published", [User Data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq#1_what_is_required_from_developers_to_publishupdate_a_chrome_web_store_item)), data kept on the computer included ("Extensions are required to disclose how they handle user data, even when data is processed or stored locally on a user's device", [User Data FAQ](https://developer.chrome.com/docs/webstore/program-policies/user-data-faq#3_does_an_extension_need_to_disclose_user_data_handling_if_the_data_is_only_processed_or_stored_locally_on_a_users_device)).
+- **Third, activeTab.** Before you submit, record in ticket My-Prompt-Manager-79h7 whether 2.0.0 keeps `activeTab`, which `manifest.json:13` declares and no feature needs (activeTab, below). If it stays, paste its justification with the others. If it goes, make no listing-only submission, since Google says "If there are permissions listed here that you don't require, remove them from your manifest and upload a new version of your extension before continuing" ([Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy#list_and_justify_any_permissions)): the listing waits for the Release that drops it (With a later Release, below).
+- **Now, for the published 2.0.0:** paste the text and upload the images on the Dashboard tabs ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata): "If you're changing anything about the Chrome Web Store listing for your item, its distribution, or details of your privacy policy, you must update the information on the developer dashboard"): four screenshots, 1 to 4, the small promo tile and the marquee, holding screenshot 5 while ticket My-Prompt-Manager-1c88 is open. Then click Submit for review ([Submitting the update](https://developer.chrome.com/docs/webstore/update#submitting-the-update)). No new package is needed: one is required only "If you're changing any code, the manifest, or other assets packaged with your extension" ([Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file)). Google reviews the listing like any submission ([Review process](https://developer.chrome.com/docs/webstore/review-process#review-time): "all item submissions ... are subject to the same review process"). The store keeps the old listing until the review passes: a refused submission leaves "the description text, image assets, privacy disclosures, and published CRX all" unchanged ([Rejection](https://developer.chrome.com/docs/webstore/review-process#rejection)). Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item): "Cancel review: Use when your item is awaiting review. This review will be cancelled letting you make changes to your draft").
+- **With a later Release:** paste what changed and save the draft without submitting it, before `release.yml` makes the Submission, which sends the draft, listing included (`docs/CHROME_WEBSTORE_GUIDE.md`, Version Updates). Until that review passes, the published item stays as it is: "When you submit an update for review, it doesn't yet affect your published item" ([Submitting the update](https://developer.chrome.com/docs/webstore/update#submitting-the-update)).
 
-Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, and Perplexity. Store, organize, and instantly access your best prompts with one click.
+## Summary (not pasted)
 
-**Key Features:**
-• **Smart Integration** - Native one-click prompt insertion on Claude.ai, ChatGPT, and Perplexity
-• **Organized Library** - Create categories, search with highlighting, and manage unlimited prompts
-• **Privacy First** - All data stored locally on your device - no cloud servers or data collection
-• **Instant Access** - Beautiful floating icons appear next to text inputs on supported AI platforms
-• **Dark/Light Themes** - Matches your system preferences automatically
-• **Custom Sites** - Extend support to any AI platform with configurable selectors
-• **Professional UI** - Clean, modern interface built with React and TypeScript
+Not pasted: the Dashboard cannot edit the summary. It is the `description` of `manifest.json`, so this text goes live with the first Release whose `manifest.json` carries it (ticket My-Prompt-Manager-tuh.11).
 
-**Perfect For:**
-Writers, developers, marketers, researchers, students, and professionals who frequently use AI tools and want to streamline their workflow with reusable prompts.
+```text
+Write a prompt once, then type // to insert it in Claude, ChatGPT, Gemini, Mistral or Perplexity. Stays on your device.
+```
 
-**Privacy & Security:**
-Your prompts never leave your device. Uses Chrome's secure local storage API with no external connections or data transmission.
+119 characters. The limit is 132 ([Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing#item_summary): "132 characters or less").
 
-Works offline once installed. Transform repetitive AI interactions into efficient, organized workflows.
+The store shows the `description` field of the uploaded package's `manifest.json` ([manifest `description`](https://developer.chrome.com/docs/extensions/reference/manifest/description): "no more than 132 characters"; [Prepare your extension](https://developer.chrome.com/docs/webstore/prepare#manifest): "After uploading your item, you won't be able to edit the metadata of your manifest in the developer dashboard"). The 2.0.0 package carries "Personal prompt library for AI platforms. Store, organize, and instantly insert your best prompts with one click." (113 characters). The summary names the five Platforms this version works on, the most that the [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows in a list. It names no Copilot: copilot.microsoft.com now redirects to copilot.com, and a work account lands on copilot.cloud.microsoft, two hosts that 2.0.0 does not declare (tickets My-Prompt-Manager-1c88 and My-Prompt-Manager-j74b).
 
-## Short Summary (128 characters)
+## Detailed description
 
-**Organize & instantly access your AI prompts on Claude, ChatGPT & Perplexity with one-click insertion. Privacy-first, local storage.**
+Store listing tab, Description. Plain text: the store shows no Markdown. Paste what is between the fences.
 
-## Permission Justifications
+```text
+Stop retyping your prompts. My Prompt Manager keeps the prompts you reuse in one Library and brings them into your AI chats: type // in the chat box, pick a prompt, and it goes in where your cursor is.
 
-### <all_urls> (Access your data on all websites)
-This permission enables the extension to detect AI platforms (Claude.ai, ChatGPT, Perplexity) and inject the prompt manager icon next to text input fields. The extension only activates on AI platforms and user-configured custom sites - it doesn't access or modify content on other websites.
+Your prompts, one // away
+• Type // at the start of the chat box, or after a space or a line break, and your prompts open right there. The Prompts button in the chat box opens them too.
+• Browse All, Pinned, Recent (the last five you inserted) or one Category, or search your whole Library.
+• Each insertion is confirmed above the chat box, with Undo to put back the text that was there.
 
-### Storage
-Stores your personal prompt library, categories, and settings locally on your device using Chrome's secure storage API. No data is transmitted to external servers.
+Write it once. Reuse it everywhere.
+• Variables: write {{name}} where the details change. When you insert the prompt in a chat, you fill in each Variable first.
+• The rest arrives exactly as you saved it, line breaks included.
 
-### ActiveTab
-Allows the extension to interact with the currently active tab to insert prompts into AI chat interfaces when you click the prompt manager icon.
+One Library for every AI chat
+Works on Claude, ChatGPT, Gemini, Mistral and Perplexity. Turn each one on or off in Settings.
+Microsoft Copilot is not supported in this version: it now opens at copilot.com, or at copilot.cloud.microsoft with a work account.
+Another AI site? Add it as a custom site, and show where the Prompts button goes with the Element picker.
 
-### Tabs
-Required to detect which AI platform you're using (Claude, ChatGPT, or Perplexity) to provide the appropriate integration experience.
+A home for every prompt you write
+• Categories in 12 colors.
+• Filter your Library: All, Pinned, Most Used, or one Category.
+• Search with Cmd+K on a Mac, Ctrl+K elsewhere, in titles, text and Category names. A search that finds nothing offers to create a new one.
+• Pin the prompts you want first, copy one in a click, or share one as a Share code.
+• Open it in Chrome's side panel or as a popup, in light or dark mode, or following your system.
 
-### Scripting
-Enables the extension to inject the prompt manager interface into AI platforms and insert selected prompts into text fields when requested.
+Not sure where to start? Pick a Pack
+The first time you open the extension after installing it, the Welcome shows how it works in three short steps and offers four Packs of ready-made prompts: Product, Engineering, Writing and Hiring. The Packs you pick go into your Library, each in a Category named after it, and everything stays editable.
 
-## Category & Keywords
+Analytics
+See the prompts you use most, your busiest weekday, and the AI chats and Categories you use. Tidy up lists the prompts you never used and the duplicate pairs, each with a Review button that opens them in your Library.
 
-**Primary Category:** Productivity
-**Secondary Category:** Developer Tools
+Stays on your device. No account, no cloud.
+• Your Library, settings and usage history stay in Chrome's local storage on your computer. They are not synced, and there is no account and no server. The extension itself sends nothing anywhere.
+• Export a Backup file of your Library whenever you like, and restore it from Settings.
+```
 
-**SEO Keywords:**
-- AI prompt manager
-- ChatGPT prompts
-- Claude AI prompts  
-- Perplexity prompts
-- Prompt library
-- AI productivity
-- Prompt organizer
-- AI workflow
-- Prompt templates
-- AI assistant tools
-- Content creation tools
-- Writing productivity
-- Developer prompts
-- Marketing prompts
+2,532 characters. Google's documentation names no character limit for the detailed description ([Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#product_details), [Creating a great listing page](https://developer.chrome.com/docs/webstore/best-listing#item_description)); the Dashboard field is commonly reported to take 16,000 characters, which Google does not document. The summary, the description and the single purpose name the same five Platforms, the most that the [Keyword spam](https://developer.chrome.com/docs/webstore/program-policies/spam-faq#keyword-spam) policy allows in a list of supported sites ("When listing supported websites or brands in the description, do not list more than five"). No Platform name appears five times.
 
-**Target Audience:**
-- AI power users
-- Content creators
-- Developers
-- Digital marketers
-- Writers and copywriters
-- Researchers
-- Students
-- Business professionals
+## Category and language
 
-## Key Selling Points
+- **Category:** Workflow & Planning, "Extensions to help users perform their tasks more efficiently" ([Choose your extension's category well](https://developer.chrome.com/docs/webstore/best-practices#choose-category-well)). Productivity, the category of 1.x, was replaced in mid 2023.
+- **Language:** English
 
-• **Universal AI Integration** - Works seamlessly with Claude, ChatGPT, and Perplexity without switching tabs or copying/pasting
+## Privacy practices
 
-• **100% Privacy Protected** - All prompts stored locally on your device with zero data collection or external connections
+### Single purpose
 
-• **One-Click Efficiency** - Instantly insert any prompt with a single click directly from AI chat interfaces
+```text
+Keep a personal Library of prompts and insert them into the chat box of AI chat sites, such as Claude, ChatGPT, Gemini, Mistral and Perplexity, and of the sites the user adds.
+```
 
-• **Unlimited Organization** - Create unlimited prompts and categories with powerful search and filtering capabilities
+### Permission justifications
 
-• **Smart Visual Integration** - Beautiful floating icons appear contextually next to input fields on supported platforms
+One field per permission that `manifest.json` declares under `permissions`.
 
-• **Extensible Platform Support** - Add custom site configurations to work with any AI platform beyond the built-in three
+#### storage
 
-• **Professional Grade UI** - Modern React-based interface with dark/light theme support and responsive design
+Keeps your Library on your computer: your prompts, Categories and settings, which sites the extension works on, and the history of your insertions that Analytics counts. They are kept in Chrome's local storage, which is not synced. Chrome's session storage, emptied when Chrome closes, holds short-lived state: where the Prompts button was placed in each tab, the progress of the Element picker, and a Review on its way to the side panel. The extension sends nothing it stores anywhere.
 
-• **Zero Learning Curve** - Intuitive design requires no tutorials - start organizing prompts immediately
+#### activeTab
 
-• **Offline Capable** - Works completely offline once installed, no internet connection required for prompt management
+> This note is not pasted; the paragraph after it is, while `manifest.json` declares activeTab. 2.0.0 does not need activeTab: the content script is injected only after a check of the host permission for the tab's site (`src/background/background.ts:495-497`). A script that looks whether the content script is already in the tab, and removes what an earlier version left there, can run before that check, as when the Element picker starts (`:1542`, which runs `:571`), but the injection that follows still stops at it. Google says activeTab is not required "When the extension has access to broad host permissions or host permissions for the specific domains that are relevant to the extension's operations" ([Excessive permissions](https://developer.chrome.com/docs/webstore/troubleshooting#excessive-permissions)), and asks to remove a permission that is not required ([Privacy practices](https://developer.chrome.com/docs/webstore/cws-dashboard-privacy#list_and_justify_any_permissions)), so its review may refuse the listing over it. Dropping it needs the owner's decision (ticket My-Prompt-Manager-79h7): `src/test/guardrails/manifestHosts.test.ts:33` pins the five permissions of 1.9.0. This heading goes when activeTab does.
 
-• **Developer-Friendly** - Built with TypeScript, comprehensive testing, and follows Chrome extension best practices
+When you click the extension's icon in Chrome's toolbar, with the extension set to open in the side panel, the extension adds its Prompts button to the tab you are on if it is missing there. It acts only on that tab, at your click, and only on the AI chat sites it works on and the sites you gave it access to.
 
-• **Maintenance-Free** - Local storage means no subscription fees, server maintenance, or service interruptions
+#### tabs
 
-## Store Submission Checklist
+Lets the extension see the address of your open tabs, to know which ones show an AI chat site or a site you added. It uses this to add the Prompts button to the tabs already open when you install or update the extension or add a site, to apply a theme change to them, to bring the right tab forward when you use the Element picker, and to remember where the Prompts button was placed in each tab until the tab leaves the site or closes. It also reads the address and title of the tab you are on, to offer that site when you add one in Settings. The extension never sends tab addresses anywhere.
 
-- [x] Detailed description (under 1,500 characters)
-- [x] Short summary (under 132 characters)
-- [x] Permission justifications prepared
-- [x] Category and keywords identified
-- [x] Privacy policy created and hosted
-- [x] Homepage URL updated in manifest
-- [ ] Screenshots prepared (popup interface, AI integration)
-- [ ] Store icon (128x128) ready
-- [ ] Promotional images created
-- [ ] Extension tested and packaged
-- [ ] Privacy policy hosted on public URL
-- [ ] Developer account set up
+#### sidePanel
+
+The extension opens in Chrome's side panel when you click its icon, so your Library stays open beside the chat; Settings, Appearance, Open in switches it to a popup. The Review buttons of the full-page Analytics view open the side panel on the prompts to review.
+
+#### scripting
+
+Adds the extension's own script, the one that shows the Prompts button and opens your prompts on //, to a tab: to the tabs already open when you install or update the extension or add a site, to the tab where you start the Element picker, to each page you open on a site you added (which the manifest cannot list), and to the current tab when you click the extension's icon in Chrome's toolbar in side panel mode. It is added only to the AI chat sites the extension works on and the sites you gave it access to, and it stays idle on a site you turned off. The script is part of the extension package: no code is downloaded.
+
+### Host permission justification
+
+The Dashboard has a single field for all the hosts. Paste this paragraph, then the line under each heading, one line per host:
+
+On each of these sites the extension looks for the chat box and its toolbar, to place the Prompts button there. For // and Undo, it reads only the chat box: the text just before your cursor, to notice //, and the text in the box, to put it back on Undo. When you use the Element picker to choose where the Prompts button goes, on a site you add or on one of these sites where the button could not find its usual place, it also reads the element you click, its place in the page, and the page's address. The extension sends nothing it reads anywhere. On a site you add, what the Element picker reads goes into the configuration code you can export to share it: the page's address and what identifies the element you picked, that is attributes such as its id, label, class names and data- attributes, each kept whole, so a draft of yours that the page copied into one can go too; its parent's id and its place among its siblings; and up to 50 characters of its text.
+
+> Shorter fallback, if the field's counter stops short: paste the paragraph above, then this one line in place of the seven Platform lines, then the lines of the two optional hosts.
+>
+> Claude (claude.ai), ChatGPT (chatgpt.com), Google Gemini (gemini.google.com), Perplexity (www.perplexity.ai), Mistral LeChat (chat.mistral.ai), Microsoft Copilot (copilot.microsoft.com) and Microsoft 365 Copilot (m365.cloud.microsoft): on each, to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft now redirects copilot.microsoft.com to copilot.com, and a work account from either Copilot to copilot.cloud.microsoft, two hosts this version does not run on.
+
+#### `https://claude.ai/*`
+
+Claude: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+
+#### `https://chatgpt.com/*`
+
+ChatGPT: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+
+#### `https://gemini.google.com/*`
+
+Google Gemini: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+
+#### `https://www.perplexity.ai/*`
+
+Perplexity: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+
+#### `https://chat.mistral.ai/*`
+
+Mistral LeChat: shows the Prompts button and opens your prompts on // in the chat box, then inserts the prompt you pick.
+
+#### `https://copilot.microsoft.com/*`
+
+Microsoft Copilot: to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft now redirects this address to copilot.com, which this version does not run on.
+
+#### `https://m365.cloud.microsoft/*`
+
+Microsoft 365 Copilot: to show the Prompts button and open your prompts on // in the chat box, then insert the prompt you pick. Microsoft redirects a work account from here to copilot.cloud.microsoft, which this version does not run on.
+
+#### Optional `https://*/*`
+
+Never granted at install. Asked only when you add a site yourself in Settings, or use the Element picker on a site, and then only for that one site: Chrome asks you first, and the extension works there only if you accept.
+
+#### Optional `http://*/*`
+
+Never granted at install. Asked only when you use the Element picker on a site served over http rather than https, and then only for that one site: Chrome asks you first, and the extension works there only if you accept.
+
+### Remote code
+
+No, I am not using remote code. Every script is in the package, and `manifest.json` allows only the package's own scripts (`script-src 'self'`).

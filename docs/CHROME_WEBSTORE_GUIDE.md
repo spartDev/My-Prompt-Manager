@@ -14,7 +14,7 @@ This document outlines the steps to package and submit the Prompt Library extens
 ### 2. Extension Requirements
 - [ ] Manifest V3 compliance verified
 - [ ] CSP (Content Security Policy) properly configured
-- [ ] Permissions documented (storage, sidePanel, <all_urls>)
+- [ ] Each permission and host permission of `manifest.json` justified in `chrome-web-store-listing.md`, and nothing else
 - [ ] No external network requests (except CDN for optional libraries)
 - [ ] Extension works completely offline
 - [ ] Content scripts properly inject on supported platforms
@@ -89,96 +89,16 @@ A Release's zip is made, attested and submitted by `.github/workflows/release.ym
 
 ### Store Listing Information
 
-**Basic Information:**
-- **Name:** My Prompt Manager (or "Prompt Library" if preferred)
-- **Summary:** Seamlessly manage and insert prompts directly in Claude, ChatGPT, Gemini, and other AI platforms
-- **Description:** See detailed description below
-- **Category:** Productivity / Developer Tools
-- **Language:** English
+The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md`](../chrome-web-store-listing.md): the detailed description, the category and language, and the Privacy practices (single purpose, one justification per permission and per host permission of `manifest.json`, remote code). It does not hold the Data usage answers of the Privacy practices yet, the checkboxes of the data the extension collects and the certifications, which every update needs: submit nothing before ticket My-Prompt-Manager-cdfa drafts them. The summary is not pasted: the store shows the `description` of the package's `manifest.json`, which the Dashboard cannot edit.
 
-**Detailed Description:**
-```
-My Prompt Manager is a powerful Chrome extension for AI power users who want seamless access to their personal prompt library directly within AI chat interfaces. Whether you're working with Claude, ChatGPT, Perplexity, Gemini, or custom AI platforms, this extension brings your prompts right where you need them.
+**Screenshots** (the five screenshots of the store images, with their headlines; upload 1 to 4 for now, see screenshot 5):
+1. **`//`**: "Stop retyping your prompts", a Platform composer with `//` typed and the Prompt selector open
+2. **Variables**: "Write it once. Reuse it everywhere.", the selector's Variables step, then the Insertion with its Undo confirmation
+3. **Platforms**: "One Library for every AI chat", the Prompts button in the composer of each Platform the listing names: Claude, ChatGPT, Gemini, Mistral and Perplexity, with no Copilot (ticket My-Prompt-Manager-1c88)
+4. **Library**: "A home for every prompt you write", the side panel Library with the Library filter, Categories and cards, and the line "Stays on your device. No account, no cloud."
+5. **Packs**: "Not sure where to start? Pick a Pack", the Welcome's Packs step. Held while ticket My-Prompt-Manager-1c88 is open: it shows the real 2.0.0 Welcome, whose Packs step names Copilot among the Platforms (`src/components/welcome/PackPicker.tsx:10`, read from `src/config/platforms.ts`), while the listing says Copilot is not supported. Upload it once 1c88 is resolved; until then the four others are enough, since the store asks for at least one screenshot and takes up to five.
 
-KEY FEATURES:
-✅ **Native AI Platform Integration** - Library icon appears directly in Claude, ChatGPT, Perplexity, Gemini, and Mistral chat interfaces
-✅ **One-Click Insertion** - Click prompts to instantly insert them into chat inputs (no copy-paste needed)
-✅ **Smart Organization** - Color-coded categories, fuzzy search, duplicate detection, and intelligent sorting
-✅ **Custom Site Support** - Configure any AI platform with visual element picker and fingerprinting
-✅ **Side Panel UI** - Modern Chrome side panel interface alongside popup for enhanced workflow
-✅ **Dark Mode** - Automatic theme detection with manual toggle for comfortable use
-✅ **Import/Export** - Backup and share your prompt library with full data portability
-✅ **Advanced Search** - Real-time fuzzy search with Levenshtein distance matching
-✅ **Privacy First** - 100% local storage, no external servers, complete offline functionality
-
-SUPPORTED PLATFORMS:
-• Claude.ai (claude.ai)
-• ChatGPT (chat.openai.com)
-• Perplexity (perplexity.ai)
-• Google Gemini (gemini.google.com)
-• Mistral LeChat (chat.mistral.ai)
-• Custom sites via settings (any AI platform with text input)
-
-PERFECT FOR:
-• AI researchers managing complex prompt templates
-• Content creators with reusable AI workflows
-• Developers storing code generation prompts
-• Data scientists with analysis prompt libraries
-• Writers organizing creative AI interactions
-• Anyone who frequently uses AI chat platforms
-
-PRIVACY & SECURITY:
-• All data stored locally using Chrome's secure storage API
-• No external network requests or analytics
-• No data collection or transmission to servers
-• Open source and auditable code
-• Prompt text is handled as plain text and never interpreted as markup
-• Secure element fingerprinting (no sensitive data captured)
-
-HOW TO USE:
-1. Install the extension and pin the icon
-2. Add prompts via popup or side panel
-3. Visit any supported AI platform (Claude, ChatGPT, etc.)
-4. Look for the prompt library icon near the chat input
-5. Click the icon to open your prompt selector
-6. Select a prompt - it instantly inserts into the chat
-7. For custom sites: Settings → Custom Sites → Add Site → Use Element Picker
-
-ADVANCED FEATURES:
-• **Element Fingerprinting**: Robust element identification that survives UI updates
-• **Hybrid Positioning**: CSS Anchor API + Floating UI for optimal icon placement
-• **Keyboard Navigation**: Arrow keys, Enter/Escape for quick selection
-• **Bulk Operations**: Multi-select, bulk delete, and category reassignment
-• **Data Compression**: LZ-string compression for efficient storage
-• **Levenshtein Distance**: Smart duplicate detection and fuzzy search
-
-TECHNICAL DETAILS:
-• Manifest V3 compliant
-• React 18 + TypeScript
-• 470+ automated tests
-• Lazy-loaded positioning libraries (optimal bundle size)
-• Content Security Policy compliant
-• Accessible keyboard navigation (WCAG 2.1)
-
-PERMISSIONS:
-• storage - Save prompts locally
-• sidePanel - Open side panel UI
-• <all_urls> - Inject library icon on AI platforms
-
-Version 1.5.0 - Continuously updated with new platform support and features!
-
-Start supercharging your AI workflow today with My Prompt Manager!
-```
-
-**Screenshots Required:**
-1. **Native Integration**: Library icon in Claude/ChatGPT chat interface
-2. **Prompt Selector**: Dropdown showing prompts with search and categories
-3. **Side Panel**: Modern side panel UI with prompt library
-4. **Popup Interface**: Main popup with prompt cards and categories
-5. **Custom Sites**: Element picker for configuring custom AI platforms
-6. **Dark Mode**: Extension in dark theme showing theme toggle
-7. **Category Management**: Category editor with colors and organization
-8. **Settings**: Settings page showing platform toggles and custom sites
+**Promotional images:** the small promo tile, "Your prompts, one // away", and the marquee, "Write it once. Reuse it everywhere."
 
 ### Required Assets
 
@@ -189,15 +109,18 @@ Start supercharging your AI workflow today with My Prompt Manager!
 - 128x128px - Chrome Web Store
 
 **Screenshots:**
-- Minimum 1280x800 pixels
-- Maximum 2560x1600 pixels
-- PNG or JPEG format
-- Show actual extension usage
+- At least one, up to five
+- 1280x800 or 640x400 pixels; 1280x800 is preferred, and the store shows every screenshot downscaled to 640x400
+- JPEG or 24-bit PNG, with no alpha
+- Square corners, no padding (full bleed)
+- The real UI of the Release
 
 **Promotional Images (Optional):**
-- Small promo tile: 440x280px
-- Large promo tile: 920x680px
-- Marquee promo tile: 1400x560px
+- Small promo tile: 440x280px. An item without one is shown after the items that have one
+- Marquee promo tile: 1400x560px. An item without one cannot be featured in the marquee
+- JPEG or 24-bit PNG, with no alpha
+
+Sizes from Google's [Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#graphic-assets) and [Supplying Images](https://developer.chrome.com/docs/webstore/images#screenshots), which name the format "PNG or JPEG"; the Dashboard's upload fields ask for JPEG or 24-bit PNG with no alpha.
 
 ## Submission Process
 
@@ -217,9 +140,9 @@ The Chrome Web Store API cannot create an item, so the first version of an item 
 
 ### 3. Complete Store Listing
 1. **Item Details:**
-   - Fill in description and summary
-   - Select category (Productivity)
-   - Add screenshots (5 recommended)
+   - Fill in the description (the summary is the `description` of `manifest.json`, which the Dashboard cannot edit)
+   - Select category (Workflow & Planning)
+   - Add screenshots (up to 5; for the 2.0 listing, 1 to 4 while ticket My-Prompt-Manager-1c88 is open, see Screenshots above)
    - Add promotional images (optional)
 
 2. **Privacy Practices:**
@@ -287,6 +210,12 @@ A refused Release is never submitted again:
 2. If the store listing changes with this Release, edit it in the Developer Dashboard first, and save it without submitting it: the API changes the package, not the listing, and the Submission sends the item's draft, listing included, to Store review. Once the Submission is in Store review its draft cannot change unless the Submission is cancelled, and `release.yml` never submits a cancelled version again
 3. Tag the bump's merge commit `vX.Y.Z` and push the tag
 4. `release.yml` validates, builds and attests the zip, creates the GitHub Release, then, once the owner approves the `chrome-webstore` environment, uploads the zip and submits it for Store review through the Chrome Web Store API V2 ([`RELEASE_WORKFLOW.md`](RELEASE_WORKFLOW.md); setup in [`GITHUB_ENVIRONMENTS.md`](GITHUB_ENVIRONMENTS.md))
+
+### Listing-only Updates
+New text or images with no new Release, as for the 2.0 listing on the published 2.0.0 (`chrome-web-store-listing.md`), once the three steps at the top of that file are done: the privacy policy (My-Prompt-Manager-nare), the Data usage answers (My-Prompt-Manager-cdfa) and the activeTab decision (My-Prompt-Manager-79h7), which can rule a listing-only submission out:
+1. Edit the listing on the Developer Dashboard tabs and upload the images (for the 2.0 listing, all but screenshot 5 while ticket My-Prompt-Manager-1c88 is open); no package is needed ([Update your Chrome Web Store item](https://developer.chrome.com/docs/webstore/update#uploading-new-listing-metadata), [Uploading an updated ZIP file](https://developer.chrome.com/docs/webstore/update#uploading-an-updated-zip-file))
+2. Click Submit for review. Google reviews it like any submission, and the store keeps the published listing until it passes ([Review process](https://developer.chrome.com/docs/webstore/review-process#rejection)). If you untick the publish box in the submit dialog, the listing also waits after the review until you publish it, within 30 days, after which it goes back to a draft ([Deferred publishing option](https://developer.chrome.com/docs/webstore/update#deferred-publishing-option))
+3. Push no Release tag while it waits: a draft awaiting review cannot change unless its review is cancelled ([Manage your item](https://developer.chrome.com/docs/webstore/update#manage_your_item))
 
 ### Monitoring
 - Check Chrome Web Store reviews regularly
