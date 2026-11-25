@@ -158,8 +158,10 @@ const repository = (built: { version: string; after: number } | null): { root: s
   writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2.0.0' }));
   mkdirSync(path.join(root, 'src', 'popup'), { recursive: true });
   writeFileSync(path.join(root, 'src', 'popup', 'App.tsx'), 'export {};');
-  utimesSync(path.join(root, 'package.json'), sourceTime, sourceTime);
-  utimesSync(path.join(root, 'src', 'popup', 'App.tsx'), sourceTime, sourceTime);
+  // The folders too: a folder's own time counts, and writing App.tsx set its folder's to now
+  for (const entry of ['package.json', path.join('src', 'popup', 'App.tsx'), path.join('src', 'popup'), 'src']) {
+    utimesSync(path.join(root, entry), sourceTime, sourceTime);
+  }
   if (built) {
     mkdirSync(dist);
     writeFileSync(path.join(dist, 'manifest.json'), JSON.stringify({ version: built.version }));
@@ -188,6 +190,13 @@ describe('dist.ts', () => {
   it('says to build, and names the file, when a source changed after the build', () => {
     const { root, dist } = repository({ version: '2.0.0', after: -60 });
     expect(distProblem(root, dist)).toBe(`The build in ${dist} is older than ${path.join('src', 'popup', 'App.tsx')}: run npm run build first.`);
+  });
+
+  it('says to build, and names the folder, when a source was deleted after the build', () => {
+    const { root, dist } = repository({ version: '2.0.0', after: 60 });
+    // Deleted now, after the build of 2026-11-20: only its folder's time changes
+    rmSync(path.join(root, 'src', 'popup', 'App.tsx'));
+    expect(distProblem(root, dist)).toBe(`The build in ${dist} is older than ${path.join('src', 'popup')}: run npm run build first.`);
   });
 
   it.each([

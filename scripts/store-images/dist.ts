@@ -26,7 +26,11 @@ export const BUILD_SOURCES = [
   'node_modules/.package-lock.json'
 ] as const;
 
-/** The newest modification time under `entry` (a file or a folder), 0 when it does not exist */
+/**
+ * The newest modification time under `entry` (a file or a folder), 0 when it does not exist. A
+ * folder's own time counts: deleting, renaming or moving a file into it changes the folder's time
+ * and leaves the other files' times as they were. On a tie the file is named, not its folder.
+ */
 const newestUnder = (entry: string): { time: number; file: string } => {
   if (!existsSync(entry)) {
     return { time: 0, file: entry };
@@ -35,10 +39,10 @@ const newestUnder = (entry: string): { time: number; file: string } => {
   if (!stats.isDirectory()) {
     return { time: stats.mtimeMs, file: entry };
   }
-  let newest = { time: 0, file: entry };
+  let newest = { time: stats.mtimeMs, file: entry };
   for (const name of readdirSync(entry)) {
     const candidate = newestUnder(path.join(entry, name));
-    if (candidate.time > newest.time) {
+    if (candidate.time >= newest.time) {
       newest = candidate;
     }
   }

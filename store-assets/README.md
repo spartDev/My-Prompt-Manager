@@ -18,7 +18,7 @@ All are 24-bit PNGs with no alpha channel, as the Store asks. Upload the screens
 
 ## Make the images of a Release
 
-1. Set the Release in `package.json` and `manifest.json`, then build it: `npm run build`. The script never builds. It stops and says so when `dist/` is missing, of another version, or older than a file the build reads: `src/`, `public/`, `manifest.json`, `vite.config.ts`, `package.json`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, or the installed packages (`node_modules/.package-lock.json`).
+1. Set the Release in `package.json` and `manifest.json`, then build it: `npm run build`. The script never builds. It stops and says so when `dist/` is missing, of another version, or older than a file the build reads: `src/`, `public/`, `manifest.json`, `vite.config.ts`, `package.json`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, or the installed packages (`node_modules/.package-lock.json`). A file deleted, renamed or moved in under `src/` or `public/` since the build counts too.
 2. `npm run store:images`. It writes the seven files to `store-assets/<version>/` and prints each one's size and sha256. It took 9 s on an Apple-silicon Mac (2026-11-25, `time npm run store:images`).
    - `npm run store:images -- --out <dir>` writes them elsewhere, to compare two runs.
    - `--texts <file>` writes, for each image, the text the script puts in it and the text of the UI in its scenes, to check the images' claims with `grep`. It reads the pages' text, not the pixels. It leaves out placeholders drawn by CSS or by an attribute, such as the composers' "Ask anything". It includes text that is off screen or hidden, such as Prompts below the fold, a tab cut at the edge, or text for screen readers.
