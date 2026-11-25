@@ -9,19 +9,23 @@ A summary of [the full privacy policy](./privacy-policy.md) for Release 2.0.0. W
 ## What stays on your device
 
 - **Stored:** your Prompts, Categories and preferences, the Site settings and Custom sites, and the usage history that the Analytics section counts, in Chrome's local storage (`chrome.storage.local`), which Chrome does not sync. Short-lived state goes in `chrome.storage.session`, emptied when Chrome closes.
-- **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored until the history holds 9,000 entries; it never holds more than 10,000.
-- **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box.
+- **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored: only an insertion made while the history holds 9,000 entries or more removes them, and it never holds more than 10,000.
+- **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address, the element's identifiers and attributes, and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box.
 
-## What leaves your device, and only through you
+## What leaves your device
 
-- A Prompt you insert into a chat and send.
+The extension itself sends nothing. These leave only through you:
+
+- A Prompt you insert into a chat: the site then handles it as anything you type there.
 - A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted.
 - A Backup file of your Prompts and Categories, made only when you click Export in Settings.
+
+What the extension shows inside a site's page, such as the titles and Categories of your Prompts in the Prompt selector, can be read by that site's own scripts, and any website can tell that the extension is installed.
 
 ## Permissions
 
 - **`storage`:** keeps the data above on your device.
-- **`activeTab`:** a click on the toolbar icon, in side panel mode, adds the Prompts button to the tab you are on, only on a site the extension already has access to.
+- **`activeTab`:** Chrome lets the extension act on the tab you are on when you click its toolbar icon. In side panel mode, that click adds the Prompts button to the tab, only on a site the extension already has access to; on any other site, it leaves the page untouched.
 - **`tabs`:** reads tab addresses, to find the tabs that show a Platform or a site you added, and the current tab's title, to offer it when you add a site. Never sent anywhere.
 - **`sidePanel`:** opens the extension in Chrome's side panel.
 - **`scripting`:** adds the extension's own packaged script to the tabs of the Platforms and of the sites you allowed.
