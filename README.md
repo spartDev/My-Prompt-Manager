@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Chrome](https://img.shields.io/badge/Chrome-116%2B-yellow.svg)](https://www.google.com/chrome/)
 
-Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral, Perplexity, and Microsoft Copilot. Store, organize, share, and instantly insert your best prompts with one click.
+Transform your AI interactions with a powerful personal prompt library that integrates seamlessly with Claude, ChatGPT, Gemini, Mistral and Perplexity. Store, organize, share, and instantly insert your best prompts with one click.
 
 **Author:** Thomas Roux  
 **Repository:** [github.com/spartDev/My-Prompt-Manager](https://github.com/spartDev/My-Prompt-Manager)
@@ -48,8 +48,8 @@ Transform your AI interactions with a powerful personal prompt library that inte
 | Google Gemini | ✅ Fully Supported | gemini.google.com | 85 |
 | Mistral LeChat | ✅ Fully Supported | chat.mistral.ai | 85 |
 | Perplexity | ✅ Fully Supported | www.perplexity.ai | 80 |
-| Microsoft Copilot | ✅ Fully Supported | copilot.microsoft.com | 80 |
-| Microsoft 365 Copilot | ✅ Fully Supported | m365.cloud.microsoft | 80 |
+| Microsoft Copilot | ❌ Not supported in 2.0.0: Microsoft now redirects copilot.microsoft.com to copilot.com | copilot.microsoft.com | 80 |
+| Microsoft 365 Copilot | ❌ Not supported in 2.0.0: Microsoft redirects a work account to copilot.cloud.microsoft | m365.cloud.microsoft | 80 |
 | Custom Sites | ✅ Configurable | User-defined | Variable |
 
 See our [Platform Integration Guide](docs/PLATFORM_INTEGRATION.md) to add your own platforms.
@@ -331,11 +331,12 @@ npm test -- src/content/platforms/__tests__/claude-strategy.test.ts
 - **Stored on your device:** What the extension keeps is in Chrome's storage on your computer, which Chrome does not sync, but for a short log that the Element picker leaves in the page you use it on, where that site can read it
 - **Nothing sent by the extension:** It sends nothing to the developer or to anyone else: no telemetry, no analytics service, no crash reports, no ads. A Prompt you insert goes into the chat box of the site you are on, and what the extension shows inside a site's page can be read by that site's own scripts. A Share code, a configuration code or a Backup file leaves your device only where you put it
 - **Analytics is local:** The Analytics section counts your insertions on your device, from a usage history kept in Chrome's local storage. Nothing about your use is sent anywhere
-- **Element Picker Security:** It cannot pick password, e-mail, phone, payment or one-time-code fields, and it turns itself off on some sites that look sensitive (the list does not recognize every one). Values that look sensitive are left out of its description of an element, but not out of its CSS selector, and the description can hold the first 50 characters of a draft in the chat box: see [Element picker](privacy-policy.md#element-picker)
+- **Element Picker Security:** It cannot pick an element whose attributes contain password, token, key, account, card or a few other such words, nor a field whose type marks it as a password, e-mail or phone field, or whose `autocomplete` marks it as a password, payment or one-time-code field; a phone or e-mail field that the page marks only by its label, its name or its `autocomplete` can be picked, and its description then keeps that label and name, not what you typed in it. It turns itself off on some sites that look sensitive (the list does not recognize every one). Values that look sensitive are left out of its description of an element, but not out of its CSS selector, and the description can hold the first 50 characters of a draft in the chat box: see [Element picker](privacy-policy.md#element-picker)
 
 ### Privacy Commitment
 
 - Everything stays on your device: what the extension keeps is in Chrome's storage on your computer, which Chrome does not sync, but for a short log that the Element picker leaves in the page you use it on, where that site can read it
+- You decide what leaves: a Prompt you insert goes to the site you insert it on, that site's own scripts can read what the extension shows inside its page, and a Share code, a configuration code or a Backup file leaves your device only where you put it
 - No account, no server and no cloud storage
 - No analytics service and no telemetry: the Analytics section counts your insertions on your device, and nothing about your use is sent anywhere
 - Open source for transparency
@@ -475,7 +476,7 @@ window.__promptLibraryDebug?.testInsertion?.('test content')
 
 ### Version 2.0 (Current)
 - [x] Core prompt management
-- [x] Multi-platform AI integration (8 platforms)
+- [x] Multi-platform AI integration (5 platforms, and your own Custom sites)
 - [x] Dark mode support
 - [x] Custom site configuration
 - [x] Comprehensive testing (Vitest and Playwright)
