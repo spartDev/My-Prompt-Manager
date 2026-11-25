@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["node", "chrome", "vite/client"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "scripts/capture-composers.ts", "scripts/live-check.ts", "scripts/composers/*.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "scripts/capture-composers.ts", "scripts/live-check.ts", "scripts/composers/*.ts", "scripts/store-images.ts", "scripts/store-images/*.ts", "scripts/__tests__/store-images.test.ts"]
 }

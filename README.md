@@ -136,6 +136,7 @@ Versions: `package.json`.
 | `npm run test:e2e` | Run Playwright E2E tests | E2E Testing |
 | `npm run test:e2e:linux -- <spec>` | Run a spec like Linux CI, in Docker with DejaVu fonts | E2E Testing |
 | `npm run package` | Package extension for distribution | Chrome Web Store |
+| `npm run store:images` | Make the Store listing's images from the build in `dist/` ([store-assets/README.md](store-assets/README.md)) | Chrome Web Store |
 
 ## 🏗️ Architecture
 

@@ -27,6 +27,7 @@
     "test:e2e:linux": "scripts/test-e2e-linux.sh",
     "composers:capture": "tsx scripts/capture-composers.ts",
     "live:check": "tsx scripts/live-check.ts",
+    "store:images": "tsx scripts/store-images.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {

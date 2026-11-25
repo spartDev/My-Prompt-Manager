@@ -122,6 +122,8 @@ The text pasted into the Developer Dashboard is in [`chrome-web-store-listing.md
 
 Sizes from Google's [Complete your listing information](https://developer.chrome.com/docs/webstore/cws-dashboard-listing#graphic-assets) and [Supplying Images](https://developer.chrome.com/docs/webstore/images#screenshots), which name the format "PNG or JPEG"; the Dashboard's upload fields ask for JPEG or 24-bit PNG with no alpha.
 
+`npm run store:images` makes the five screenshots, the small promo tile and the marquee of a Release from its build, in `store-assets/<version>/`: [store-assets/README.md](../store-assets/README.md).
+
 ## Submission Process
 
 ### 1. Developer Account Setup
