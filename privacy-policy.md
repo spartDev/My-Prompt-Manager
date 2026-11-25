@@ -58,7 +58,7 @@ The description is stored in `chrome.storage.local`: with the Custom site in the
 
 ## What the extension reads on a site
 
-The extension works on the seven Platforms listed under [Permissions](#permissions), and on the sites you add and allow. On each of them, while the site is turned on in Settings:
+The extension has access to the seven Platforms listed under [Permissions](#permissions), and works on five of them: Microsoft Copilot is not supported in this version (see the host permissions there). It also works on the sites you add and allow. On each site it works on, while the site is turned on in Settings:
 
 - it reads the page's structure to find the chat box and its toolbar, and places the Prompts button there;
 - of what you write, it reads only the chat box: the text just before your cursor, to notice `//`, and the text in the box around an Insertion, to check that the Prompt went in and to put the earlier text back if you click Undo. It keeps this in memory, never stores it, and never sends it;
@@ -102,17 +102,17 @@ The extension asks for these permissions in its `manifest.json`, and uses each f
 | `sidePanel` | Opens the extension in Chrome's side panel, so your Library stays open beside the chat (Settings can switch it to a popup), and lets the Review buttons of the full-page Analytics view open the side panel on the Prompts to review. |
 | `scripting` | Adds the extension's own script, the one that shows the Prompts button and opens the Prompt selector on `//`, to a tab: to the tabs already open when the extension is installed or updated or when you add a site, to the tab where you start the Element picker, to each page you open on a Custom site (which the manifest cannot list), and to the current tab when you click the toolbar icon in side panel mode. Only on the Platforms and the sites you allowed. The script is part of the extension's package: no code is downloaded. |
 
-Host permissions: on each of these Platforms the extension shows the Prompts button in the chat box, opens the Prompt selector on `//`, and inserts the Prompt you pick.
+Host permissions: each is there so that the extension can show the Prompts button in that Platform's chat box, open the Prompt selector on `//`, and insert the Prompt you pick. Microsoft Copilot is not supported in this version: Microsoft now redirects `copilot.microsoft.com` to copilot.com, and a work account from either Copilot to copilot.cloud.microsoft, two addresses this version does not run on.
 
-| Host permission | Platform |
-| --- | --- |
-| `https://claude.ai/*` | Claude |
-| `https://chatgpt.com/*` | ChatGPT |
-| `https://gemini.google.com/*` | Google Gemini |
-| `https://www.perplexity.ai/*` | Perplexity |
-| `https://chat.mistral.ai/*` | Mistral LeChat |
-| `https://copilot.microsoft.com/*` | Microsoft Copilot |
-| `https://m365.cloud.microsoft/*` | Microsoft 365 Copilot |
+| Host permission | Platform | In this version |
+| --- | --- | --- |
+| `https://claude.ai/*` | Claude | Works |
+| `https://chatgpt.com/*` | ChatGPT | Works |
+| `https://gemini.google.com/*` | Google Gemini | Works |
+| `https://www.perplexity.ai/*` | Perplexity | Works |
+| `https://chat.mistral.ai/*` | Mistral LeChat | Works |
+| `https://copilot.microsoft.com/*` | Microsoft Copilot | Not supported: Microsoft now redirects this address to copilot.com, which this version does not run on. |
+| `https://m365.cloud.microsoft/*` | Microsoft 365 Copilot | Not supported: Microsoft redirects a work account from here to copilot.cloud.microsoft, which this version does not run on. |
 
 Optional host permissions: never granted at install, and asked for one site at a time. Chrome asks you first, and the extension works on that site only if you accept.
 
@@ -121,7 +121,7 @@ Optional host permissions: never granted at install, and asked for one site at a
 | `https://*/*` | When you add a site in Settings, by hand or from a configuration code, or start the Element picker on a site that is not a Platform. |
 | `http://*/*` | When you start the Element picker on a site served over `http` rather than `https`. |
 
-The extension does not ask for access to all sites: beyond the seven Platforms, it can work only on the sites you allow one by one.
+The extension does not ask for access to all sites: beyond the addresses of the seven Platforms, it has access only to the sites you allow one by one.
 
 ## Your control over your data
 
@@ -132,7 +132,7 @@ The extension does not ask for access to all sites: beyond the seven Platforms, 
 
 ## Children's Privacy
 
-Nothing the extension stores reaches the developer, whatever the user's age: the developer receives no information from anyone.
+Nothing the extension stores reaches the developer, whatever the user's age: the developer receives no information from anyone through the extension.
 
 ## Privacy laws
 

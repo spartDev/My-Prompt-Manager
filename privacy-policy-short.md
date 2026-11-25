@@ -29,13 +29,13 @@ What the extension shows inside a site's page, such as the titles and Categories
 - **`tabs`:** reads tab addresses, to find the tabs that show a Platform or a site you added, and the current tab's title, to offer it when you add a site. Never sent anywhere.
 - **`sidePanel`:** opens the extension in Chrome's side panel.
 - **`scripting`:** adds the extension's own packaged script to the tabs of the Platforms and of the sites you allowed.
-- **Host permissions:** the seven Platforms: `https://claude.ai/*`, `https://chatgpt.com/*`, `https://gemini.google.com/*`, `https://www.perplexity.ai/*`, `https://chat.mistral.ai/*`, `https://copilot.microsoft.com/*`, `https://m365.cloud.microsoft/*`.
+- **Host permissions:** the addresses of the seven Platforms: `https://claude.ai/*`, `https://chatgpt.com/*`, `https://gemini.google.com/*`, `https://www.perplexity.ai/*`, `https://chat.mistral.ai/*`, `https://copilot.microsoft.com/*`, `https://m365.cloud.microsoft/*`. The extension works on the first five. Microsoft Copilot is not supported in this version: Microsoft now redirects `copilot.microsoft.com` to copilot.com, and a work account to copilot.cloud.microsoft, two addresses this version does not run on.
 - **Optional `https://*/*` and `http://*/*`:** never granted at install; Chrome asks you for one site at a time, when you add a site or use the Element picker on it.
 
 ## Your control
 
 - Delete any Prompt or Category, clear the usage history in Analytics, or use Clear All Data in Settings.
 - Export a Backup file in JSON at any time, and restore it from Settings.
-- Uninstalling the extension makes Chrome delete what it stored.
+- Uninstalling the extension makes Chrome delete what it stored in Chrome's storage. The Element picker's log in a page's own session storage goes when that tab closes.
 
 **Full policy:** https://github.com/spartDev/My-Prompt-Manager/blob/main/privacy-policy.md
