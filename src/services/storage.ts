@@ -46,6 +46,7 @@ import {
   togglePin
 } from './promptAdmission';
 import { withSiteSettingsLock } from './siteSettings';
+import { withUsageHistoryLock } from './usageHistoryLock';
 
 class StorageError extends Error implements AppError {
   public type: ErrorType;
@@ -159,8 +160,9 @@ export class StorageManager {
   // Locks for the Prompts, Categories and settings keys, shared with the other contexts (popup, side
   // panel, service worker) through the Web Locks API, so a read-then-write from one context cannot
   // overwrite a write made in between from another, nor write back after Clear All Data.
-  // Lock order: CATEGORIES -> PROMPTS -> SETTINGS, then the Site settings lock, then the icon
-  // placement repairs lock, then the What's new lock (all three clearAllData only).
+  // Lock order: CATEGORIES -> PROMPTS -> SETTINGS, then the usage history lock, the Site settings
+  // lock, the icon placement repairs lock, the What's new lock and the Welcome lock (those five
+  // nested by clearAllData only).
   private readonly mutex = new AsyncMutex({ scope: 'StorageManager' });
 
   private constructor() {}
@@ -907,19 +909,21 @@ export class StorageManager {
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () =>
       this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, () =>
         this.mutex.withLock(this.STORAGE_KEYS.SETTINGS, () =>
-          // Last, after SETTINGS: a change of the Site settings, an icon placement repair, or a
-          // write of the What's new record or of the Welcome record (those two locks innermost, in
-          // that order), waiting in another context, is applied to the cleared store and cannot
-          // write the old ones back
-          withSiteSettingsLock(() =>
-            withIconPlacementRepairsLock(() =>
-              withKeptRecordLocks(async () => {
-                try {
-                  await clearStorageKeepingRecords();
-                } catch (error) {
-                  throw this.handleStorageError(error);
-                }
-              })
+          // Last, after SETTINGS: an insertion recorded in the usage history, a change of the Site
+          // settings, an icon placement repair, or a write of the What's new record or of the
+          // Welcome record (those two locks innermost, in that order), waiting in another context,
+          // is applied to the cleared store and cannot write the old ones back
+          withUsageHistoryLock(() =>
+            withSiteSettingsLock(() =>
+              withIconPlacementRepairsLock(() =>
+                withKeptRecordLocks(async () => {
+                  try {
+                    await clearStorageKeepingRecords();
+                  } catch (error) {
+                    throw this.handleStorageError(error);
+                  }
+                })
+              )
             )
           )
         )

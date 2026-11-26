@@ -342,8 +342,9 @@ export function applySiteSettingsChange(settings: SiteSettings, change: SiteSett
 
 // Shared with the popup, the side panel and the service worker through the Web Locks API, like
 // the locks of StorageManager (ADR-001): two surfaces changing the Site settings at once lose
-// neither change, and Clear All Data, which takes this lock after SETTINGS and before the icon
-// placement repairs lock (withIconPlacementRepairsLock), is not undone by a change that was waiting.
+// neither change, and Clear All Data, which takes this lock after the usage history lock
+// (withUsageHistoryLock) and before the icon placement repairs lock (withIconPlacementRepairsLock),
+// is not undone by a change that was waiting.
 const siteSettingsLock = new AsyncMutex({ scope: 'SiteSettings' });
 
 /** Runs an operation while no context can change the Site settings */

@@ -406,6 +406,7 @@ describe('Welcome record: kept across Clear All Data', () => {
         'acquire StorageManager:categories',
         'acquire StorageManager:prompts',
         'acquire StorageManager:settings',
+        'acquire UsageTracker:usageHistory',
         'acquire SiteSettings:promptLibrarySettings',
         'acquire IconPlacementRepairs:iconPlacementRepairs',
         `acquire WhatsNew:${WHATS_NEW_KEY}`,
