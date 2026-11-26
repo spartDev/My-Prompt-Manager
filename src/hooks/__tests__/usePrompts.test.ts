@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildPrompt } from '../../test/builders';
+import { getMockStorageManager } from '../../test/mocks';
 import type { Prompt } from '../../types';
 import { usePrompts } from '../usePrompts';
 
@@ -806,6 +807,117 @@ describe('usePrompts', () => {
       expect(result.current.prompts).toHaveLength(5);
       expect(result.current.prompts.find(p => p.title === 'Prompt 4')).toBeDefined();
       expect(result.current.prompts.find(p => p.title === 'Prompt 5')).toBeDefined();
+    });
+  });
+
+  // A Try again's read hung past its bound, a later Try again brought the Library back, then the hung
+  // read failed: Error Loading Data came back over a working Library (My-Prompt-Manager-7v5k). Only the
+  // newest read counts, the one started last, whatever order the reads end in
+  describe('a read that ends after a newer one has started (My-Prompt-Manager-7v5k)', () => {
+    /** Prompts read before the newer read started: what a hung read brings back when it ends late */
+    const readEarlier = [buildPrompt({ id: 'earlier', title: 'Read before the newer read' })];
+    /** Prompts the newer read brings back */
+    const readNewer = [buildPrompt({ id: 'newer', title: 'Read by the newer read' })];
+
+    /** The next read of the Prompts, held until the test settles it */
+    const holdTheNextRead = (): { succeed: (prompts: Prompt[]) => void; fail: (message: string) => void } => {
+      let resolve: (prompts: Prompt[]) => void = () => undefined;
+      let reject: (error: Error) => void = () => undefined;
+      getMockStorageManager().getPrompts.mockImplementationOnce(() => new Promise<Prompt[]>((resolveRead, rejectRead) => {
+        resolve = resolveRead;
+        reject = rejectRead;
+      }));
+      return { succeed: (prompts) => { resolve(prompts); }, fail: (message) => { reject(new Error(message)); } };
+    };
+
+    /** The hook with mockPrompts read, its opening read ended */
+    const loaded = async () => {
+      await chrome.storage.local.set({ prompts: mockPrompts });
+      const hook = renderHook(() => usePrompts());
+      await waitFor(() => { expect(hook.result.current.loading).toBe(false); });
+      expect(hook.result.current.prompts).toEqual(mockPrompts);
+      return hook;
+    };
+
+    it('hung, then failing after a newer read has read the Prompts: the Prompts stay, with no error, and it resolves to the newer outcome, true', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { hungOutcome = result.current.refreshPrompts(); });
+
+      let newerOutcome: boolean | undefined;
+      await act(async () => { newerOutcome = await result.current.refreshPrompts(); });
+      expect(newerOutcome).toBe(true);
+
+      await act(async () => {
+        hung.fail('Storage unavailable');
+        await hungOutcome;
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.prompts).toEqual(mockPrompts);
+      expect(result.current.loading).toBe(false);
+      await expect(hungOutcome).resolves.toBe(true);
+    });
+
+    // The newer failure stands: the newer read was asked for after whatever the hung one read past (a
+    // write, an import, another Try again), and its failure is what the caller was last told. The hung
+    // read's Prompts could predate that change, and taking them would leave the error over Prompts
+    // that are not the newest read's
+    it('hung, then reading the Prompts after a newer read has failed: the newer failure stands, its error kept and the Prompts not replaced by the hung read\'s, and it resolves to false', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(true);
+      act(() => { hungOutcome = result.current.refreshPrompts(); });
+
+      getMockStorageManager().getPrompts.mockRejectedValueOnce(new Error('Still unavailable'));
+      let newerOutcome: boolean | undefined;
+      await act(async () => { newerOutcome = await result.current.refreshPrompts(); });
+      expect(newerOutcome).toBe(false);
+      expect(result.current.error?.message).toBe('Still unavailable');
+
+      await act(async () => {
+        hung.succeed(readEarlier);
+        await hungOutcome;
+      });
+
+      expect(result.current.error?.message).toBe('Still unavailable');
+      expect(result.current.prompts).toEqual(mockPrompts);
+      expect(result.current.loading).toBe(false);
+      await expect(hungOutcome).resolves.toBe(false);
+    });
+
+    it('ending while the newer read is still pending: nothing changes, the hook still loading, and it resolves only once the newer read has ended, to its outcome', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { hungOutcome = result.current.refreshPrompts(); });
+      const newer = holdTheNextRead();
+      let newerOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { newerOutcome = result.current.refreshPrompts(); });
+      let hungResolved = false;
+      void hungOutcome.then(() => { hungResolved = true; });
+
+      await act(async () => {
+        hung.fail('Storage unavailable');
+        await Promise.resolve();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(true);
+      expect(result.current.prompts).toEqual(mockPrompts);
+      expect(hungResolved).toBe(false);
+
+      await act(async () => {
+        newer.succeed(readNewer);
+        await newerOutcome;
+      });
+
+      expect(result.current.prompts).toEqual(readNewer);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+      await expect(newerOutcome).resolves.toBe(true);
+      await expect(hungOutcome).resolves.toBe(true);
     });
   });
 });

@@ -28,10 +28,12 @@ A failed read of the Library, its Prompts or its Categories, replaces the Sectio
   - While they run, Try again is busy: the spinner and "Trying again...", `aria-disabled`, never `disabled`. A press does nothing.
   - Reads that work show the Section at once.
   - Reads that fail again keep it busy, over the error it tries past, until `RETRY_FAILURE_HOLD_MS` (300 ms) has passed since the press. Then the new error, the idle Try again and the status change together.
-  - A read still pending after `RETRY_READ_BOUND_MS` (10 s) gives the button back. The reads go on, and their outcome applies if they settle.
+  - A read still pending after `RETRY_READ_BOUND_MS` (10 s) gives the button back. The reads go on, and their outcome applies if they settle before a newer read has started.
+  - A read that ends after a newer one has started changes nothing (`useNewestRead`, in `usePrompts` and `useCategories`, My-Prompt-Manager-7v5k). A hung read that fails after a later Try again brought the Library back leaves the Library on screen; one that works after a later Try again failed leaves Error Loading Data, the newer outcome.
   - Both constants are in `src/constants/ui.ts`.
 - **Status announcement**
   - The outcome is said in a `role="status"` (`load-status`): "Your library is back", "Still couldn't read your library", or, past `RETRY_READ_BOUND_MS`, "Still reading your library. You can try again."
+  - Error Loading Data back over a Section with no press of Try again (a later read failed, after a Category's deletion for one) empties the status, so it never keeps "Your library is back" over the error (My-Prompt-Manager-7v5k).
   - It comes second in both the error screen and the Section's tree, right after the screen's own element, so React keeps the one element from one to the other.
   - It is never first. Placed first, its sr-only box (1px, margin -1px) would sit at -1px, where the side panel's editor motion would measure it for the app. Second, it sits at the bottom edge, and the app stays the root's first element.
 - **Focus destinations** (never the document on the way)

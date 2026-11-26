@@ -3,6 +3,7 @@ import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCategory } from '../../test/builders';
+import { getMockStorageManager } from '../../test/mocks';
 import type { Category } from '../../types';
 import { DEFAULT_CATEGORY } from '../../types';
 import { useCategories } from '../useCategories';
@@ -623,6 +624,114 @@ describe('useCategories', () => {
       // Assert - Read, with the Category created meanwhile
       expect(result.current.error).toBeNull();
       expect(result.current.categories.map(category => category.name)).toEqual([...mockCategories.map(category => category.name), 'New Category']);
+    });
+  });
+
+  // As in usePrompts: only the newest read counts, the one started last, whatever order the reads end
+  // in, so a hung read that ends late never brings Error Loading Data back (My-Prompt-Manager-7v5k)
+  describe('a read that ends after a newer one has started (My-Prompt-Manager-7v5k)', () => {
+    /** Categories read before the newer read started: what a hung read brings back when it ends late */
+    const readEarlier = [buildCategory({ id: 'earlier', name: 'Read before the newer read' })];
+    /** Categories the newer read brings back */
+    const readNewer = [buildCategory({ id: 'newer', name: 'Read by the newer read' })];
+
+    /** The next read of the Categories, held until the test settles it */
+    const holdTheNextRead = (): { succeed: (categories: Category[]) => void; fail: (message: string) => void } => {
+      let resolve: (categories: Category[]) => void = () => undefined;
+      let reject: (error: Error) => void = () => undefined;
+      getMockStorageManager().getCategories.mockImplementationOnce(() => new Promise<Category[]>((resolveRead, rejectRead) => {
+        resolve = resolveRead;
+        reject = rejectRead;
+      }));
+      return { succeed: (categories) => { resolve(categories); }, fail: (message) => { reject(new Error(message)); } };
+    };
+
+    /** The hook with mockCategories read, its opening read ended */
+    const loaded = async () => {
+      await chrome.storage.local.set({ categories: mockCategories });
+      const hook = renderHook(() => useCategories());
+      await waitFor(() => { expect(hook.result.current.loading).toBe(false); });
+      expect(hook.result.current.categories).toEqual(mockCategories);
+      return hook;
+    };
+
+    it('hung, then failing after a newer read has read the Categories: the Categories stay, with no error, and it resolves to the newer outcome, true', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { hungOutcome = result.current.refreshCategories(); });
+
+      let newerOutcome: boolean | undefined;
+      await act(async () => { newerOutcome = await result.current.refreshCategories(); });
+      expect(newerOutcome).toBe(true);
+
+      await act(async () => {
+        hung.fail('Storage unavailable');
+        await hungOutcome;
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.categories).toEqual(mockCategories);
+      expect(result.current.loading).toBe(false);
+      await expect(hungOutcome).resolves.toBe(true);
+    });
+
+    // The newer failure stands, as in usePrompts: the newer read was asked for after whatever the hung
+    // one read past, and its failure is what the caller was last told
+    it('hung, then reading the Categories after a newer read has failed: the newer failure stands, its error kept and the Categories not replaced by the hung read\'s, and it resolves to false', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(true);
+      act(() => { hungOutcome = result.current.refreshCategories(); });
+
+      getMockStorageManager().getCategories.mockRejectedValueOnce(new Error('Still unavailable'));
+      let newerOutcome: boolean | undefined;
+      await act(async () => { newerOutcome = await result.current.refreshCategories(); });
+      expect(newerOutcome).toBe(false);
+      expect(result.current.error?.message).toBe('Still unavailable');
+
+      await act(async () => {
+        hung.succeed(readEarlier);
+        await hungOutcome;
+      });
+
+      expect(result.current.error?.message).toBe('Still unavailable');
+      expect(result.current.categories).toEqual(mockCategories);
+      expect(result.current.loading).toBe(false);
+      await expect(hungOutcome).resolves.toBe(false);
+    });
+
+    it('ending while the newer read is still pending: nothing changes, the hook still loading, and it resolves only once the newer read has ended, to its outcome', async () => {
+      const { result } = await loaded();
+      const hung = holdTheNextRead();
+      let hungOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { hungOutcome = result.current.refreshCategories(); });
+      const newer = holdTheNextRead();
+      let newerOutcome: Promise<boolean> = Promise.resolve(false);
+      act(() => { newerOutcome = result.current.refreshCategories(); });
+      let hungResolved = false;
+      void hungOutcome.then(() => { hungResolved = true; });
+
+      await act(async () => {
+        hung.fail('Storage unavailable');
+        await Promise.resolve();
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(true);
+      expect(result.current.categories).toEqual(mockCategories);
+      expect(hungResolved).toBe(false);
+
+      await act(async () => {
+        newer.succeed(readNewer);
+        await newerOutcome;
+      });
+
+      expect(result.current.categories).toEqual(readNewer);
+      expect(result.current.error).toBeNull();
+      expect(result.current.loading).toBe(false);
+      await expect(newerOutcome).resolves.toBe(true);
+      await expect(hungOutcome).resolves.toBe(true);
     });
   });
 });

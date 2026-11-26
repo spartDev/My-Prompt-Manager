@@ -13,6 +13,8 @@
  *   TypeError at render.
  * - My-Prompt-Manager-95bk: over such entries, the Category sheet creates and renames a Category, never
  *   a raw TypeError shown as a name refusal, and the entries stay in storage as they are.
+ * - My-Prompt-Manager-7v5k: a Try again's read that ends after a later press has read again changes
+ *   nothing, the newer outcome standing; Error Loading Data back with no press empties the role=status.
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -385,6 +387,129 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
       expect(status).toHaveTextContent('Your library is back');
       await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
+    });
+
+    // A Try again's read hung past the bound, a later Try again brought the Library back, then the hung
+    // read failed: Error Loading Data came back over a working Library, the status still saying it was
+    // back and the keyboard on the document. Only the newest read counts (usePrompts, useCategories)
+    describe('a read that ends after a newer one has started (My-Prompt-Manager-7v5k)', () => {
+      /** The read of the Prompts made by the next press of Try again, hung until the test ends it */
+      const hungRead = (): { succeed: () => Promise<void>; fail: (message: string) => Promise<void> } => {
+        let resolve: (prompts: Prompt[]) => void = () => undefined;
+        let reject: (error: Error) => void = () => undefined;
+        getMockStorageManager().getPrompts.mockImplementationOnce(() => new Promise<Prompt[]>((resolveRead, rejectRead) => { resolve = resolveRead; reject = rejectRead; }));
+        /** Ends the read, then lets everything it set off run, a macrotask included */
+        const end = async (settle: () => void): Promise<void> => {
+          await act(async () => {
+            settle();
+            await new Promise((done) => { setTimeout(done, 0); });
+          });
+        };
+        return {
+          succeed: () => end(() => { resolve(LIBRARY); }),
+          fail: (message) => end(() => { reject(new Error(message)); })
+        };
+      };
+
+      /** Enter on Try again, its Prompts read hung: once the bound has passed, Try again can be pressed again */
+      const pressPastTheBound = async (user: ReturnType<typeof userEvent.setup>, tryAgain: HTMLElement): Promise<void> => {
+        // Faked from here, still running with the real clock, so the reads and user-event's waits go on
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        try {
+          await user.keyboard('{Enter}');
+          expect(tryAgain).toHaveAttribute('aria-disabled', 'true');
+          act(() => { vi.advanceTimersByTime(BOUND_MS); });
+          expect(tryAgain).not.toHaveAttribute('aria-disabled');
+          expect(loadStatus()).toHaveTextContent('Still reading your library. You can try again.');
+        } finally {
+          vi.useRealTimers();
+        }
+      };
+
+      it.each([
+        { categories: 'read', press: 'the hung press reads the Categories' },
+        { categories: 'refused', press: 'the hung press has its Categories read refused (the reviewer\'s case on PR #610)' }
+      ] as const)('AC1: a Try again whose Prompts read hangs ($press), a later Try again that brings the Library, then the hung read failing: the Library stays, no Error Loading Data, the role=status still says it is back, the keyboard on All', async ({ categories }) => {
+        const user = userEvent.setup();
+        const tryAgain = await openOnTheError(user);
+        const status = loadStatus();
+        const hung = hungRead();
+        if (categories === 'refused') {
+          getMockStorageManager().getCategories.mockRejectedValueOnce(new Error('Categories unavailable'));
+        }
+        await pressPastTheBound(user, tryAgain);
+
+        await user.keyboard('{Enter}');
+        expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+        await waitFor(() => { expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus(); });
+        expect(status).toHaveTextContent('Your library is back');
+
+        await hung.fail('Storage unavailable, too late');
+
+        expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument();
+        expect(screen.queryByText('Storage unavailable, too late')).not.toBeInTheDocument();
+        expect(screen.getAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+        expect(screen.getByRole('radio', { name: 'All' })).toHaveFocus();
+        expect(loadStatus()).toBe(status);
+        expect(status).toHaveTextContent('Your library is back');
+      });
+
+      // The newer outcome stands, here a failure: Try again, pressed last, said the read failed again,
+      // and that stays what the screen and the role=status say. Try again is the way on
+      it('AC2: a Try again whose Prompts read hangs, a later Try again whose read fails, then the hung read working: the newer failure stands, Error Loading Data with its message, the role=status still saying the read failed again, the keyboard on Try again', async () => {
+        const user = userEvent.setup();
+        const tryAgain = await openOnTheError(user);
+        const status = loadStatus();
+        const hung = hungRead();
+        await pressPastTheBound(user, tryAgain);
+
+        getMockStorageManager().getPrompts.mockRejectedValueOnce(new Error('Still unavailable'));
+        await user.keyboard('{Enter}');
+        await waitFor(() => { expect(status).toHaveTextContent("Still couldn't read your library"); });
+        expect(screen.getByText('Still unavailable')).toBeInTheDocument();
+
+        await hung.succeed();
+
+        expect(screen.getByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+        expect(screen.getByText('Still unavailable')).toBeInTheDocument();
+        expect(screen.queryAllByTestId('prompt-card')).toHaveLength(0);
+        expect(tryAgain).toHaveAccessibleName('Try again');
+        expect(tryAgain).not.toHaveAttribute('aria-disabled');
+        expect(tryAgain).toHaveFocus();
+        expect(status).toHaveTextContent("Still couldn't read your library");
+
+        // The way on: Try again reads again, and brings the Library
+        await user.keyboard('{Enter}');
+        expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+        expect(status).toHaveTextContent('Your library is back');
+      });
+
+      it('AC3: Error Loading Data back with no press of Try again (the Library back, then the Prompts read after a Category\'s deletion refused): the role=status no longer says the Library is back, it says nothing; Try again then says it again', async () => {
+        const user = userEvent.setup();
+        await openOnTheError(user);
+        const status = loadStatus();
+        await user.keyboard('{Enter}');
+        expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+        expect(status).toHaveTextContent('Your library is back');
+
+        await user.click(screen.getByRole('tab', { name: 'Categories' }));
+        await user.click(await screen.findByRole('button', { name: 'Edit category Work' }));
+        const storageManager = getMockStorageManager();
+        vi.mocked(storageManager.deleteCategory).mockResolvedValueOnce({ category: work, index: 1, movedPrompts: [] });
+        storageManager.getPrompts.mockRejectedValueOnce(new Error('Storage unavailable again'));
+        await user.click(within(screen.getByRole('dialog', { name: 'Edit category' })).getByRole('button', { name: 'Delete' }));
+
+        expect(await screen.findByRole('heading', { name: ERROR_TITLE })).toBeInTheDocument();
+        expect(screen.getByText('Storage unavailable again')).toBeInTheDocument();
+        expect(loadStatus()).toBe(status);
+        expect(status).toBeEmptyDOMElement();
+
+        const tryAgain = screen.getByRole('button', { name: 'Try again' });
+        act(() => { tryAgain.focus(); });
+        await user.keyboard('{Enter}');
+        await waitFor(() => { expect(screen.queryByRole('heading', { name: ERROR_TITLE })).not.toBeInTheDocument(); });
+        expect(status).toHaveTextContent('Your library is back');
+      });
     });
   });
 

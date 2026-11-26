@@ -560,6 +560,16 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
   // While busy, the screen shows the error it tries past, even once a read has failed with its own:
   // the new error, the button and the role=status change together
   const shownLoadError = retryBusy ? retryError : loadError ?? retryError;
+  // Error Loading Data back over a Section, which no press of Try again brings (a later read failed):
+  // the role=status, which said how an earlier press went, says nothing, never "Your library is back"
+  // over it (My-Prompt-Manager-7v5k). Set while rendering, so the screen never shows with that text
+  const [loadErrorOnScreen, setLoadErrorOnScreen] = useState(false);
+  if ((shownLoadError !== null) !== loadErrorOnScreen) {
+    setLoadErrorOnScreen(shownLoadError !== null);
+    if (shownLoadError !== null) {
+      setLoadStatus('');
+    }
+  }
   // The press an outcome belongs to: reads left pending past the bound, then overtaken by another
   // press, say nothing when they settle
   const retryAttempt = useRef(0);
