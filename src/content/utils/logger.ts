@@ -16,12 +16,33 @@ let _debugModeCacheTime = 0;
 const DEBUG_CACHE_DURATION = 5000; // 5 seconds
 
 /**
+ * The development shortcuts to Debug mode, in a development build (`npm run dev`) only: the page
+ * at localhost, and the page's own localStorage flag. The page owns its localStorage, so in a
+ * release build, where `import.meta.env.DEV` is false and the build drops this code, no site can
+ * turn Debug mode on (My-Prompt-Manager-j3i6).
+ */
+function isDevelopmentDebugShortcutOn(): boolean {
+  if (!import.meta.env.DEV) {
+    return false;
+  }
+  if (window.location.hostname === 'localhost') {
+    return true;
+  }
+  try {
+    return localStorage.getItem('prompt-library-debug') === 'true';
+  } catch {
+    // localStorage not available: the Settings switch decides
+    return false;
+  }
+}
+
+/**
  * Check if debug mode is enabled
- * Debug mode is enabled in development, via Chrome extension settings, or localStorage fallback
+ * Debug mode is the Settings switch, read from the extension's own storage, which no page can
+ * write; a development build also has the shortcuts of isDevelopmentDebugShortcutOn
  */
 export function isDebugMode(): boolean {
-  // Always enabled on localhost for development
-  if (window.location.hostname === 'localhost') {
+  if (isDevelopmentDebugShortcutOn()) {
     return true;
   }
 
@@ -29,18 +50,6 @@ export function isDebugMode(): boolean {
   const now = Date.now();
   if (_debugModeCache !== null && (now - _debugModeCacheTime) < DEBUG_CACHE_DURATION) {
     return _debugModeCache;
-  }
-
-  // Try localStorage as immediate fallback (synchronous)
-  try {
-    const localStorageDebug = localStorage.getItem('prompt-library-debug') === 'true';
-    if (localStorageDebug) {
-      _debugModeCache = true;
-      _debugModeCacheTime = now;
-      return true;
-    }
-  } catch {
-    // localStorage not available, continue to Chrome storage check
   }
 
   // Return cached value or false while we update the cache asynchronously

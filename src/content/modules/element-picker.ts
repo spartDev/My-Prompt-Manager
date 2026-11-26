@@ -4,7 +4,7 @@
  */
 
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
-import { debug, info } from '../utils/logger';
+import { debug, info, isDebugMode } from '../utils/logger';
 
 // Interface for audit log details
 interface AuditDetails {
@@ -286,9 +286,9 @@ export class ElementPicker {
     }
 
     // Log to console in debug mode (sanitized for security)
-    if (localStorage.getItem('prompt-library-debug') === 'true') {
+    if (isDebugMode()) {
       const sanitizedDetails = this.sanitizeAuditDetailsForLogging(details);
-      // biome-ignore lint/suspicious/noConsole: opt-in audit trail, printed only when prompt-library-debug is set
+      // biome-ignore lint/suspicious/noConsole: opt-in audit trail, printed only in Debug mode
       console.log(`[ElementPicker Audit] ${action}:`, sanitizedDetails);
     }
   }

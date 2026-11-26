@@ -43,7 +43,8 @@ cd                   # Change directory
 
 ## Debug Commands
 ```javascript
-// Enable debug logging in browser console
+// Enable debug logging in browser console, on a development build (npm run dev) only;
+// a release build reads Debug mode from the Settings switch alone
 localStorage.setItem('prompt-library-debug', 'true');
 location.reload();
 

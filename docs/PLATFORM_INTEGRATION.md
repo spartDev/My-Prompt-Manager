@@ -477,14 +477,14 @@ private _tryEditorApi(element: HTMLElement, content: string): InsertionResult {
 
 ### Debug Mode
 
-Enable debug logging by opening browser console and running:
+On a development build (`npm run dev`), enable debug logging by opening the browser console and running:
 
 ```javascript
 localStorage.setItem('prompt-library-debug', 'true');
 // Then reload the page
 ```
 
-The Debug mode switch in Settings → Advanced turns on the same logging on every Platform, and also shows the Welcome, then What's new, at every opening of the popup and side panel. The localStorage flag does not: the popup reads Debug mode only from the stored Site settings.
+A development build also turns it on at `localhost`. A release build (`npm run build`, the build the e2e suite and `live:check` load) reads neither: the page owns its localStorage, so `src/content/utils/logger.ts` reads the flag only when `import.meta.env.DEV` is true, and the release build drops that code (ticket My-Prompt-Manager-j3i6). There, the Debug mode switch in Settings → Advanced is the only way: it turns on the same logging on every Platform, and also shows the Welcome, then What's new, at every opening of the popup and side panel. The localStorage flag does not: the popup reads Debug mode only from the stored Site settings.
 
 ### Debug Interface
 
@@ -521,7 +521,7 @@ window.__promptLibraryDebug?.getLogger();      // error, warn, info, debug
 
 **Button appears in wrong location:**
 - Adjust the `iconPlacement` chain in `platforms.ts` (no strategy keeps a copy)
-- With debug mode on (`localStorage.setItem('prompt-library-debug', 'true')`, then reload; warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner. It comes 5 seconds after the icon was placed on the editor (`IconPlacementController.TOOLBAR_GRACE_MS`), not at once: until then the icon waits there for a toolbar the Platform renders after it
+- With debug mode on (see [Debug Mode](#debug-mode); warnings are silent otherwise), a warning `No anchor of this Platform found in its composer, the icon is anchored on the editor instead` in the console means no anchor was found and the icon fell back to the editor's corner. It comes 5 seconds after the icon was placed on the editor (`IconPlacementController.TOOLBAR_GRACE_MS`), not at once: until then the icon waits there for a toolbar the Platform renders after it
 - Check that `editor.closest(composer)` finds the composer, and that an anchor exists inside it
 
 **Content doesn't insert:**

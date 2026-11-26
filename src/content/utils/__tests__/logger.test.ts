@@ -43,6 +43,10 @@ describe('Logger', () => {
     // Mock setTimeout FIRST
     vi.useFakeTimers();
 
+    // A development build, where the page's localStorage flag turns Debug mode on, unless a test
+    // builds for release
+    vi.stubEnv('DEV', true);
+
     // Reset all mocks
     vi.clearAllMocks();
 
@@ -102,38 +106,92 @@ describe('Logger', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
   });
 
   describe('isDebugMode', () => {
-    it('should return true when localStorage flag is set', () => {
-      localStorageMock.getItem.mockReturnValue('true');
-      expect(Logger.isDebugMode()).toBe(true);
-      expect(localStorageMock.getItem).toHaveBeenCalledWith('prompt-library-debug');
-    });
+    /** The Settings switch as Settings stores it, in the extension's own storage, read again */
+    const storeSettingsSwitch = async (debugMode: boolean): Promise<void> => {
+      chromeStorageMock.local.get.mockResolvedValue({ promptLibrarySettings: { debugMode } });
+      Logger.refreshDebugMode();
+      await vi.runAllTimersAsync();
+    };
 
-    it('should return false when localStorage flag is not set', () => {
-      localStorageMock.getItem.mockReturnValue(null);
-      expect(Logger.isDebugMode()).toBe(false);
-    });
-
-    it('should return true when hostname is localhost', () => {
-      localStorageMock.getItem.mockReturnValue(null);
+    const onLocalhost = (): void => {
       Object.defineProperty(window, 'location', {
         value: { hostname: 'localhost', href: 'http://localhost:3000' },
         writable: true,
       });
-      expect(Logger.isDebugMode()).toBe(true);
+    };
+
+    describe('in a release build (My-Prompt-Manager-j3i6)', () => {
+      beforeEach(() => {
+        vi.stubEnv('DEV', false);
+      });
+
+      it("does not read the page's own localStorage: a page that sets prompt-library-debug gets no Debug mode", () => {
+        localStorageMock.getItem.mockReturnValue('true');
+
+        expect(Logger.isDebugMode()).toBe(false);
+        expect(localStorageMock.getItem).not.toHaveBeenCalled();
+      });
+
+      it('writes no debug, info or warning message, and shows no notification, for a page that sets the flag', () => {
+        localStorageMock.getItem.mockReturnValue('true');
+
+        Logger.debug('debug message');
+        Logger.info('info message');
+        Logger.warn('warning message');
+        Logger.showDebugNotification('notification');
+
+        expect(consoleMock.debug).not.toHaveBeenCalled();
+        expect(consoleMock.info).not.toHaveBeenCalled();
+        expect(consoleMock.warn).not.toHaveBeenCalled();
+        expect(documentMock.createElement).not.toHaveBeenCalled();
+      });
+
+      it('is off at localhost while the Settings switch is off', () => {
+        onLocalhost();
+
+        expect(Logger.isDebugMode()).toBe(false);
+      });
+
+      it("is the Settings switch, read from the extension's own storage", async () => {
+        await storeSettingsSwitch(true);
+        expect(Logger.isDebugMode()).toBe(true);
+
+        await storeSettingsSwitch(false);
+        expect(Logger.isDebugMode()).toBe(false);
+      });
     });
 
-    it('should handle localStorage errors gracefully', () => {
-      localStorageMock.getItem.mockImplementation(() => {
-        throw new Error('localStorage not available');
+    describe('in a development build', () => {
+      it("the page's localStorage flag turns it on", () => {
+        localStorageMock.getItem.mockReturnValue('true');
+        expect(Logger.isDebugMode()).toBe(true);
+        expect(localStorageMock.getItem).toHaveBeenCalledWith('prompt-library-debug');
       });
-      Object.defineProperty(window, 'location', {
-        value: { hostname: 'localhost', href: 'http://localhost:3000' },
-        writable: true,
+
+      it('is off with no flag and the Settings switch off', () => {
+        localStorageMock.getItem.mockReturnValue(null);
+        expect(Logger.isDebugMode()).toBe(false);
       });
-      expect(Logger.isDebugMode()).toBe(true);
+
+      it('is on at localhost', () => {
+        localStorageMock.getItem.mockReturnValue(null);
+        onLocalhost();
+        expect(Logger.isDebugMode()).toBe(true);
+      });
+
+      it('a localStorage that throws leaves Debug mode to the Settings switch', async () => {
+        localStorageMock.getItem.mockImplementation(() => {
+          throw new Error('localStorage not available');
+        });
+        expect(Logger.isDebugMode()).toBe(false);
+
+        await storeSettingsSwitch(true);
+        expect(Logger.isDebugMode()).toBe(true);
+      });
     });
   });
 
