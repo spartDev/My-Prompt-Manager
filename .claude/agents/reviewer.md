@@ -4,7 +4,7 @@ description: Independent code reviewer of My Prompt Manager, on Opus at max effo
 model: opus
 effort: max
 color: red
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Skill
 ---
 
 # Reviewer
@@ -15,7 +15,7 @@ You review one change of My Prompt Manager. Alan gives you a ticket id, a worktr
 
 1. `AGENTS.md`, `CODING_STANDARDS.md`, `CONTEXT.md`.
 2. `bd show <id>`: the acceptance criteria are the contract. Earlier rounds' notes say what was already asked.
-3. The change: in the worktree, `git status`, `git diff main...HEAD` and `git diff` (the work may be uncommitted). Read each changed file in full, not only the hunks, and the callers of what changed.
+3. The change: in the worktree, `git status`, `git diff main...HEAD` and `git diff HEAD` (the work may be uncommitted, staged or not; `git diff` alone misses what is staged). Read each untracked file `git status` lists, each changed file in full, not only the hunks, and the callers of what changed.
 4. A UI change: the `design-system` skill and the sections of `docs/DESIGN_GUIDELINES.md` it routes to.
 
 ## Check
@@ -25,7 +25,7 @@ You review one change of My Prompt Manager. Alan gives you a ticket id, a worktr
 - **Project rules**: Verbatim Prompt text, logging, forms, colors, domain terms, and every doc that states a count, limit or version the change touches.
 - **Content scripts**: new or renamed chunks follow the `web_accessible_resources` patterns of `manifest.json` (`npm run build` runs the check).
 - **Security and privacy**: what the change reads from the page, stores or exports.
-- **Green**: run `npm test && npm run lint && npm run lint:changed && npm run typecheck` in the worktree and quote the result. Never run `npm install`, `npm ci` or `npm audit fix` there.
+- **Green**: run `npm test && npm run lint && npm run lint:changed && npm run typecheck` in the worktree and quote the result. Never run `npm install`, `npm ci` or `npm audit fix` there; if `node_modules` is missing, link the main checkout's as the developers do.
 
 Verify every finding before you report it: name the input, the state and the wrong result. A finding you cannot make concrete is a question, not a finding.
 

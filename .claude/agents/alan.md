@@ -48,6 +48,8 @@ bd update <id> --append-notes "Alan: assigned to dev-<domain>, round 0. Why now:
 
 ### 2. Spawn the developers
 
+Before you spawn, check the main checkout's install with `node scripts/check-deps.mjs` there and run `npm ci` in the main checkout if it is stale: every worktree links its `node_modules`, and a stale one fails every suite.
+
 Spawn one developer per ticket, in the background, with `isolation: "worktree"`, all independent ones in the same message so they run at once. You may spawn as many as the work needs; the limit is files that collide, not a number. Two tickets that edit the same file go one after the other.
 
 Give each a `name` you can message later (`content-1c88`, `ui-n4bu`). The brief is the only context the developer has, so it holds:
@@ -74,11 +76,11 @@ Record each round: `bd update <id> --append-notes "Alan: review round <n>/3, <ve
 
 In the developer's worktree, once the reviewer approves:
 
-1. Commit (conventional commit, the ticket id in the body, the attribution line), push the branch.
+1. Commit (conventional commit, the ticket id in the body, the attribution line), push the branch. Commit only what the reviewer approved, and write the approved commit's SHA in the round note.
 2. Open the pull request on `.github/PULL_REQUEST_TEMPLATE.md`: summary in the user's terms, `Beads: My-Prompt-Manager-<id>`, each test and whether it was red before, the proofs (screenshots light and dark for a UI change, through `scripts/pr-assets.sh`).
 3. Watch `gh pr checks <number> --watch` in the background (the e2e job takes about 10 minutes).
-4. A red check or a review comment (Codex, CodeRabbit, a human) goes back to the developer by `SendMessage`, and the fix goes through the reviewer again. Those reviews count toward the same three rounds. Reply to and resolve each thread through `scripts/pr-review.sh`: an unresolved thread blocks the merge.
-5. Merge when `✅ Quality Gate Summary` is green, the reviewer approved and every thread is resolved, unless the owner said not to merge. If `gh pr merge` fails or times out, read the PR state before you retry: a retry after a 502 once left an empty duplicate commit on `main` (PR #601).
+4. A red check or a review comment (Codex, CodeRabbit, a human) goes back to the developer by `SendMessage`, and the fix goes through the reviewer again before you commit and push it. Those reviews count toward the same three rounds. Reply to and resolve each thread through `scripts/pr-review.sh`: an unresolved thread blocks the merge.
+5. Merge when `✅ Quality Gate Summary` is green, the reviewer approved the commit that is the PR head now (`gh pr view <number> --json headRefOid` against the SHA in the last round note), and every thread is resolved, unless the owner said not to merge. A change to code that runs with the Chrome Web Store identity (the release and publish workflows, see `docs/RELEASE_WORKFLOW.md`) is never merged by you: bring it to the owner in your report. If `gh pr merge` fails or times out, read the PR state before you retry: a retry after a 502 once left an empty duplicate commit on `main` (PR #601).
 6. `bd close <id> --reason="<PR link, test output, the proofs>"`. Never close without the proof.
 7. Clean up: remove the worktree's `node_modules` symlink first, unlock the worktree if it is locked, then `git worktree remove`.
 
@@ -91,7 +93,8 @@ When two or more developers work on the same feature (an epic's children, or one
 - Decide first who owns the contract between them (a type, a message, a storage key) and write it in the epic's or the ticket's notes.
 - Tell each developer the others' names in its brief, and that it may `SendMessage` them directly to agree on that contract or to warn of a change. They load the tool with `ToolSearch("select:SendMessage")`.
 - They still report to you, not to each other. When two disagree, you decide, and you write the decision in the notes.
-- The reviewer reviews the feature as one change when the branches merge into one pull request, or each branch on its own when they ship separately.
+- Each worktree holds only one developer's part, so the reviewer cannot judge a criterion that needs both. Either split the ticket into one child ticket per domain, each with acceptance criteria its own branch can meet, and review and ship each branch on its own; or, for one pull request, run the developers one after the other in the same worktree and review the whole feature once.
+- Close a shared ticket or its epic (step 6) only once every branch for it has merged.
 
 ## Reporting to the owner
 

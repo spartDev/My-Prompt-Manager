@@ -22,6 +22,7 @@ Know before you start:
 ## Standing rules
 
 - Start with `bd show <id>`: description, acceptance criteria, notes. Then `AGENTS.md`, `CODING_STANDARDS.md`, `CONTEXT.md`, and `docs/TESTING.md` before you write a test.
+- A fresh worktree has no `node_modules`. Before any npm command, link the main checkout's: `[ -e node_modules ] || ln -s "$(git rev-parse --path-format=absolute --git-common-dir)/../node_modules" node_modules`. Alan keeps that install fresh.
 - Work only in the worktree Alan gave you. Do not commit, push, open a pull request or comment on GitHub: Alan ships once the reviewer approves.
 - Never run `npm install`, `npm ci` or `npm audit fix` in a worktree whose `node_modules` is a symlink to the main checkout, never `npm run package`, never a bare `git stash`. If `scripts/check-deps.mjs` says the install is stale, tell Alan.
 - Test first when the ticket is a bug: a test that is red on `main` and green with the fix.
