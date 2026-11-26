@@ -50,7 +50,7 @@ A pick on a composer that holds a draft carries the draft's first 50 characters,
 
 Activation, Escape and deactivation are not recorded. The log keeps the last 50 entries (`MAX_AUDIT_ENTRIES`) in memory, and each entry copies it to the page's `sessionStorage` under `element-picker-audit`. That storage belongs to the page's origin, so the page's own scripts can read it. Each page load starts an empty log, whose first entry overwrites the stored one, and nothing reads the key back.
 
-When the page's `localStorage` holds `prompt-library-debug` = `true`, each entry is also printed to the console, reduced by `sanitizeAuditDetailsForLogging` to categories: `reasonType`, `selectorType` and `domainType` for a warning; `elementType`, `secure`, `selectorType` and `domainType` for a pick. The sanitizer's branch for a URL (`protocol`, `hasSensitivePath`) never runs, since `logAudit` adds the URL to the stored entry only. The debug logger separately prints the raw fingerprint and selector of a pick.
+In Debug mode (`isDebugMode()` of `src/content/utils/logger.ts`: the Settings switch; in a development build, also the page's `prompt-library-debug` flag and `localhost`, ticket My-Prompt-Manager-j3i6), each entry is also printed to the console, reduced by `sanitizeAuditDetailsForLogging` to categories: `reasonType`, `selectorType` and `domainType` for a warning; `elementType`, `secure`, `selectorType` and `domainType` for a pick. The sanitizer's branch for a URL (`protocol`, `hasSensitivePath`) never runs, since `logAudit` adds the URL to the stored entry only. The debug logger separately prints the raw fingerprint and selector of a pick.
 
 ## 5. Visual feedback
 

@@ -1,13 +1,70 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
+import { isDebugMode } from '../../utils/logger';
 import { ElementPicker } from '../element-picker';
 
 vi.mock('../../utils/logger', () => ({
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-  debug: vi.fn()
+  debug: vi.fn(),
+  isDebugMode: vi.fn(() => false)
 }));
+
+describe('ElementPicker: its audit in the console follows Debug mode, not the page (My-Prompt-Manager-j3i6)', () => {
+  let picker: ElementPicker | undefined;
+  let field: HTMLInputElement;
+  let consoleLog: MockInstance<typeof console.log>;
+  let elementFromPoint: MockInstance<typeof document.elementFromPoint>;
+
+  beforeEach(() => {
+    field = document.createElement('input');
+    field.type = 'password';
+    document.body.appendChild(field);
+    elementFromPoint = vi.spyOn(document, 'elementFromPoint').mockReturnValue(field);
+    consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    picker?.deactivate();
+    field.remove();
+    document.getElementById('mpm-security-warning')?.remove();
+    elementFromPoint.mockRestore();
+    consoleLog.mockRestore();
+    vi.mocked(isDebugMode).mockReturnValue(false);
+    localStorage.removeItem('prompt-library-debug');
+    sessionStorage.removeItem('element-picker-audit');
+  });
+
+  /** Points at the password field and clicks it: the picker refuses it and records the refusal in its audit */
+  const refusePasswordField = (): void => {
+    picker = new ElementPicker();
+    picker.activate();
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 1, clientY: 1, bubbles: true }));
+    document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  };
+
+  const auditLines = () => consoleLog.mock.calls.filter(([first]) => String(first).startsWith('[ElementPicker Audit]'));
+
+  it("prints nothing for a page that sets prompt-library-debug in its own localStorage while Debug mode is off", () => {
+    localStorage.setItem('prompt-library-debug', 'true');
+
+    refusePasswordField();
+
+    expect(sessionStorage.getItem('element-picker-audit')).toContain('blocked_selection');
+    expect(auditLines()).toEqual([]);
+  });
+
+  it('prints the refusal, reduced to its categories, in Debug mode', () => {
+    vi.mocked(isDebugMode).mockReturnValue(true);
+
+    refusePasswordField();
+
+    expect(auditLines()).toEqual([
+      ['[ElementPicker Audit] blocked_selection:', expect.objectContaining({ reasonType: 'password_field' })]
+    ]);
+  });
+});
 
 describe('ElementPicker: the page unloading', () => {
   const pickers: ElementPicker[] = [];
