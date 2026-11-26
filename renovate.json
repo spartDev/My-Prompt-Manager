@@ -111,20 +111,6 @@
       ]
     },
     {
-      "description": "Major updates - require manual review; the PR opens only once ticked in the Dependency Dashboard",
-      "matchUpdateTypes": [
-        "major"
-      ],
-      "labels": [
-        "major-update",
-        "dependencies",
-        "renovate"
-      ],
-      "automerge": false,
-      "dependencyDashboardApproval": true,
-      "prPriority": -1
-    },
-    {
       "description": "Vite ecosystem majors land in one PR: @vitejs/plugin-react follows Vite's major (6.x needs vite ^8) and cannot install alone",
       "matchUpdateTypes": [
         "major"
@@ -167,6 +153,20 @@
       "groupName": "github actions",
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Major updates - require manual review; the PR opens only once ticked in the Dependency Dashboard. After the GitHub Actions rule: a later rule wins, so an action major is not automerged once ticked",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "labels": [
+        "major-update",
+        "dependencies",
+        "renovate"
+      ],
+      "automerge": false,
+      "dependencyDashboardApproval": true,
+      "prPriority": -1
     },
     {
       "description": "release.yml runs the Chrome Web Store jobs: its updates get their own PR and a human merge, see docs/RENOVATE_CONFIGURATION.md. After the GitHub Actions rule: a later rule wins",
