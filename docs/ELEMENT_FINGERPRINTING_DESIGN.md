@@ -40,7 +40,7 @@ Instead of relying on brittle CSS selectors, we create a **unique fingerprint** 
     type: "submit",
     role: "button",
     
-    // No text, no page address: they can be the user's (ticket My-Prompt-Manager-je37)
+    // No text content, no page address: they can be the user's (ticket My-Prompt-Manager-je37)
     
     // Structural context (for disambiguation)
     parentId: "checkout-form",

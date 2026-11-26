@@ -18,7 +18,7 @@ A summary of [the full privacy policy](./privacy-policy.md) for Release 2.0.0. W
 The extension itself sends nothing. These leave only through you:
 
 - A Prompt you insert into a chat: the site then handles it as anything you type there.
-- A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted. From the version after 2.0.0, a configuration code holds no page address and no text.
+- A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted. From the version after 2.0.0, a configuration code holds no page address and none of the element's text, but keeps the element's labels as the site wrote them.
 - A Backup file of your Prompts and Categories, made only when you click Export in Settings.
 
 What the extension shows inside a site's page, such as the titles and Categories of your Prompts in the Prompt selector, can be read by that site's own scripts, and any website can tell that the extension is installed.
