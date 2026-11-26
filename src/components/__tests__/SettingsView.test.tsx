@@ -2,6 +2,7 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
+import { RETRY_FAILURE_HOLD_MS } from '../../constants/ui';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { AdmissionRefusedError } from '../../services/promptAdmission';
 import { enabledPlatforms, parseSiteSettings } from '../../services/siteSettings';
@@ -302,11 +303,18 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
     const loadsBeforeImport = storageMock.getPrompts.mock.calls.length;
+    // My-Prompt-Manager-tg6l: the warning opens as Import's busy state ends, its hold passed
+    const atRefusal: { after: number; importBusy: string | null }[] = [];
+    let chosenAt = 0;
+    onStorageRefusedMock.mockImplementation(() => {
+      atRefusal.push({ after: performance.now() - chosenAt, importBusy: screen.getByRole('button', { name: /^Import/ }).getAttribute('aria-disabled') });
+    });
 
     const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
     const prompts: Prompt[] = Array.from({ length: 4 }, (_, i) => (
       { id: `p${String(i)}`, title: `Prompt ${String(i)}`, content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
     ));
+    chosenAt = performance.now();
     await userEvent.upload(
       fileInput as HTMLInputElement,
       createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' }))
@@ -316,6 +324,13 @@ describe('SettingsView', () => {
       expect(onStorageRefusedMock).toHaveBeenCalledWith(
         `The import stopped when storage was full: 2 of 4 prompts were imported. ${STORAGE_REFUSAL}`
       );
+    });
+    // Within a timer's 1 ms rounding of the hold, and in the task that ends the busy state
+    expect(atRefusal).toHaveLength(1);
+    expect(atRefusal[0].after).toBeGreaterThanOrEqual(RETRY_FAILURE_HOLD_MS - 1);
+    expect(atRefusal[0].importBusy).toBe('true');
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Import' })).not.toHaveAttribute('aria-disabled');
     });
     expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(alertSpy).not.toHaveBeenCalled();
@@ -348,17 +363,35 @@ describe('SettingsView', () => {
       expect(storageMock.getPrompts).toHaveBeenCalled();
     });
     const loadsBeforeImport = storageMock.getPrompts.mock.calls.length;
+    // My-Prompt-Manager-tg6l: the Notification and the report show as Import's busy state ends, its
+    // hold passed
+    const atNotification: { after: number; importBusy: string | null; report: boolean }[] = [];
+    let chosenAt = 0;
+    showToastMock.mockImplementation(() => {
+      atNotification.push({
+        after: performance.now() - chosenAt,
+        importBusy: screen.getByRole('button', { name: /^Import/ }).getAttribute('aria-disabled'),
+        report: screen.queryByRole('status', { name: 'Import report' }) !== null
+      });
+    });
 
     const prompts: Prompt[] = Array.from({ length: 4 }, (_, i) => (
       { id: `p${String(i)}`, title: `Prompt ${String(i)}`, content: 'Hello', category: 'Uncategorized', createdAt: 1, updatedAt: 1 }
     ));
     const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]') as HTMLInputElement;
+    chosenAt = performance.now();
     await userEvent.upload(fileInput, createJsonFile(JSON.stringify({ prompts, categories: [], version: '1.0' })));
 
     const report = await screen.findByRole('status', { name: 'Import report' });
     expect(report).toHaveTextContent('The import stopped: 2 of 4 prompts were imported.');
     expect(report).toHaveTextContent('Storage API is unavailable. Please try again later.');
     expect(showToastMock).toHaveBeenCalledWith('Import stopped', 'error', { sub: '2 of 4 prompts were imported. See Your data.' });
+    // Within a timer's 1 ms rounding of the hold, in the task that ends the busy state: no report
+    // committed before it, the Notification, the report and the idle Import in one commit
+    expect(atNotification).toHaveLength(1);
+    expect(atNotification[0].after).toBeGreaterThanOrEqual(RETRY_FAILURE_HOLD_MS - 1);
+    expect(atNotification[0]).toMatchObject({ importBusy: 'true', report: false });
+    expect(screen.getByRole('button', { name: 'Import' })).not.toHaveAttribute('aria-disabled');
     expect(storageMock.importPrompt).toHaveBeenCalledTimes(3);
     expect(onStorageRefusedMock).not.toHaveBeenCalled();
     expect(alertSpy).not.toHaveBeenCalled();
@@ -396,7 +429,7 @@ describe('SettingsView', () => {
 
     finishImport();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Import' })).toHaveAttribute('aria-disabled', 'false');
+      expect(screen.getByRole('button', { name: 'Import' })).not.toHaveAttribute('aria-disabled');
     });
   });
 

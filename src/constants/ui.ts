@@ -21,7 +21,11 @@ export const RETRY_READ_BOUND_MS = 10_000;
  * had done nothing. 300 ms is three times that 0.1 s, long enough to see and read "Trying again..." as
  * the answer to the press, and well under the 1 s at which a wait breaks the flow of thought (Nielsen's
  * limits, as for RETRY_READ_BOUND_MS). A read that works is never held: the Library replaces the
- * screen as soon as the reads end
+ * screen as soon as the reads end. Import in Settings, from the file chosen, and the starter
+ * Categories of the empty Categories also hold a failure as long, through useBusyButton
+ * (My-Prompt-Manager-tg6l). Import shows its outcome with its idle button; a starter holds only its
+ * busy state, its outcome (App's failure Notification or storage warning) still shown at once until
+ * My-Prompt-Manager-86lj
  */
 export const RETRY_FAILURE_HOLD_MS = 300;
 

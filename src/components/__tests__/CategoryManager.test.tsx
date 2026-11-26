@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { PRESET_COLORS } from '../../constants/colors';
+import { RETRY_FAILURE_HOLD_MS } from '../../constants/ui';
 import { buildPrompt } from '../../test/builders';
 import type { AppError, Category } from '../../types';
 import CategoryManager from '../CategoryManager';
@@ -99,6 +100,26 @@ describe('CategoryManager', () => {
       // The starter itself is what a full storage warning gives the keyboard back to
       expect(onCreateCategory).toHaveBeenCalledWith({ name: 'Work', color: '#2563EB' }, starter);
       expect(screen.getByTestId('categories-empty')).toBeInTheDocument();
+    });
+
+    // My-Prompt-Manager-tg6l: the creation's failure reaches the empty state, which holds the starter's
+    // busy state RETRY_FAILURE_HOLD_MS from the tap (its outcome is App's, shown at once until
+    // My-Prompt-Manager-86lj)
+    it(`keeps a starter whose creation fails busy until ${String(RETRY_FAILURE_HOLD_MS)} ms after the tap`, async () => {
+      const onCreateCategory = vi.fn().mockRejectedValue({ type: 'STORAGE_QUOTA_EXCEEDED', message: 'full' } satisfies AppError);
+      renderManager({ categories: onlyDefault, onCreateCategory });
+      vi.useFakeTimers();
+      try {
+        act(() => { screen.getByRole('button', { name: 'Create category Work' }).click(); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(RETRY_FAILURE_HOLD_MS - 1); });
+        expect(screen.getByRole('button', { name: 'Creating category Work...' })).toHaveAttribute('aria-disabled', 'true');
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+        expect(screen.getByRole('button', { name: 'Create category Work' })).not.toHaveAttribute('aria-disabled');
+        expect(onCreateCategory).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('gives way to the list as soon as a Category exists, and comes back when the last one is deleted', () => {

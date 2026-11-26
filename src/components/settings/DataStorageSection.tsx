@@ -1,5 +1,6 @@
 import { type FC, useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { type BusyResult, useBusyButton } from '../../hooks/useBusyButton';
 import type { Category, Prompt } from '../../types';
 import type {} from '../../types/file-system-access-api';
 import type { ShowToast } from '../../types/hooks';
@@ -35,7 +36,11 @@ interface DataStorageSectionProps {
   libraryUnavailable?: boolean;
   /** The bytes Chrome stores (getBytesInUse) and its quota (QUOTA_BYTES); null until they are read */
   storageUsage: { used: number; total: number } | null;
-  onImport: (data: { prompts: Prompt[]; categories: Category[] }) => Promise<void>;
+  /**
+   * Restores the Backup. Its success shows at once; a failure resolves to what shows it (a
+   * Notification, the report, the storage warning), which Import calls as its busy state ends
+   */
+  onImport: (data: { prompts: Prompt[]; categories: Category[] }) => Promise<BusyResult>;
   /** The last import's report, shown under Import until dismissed; null when there is none */
   importReport?: ImportReport | null;
   onDismissImportReport?: () => void;
@@ -59,7 +64,9 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
   onClearData,
   onShowToast
 }) => {
-  const [importing, setImporting] = useState(false);
+  // Import keeps the keyboard while it imports: the Loading State of docs/DESIGN_GUIDELINES.md, its
+  // failure held RETRY_FAILURE_HOLD_MS from the file chosen
+  const { busy: importing, run: runImport } = useBusyButton();
   const [clearing, setClearing] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,16 +131,11 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    setImporting(true);
+  // Reads, checks and restores the Backup chosen; resolves to what shows its failure, when it failed
+  const importFile = async (file: File): Promise<BusyResult> => {
     try {
       const text = await file.text();
-      
+
       // Parse JSON with better error handling
       let data: unknown;
       try {
@@ -141,7 +143,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       } catch {
         throw new Error('Invalid JSON format. Please select a valid backup file.');
       }
-      
+
       // Validate the basic structure
       if (typeof data !== 'object' || data === null || Array.isArray(data)) {
         throw new Error('Invalid backup file: file does not contain valid data structure.');
@@ -171,7 +173,7 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
         }
       }
 
-      await onImport({
+      const failure = await onImport({
         prompts: typedData.prompts,
         categories: typedData.categories || []
       });
@@ -180,16 +182,23 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      return failure;
     } catch (error) {
       Logger.error('Import failed', toError(error));
 
       // An invalid file says so in its message; any other failure is not blamed on the file. An
       // import stopped by storage never reaches here: Settings opens the storage warning for it.
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      onShowToast('Import failed', 'error', { sub: errorMessage });
-    } finally {
-      setImporting(false);
+      return () => { onShowToast('Import failed', 'error', { sub: errorMessage }); };
     }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    void runImport(() => importFile(file));
   };
 
   const handleClearData = async () => {
@@ -252,16 +261,18 @@ const DataStorageSection: FC<DataStorageSectionProps> = ({
             <ExportIcon />
             Export
           </button>
+          {/* Busy, it keeps the keyboard at full strength (Loading State): opacity-50 would take its ring
+              to 2.49:1 in light and 1.76:1 in dark, under the 3:1 of a focus indicator */}
           <button
             ref={importButtonRef}
             type="button"
             onClick={handleImportClick}
-            aria-disabled={importing}
-            className={`${DATA_BUTTON_CLASSES} aria-disabled:opacity-50 aria-disabled:cursor-not-allowed`}
+            aria-disabled={importing ? true : undefined}
+            className={`${DATA_BUTTON_CLASSES} aria-disabled:cursor-wait aria-disabled:hover:bg-card`}
           >
             {importing ? (
               <>
-                <span aria-hidden="true" className="size-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span aria-hidden="true" className="size-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
                 Importing...
               </>
             ) : (
