@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import manifest from '../../manifest.json';
 import { NATURAL_SORT_DIRECTION } from '../constants';
+import type { BusyResult } from '../hooks/useBusyButton';
 import { AdmissionRefusedError } from '../services/promptAdmission';
 import {
   changeSiteSettings,
@@ -275,8 +276,10 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
     void changeSettings({ type: 'setDebugMode', enabled });
   }, [changeSettings]);
 
-  // Handle import data
-  const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }) => {
+  // Restores a Backup. Its success shows at once; a failure resolves to what shows it, which Import
+  // calls as its busy state ends, no sooner than RETRY_FAILURE_HOLD_MS from the file chosen (the
+  // Loading State of docs/DESIGN_GUIDELINES.md)
+  const handleImportData = async (data: { prompts: Prompt[]; categories: Category[] }): Promise<BusyResult> => {
     setImportReport(null);
     // An item that is refused at Admission (ADR-001) is skipped and reported; the rest are restored.
     const skipped: ImportReport['skipped'] = [];
@@ -322,15 +325,15 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       const count = `${imported.prompts.toString()} of ${formatCount(total, 'prompt was', 'prompts were')}`;
       // Like a refused save, a refusal for storage opens the storage warning (not the file's fault)
       if (appError.type === 'STORAGE_QUOTA_EXCEEDED') {
-        onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`);
-        return;
+        return () => { onStorageRefused(`The import stopped when storage was full: ${count} imported. ${appError.message}`); };
       }
       // Any other error: the report says how many were imported and why it stopped, which a
       // one-line Notification cannot hold
       const reason = error instanceof Error ? error.message : 'Unknown error occurred';
-      setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
-      showToast('Import stopped', 'error', { sub: `${count} imported. See Your data.` });
-      return;
+      return () => {
+        setImportReport({ skipped, stopped: { imported: imported.prompts, total, reason } });
+        showToast('Import stopped', 'error', { sub: `${count} imported. See Your data.` });
+      };
     }
 
     // Reload data
@@ -344,6 +347,7 @@ const SettingsView: FC<SettingsViewProps> = ({ context = 'popup', showToast, toa
       setImportReport({ skipped });
       showToast(`Skipped ${skipped.length.toString()}`, 'warning', { sub: `Imported ${summary}. See Your data.` });
     }
+    return undefined;
   };
 
   const dismissImportReport = useCallback(() => { setImportReport(null); }, []);

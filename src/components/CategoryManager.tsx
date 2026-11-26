@@ -229,8 +229,10 @@ const CategoryManager: FC<CategoryManagerProps> = ({
     try {
       await onCreateCategory(category, starter);
     } catch (error) {
-      // The app has said why (a failure Notification, or the storage warning)
+      // The app has said why (a failure Notification, or the storage warning); the empty state holds
+      // the starter's busy state on it
       Logger.error('Failed to create starter category', toError(error), { component: 'CategoryManager' });
+      throw error;
     }
   };
 

@@ -8,6 +8,8 @@
 
 import type { Locator, Page } from '@playwright/test';
 
+import { getContrastRatio } from '../../../src/constants/colors';
+
 /** How far, in RGB, a pixel may be from the ring's color and still count as the ring */
 export const RING_TOLERANCE = 48;
 
@@ -78,6 +80,8 @@ const rgbOf = (color: string): [number, number, number] => {
 export interface Pixels {
   /** Infinity for a point outside the piece read */
   distance: (x: number, y: number, color: string) => number;
+  /** The pixel's color at a viewport point, as "#RRGGBB"; null for a point outside the piece read */
+  colorAt: (x: number, y: number) => string | null;
 }
 
 /** Reads the pixels of the page within `clip` (viewport CSS pixels) from a screenshot */
@@ -98,16 +102,30 @@ export const pixelsOf = async (page: Page, clip: { x: number; y: number; width: 
     context.drawImage(picture, 0, 0);
     return { width: picture.naturalWidth, height: picture.naturalHeight, data: [...context.getImageData(0, 0, picture.naturalWidth, picture.naturalHeight).data] };
   }, png.toString('base64'));
+  /** Where the pixel at a viewport point starts in the image's data; null outside it */
+  const indexOf = (x: number, y: number): number | null => {
+    const column = Math.floor(x) - area.x;
+    const row = Math.floor(y) - area.y;
+    if (column < 0 || row < 0 || column >= image.width || row >= image.height) {
+      return null;
+    }
+    return (row * image.width + column) * 4;
+  };
   return {
     distance: (x, y, color) => {
-      const column = Math.floor(x) - area.x;
-      const row = Math.floor(y) - area.y;
-      if (column < 0 || row < 0 || column >= image.width || row >= image.height) {
+      const index = indexOf(x, y);
+      if (index === null) {
         return Infinity;
       }
       const [red, green, blue] = rgbOf(color);
-      const index = (row * image.width + column) * 4;
       return Math.hypot(image.data[index] - red, image.data[index + 1] - green, image.data[index + 2] - blue);
+    },
+    colorAt: (x, y) => {
+      const index = indexOf(x, y);
+      if (index === null) {
+        return null;
+      }
+      return `#${[0, 1, 2].map((channel) => image.data[index + channel].toString(16).padStart(2, '0')).join('').toUpperCase()}`;
     }
   };
 };
@@ -156,4 +174,53 @@ export const ringSides = async (page: Page, ring: FocusRing): Promise<RingSide[]
     side('bottom', columns, (x, y) => distanceAt(x, y), ring.bottom - ring.width),
     side('left', rows, (y, x) => distanceAt(x, y), ring.left)
   ];
+};
+
+export interface RingContrast {
+  /** The lowest ratio at any point read, by the app's getContrastRatio (scripts/contrast.ts prints the same) */
+  lowest: number;
+  /** The ring's pixel and the surface's at that point, "#RRGGBB" */
+  ring: string;
+  surface: string;
+  samples: number;
+}
+
+/**
+ * The contrast of `ring` as drawn (My-Prompt-Manager-tg6l): read from a screenshot along its top and
+ * bottom straight parts, at each point the pixel of its band nearest its computed color, against the
+ * pixel just outside the band, the surface beside the ring. A ring under an opacity is drawn mixed with
+ * that surface, and reads lower than its color would. Its left and right sides are left out, where a
+ * neighbor can sit within a pixel of the ring
+ */
+export const ringContrast = async (page: Page, ring: FocusRing): Promise<RingContrast> => {
+  const pixels = await pixelsOf(page, { x: ring.left - 2, y: ring.top - 2, width: ring.right - ring.left + 4, height: ring.bottom - ring.top + 4 });
+  const columns = along(ring.left + ring.radius, ring.right - ring.radius);
+  // The rows a band of the ring's width covers from `start`, and the row just outside it
+  const bandFrom = (start: number): number[] =>
+    Array.from({ length: Math.ceil(start + ring.width) - Math.floor(start) }, (_, index) => Math.floor(start) + index + 0.5);
+  const sides = [
+    { band: bandFrom(ring.top), outside: Math.floor(ring.top) - 0.5 },
+    { band: bandFrom(ring.bottom - ring.width), outside: Math.ceil(ring.bottom) + 0.5 }
+  ];
+  let lowest: Omit<RingContrast, 'samples'> | null = null;
+  let samples = 0;
+  for (const { band, outside } of sides) {
+    for (const x of columns) {
+      const row = band.reduce((nearest, y) => (pixels.distance(x, y, ring.color) < pixels.distance(x, nearest, ring.color) ? y : nearest));
+      const drawn = pixels.colorAt(x, row);
+      const surface = pixels.colorAt(x, outside);
+      if (drawn === null || surface === null) {
+        continue;
+      }
+      samples += 1;
+      const ratio = getContrastRatio(drawn, surface);
+      if (lowest === null || ratio < lowest.lowest) {
+        lowest = { lowest: ratio, ring: drawn, surface };
+      }
+    }
+  }
+  if (lowest === null) {
+    throw new Error('No point of the ring could be read');
+  }
+  return { ...lowest, samples };
 };
