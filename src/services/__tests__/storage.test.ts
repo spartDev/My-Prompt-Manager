@@ -499,6 +499,136 @@ describe('StorageManager', () => {
         expect(chrome.storage.local.set).not.toHaveBeenCalled();
       });
     });
+
+    // My-Prompt-Manager-95bk: the writers agree with getCategories. They find and compare only the
+    // stored entries that are a Category, and write every other entry back as it is, in its place,
+    // so a malformed entry neither fails the write (a raw TypeError shown as a name refusal in the
+    // Category sheet) nor is taken for the Category it shares an id with
+    describe('writing Categories over entries that storage holds malformed', () => {
+      const uncategorized: Category = { id: 'default', name: DEFAULT_CATEGORY };
+      const work: Category = { id: 'work', name: 'Work', color: '#DB2777' };
+      const ROSE = '#E11D48';
+      const EARLIER = FIXED_TIME.getTime() - 60_000;
+      const inWork = buildPrompt({ id: 'in-work', title: 'In Work', content: 'Work content', category: 'Work', createdAt: EARLIER, updatedAt: EARLIER });
+      const inDefault = buildPrompt({ id: 'in-default', title: 'In default', content: 'Default content', category: DEFAULT_CATEGORY, createdAt: EARLIER, updatedAt: EARLIER });
+
+      const storedCategories = async (): Promise<unknown> => (await chrome.storage.local.get('categories')).categories;
+      const categoryOf = async (id: string): Promise<string | undefined> =>
+        ((await chrome.storage.local.get('prompts')).prompts as Prompt[]).find(p => p.id === id)?.category;
+
+      describe.each<{ stored: string; malformed: unknown }>([
+        { stored: '[Uncategorized, null, Work]', malformed: null },
+        { stored: '[Uncategorized, an entry whose name is a number, Work]', malformed: { id: 'numbered', name: 42 } },
+        { stored: '[Uncategorized, an entry without a name, Work]', malformed: { id: 'nameless', color: '#0F766E' } },
+        { stored: '[Uncategorized, an entry without a name that carries the id of Work, Work]', malformed: { id: 'work' } }
+      ])('$stored', ({ malformed }) => {
+        beforeEach(async () => {
+          await chrome.storage.local.set({ categories: [uncategorized, malformed, work], prompts: [inWork, inDefault] });
+        });
+
+        it('saveCategory adds the Category after every stored entry, each kept as it is', async () => {
+          const saved = await storageManager.saveCategory({ name: 'Notes', color: '#0F766E' });
+
+          expect(saved).toEqual({ id: expect.any(String), name: 'Notes', color: '#0F766E' });
+          expect(await storedCategories()).toEqual([uncategorized, malformed, work, saved]);
+          expect(await storageManager.getCategories()).toEqual([uncategorized, work, saved]);
+        });
+
+        it('saveCategory still refuses the name of a stored Category, ignoring case, and writes nothing', async () => {
+          await expect(storageManager.saveCategory({ name: 'work' })).rejects.toThrow('Category with name "work" already exists');
+
+          expect(await storedCategories()).toEqual([uncategorized, malformed, work]);
+        });
+
+        it('updateCategory recolors Work, and only Work', async () => {
+          const updated = await storageManager.updateCategory('work', { color: ROSE });
+
+          expect(updated).toEqual({ ...work, color: ROSE });
+          expect(await storedCategories()).toEqual([uncategorized, malformed, { ...work, color: ROSE }]);
+        });
+
+        it('updateCategory renames Work in its place and moves its Prompts with it (the rename path)', async () => {
+          const updated = await storageManager.updateCategory('work', { name: 'Office' });
+
+          expect(updated).toEqual({ ...work, name: 'Office' });
+          expect(await storedCategories()).toEqual([uncategorized, malformed, { ...work, name: 'Office' }]);
+          expect(await categoryOf('in-work')).toBe('Office');
+          expect(await categoryOf('in-default')).toBe(DEFAULT_CATEGORY);
+        });
+
+        it('updateCategory still refuses a rename into the name of another stored Category, ignoring case, and writes nothing', async () => {
+          await expect(storageManager.updateCategory('work', { name: 'uncategorized' }))
+            .rejects.toThrow('Category with name "uncategorized" already exists');
+
+          expect(await storedCategories()).toEqual([uncategorized, malformed, work]);
+          expect(await categoryOf('in-work')).toBe('Work');
+        });
+
+        it('deleteCategory removes Work alone and moves its Prompts to the default Category', async () => {
+          const deleted = await storageManager.deleteCategory('work');
+
+          expect(deleted).toEqual({
+            category: work,
+            index: 2,
+            movedPrompts: [{ id: 'in-work', updatedAt: EARLIER, movedAt: FIXED_TIME.getTime() }]
+          });
+          expect(await storedCategories()).toEqual([uncategorized, malformed]);
+          expect(await categoryOf('in-work')).toBe(DEFAULT_CATEGORY);
+        });
+
+        it('restoreCategory puts Work back in its place, with its Prompts', async () => {
+          const deleted = await storageManager.deleteCategory('work');
+
+          const restored = await storageManager.restoreCategory(deleted);
+
+          expect(restored).toEqual(work);
+          expect(await storedCategories()).toEqual([uncategorized, malformed, work]);
+          expect(await categoryOf('in-work')).toBe('Work');
+        });
+
+        it('importCategory renames Work, matched by its id, in its place and moves its Prompts with it', async () => {
+          const imported = await storageManager.importCategory({ id: 'work', name: 'Office', color: work.color });
+
+          expect(imported).toEqual({ ...work, name: 'Office' });
+          expect(await storedCategories()).toEqual([uncategorized, malformed, { ...work, name: 'Office' }]);
+          expect(await categoryOf('in-work')).toBe('Office');
+        });
+
+        it('importCategory gives the colour of a Backup Category named like Work, ignoring case, to Work, which keeps its id and name', async () => {
+          const imported = await storageManager.importCategory({ id: 'backup-work', name: 'WORK', color: ROSE });
+
+          expect(imported).toEqual({ ...work, color: ROSE });
+          expect(await storedCategories()).toEqual([uncategorized, malformed, { ...work, color: ROSE }]);
+        });
+
+        it('importCategory adds a new Category after every stored entry, each kept as it is', async () => {
+          const notes: Category = { id: 'notes', name: 'Notes', color: '#0F766E' };
+
+          await expect(storageManager.importCategory(notes)).resolves.toEqual(notes);
+
+          expect(await storedCategories()).toEqual([uncategorized, malformed, work, notes]);
+        });
+      });
+
+      describe('[null, Work], without the default Category stored', () => {
+        beforeEach(async () => {
+          await chrome.storage.local.set({ categories: [null, work], prompts: [inWork] });
+        });
+
+        it('saveCategory writes the default Category first, then adds the Category, null kept in its place', async () => {
+          const saved = await storageManager.saveCategory({ name: 'Notes' });
+
+          expect(await storedCategories()).toEqual([{ id: expect.any(String), name: DEFAULT_CATEGORY }, null, work, saved]);
+        });
+
+        it('updateCategory writes the default Category first, then renames Work and moves its Prompts', async () => {
+          await storageManager.updateCategory('work', { name: 'Office' });
+
+          expect(await storedCategories()).toEqual([{ id: expect.any(String), name: DEFAULT_CATEGORY }, null, { ...work, name: 'Office' }]);
+          expect(await categoryOf('in-work')).toBe('Office');
+        });
+      });
+    });
   });
 
   describe('Race Condition Prevention', () => {
