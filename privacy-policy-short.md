@@ -10,7 +10,7 @@ A summary of [the full privacy policy](./privacy-policy.md) for Release 2.0.0. W
 
 - **Read where it works, not kept:** the keys you press and the text in the chat box, to notice `//` and for Undo, and the page's structure, to place the Prompts button.
 - **Stored:** your Prompts, Categories and preferences, the Site settings and Custom sites, and the usage history that the Analytics section counts, in Chrome's local storage (`chrome.storage.local`), which Chrome does not sync. Short-lived state goes in `chrome.storage.session`, emptied when Chrome closes.
-- **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored: only an insertion made while the history holds 9,000 entries or more removes them, and it never holds more than 10,000.
+- **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored until an insertion made while the history holds 9,000 entries or more removes them, and the history never holds more than 10,000. From the version after 2.0.0, entries older than 30 days are removed at each insertion, at each Chrome start and on each update; between those moments an entry can stay past 30 days.
 - **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address, the element's identifiers and attributes, and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box.
 
 ## What leaves your device
