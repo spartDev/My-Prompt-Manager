@@ -135,6 +135,12 @@ const App: FC<AppProps> = ({ context = 'popup' }) => {
 
   const openEditor = (next: EditorState) => {
     editorTriggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // In the side panel the exit Notification of the Welcome (`whole`) stands left of center, off the
+    // close button, and so over the editor's Cancel: it leaves as the editor opens. Every other
+    // Notification, and the popup, keep theirs (My-Prompt-Manager-h1dh)
+    if (context === 'sidepanel' && toast?.whole === true) {
+      hideToast(toast.id);
+    }
     setEditorKey(key => key + 1);
     setEditor(next);
   };

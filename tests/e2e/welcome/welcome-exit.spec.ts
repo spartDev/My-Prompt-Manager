@@ -18,7 +18,10 @@
  *   whenever it does with no Notification. A one-line Notification shown next stays centered. A click
  *   on each corner, each edge and the centre of the button, while the Notification shows, reaches the
  *   button's close and never the pill, the pointer resting there never holds its time, and a real
- *   click on the corner the pill used to cover closes the side panel.
+ *   click on the corner the pill used to cover closes the side panel. The editor opened with New while
+ *   the Notification shows: the Notification leaves in the commit that puts the editor in, no pixel
+ *   of the editor's Cancel or Save is under it in any frame, both are whole once the editor rests, and
+ *   a click on Cancel where the pill used to lie closes the editor.
  * - The exit Notification stays 6 s (My-Prompt-Manager-syj): its 9 words take about 2.3 s to read and
  *   its `//` comes last. In the popup 400 x 500 and the side panel 320 x 600, light and dark, it is
  *   first drawn within 1 s of the click on "Add 9 prompts", still drawn 5.5 s after it, without a break
@@ -506,70 +509,90 @@ const CLOSE_SURFACES = [
   { width: 360, height: 600 }
 ] as const;
 
-/** A pixel of the close button's box, hit tested at its centre */
+/** A pixel of a control's box, hit tested at its centre */
 interface Pixel {
   x: number;
   y: number;
 }
 
-/** Hit tests every pixel of the close button's box: how many reach the button, how many the pill */
-interface CloseButtonHits {
+/**
+ * Hit tests every pixel of a control's box: how many reach the control, which reach the pill, and
+ * which reach another element than the control and its ancestors (the pill among them): a pixel at a
+ * rounded corner shows what the control stands on, any other is covered
+ */
+interface ControlHits {
   box: Box;
   pixels: number;
-  onButton: number;
+  onControl: number;
   underPill: Pixel[];
+  covered: Pixel[];
+}
+
+/** One control, over the frames the exit Notification is in the document */
+interface ControlWatch {
+  /** When it was first in the document, by the page's clock */
+  appearedAt?: number;
+  /** Frames where the control was not in the document */
+  framesWithout: number;
+  /** Each frame where it was: where its box stood, and how many of its pixels reached it */
+  frames: { left: number; top: number; onControl: number }[];
+  /** Frames where a pixel of its box reached the pill, and the first such pixels */
+  framesUnderPill: number;
+  underPill: (Pixel & { frame: number })[];
+  /** Frames where a pixel of its box was covered (ControlHits) */
+  framesCovered: number;
+  last?: ControlHits;
 }
 
 /**
- * What the page notes about the side panel's close button while the exit Notification `message` is in
- * the document, on each animation frame from the one it is put in to the one it leaves, its entrance
- * included: CloseButtonHits of the button's box, and anything that held the pill's time
+ * What the page notes while the exit Notification `message` is in the document, on each animation
+ * frame from the one it is put in to the one it leaves, its entrance included: a ControlWatch of each
+ * control named, and anything that held the pill's time
  */
-interface CloseButtonWatch {
+interface NotificationWatch {
   shownAt?: number;
   goneAt?: number;
-  /** Frames sampled while the pill was in the document, and those of them with no close button */
+  /** Frames sampled while the pill was in the document */
   frames: number;
-  framesWithoutButton: number;
-  /** The fewest pixels that reached the button in one frame */
-  minOnButton: number | null;
-  /** Frames where a pixel of the button's box reached the pill, and the first such pixels */
-  framesUnderPill: number;
-  underPill: (Pixel & { frame: number })[];
   /** The pointer or the focus on the pill (mouseenter, focusin): either stops its time */
   held: string[];
-  /** The pill's box at its farthest right, over every frame */
+  /** The pill's box at its farthest right, over every frame, and in the last frame */
   pillRightmost: number | null;
-  last?: CloseButtonHits & { pill: Box };
+  lastPill?: Box;
+  controls: Record<string, ControlWatch>;
 }
 
-type CloseWatchWindow = typeof globalThis & {
-  closeButtonWatch: CloseButtonWatch;
-  /** CloseButtonHits as the page stands, or null with no close button */
-  closeButtonHits: () => CloseButtonHits | null;
+type NotificationWatchWindow = typeof globalThis & {
+  notificationWatch: NotificationWatch;
+  /** ControlHits of the control named, as the page stands, or null when it is not in the document */
+  controlHits: (name: string) => ControlHits | null;
 };
 
 /**
- * Starts noting the CloseButtonWatch of the exit Notification `message`, before the click on the
- * primary button. Each pixel of the close button's box is hit tested at its centre with
- * elementFromPoint, which reads the page as drawn: the pill's transform during its entrance, and the
- * rounded corners of both, are those Chrome hit tests a click with
+ * Starts noting the NotificationWatch of the exit Notification `message` over `controls` (a name for
+ * each, and its selector), before the click on the primary button. Each pixel of a control's box is
+ * hit tested at its centre with elementFromPoint, which reads the page as drawn: the pill's transform
+ * during its entrance, the stacking of the pill and of what opens over the Library, and the rounded
+ * corners, are those Chrome hit tests a click with
  */
-const watchTheCloseButton = (page: Page, message: string): Promise<void> =>
-  page.evaluate(({ watched, selector }) => {
-    const watch: CloseButtonWatch = { frames: 0, framesWithoutButton: 0, minOnButton: null, framesUnderPill: 0, underPill: [], held: [], pillRightmost: null };
+const watchControlsUnderTheNotification = (page: Page, message: string, controls: Record<string, string>): Promise<void> =>
+  page.evaluate(({ watched, selectors }) => {
+    const watch: NotificationWatch = { frames: 0, held: [], pillRightmost: null, controls: {} };
+    for (const name of Object.keys(selectors)) {
+      watch.controls[name] = { framesWithout: 0, frames: [], framesUnderPill: 0, underPill: [], framesCovered: 0 };
+    }
     const box = (element: Element): Box => {
       const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
       return { left, top, right, bottom, width, height };
     };
     let pill: HTMLElement | null = null;
-    const hits = (): CloseButtonHits | null => {
-      const button = document.querySelector(selector);
-      if (!button) {
+    const hits = (name: string): ControlHits | null => {
+      const control = document.querySelector(selectors[name]);
+      if (!control) {
         return null;
       }
-      const at = box(button);
-      const result: CloseButtonHits = { box: at, pixels: 0, onButton: 0, underPill: [] };
+      const at = box(control);
+      const result: ControlHits = { box: at, pixels: 0, onControl: 0, underPill: [], covered: [] };
       for (let row = Math.floor(at.top); row < at.bottom; row++) {
         for (let column = Math.floor(at.left); column < at.right; column++) {
           const x = column + 0.5;
@@ -579,46 +602,61 @@ const watchTheCloseButton = (page: Page, message: string): Promise<void> =>
           }
           result.pixels++;
           const hit = document.elementFromPoint(x, y);
-          if (hit !== null && button.contains(hit)) {
-            result.onButton++;
-          } else if (hit !== null && pill?.contains(hit) === true) {
+          if (hit !== null && control.contains(hit)) {
+            result.onControl++;
+            continue;
+          }
+          if (hit !== null && pill?.contains(hit) === true) {
             result.underPill.push({ x, y });
+          }
+          if (hit === null || !hit.contains(control)) {
+            result.covered.push({ x, y });
           }
         }
       }
       return result;
     };
-    (globalThis as CloseWatchWindow).closeButtonWatch = watch;
-    (globalThis as CloseWatchWindow).closeButtonHits = hits;
+    (globalThis as NotificationWatchWindow).notificationWatch = watch;
+    (globalThis as NotificationWatchWindow).controlHits = hits;
 
     const sample = (): void => {
       if (!pill?.isConnected) {
         return;
       }
       watch.frames++;
-      const frame = hits();
-      if (frame === null) {
-        watch.framesWithoutButton++;
-      } else {
-        watch.minOnButton = watch.minOnButton === null ? frame.onButton : Math.min(watch.minOnButton, frame.onButton);
-        if (frame.underPill.length > 0) {
-          watch.framesUnderPill++;
-          watch.underPill.push(...frame.underPill.slice(0, Math.max(0, 20 - watch.underPill.length)).map((pixel) => ({ ...pixel, frame: watch.frames })));
+      const pillBox = box(pill);
+      watch.pillRightmost = Math.max(watch.pillRightmost ?? pillBox.right, pillBox.right);
+      watch.lastPill = pillBox;
+      for (const [name, control] of Object.entries(watch.controls)) {
+        const frame = hits(name);
+        if (frame === null) {
+          control.framesWithout++;
+          continue;
         }
-        const pillBox = box(pill);
-        watch.pillRightmost = Math.max(watch.pillRightmost ?? pillBox.right, pillBox.right);
-        watch.last = { ...frame, pill: pillBox };
+        control.frames.push({ left: frame.box.left, top: frame.box.top, onControl: frame.onControl });
+        if (frame.underPill.length > 0) {
+          control.framesUnderPill++;
+          control.underPill.push(...frame.underPill.slice(0, Math.max(0, 20 - control.underPill.length)).map((pixel) => ({ ...pixel, frame: watch.frames })));
+        }
+        control.framesCovered += frame.covered.length > 0 ? 1 : 0;
+        control.last = frame;
       }
       requestAnimationFrame(sample);
     };
 
     new MutationObserver(() => {
+      const now = performance.now();
       if (pill?.isConnected === false && watch.goneAt === undefined) {
-        watch.goneAt = performance.now();
+        watch.goneAt = now;
+      }
+      for (const [name, control] of Object.entries(watch.controls)) {
+        if (control.appearedAt === undefined && document.querySelector(selectors[name]) !== null) {
+          control.appearedAt = now;
+        }
       }
       const found = document.querySelector<HTMLElement>('[data-testid="toast"]');
       if (pill === null && found && (found.textContent ?? '').includes(watched)) {
-        watch.shownAt = performance.now();
+        watch.shownAt = now;
         found.addEventListener('mouseenter', () => { watch.held.push('mouseenter'); });
         found.addEventListener('focusin', () => { watch.held.push('focusin'); });
         pill = found;
@@ -626,9 +664,48 @@ const watchTheCloseButton = (page: Page, message: string): Promise<void> =>
         sample();
       }
     }).observe(document.body, { childList: true, subtree: true });
-  }, { watched: message, selector: LIBRARY_CLOSE });
+  }, { watched: message, selectors: controls });
 
-const closeButtonWatchOf = (page: Page): Promise<CloseButtonWatch> => page.evaluate(() => (globalThis as CloseWatchWindow).closeButtonWatch);
+const notificationWatchOf = (page: Page): Promise<NotificationWatch> => page.evaluate(() => (globalThis as NotificationWatchWindow).notificationWatch);
+
+/** ControlHits of each control named, once the exit Notification has left */
+const controlHitsAtRest = async (page: Page, names: readonly string[]): Promise<Record<string, ControlHits | null>> =>
+  page.evaluate((all) => Object.fromEntries(all.map((name) => [name, (globalThis as NotificationWatchWindow).controlHits(name)])), names);
+
+/**
+ * `name` whole with no Notification: each pixel of its box reaches it, or at its rounded corners what
+ * it stands on, and none another element; it is reached at all but those corners
+ */
+const expectWholeAtRest = (name: string, rest: ControlHits): void => {
+  expect(rest.covered, `pixels of ${name} covered, with no Notification`).toEqual([]);
+  expect(rest.onControl, `${name} reached at all but its rounded corners, with no Notification`).toBeGreaterThan(rest.pixels * 0.8);
+};
+
+/**
+ * `name` reachable whole all along the exit Notification: in no frame does a pixel of its box reach
+ * the pill, and in every frame where it stood where it rests, each pixel that reaches it with no
+ * Notification (all but its rounded corners) reaches it. A control moving in (the editor rising) is
+ * read at rest only for the count, as its box then falls on other pixel rows
+ */
+const expectReachableThroughout = (name: string, control: ControlWatch, rest: ControlHits | null): void => {
+  expect(rest, `${name}, with no Notification`).not.toBeNull();
+  if (rest === null) {
+    return;
+  }
+  expectWholeAtRest(name, rest);
+  expect(control.underPill, `pixels of ${name} under the Notification`).toEqual([]);
+  expect(control.framesUnderPill, `frames where a pixel of ${name} was under the Notification`).toBe(0);
+  expect(control.framesCovered, `frames where a pixel of ${name} was covered`).toBe(0);
+  const atRest = control.frames.filter((frame) => Math.abs(frame.left - rest.box.left) < 0.01 && Math.abs(frame.top - rest.box.top) < 0.01);
+  expect(atRest.length, `frames with ${name} at rest while the Notification was in the document`).toBeGreaterThan(0);
+  expect(atRest.filter((frame) => frame.onControl !== rest.onControl), `frames at rest where a pixel of ${name} did not reach it`).toEqual([]);
+};
+
+/** The Cancel and Save of the editor's bar (PromptEditor), both in the band of the exit Notification */
+const EDITOR_CONTROLS = {
+  Cancel: '[data-testid="editor-sheet"] header button[aria-keyshortcuts="Escape"]',
+  Save: '[data-testid="editor-sheet"] header button[type="submit"]'
+} as const;
 
 /**
  * Each call of `window.close()`, from the page's first script on: where the click that made it was,
@@ -797,30 +874,27 @@ test.describe('Leaving the Welcome in the real extension', () => {
         await expectTheme(page, theme);
         await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
 
-        await watchTheCloseButton(page, ADDED);
+        await watchControlsUnderTheNotification(page, ADDED, { close: LIBRARY_CLOSE });
         await primary(page).click();
         await expect(page.getByTestId('toast').getByText(ADDED, { exact: true })).toBeVisible();
         await animationsDone(page);
         await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
         await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `close-button-free-sidepanel-${String(width)}x${String(height)}-${theme}.png`) });
-        await expect.poll(async () => (await closeButtonWatchOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
+        await expect.poll(async () => (await notificationWatchOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
 
         // With no Notification, the pixels of the box that reach the button: all but its rounded corners
-        const rest = await page.evaluate(() => (globalThis as CloseWatchWindow).closeButtonHits());
-        const watch = await closeButtonWatchOf(page);
+        const { close: rest } = await controlHitsAtRest(page, ['close']);
+        const watch = await notificationWatchOf(page);
         const report = { ...watch, rest, onScreenMs: (watch.goneAt ?? Number.NaN) - (watch.shownAt ?? Number.NaN) };
-        test.info().annotations.push({ type: 'close button under the exit Notification (px)', description: JSON.stringify(report) });
+        test.info().annotations.push({ type: 'close button under the exit Notification (px)', description: JSON.stringify({ ...report, controls: { close: { ...watch.controls.close, frames: watch.controls.close.frames.length } } }) });
         await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `close-button-free-sidepanel-${String(width)}x${String(height)}-${theme}.json`), `${JSON.stringify(report, null, 2)}\n`);
 
         expect(watch.held, 'nothing hovered or focused the Notification').toEqual([]);
         expect(watch.frames, 'frames sampled while the Notification was in the document').toBeGreaterThan(0);
-        expect(watch.framesWithoutButton, 'frames with no close button').toBe(0);
-        expect(rest, 'the close button, with no Notification').not.toBeNull();
-        expect(rest?.underPill ?? [], 'pixels under a pill with no Notification').toEqual([]);
-        expect(rest?.onButton ?? 0, 'the button reached at all but its rounded corners').toBeGreaterThan((rest?.pixels ?? Number.NaN) * 0.9);
-        expect(watch.underPill, 'pixels of the close button under the Notification').toEqual([]);
-        expect(watch.framesUnderPill, 'frames where a pixel of the close button was under the Notification').toBe(0);
-        expect(watch.minOnButton, 'the fewest pixels reaching the button in a frame, against none shown').toBe(rest?.onButton);
+        expect(watch.controls.close.framesWithout, 'frames with no close button').toBe(0);
+        // The button never moves: every frame is at rest, so each one reaches it whole
+        expect(watch.controls.close.frames.length, 'frames with the close button').toBe(watch.frames);
+        expectReachableThroughout('the close button', watch.controls.close, rest);
 
         // No other Notification moves: a one-line one, the copy of the first card, stays centered
         await firstCardCopy(page).click();
@@ -842,7 +916,7 @@ test.describe('Leaving the Welcome in the real extension', () => {
       await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
       await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
 
-      await watchTheCloseButton(page, ADDED);
+      await watchControlsUnderTheNotification(page, ADDED, { close: LIBRARY_CLOSE });
       await primary(page).click();
       const notification = page.getByTestId('toast');
       await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
@@ -868,7 +942,7 @@ test.describe('Leaving the Welcome in the real extension', () => {
       // The pointer rests on the corner the pill used to cover
       await page.mouse.move(points[0].x, points[0].y);
       const calls = await closeCallsOf(page);
-      const { held } = await closeButtonWatchOf(page);
+      const { held } = await notificationWatchOf(page);
       // A click's clientX and clientY may be rounded to whole pixels
       const closedBy = (point: Pixel) => calls.some((call) => Math.abs(call.x - point.x) < 1 && Math.abs(call.y - point.y) < 1);
       const missed = points.filter((point) => !closedBy(point)).map(({ name }) => name);
@@ -887,6 +961,73 @@ test.describe('Leaving the Welcome in the real extension', () => {
       await closed;
       expect(page.isClosed(), 'the side panel closed').toBe(true);
     });
+
+    // Round 1 of My-Prompt-Manager-h1dh (Codex on PR #636): moved left, the pill, over everything
+    // (z-50), covered nearly all of the Cancel of an editor opened while it showed, the editor's bar
+    // being in its band. In the side panel it now leaves as the editor opens: in no frame is a pixel of
+    // Cancel or Save under it, and once the editor rests both are whole
+    for (const theme of ['light', 'dark'] as const) {
+      test(`the editor opened while the exit Notification shows: the Notification leaves as it opens, and every pixel of its Cancel and Save is reachable (sidepanel ${String(width)} x ${String(height)}, ${theme})`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+        await expectTheme(page, theme);
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+
+        await watchControlsUnderTheNotification(page, ADDED, EDITOR_CONTROLS);
+        await primary(page).click();
+        const notification = page.getByTestId('toast');
+        await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Add new prompt' }).click();
+        const editor = page.getByTestId('editor-sheet');
+        await expect(editor.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
+        await animationsDone(page);
+        await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
+        await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `editor-after-exit-notification-sidepanel-${String(width)}x${String(height)}-${theme}.png`) });
+        // Gone with the editor, or, where it stays over the editor, at the end of its time
+        await expect.poll(async () => (await notificationWatchOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
+
+        const names = Object.keys(EDITOR_CONTROLS);
+        const rest = await controlHitsAtRest(page, names);
+        const watch = await notificationWatchOf(page);
+        const report = { ...watch, rest, onScreenMs: (watch.goneAt ?? Number.NaN) - (watch.shownAt ?? Number.NaN) };
+        test.info().annotations.push({
+          type: 'Cancel and Save and the exit Notification (px, ms)',
+          description: JSON.stringify({
+            shownAt: watch.shownAt,
+            goneAt: watch.goneAt,
+            controls: names.map((name) => ({ name, appearedAt: watch.controls[name].appearedAt, rest: rest[name], framesWithPill: watch.controls[name].frames.length, framesUnderPill: watch.controls[name].framesUnderPill, underPill: watch.controls[name].underPill.slice(0, 5) }))
+          })
+        });
+        await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `editor-after-exit-notification-sidepanel-${String(width)}x${String(height)}-${theme}.json`), `${JSON.stringify(report, null, 2)}\n`);
+
+        expect(watch.held, 'nothing hovered or focused the Notification').toEqual([]);
+        for (const name of names) {
+          const control = watch.controls[name];
+          // In every frame both were in the document with the Notification, none of their pixels under it
+          expect(control.underPill, `pixels of ${name} under the Notification`).toEqual([]);
+          expect(control.framesUnderPill, `frames where a pixel of ${name} was under the Notification`).toBe(0);
+          expect(control.framesCovered, `frames where a pixel of ${name} was covered`).toBe(0);
+          // The editor at rest: each pixel reaches the button, or at its rounded corners the editor's bar
+          const at = rest[name];
+          expect(at, `${name}, the editor at rest`).not.toBeNull();
+          if (at !== null) {
+            expectWholeAtRest(name, at);
+          }
+        }
+        // It left as the editor opened, in the same commit, long before its time ran out
+        const { shownAt = Number.NaN, goneAt = Number.NaN } = watch;
+        const editorAt = watch.controls.Cancel.appearedAt ?? Number.NaN;
+        expect(goneAt - editorAt, 'the Notification gone as the editor is put in the document (ms)').toBeLessThanOrEqual(1);
+        expect(goneAt - shownAt, 'the Notification gone before its time (ms)').toBeLessThan(STILL_THERE_MS);
+        await expect(notification).toHaveCount(0);
+
+        // A click on Cancel where the pill used to lie, 18px in from its left: the editor closes
+        const cancel = boxOf(await page.locator(EDITOR_CONTROLS.Cancel).boundingBox(), 'Cancel');
+        await page.mouse.click(cancel.left + 18, (cancel.top + cancel.bottom) / 2);
+        await expect(editor).toHaveCount(0);
+      });
+    }
   }
 
   test('the exit Notification of a Debug replay, "Your library is ready", stays 6 s as well (popup 400 x 500)', async ({ page, storage, extensionId }) => {

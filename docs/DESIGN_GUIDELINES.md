@@ -993,8 +993,12 @@ which wins at 320px. At 320px it stands from 16px to 254px, 6px from the button 
 360px from 54px to 292px; at 400px centered, as in the popup, which has no close button. No pixel of
 the button is under it in any frame, its entrance included, so a click anywhere on the button closes the
 side panel and a pointer resting there never holds its time. It moves sideways only (`translate`, which
-adds to the entrance's transform). Every other Notification stays centered: a one-line pill as wide as
-its room still reaches the button's top 8px in a 320px side panel.
+adds to the entrance's transform). Moved left, it would cover the Cancel of an editor opened while it
+shows (the editor's bar, Cancel at the left and Save at the right, is in its band), so in the side panel
+it leaves as the editor opens, New or Edit (App's `openEditor`): the user has moved on from the
+Library it was about. It stays over everything else (z-50), What's new of a Debug replay included. Every
+other Notification stays centered, and stays as the editor opens; in the popup the exit Notification
+stays too. A one-line pill as wide as its room still reaches the button's top 8px in a 320px side panel.
 
 It stays 6s, not a confirmation's 2.7s (My-Prompt-Manager-syj): its 9 words take about 2.3s to read
 and `//` comes last. `useWelcomeExit` passes `duration: 6000`, for "Your library is ready" (a Debug
