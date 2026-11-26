@@ -29,10 +29,16 @@
  *   Try again at its idle width, no sooner than 300 ms after the press, and the role=status saying the
  *   read failed again.
  *
+ * - A read that ends after a newer one has started (My-Prompt-Manager-7v5k): a Try again's read held
+ *   past the 10 s bound, a later Try again bringing the Library back, then the held read refused. The
+ *   Library stays, with no Error Loading Data, the role=status still saying it is back and the
+ *   keyboard on All, never on the document.
+ *
  * Light and dark, popup 400 x 500. Screenshots in LOAD_ERROR_FOCUS_SCREENSHOTS
  * (test-results/load-error-focus when unset): try-again-failed-again-<theme>.png (the keyboard on Try
- * again after a Try again that failed), library-back-<theme>.png (the keyboard on All) and
- * try-again-busy-<theme>.png (Try again while it reads).
+ * again after a Try again that failed), library-back-<theme>.png (the keyboard on All),
+ * try-again-busy-<theme>.png (Try again while it reads) and library-kept-after-late-failure-<theme>.png
+ * (the Library after the held read was refused).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -77,6 +83,8 @@ interface ReadFailure {
   rejectedAt: number[];
   held: boolean;
   release?: () => void;
+  /** Ends the held read with a refusal instead (My-Prompt-Manager-7v5k) */
+  refuse?: () => void;
 }
 
 /**
@@ -123,6 +131,10 @@ const failThePromptsReads = ({ message, count, afterWriteOf, holdNext = false }:
       state.held = true;
       return new Promise((resolve, reject) => {
         state.release = () => { get(keys).then(resolve, reject); };
+        state.refuse = () => {
+          state.rejectedAt.push(performance.now());
+          reject(new Error(`${message}, too late`));
+        };
       });
     }
     return get(keys);
@@ -132,6 +144,16 @@ const failThePromptsReads = ({ message, count, afterWriteOf, holdNext = false }:
 /** Lets go the read of the Prompts the patch holds */
 const releaseTheHeldRead = (page: Page): Promise<void> =>
   page.evaluate(() => { (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.release?.(); });
+
+/** Ends the read of the Prompts the patch holds with a refusal, then waits a few frames and a timer for the page to take it in */
+const refuseTheHeldRead = (page: Page): Promise<void> =>
+  page.evaluate(async () => {
+    (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.refuse?.();
+    for (let frame = 0; frame < 5; frame++) {
+      await new Promise((done) => { requestAnimationFrame(done); });
+    }
+    await new Promise((done) => { setTimeout(done, 200); });
+  });
 
 const rejectedReads = (page: Page): Promise<number | undefined> =>
   page.evaluate(() => (window as Window & { __promptsReads?: ReadFailure }).__promptsReads?.rejected);
@@ -466,6 +488,47 @@ test.describe('Error Loading Data: the keyboard after Try again', () => {
       await expect(page.getByRole('radio', { name: 'All' })).toBeFocused();
       await expect(page.getByTestId('load-status')).toHaveText('Your library is back');
       await expectNeverOnTheDocument(page, `All, after a busy Try again (${theme})`);
+    });
+
+    // My-Prompt-Manager-7v5k: on main, the held read's refusal brought Error Loading Data back over the
+    // Library, the status still saying it was back and the keyboard on the document
+    test(`a Try again whose read is held past the bound, a later Try again that brings the Library, then the held read refused (${theme}): the Library stays, no Error Loading Data, the role=status still says it is back, the keyboard on All; never on the document`, async ({ page, storage, extensionId }) => {
+      await seedLibrary(storage, { categories: CATEGORIES, prompts: PROMPTS, settings: { ...DEFAULT_SETTINGS, theme } });
+      await openPopup(page, extensionId, theme, { message: READ_FAILURE, count: 1, holdNext: true });
+      const heading = page.getByRole('heading', { name: ERROR_TITLE });
+      const status = page.getByTestId('load-status');
+      await tabToTryAgain(page);
+
+      // The press whose read is held: busy, then past RETRY_READ_BOUND_MS (10 s) Try again again
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('button', { name: 'Trying again...' })).toBeFocused();
+      await expect(status).toHaveText('Still reading your library. You can try again.', { timeout: 15_000 });
+      const tryAgain = page.getByRole('button', { name: 'Try again' });
+      await expect(tryAgain).toBeFocused();
+      await expect(tryAgain).not.toHaveAttribute('aria-disabled');
+
+      // A later press: its read goes through, the Library is back
+      await watchTheKeyboard(page);
+      await page.keyboard.press('Enter');
+      await expect(page.getByTestId('prompt-card')).toHaveCount(PROMPTS.length);
+      const all = page.getByRole('radio', { name: 'All' });
+      await expect(all).toBeFocused();
+      await expect(status).toHaveText('Your library is back');
+
+      // The held read refused, after the newer one: nothing changes
+      await refuseTheHeldRead(page);
+      expect(await refusedAt(page)).toHaveLength(2);
+      await expect(heading).toHaveCount(0);
+      await expect(page.getByText(`${READ_FAILURE}, too late`)).toHaveCount(0);
+      await expect(page.getByTestId('prompt-card')).toHaveCount(PROMPTS.length);
+      await expect(all).toBeFocused();
+      await expect(status).toHaveText('Your library is back');
+      await expectNeverOnTheDocument(page, `All, the held read refused after a later Try again (${theme})`);
+
+      await animationsDone(page);
+      await page.mouse.move(2, HEIGHT - 2);
+      await fs.mkdir(SCREENSHOTS_DIR, { recursive: true });
+      await page.screenshot({ path: path.join(SCREENSHOTS_DIR, `library-kept-after-late-failure-${theme}.png`) });
     });
 
     // The owner's decision on PR #610: a read that fails again within a frame or two still shows the
