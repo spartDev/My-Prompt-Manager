@@ -154,16 +154,18 @@ The provider of step 4 needs no change: it names the repository by its ID, which
 
 ## 6. Add the service account in the Developer Dashboard
 
-In the [Developer Dashboard](https://chrome.google.com/webstore/devconsole), signed in as the publisher's owner, open the **Account** section, and add the service account's e-mail (printed at step 3) under service accounts. A publisher holds one service account at a time.
+In the [Developer Dashboard](https://chrome.google.com/webstore/devconsole), signed in as the publisher's owner, open **Publisher > Settings > Service account** (in French, **Éditeur > Paramètres > Compte de service**), click **Add a service account**, and enter the service account's e-mail (printed at step 3). The **Account** part of the menu holds only Profile and Notifications: the service account is not there.
 
-This link is what lets the service account manage the publisher's items; without it every call answers 403.
+Only one service account fits per publisher. If the section already shows one, it is the account the store trusts today: the e-mail of step 3 must take its place, once you know nothing else publishes with the old one.
+
+This link is what lets the service account manage the publisher's items; without it every call answers 403 (Troubleshooting).
 
 ## 7. The publisher ID and the extension ID
 
-- **Publisher ID**: in the Developer Dashboard, **Publisher > Settings**. With more than one publisher, switch to this one first.
-- **Extension ID**: the item's 32 letters, on its **Package** tab in the Developer Dashboard, or on `chrome://extensions` with Developer mode on.
+- **Publisher ID**: in the Developer Dashboard, **Publisher > Settings** (**Éditeur > Paramètres**). With more than one publisher, switch to this one first.
+- **Extension ID**: the ID of the store item, 32 letters from a to p. It is on the item's **Package** tab in the Developer Dashboard, and it ends the item's store URL, `https://chromewebstore.google.com/detail/<name>/<extension-id>`. Do not read it from a build you loaded yourself: a build loaded unpacked gets another ID, because `manifest.json` has no `key`, and that ID has no store item. `chrome://extensions` shows the store item's ID only on the copy installed from the store.
 
-Put both in the values file.
+Check the extension ID: `https://chromewebstore.google.com/detail/<extension-id>` must open the extension's store page. Then put both IDs in the values file.
 
 ## 8. The GitHub environment `chrome-webstore`
 
@@ -187,16 +189,28 @@ gh api -X POST "repos/$REPO/environments/chrome-webstore/deployment-branch-polic
 gh api -X POST "repos/$REPO/environments/chrome-webstore/deployment-branch-policies" -f name='v*' -f type=tag
 ```
 
-Check it: one reviewer, the owner, and the two policies.
+The environment holds no secret.
+
+Check it before step 9: the owner as its only reviewer, custom deployment policies, and the two policies.
 
 ```sh
 . ~/.config/my-prompt-manager/cws-setup.sh
 gh api "repos/$REPO/environments/chrome-webstore" \
-  --jq '{reviewers: [.protection_rules[] | select(.type == "required_reviewers") | .reviewers[].reviewer.login], deployment_branch_policy}'
+  --jq '(.protection_rules[] | select(.type == "required_reviewers") | .reviewers[] | "reviewer \(.reviewer.login)"), "custom_branch_policies \(.deployment_branch_policy.custom_branch_policies)"'
 gh api "repos/$REPO/environments/chrome-webstore/deployment-branch-policies" --jq '.branch_policies[] | "\(.type) \(.name)"'
 ```
 
-The environment holds no secret.
+It must print these four lines, and only these, with your GitHub login in place of `<owner-login>`:
+
+```text
+reviewer <owner-login>
+custom_branch_policies true
+branch main
+tag v*
+```
+
+- The first two lines differ: run the `PUT` block again, then this check.
+- The line `tag v*` is missing: no tag may deploy to the environment, and the Submission job of every Release fails before it reaches the store. The line `branch main` is missing: the rehearsal of step 10 fails the same way. Run the policies block (the two `POST`) again, then this check.
 
 ## 9. The four repository variables
 
@@ -238,9 +252,8 @@ The **🔎 Chrome Web Store Status** job then waits for approval: open the run i
 | 🔑 Authenticate to Google Cloud | the credential is rejected by the attribute condition | the job is not in the `chrome-webstore` environment, or the repository ID in the condition is wrong (step 4) |
 | 🔑 Authenticate to Google Cloud | `Permission 'iam.serviceAccounts.getAccessToken' denied` | the binding of step 5 is missing, not applied yet (wait 5 minutes), or names another subject: after a rename or a transfer of the repository, or since `use_immutable_subject` turned `true` (step 5) |
 | 🔑 Authenticate to Google Cloud | an API is not enabled | step 2 |
-| the store call, HTTP 403 | `The caller does not have permission` | the service account is not added in the Developer Dashboard (step 6), or the publisher ID is not this publisher's |
+| the store call, HTTP 403 | `Permission denied on resource 'publishers/<publisher>/items/<item>' (or it might not exist).` | Google gives this same answer to three causes; a wrong publisher or extension ID answers this 403, not a 404. Check them in this order: the service account in **Publisher > Settings > Service account** is not `CWS_SERVICE_ACCOUNT` (step 6); `CWS_EXTENSION_ID` is not the store item's ID, such as the ID of a build loaded unpacked (step 7); `CWS_PUBLISHER_ID` is not this publisher's (step 7). `gh variable list --repo spartDev/My-Prompt-Manager` shows the three values |
 | the store call, HTTP 403 | `SERVICE_DISABLED` | the Chrome Web Store API is off in the project (step 2) |
-| the store call, HTTP 404 | not found | the publisher ID or the extension ID is wrong (step 7) |
 
 The job summary holds Google's message verbatim. If Google refuses the federated token itself for the Chrome Web Store API, stop: the fallback is a JSON key for the service account, decided with the owner, and this guide does not set it up.
 
