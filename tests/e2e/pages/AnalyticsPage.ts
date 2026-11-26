@@ -94,13 +94,18 @@ export class AnalyticsPage extends BasePage {
   }
 
   /**
-   * Confirm clearing history in the confirmation modal
+   * Confirm clearing history in the confirmation modal, and wait until the clear is done: the modal
+   * closes once the history is written empty (AnalyticsTab, handleClearHistory). The write is not
+   * done when the click returns: the clear first waits for the usage history's lock, shared with the
+   * other contexts of the extension (UsageTracker), so a read of storage at once can still see the
+   * history
    */
   async confirmClearHistory(): Promise<void> {
     await this.getClearHistoryButton().click();
     const modal = this.getClearHistoryModal();
     await modal.waitFor({ state: 'visible' });
     await modal.getByRole('button', { name: 'Clear History' }).click();
+    await modal.waitFor({ state: 'hidden' });
   }
 
   /**
