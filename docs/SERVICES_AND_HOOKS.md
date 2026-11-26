@@ -55,7 +55,7 @@ Other keys of `chrome.storage.local` belong to the code that owns them, which wr
 | `src/services/libraryFilter.ts` | The Library filter (All, Pinned, Most Used, one Category, and from Analytics Never used and Possible duplicates): which Categories get a pill, and which Prompts a filter keeps |
 | `src/services/libraryReview.ts` | A review asked from the full-page Analytics view: `requestLibraryReview` opens the side panel of the window within the click and leaves the Library filter under a key of that window (`pendingLibraryReview:<windowId>`) in `chrome.storage.session`; the side panel takes it once (`takePendingLibraryReview`, on opening and through `onLibraryReviewRequested`) |
 | `src/services/usageInsights.ts` | What Analytics shows, as pure functions: Insertions per weekday (Monday first) and the busiest one, the Platforms and the Categories ranked by Insertions (`platformRanking`, `categoryRanking`, the first of each being the top one), the busiest entry of any counted series (`busiest`), Prompts ranked by Insertions in the period, the Never used count, and the Duplicate pairs counted from `PromptManager.findDuplicatePrompts` groups |
-| `src/services/UsageTracker.ts` | Usage events for Analytics: one per insertion into a Platform (the service worker records it). Analytics reads the last 30 days; storage drops older events only once the history reaches 9,000 events, and keeps at most 10,000 (`cleanup()` has no production caller) |
+| `src/services/UsageTracker.ts` | Usage events for Analytics: one per insertion into a Platform (the service worker records it). Analytics reads the last 30 days (`USAGE_RETENTION_DAYS`), and storage keeps no older event: each insertion removes them (`record`), and so does `cleanup()`, which the service worker calls on extension update and at every browser startup. At most 10,000 events within the 30 days. An entry with no numeric time counts as outside them: the reads skip it, `record` and `cleanup()` remove it |
 | `src/services/promptEncoder.ts` | Share codes: one Prompt as compact text, decoded without changing the text (Admission happens when the Prompt is saved) |
 | `src/services/configurationEncoder.ts` | Import and export codes of a custom site configuration: compression, checksum, validation of the decoded configuration |
 
@@ -70,7 +70,7 @@ Helpers the services lean on: `src/utils/asyncMutex.ts` (locks), `src/utils/stor
 - Clear All Data takes all seven, so a write from another context lands wholly before or after it.
 - Reads take no lock, except reading the Categories, which takes CATEGORIES only to write a missing default Category.
 - Settings writes take only the SETTINGS key, so a toggle never waits on a Prompt write.
-- `UsageTracker` keeps a plain in-memory `AsyncMutex`.
+- `UsageTracker` has a lock of its own (scope `UsageTracker`), shared across contexts the same way, so `record`, `cleanup()` and `clearHistory` exclude each other wherever they run: the service worker's removal of the older events cannot write back a history that Clear history emptied meanwhile. Clear All Data does not take it, so a usage write in flight in another context can still land after the clear.
 
 ### StorageManager: quota
 

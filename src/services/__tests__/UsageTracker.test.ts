@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FakeLockManager, installNavigatorLocks } from '../../test/utils/FakeLockManager';
 import { type PlatformType, USAGE_RETENTION_DAYS, USAGE_STORAGE_KEY, type UsageEvent } from '../../types';
 import * as Logger from '../../utils/logger';
 import { UsageTracker } from '../UsageTracker';
@@ -106,6 +107,18 @@ describe('UsageTracker', () => {
       expect(history).toHaveLength(platforms.length);
       expect(history.map(e => e.platform).sort()).toEqual(platforms.sort());
     });
+
+    it('removes from storage the insertions older than the retention period, however few the history holds, and keeps the others', async () => {
+      const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const inside = buildUsageEvent({ promptId: 'inside', timestamp: FIXED_TIMESTAMP - retentionMs });
+      const older = buildUsageEvent({ promptId: 'older', timestamp: FIXED_TIMESTAMP - retentionMs - 1 });
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: [older, inside] });
+
+      await usageTracker.record('new-prompt', 'claude', null);
+
+      const stored = (await chrome.storage.local.get(USAGE_STORAGE_KEY))[USAGE_STORAGE_KEY] as UsageEvent[];
+      expect(stored.map(e => e.promptId)).toEqual(['inside', 'new-prompt']);
+    });
   });
 
   describe('getHistory', () => {
@@ -207,6 +220,72 @@ describe('UsageTracker', () => {
 
       const history = await usageTracker.getHistory();
       expect(history).toEqual([]);
+    });
+
+    it('resolves to the number of entries it removed', async () => {
+      const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      await chrome.storage.local.set({
+        [USAGE_STORAGE_KEY]: [
+          buildUsageEvent({ promptId: 'fresh', timestamp: FIXED_TIMESTAMP }),
+          buildUsageEvent({ promptId: 'expired-1', timestamp: FIXED_TIMESTAMP - retentionMs - 1 }),
+          buildUsageEvent({ promptId: 'expired-2', timestamp: FIXED_TIMESTAMP - retentionMs - 2 })
+        ]
+      });
+
+      await expect(usageTracker.cleanup()).resolves.toBe(2);
+      await expect(usageTracker.cleanup()).resolves.toBe(0);
+    });
+  });
+
+  /**
+   * Stored data comes from every earlier Release, and storage can hold what no Release wrote.
+   * An entry that is not an insertion with a numeric time is outside the retention period: the
+   * readers skip it and the writers remove it, and none of them throws it at the user.
+   */
+  describe('malformed stored entries', () => {
+    const fresh = buildUsageEvent({ promptId: 'fresh', timestamp: FIXED_TIMESTAMP - 1000 });
+    const malformed: unknown[] = [
+      null,
+      'not an insertion',
+      42,
+      { promptId: 'no-time', platform: 'claude', categoryId: null },
+      { promptId: 'text-time', timestamp: String(FIXED_TIMESTAMP), platform: 'claude', categoryId: null },
+      { promptId: 'nan-time', timestamp: Number.NaN, platform: 'claude', categoryId: null }
+    ];
+
+    const stored = async (): Promise<unknown> => (await chrome.storage.local.get(USAGE_STORAGE_KEY))[USAGE_STORAGE_KEY];
+
+    beforeEach(async () => {
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: [...malformed, fresh] });
+    });
+
+    it('getHistory skips them', async () => {
+      await expect(usageTracker.getHistory()).resolves.toEqual([fresh]);
+    });
+
+    it('cleanup removes them', async () => {
+      await expect(usageTracker.cleanup()).resolves.toBe(malformed.length);
+      expect(await stored()).toEqual([fresh]);
+    });
+
+    it('record removes them and records the insertion', async () => {
+      await usageTracker.record('new-prompt', 'claude', null);
+
+      expect(await stored()).toEqual([fresh, buildUsageEvent({ promptId: 'new-prompt', timestamp: FIXED_TIMESTAMP })]);
+    });
+
+    it.each([
+      ['an object', { 0: fresh }],
+      ['a string', 'usage'],
+      ['null', null]
+    ])('reads a history stored as %s as empty, and the next insertion replaces it', async (_kind, value) => {
+      await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: value });
+
+      await expect(usageTracker.getHistory()).resolves.toEqual([]);
+      await expect(usageTracker.cleanup()).resolves.toBe(0);
+      await usageTracker.record('new-prompt', 'claude', null);
+
+      expect(await stored()).toEqual([buildUsageEvent({ promptId: 'new-prompt', timestamp: FIXED_TIMESTAMP })]);
     });
   });
 
@@ -445,6 +524,64 @@ describe('UsageTracker', () => {
     });
   });
 
+  /**
+   * The service worker removes the older insertions at startup while a popup, side panel or the
+   * full-page Analytics view can clear the history: each runs UsageTracker in its own JS context over
+   * the one chrome.storage. A context here is a UsageTracker instance of its own, over the shared
+   * storage fake and a shared fake lock manager.
+   */
+  describe('across contexts', () => {
+    let uninstall: () => void;
+
+    /** A UsageTracker of its own context: its own memory, the shared storage and the shared locks */
+    const context = (): UsageTracker => Reflect.construct(UsageTracker, []);
+
+    /** Makes the next read of the usage history slow; resolves when that read has started */
+    const slowRead = (): Promise<void> => {
+      const read = vi.mocked(chrome.storage.local.get).getMockImplementation() as unknown as (
+        keys: unknown
+      ) => Promise<Record<string, unknown>>;
+      return new Promise((started) => {
+        vi.mocked(chrome.storage.local.get).mockImplementationOnce((async (keys: unknown) => {
+          const result = await read(keys);
+          started();
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          return result;
+        }) as never);
+      });
+    };
+
+    beforeEach(() => {
+      vi.useRealTimers();
+      uninstall = installNavigatorLocks(new FakeLockManager());
+    });
+
+    afterEach(() => {
+      uninstall();
+    });
+
+    it('the removal of the older insertions in the service worker cannot bring back a history that Clear history emptied meanwhile', async () => {
+      const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const now = Date.now();
+      await chrome.storage.local.set({
+        [USAGE_STORAGE_KEY]: [
+          buildUsageEvent({ promptId: 'fresh', timestamp: now - 1000 }),
+          buildUsageEvent({ promptId: 'expired', timestamp: now - retentionMs - 1000 })
+        ]
+      });
+      const worker = context();
+      const analytics = context();
+      const readStarted = slowRead();
+
+      const removal = worker.cleanup();
+      await readStarted;
+      await analytics.clearHistory();
+      await removal;
+
+      expect((await chrome.storage.local.get(USAGE_STORAGE_KEY))[USAGE_STORAGE_KEY]).toEqual([]);
+    });
+  });
+
   describe('Retention Period', () => {
     it('should use 30 days as retention period', () => {
       expect(USAGE_RETENTION_DAYS).toBe(30);
@@ -468,12 +605,10 @@ describe('UsageTracker', () => {
   });
 
   describe('Quota Protection', () => {
-    const CLEANUP_THRESHOLD = 9000;
     const MAX_EVENTS = 10000;
 
-    it('should trigger proactive cleanup when reaching threshold', async () => {
-      // Pre-populate storage with exactly CLEANUP_THRESHOLD events (all within retention)
-      const events: UsageEvent[] = Array.from({ length: CLEANUP_THRESHOLD }, (_, i) =>
+    it('keeps every insertion of the retention period below the hard limit, 9,000 of them and more', async () => {
+      const events: UsageEvent[] = Array.from({ length: 9000 }, (_, i) =>
         buildUsageEvent({
           promptId: `prompt-${i}`,
           timestamp: FIXED_TIMESTAMP - i * 1000 // All within retention period
@@ -481,24 +616,11 @@ describe('UsageTracker', () => {
       );
       await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
 
-      // Record one more event to trigger proactive cleanup
       await usageTracker.record('new-prompt', 'claude', null);
 
-      // Verify proactive cleanup was logged
-      expect(Logger.info).toHaveBeenCalledWith(
-        'UsageTracker: Proactive cleanup triggered',
-        expect.objectContaining({
-          component: 'UsageTracker',
-          originalCount: CLEANUP_THRESHOLD,
-          threshold: CLEANUP_THRESHOLD
-        })
-      );
-
-      // Verify history contains events (trimOldEvents keeps all within retention)
       const history = await usageTracker.getHistory();
-      // All events were within retention, so trimOldEvents doesn't remove any
-      // Plus the new event we just added
-      expect(history.length).toBe(CLEANUP_THRESHOLD + 1);
+      expect(history.length).toBe(9001);
+      expect(Logger.warn).not.toHaveBeenCalled();
     });
 
     it('should enforce hard limit by removing oldest events', async () => {
@@ -537,11 +659,10 @@ describe('UsageTracker', () => {
       expect(promptIds).toContain('new-prompt');
     });
 
-    it('should filter expired events during proactive cleanup via trimOldEvents', async () => {
+    it('removes the expired events before the hard limit counts, so none of the fresh ones goes', async () => {
       const retentionMs = USAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-      // Create events where half are expired (outside 30 day retention)
-      // Total count exceeds CLEANUP_THRESHOLD to trigger proactive cleanup
+      // MAX_EVENTS stored, half of them outside the 30 day retention period
       const freshEvents: UsageEvent[] = Array.from({ length: 5000 }, (_, i) =>
         buildUsageEvent({
           promptId: `fresh-${i}`,
@@ -561,18 +682,12 @@ describe('UsageTracker', () => {
       const events = [...freshEvents, ...expiredEvents];
       await chrome.storage.local.set({ [USAGE_STORAGE_KEY]: events });
 
-      // Record one more event to trigger proactive cleanup
       await usageTracker.record('trigger-prompt', 'claude', null);
 
-      // Verify proactive cleanup was triggered
-      expect(Logger.info).toHaveBeenCalledWith(
-        'UsageTracker: Proactive cleanup triggered',
-        expect.objectContaining({
-          component: 'UsageTracker',
-          originalCount: 10000,
-          newCount: 5000 // trimOldEvents removed the 5000 expired events
-        })
-      );
+      // The hard limit was not reached once the expired events were gone
+      expect(Logger.warn).not.toHaveBeenCalled();
+      const stored = (await chrome.storage.local.get(USAGE_STORAGE_KEY))[USAGE_STORAGE_KEY] as UsageEvent[];
+      expect(stored).toHaveLength(5001);
 
       // Verify only fresh events remain (plus the new trigger event)
       const history = await usageTracker.getHistory();

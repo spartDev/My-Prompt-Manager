@@ -42,7 +42,7 @@ Analytics counts only the entries of the last 30 days. It is computed on your de
 
 ### How long the usage history is kept
 
-The usage history is not emptied on a schedule: entries older than 30 days stay in storage. Only an insertion made while the history holds 9,000 entries or more first removes the entries older than 30 days; older entries then pile up again until the history holds 9,000 once more. The history never holds more than 10,000 entries: when it would, the oldest go first. Deleting a Prompt does not remove its entries. **Clear history** in Analytics removes the whole history at once, older entries included, but Analytics offers it only while the last 30 days have entries; **Clear All Data** in Settings, which deletes your Library too, always removes it.
+The usage history keeps the entries of the last 30 days, which Analytics counts, and removes the older ones each time you insert a Prompt, each time Chrome starts, and when the extension is updated; between those moments an entry can stay past 30 days, until the next of them. Release 2.0.0 itself does not remove them on a schedule: in 2.0.0, entries older than 30 days stay in storage until an insertion made while the history holds 9,000 entries or more removes them. The history never holds more than 10,000 entries: when it would, the oldest go first. Deleting a Prompt does not remove its entries; they go after 30 days, as the others do. **Clear history** in Analytics removes the whole history at once, but Analytics offers it only while the last 30 days have entries; **Clear All Data** in Settings, which deletes your Library too, always removes it.
 
 ## Element picker
 
@@ -180,7 +180,7 @@ The extension's source code is public: https://github.com/spartDev/My-Prompt-Man
 | The Library and preferences in `chrome.storage.local` | `src/services/storage.ts` |
 | The Site settings and Custom sites | `src/services/siteSettings.ts` |
 | The Prompts button's placement on the Platforms | `src/services/iconPlacementRepairs.ts` |
-| The usage history, and how long it is kept | `src/services/UsageTracker.ts` |
+| The usage history, and how long it is kept | `src/services/UsageTracker.ts`, and `src/background/background.ts` for the removal at each start of Chrome and on update |
 | The Element picker and its description of an element | `src/content/modules/element-picker.ts`, `src/content/utils/element-fingerprint.ts` |
 | Share codes and configuration codes | `src/services/promptEncoder.ts`, `src/services/configurationEncoder.ts` |
 | Backup files | `src/components/settings/DataStorageSection.tsx` |

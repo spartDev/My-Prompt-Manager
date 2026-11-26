@@ -23,23 +23,36 @@ class UsageTrackerError extends Error implements AppError {
 }
 
 /**
+ * Whether a stored entry is an insertion of the retention period, which starts at `cutoff`. An
+ * entry with no numeric time, or no entry at all, is outside it: readers skip it, writers remove it.
+ */
+function isRetained(entry: unknown, cutoff: number): entry is UsageEvent {
+  if (typeof entry !== 'object' || entry === null) {
+    return false;
+  }
+  const { timestamp } = entry as { timestamp?: unknown };
+  return typeof timestamp === 'number' && timestamp >= cutoff;
+}
+
+/**
  * UsageTracker - Singleton service for tracking prompt usage analytics
  *
  * Records usage events when prompts are inserted into AI platforms.
- * Maintains a 30-day rolling window of usage history.
+ * Keeps the insertions of the retention period (USAGE_RETENTION_DAYS) and no older ones: each
+ * insertion removes the older ones (record), and the service worker removes them at every browser
+ * startup and on an extension update (cleanup).
  * All data stays local in Chrome storage.
  */
 export class UsageTracker {
   private static instance: UsageTracker | undefined;
 
-  // Mutex for preventing concurrent storage operations
-  private readonly mutex = new AsyncMutex();
+  // Shared by every context (popup, side panel, service worker) through the Web Locks API, so a
+  // removal of the older insertions in the service worker cannot write back a history cleared meanwhile
+  private readonly mutex = new AsyncMutex({ scope: 'UsageTracker' });
 
-  // Storage quota protection limits
+  // Storage quota protection limit, within the retention period
   // At ~100 bytes per event, 10,000 events = ~1MB (leaving plenty of buffer)
   private static readonly MAX_EVENTS = 10000;
-  // Cleanup threshold: when we hit this, trim to keep newest events within retention period
-  private static readonly CLEANUP_THRESHOLD = 9000;
 
   private constructor() {}
 
@@ -56,7 +69,7 @@ export class UsageTracker {
    * @param platform - The platform where the prompt was inserted
    * @param categoryId - The category ID of the prompt (null if uncategorized)
    */
-  async record(promptId: string, platform: PlatformType, categoryId: string | null): Promise<void> {
+  record(promptId: string, platform: PlatformType, categoryId: string | null): Promise<void> {
     return this.mutex.withLock(async () => {
       try {
         const event: UsageEvent = {
@@ -66,21 +79,10 @@ export class UsageTracker {
           categoryId
         };
 
-        let history = await this.getRawHistory();
+        // Each insertion removes the entries older than the retention period, and the malformed ones
+        let history = this.retained(await this.getRawHistory());
 
-        // Quota protection: trim old events if approaching limit
-        if (history.length >= UsageTracker.CLEANUP_THRESHOLD) {
-          const originalLength = history.length;
-          history = this.trimOldEvents(history);
-          Logger.info('UsageTracker: Proactive cleanup triggered', {
-            component: 'UsageTracker',
-            originalCount: originalLength,
-            newCount: history.length,
-            threshold: UsageTracker.CLEANUP_THRESHOLD
-          });
-        }
-
-        // Hard limit: if still at max, remove oldest events to make room
+        // Hard limit: if at max within the retention period, remove the oldest events to make room
         if (history.length >= UsageTracker.MAX_EVENTS) {
           const eventsToRemove = history.length - UsageTracker.MAX_EVENTS + 1;
           // Sort by timestamp ascending (oldest first) and remove oldest
@@ -102,13 +104,10 @@ export class UsageTracker {
     });
   }
 
-  /**
-   * Trim old events that are outside the retention period
-   * Used for proactive cleanup to prevent storage quota issues
-   */
-  private trimOldEvents(history: UsageEvent[]): UsageEvent[] {
+  /** The entries of the retention period, in their stored order */
+  private retained(history: readonly unknown[]): UsageEvent[] {
     const cutoffTime = this.getRetentionCutoff();
-    return history.filter(event => event.timestamp >= cutoffTime);
+    return history.filter((entry): entry is UsageEvent => isRetained(entry, cutoffTime));
   }
 
   /**
@@ -119,31 +118,27 @@ export class UsageTracker {
     try {
       const history = await this.getRawHistory();
 
-      // Filter to only include events within retention period
-      const cutoffTime = this.getRetentionCutoff();
-      return history
-        .filter(event => event.timestamp >= cutoffTime)
-        .sort((a, b) => b.timestamp - a.timestamp);
+      return this.retained(history).sort((a, b) => b.timestamp - a.timestamp);
     } catch (error) {
       throw this.handleError(error);
     }
   }
 
   /**
-   * Get raw history from storage without filtering
-   * Used internally for operations that need all events
+   * Get raw history from storage without filtering: every stored entry, as stored. A value that is
+   * not a list, which no Release writes, reads as an empty history.
    */
-  private async getRawHistory(): Promise<UsageEvent[]> {
+  private async getRawHistory(): Promise<unknown[]> {
     await ensureStorageAvailable();
     const result = await chrome.storage.local.get([USAGE_STORAGE_KEY]);
-    const history = result[USAGE_STORAGE_KEY] as UsageEvent[] | undefined;
-    return history ?? [];
+    const history: unknown = result[USAGE_STORAGE_KEY];
+    return Array.isArray(history) ? history : [];
   }
 
   /**
    * Clear all usage history
    */
-  async clearHistory(): Promise<void> {
+  clearHistory(): Promise<void> {
     return this.mutex.withLock(async () => {
       try {
         await this.setHistory([]);
@@ -154,21 +149,21 @@ export class UsageTracker {
   }
 
   /**
-   * Remove events older than the retention period (30 days)
-   * Should be called on extension initialization
+   * Remove the entries older than the retention period (30 days), and the malformed ones. The
+   * service worker calls it at every browser startup and on an extension update.
+   * @returns How many entries it removed; it writes only when that is more than none
    */
-  async cleanup(): Promise<void> {
+  cleanup(): Promise<number> {
     return this.mutex.withLock(async () => {
       try {
         const history = await this.getRawHistory();
+        const kept = this.retained(history);
+        const removed = history.length - kept.length;
 
-        const cutoffTime = this.getRetentionCutoff();
-        const filteredHistory = history.filter(event => event.timestamp >= cutoffTime);
-
-        // Only write if we actually removed events
-        if (filteredHistory.length !== history.length) {
-          await this.setHistory(filteredHistory);
+        if (removed > 0) {
+          await this.setHistory(kept);
         }
+        return removed;
       } catch (error) {
         throw this.handleError(error);
       }

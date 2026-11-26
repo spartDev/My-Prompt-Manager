@@ -1312,6 +1312,30 @@ async function upgradeStoredData(): Promise<void> {
 }
 
 /**
+ * Remove from the usage history the insertions older than the retention period (USAGE_RETENTION_DAYS,
+ * the 30 days Analytics shows), on extension update and at every browser startup: each insertion
+ * removes them too (UsageTracker.record), but without an insertion they would stay. A failure is
+ * logged here and never reaches the caller.
+ */
+async function removeExpiredUsage(): Promise<void> {
+  try {
+    const removed = await UsageTracker.getInstance().cleanup();
+    if (removed > 0) {
+      Logger.info("Removed the usage history entries older than the retention period", {
+        component: "Background",
+        removed,
+      });
+    }
+  } catch (error) {
+    Logger.error(
+      "Error removing the usage history entries older than the retention period",
+      toError(error),
+      { component: "Background", phase: "usage_retention" },
+    );
+  }
+}
+
+/**
  * Write the Site settings an earlier release stored as the list of the Platforms that were on, or
  * whose list it changed after a rollback, back as the Platform choices, on extension update and again at every browser startup, like the pass
  * above. Until it runs, every reader already reads the list as those choices: it only spares later
@@ -1928,10 +1952,12 @@ async function markWelcomeDoneForExistingUser(
 
 // Initialize interface mode on extension startup and handle updates
 chrome.runtime.onInstalled.addListener((details) => {
-  // Clean stored data of Hidden characters after an update, alongside (not before) the rest
+  // Clean stored data of Hidden characters, and remove the usage history entries older than the
+  // retention period, after an update, alongside (not before) the rest
   if (details.reason === "update") {
     void upgradeStoredData();
     void upgradeSiteSettings();
+    void removeExpiredUsage();
   }
 
   // A first install records its Release; an update records where it came from, only when the
@@ -1973,6 +1999,7 @@ chrome.runtime.onStartup.addListener(() => {
   void upgradeStoredData();
   void upgradeSiteSettings();
   void expectPlacementReportsOnStartup();
+  void removeExpiredUsage();
 
   void (async () => {
     try {
