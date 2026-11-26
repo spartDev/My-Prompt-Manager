@@ -653,7 +653,7 @@ describe('editorSelectorsOf', () => {
   });
 
   // The extension gives the Prompts button only to a textarea or an editable element on a built-in
-  // Platform (PlatformManager.getAllSelectors()): live:check must not find an editor it rejects
+  // Platform (PlatformManager.getAllSelectors()): live:check must not find an element that rule rejects
   const platformNaming = (selectors: string[]) => ({ ...SUPPORTED_PLATFORMS.chatgpt, selectors });
   const found = (selectors: string[]) => selectors.flatMap((selector) => [...document.querySelectorAll(selector)]).map((element) => element.id);
 

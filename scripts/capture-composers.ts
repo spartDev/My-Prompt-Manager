@@ -309,10 +309,11 @@ const REFIND_TIMEOUT = 5_000;
 const FALLBACK_DEPTH = 5;
 
 /**
- * Where a Platform's editor is looked for: the config's selectors first, narrowed as the extension
- * narrows them (only a textarea or an editable element they name), so live:check never finds an
- * editor the extension rejects; the strategies find some editors by other means (ChatGPT's and
- * Perplexity's are contenteditable, their selectors name textareas), so then any editable element
+ * Where a Platform's editor is looked for: the config's selectors first, narrowed by
+ * platformFieldSelector(), the extension's rule for a built-in Platform's input field, to the
+ * textareas and editable elements they name, so live:check never finds an element that rule
+ * rejects; the strategies find some editors by other means (ChatGPT's and Perplexity's are
+ * contenteditable, their selectors name textareas), so then any editable element
  */
 export const editorSelectorsOf = (platform: PlatformDefinition): string[] => [...platform.selectors.map(platformFieldSelector), ...GENERIC_EDITORS];
 

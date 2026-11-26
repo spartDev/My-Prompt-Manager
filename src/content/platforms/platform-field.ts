@@ -1,10 +1,10 @@
 /**
- * The rule every built-in Platform's composer follows: it is a textarea or an editable element.
- * Shared by PlatformManager.getAllSelectors() and scripts/capture-composers.ts, so the extension
- * and live:check look for the same editor
+ * The rule every built-in Platform's input field follows: it is a textarea or an editable element.
+ * Shared by PlatformManager.getAllSelectors() and scripts/capture-composers.ts, so live:check never
+ * finds an element this rule rejects
  */
 
-/** The elements that can be a built-in Platform's composer: a textarea, or an editable element */
+/** The elements that can be a built-in Platform's input field: a textarea, or an editable element */
 const PLATFORM_FIELD = 'textarea, [contenteditable]:not([contenteditable="false"])';
 
 /** Narrows a selector of a built-in Platform to the textareas and editable elements it names */
