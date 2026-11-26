@@ -11,6 +11,8 @@
  * - AC2: Categories stored malformed (an entry that is not a Category, or a value that is not a list)
  *   show the Library with the Categories that are well formed, never Error Loading Data, never a
  *   TypeError at render.
+ * - My-Prompt-Manager-95bk: over such entries, the Category sheet creates and renames a Category, never
+ *   a raw TypeError shown as a name refusal, and the entries stay in storage as they are.
  */
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -413,6 +415,68 @@ describe('App: Error Loading Data and malformed stored Categories (My-Prompt-Man
       // The well-formed Categories, and no row for an entry that is not one
       const rows = screen.queryAllByRole('button', { name: /^Edit category / }).map((button) => button.getAttribute('aria-label'));
       expect(rows).toEqual(wellFormed ? ['Edit category Work'] : []);
+    });
+  });
+
+  // My-Prompt-Manager-95bk: the Category writers skip the entries getCategories skips, so the sheet
+  // creates and renames over them instead of showing the raw TypeError as a name refusal
+  describe('the Category sheet over Categories stored malformed (My-Prompt-Manager-95bk)', () => {
+    // What a raw TypeError reads like, as the sheet showed it before ("Cannot read properties of null
+    // (reading 'name')", "c.name.toLowerCase is not a function")
+    const RAW_TYPE_ERROR = /Cannot read properties|is not a function|TypeError/;
+    const MALFORMED = [
+      { stored: '[Uncategorized, null, Work]', malformed: null },
+      { stored: '[Uncategorized, an entry whose name is a number, Work]', malformed: { id: 'numbered', name: 42 } },
+      { stored: '[Uncategorized, an entry without a name, Work]', malformed: { id: 'nameless' } }
+    ];
+
+    const storedCategories = async (): Promise<unknown> => (await chrome.storage.local.get('categories')).categories;
+    const categoryRows = (): Array<string | null> =>
+      screen.queryAllByRole('button', { name: /^Edit category / }).map((button) => button.getAttribute('aria-label'));
+
+    const openCategories = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+      render(<App />);
+      expect(await screen.findAllByTestId('prompt-card')).toHaveLength(LIBRARY.length);
+      await user.click(screen.getByRole('tab', { name: 'Categories' }));
+      expect(await screen.findByRole('button', { name: 'Edit category Work' })).toBeInTheDocument();
+    };
+
+    it.each(MALFORMED)('$stored: a Category created from the sheet is created and confirmed, never a raw TypeError; the entry stays as it is', async ({ malformed }) => {
+      await seed({ categories: [uncategorized, malformed, work] });
+      const user = userEvent.setup();
+      await openCategories(user);
+
+      await user.click(screen.getByRole('button', { name: 'Add category' }));
+      const sheet = screen.getByRole('dialog', { name: 'New category' });
+      await user.keyboard('Research{Enter}');
+
+      const notification = await screen.findByTestId('toast');
+      expect(notification).toHaveTextContent('Category created');
+      expect(notification).toHaveTextContent('Research');
+      await waitFor(() => { expect(sheet).not.toBeInTheDocument(); });
+      expect(screen.queryByText(RAW_TYPE_ERROR)).not.toBeInTheDocument();
+      expect(categoryRows()).toEqual(['Edit category Work', 'Edit category Research']);
+      expect(await storedCategories()).toEqual([uncategorized, malformed, work, { id: expect.any(String), name: 'Research', color: expect.any(String) }]);
+    });
+
+    it.each(MALFORMED)('$stored: a Category renamed from the sheet is renamed in its place and confirmed, never a raw TypeError; the entry stays as it is', async ({ malformed }) => {
+      await seed({ categories: [uncategorized, malformed, work] });
+      const user = userEvent.setup();
+      await openCategories(user);
+
+      await user.click(screen.getByRole('button', { name: 'Edit category Work' }));
+      const sheet = screen.getByRole('dialog', { name: 'Edit category' });
+      const name = within(sheet).getByRole('textbox', { name: 'Category name' });
+      await user.clear(name);
+      await user.type(name, 'Office{Enter}');
+
+      const notification = await screen.findByTestId('toast');
+      expect(notification).toHaveTextContent('Category saved');
+      expect(notification).toHaveTextContent('Office');
+      await waitFor(() => { expect(sheet).not.toBeInTheDocument(); });
+      expect(screen.queryByText(RAW_TYPE_ERROR)).not.toBeInTheDocument();
+      expect(categoryRows()).toEqual(['Edit category Office']);
+      expect(await storedCategories()).toEqual([uncategorized, malformed, { ...work, name: 'Office' }]);
     });
   });
 });

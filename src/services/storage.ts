@@ -93,19 +93,56 @@ interface PackPlan {
 /** Two Prompts have the same content when they differ only by surrounding spaces, as a Duplicate pair compares them. */
 const contentKey = (prompt: { readonly content: string }): string => prompt.content.trim();
 
-const isNamed = (entry: unknown): entry is { name: string } =>
+/**
+ * A stored entry is a Category when it is an object with a string name, as every reader of the raw
+ * value takes one; any other entry (null, a string, an object without a string name) is not. The one
+ * test of readCategories and of the Category writers, so a write finds and compares exactly the
+ * Categories a read shows. A stored Category is taken as it is, as getCategories always read it.
+ */
+const isCategory = (entry: unknown): entry is Category =>
   typeof entry === 'object' && entry !== null && 'name' in entry && typeof entry.name === 'string';
 
 /**
- * Reads the value stored under the categories key: its entries that are a Category (an object with
- * a string name, as every reader of the raw value takes one), as they are and in their stored order.
- * An entry that is not one (null, a string, an object without a string name) is skipped, as
- * readPrompts skips what is not a Prompt, and a value that is not a list reads as no Categories.
- * Pure: reading never writes, and the entries skipped stay in storage.
+ * Reads the value stored under the categories key: its entries that are a Category (isCategory), as
+ * they are and in their stored order. An entry that is not one is skipped, as readPrompts skips what
+ * is not a Prompt, and a value that is not a list reads as no Categories. Pure: reading never writes,
+ * and the entries skipped stay in storage.
  */
 const readCategories = (stored: unknown): Category[] =>
-  // A stored Category is read as it is, as getCategories always read it
-  Array.isArray(stored) ? (stored.filter(isNamed) as Category[]) : [];
+  Array.isArray(stored) ? stored.filter(isCategory) : [];
+
+/** A stored Category and its place among the stored entries, those that are not a Category counted. */
+interface PlacedCategory {
+  readonly index: number;
+  readonly category: Category;
+}
+
+const placedAt = (entries: readonly unknown[], index: number): PlacedCategory | undefined => {
+  const category = entries[index];
+  return isCategory(category) ? { index, category } : undefined;
+};
+
+/**
+ * The stored Category with this id. An entry that is not a Category is never it, even one that
+ * carries the id: a rename, a recolor or a deletion changes the Category the user sees.
+ */
+const categoryWithId = (entries: readonly unknown[], id: string): PlacedCategory | undefined =>
+  placedAt(entries, entries.findIndex(entry => isCategory(entry) && entry.id === id));
+
+/**
+ * The stored Category with this name ignoring case (Category names are unique ignoring case), the
+ * one at `except` aside. Only Categories are compared: an entry that is not one has no name to take.
+ */
+const categoryNamed = (entries: readonly unknown[], name: string, except?: number): PlacedCategory | undefined => {
+  const key = name.toLowerCase();
+  return placedAt(entries, entries.findIndex((entry, index) =>
+    index !== except && isCategory(entry) && entry.name.toLowerCase() === key
+  ));
+};
+
+/** The stored entries with the Category at `index` replaced, every other entry as it is and in its place. */
+const replacedAt = (entries: readonly unknown[], index: number, category: Category): unknown[] =>
+  entries.map((entry, at) => (at === index ? category : entry));
 
 export class StorageManager {
   private static instance: StorageManager | undefined;
@@ -294,14 +331,14 @@ export class StorageManager {
           id: uuidv4()
         };
 
-        const existingCategories = await this.readCategoriesWithDefault();
+        const storedCategories = await this.readCategoriesWithDefault();
 
         // Check for duplicate names (on the admitted name, so invisible differences cannot hide one)
-        if (existingCategories.some(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
+        if (categoryNamed(storedCategories, newCategory.name)) {
           throw new Error(`Category with name "${newCategory.name}" already exists`);
         }
 
-        const updatedCategories = [...existingCategories, newCategory];
+        const updatedCategories = [...storedCategories, newCategory];
         await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
 
         return newCategory;
@@ -409,26 +446,24 @@ export class StorageManager {
           ...(typeof color === 'string' && (color === '' || isValidHexColor(color)) && { color })
         };
 
-        const existingCategories = await this.readCategoriesWithDefault();
-        const existingIndex = existingCategories.findIndex(c => c.id === category.id);
+        const storedCategories = await this.readCategoriesWithDefault();
+        const byId = categoryWithId(storedCategories, category.id);
 
-        if (existingIndex >= 0) {
+        if (byId) {
           // The Backup names a stored Category by id. It never renames the default Category, and
           // never renames a Category into another's name (ignoring case): then the stored name stays
           // and only the other fields (colour) come from the Backup. A rename it does apply moves the
           // Prompts with it, in one atomic write, under the same locks as updateCategory.
-          const existing = existingCategories[existingIndex];
-          const taken = existingCategories.some(
-            (c, index) => index !== existingIndex && c.name.toLowerCase() === category.name.toLowerCase()
-          );
+          const { index: existingIndex, category: existing } = byId;
+          const taken = categoryNamed(storedCategories, category.name, existingIndex) !== undefined;
           const updatedCategory: Category = {
             ...category,
             name: existing.name === DEFAULT_CATEGORY || taken ? existing.name : category.name
           };
-          existingCategories[existingIndex] = updatedCategory;
+          const updatedCategories = replacedAt(storedCategories, existingIndex, updatedCategory);
 
           if (updatedCategory.name === existing.name) {
-            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
             return updatedCategory;
           }
 
@@ -438,27 +473,24 @@ export class StorageManager {
             const movedPrompts = prompts.map(prompt =>
               prompt.category === existing.name ? repointPrompt(prompt, updatedCategory.name) : prompt
             );
-            await this.writeCategoriesAndPrompts(existingCategories, movedPrompts);
+            await this.writeCategoriesAndPrompts(updatedCategories, movedPrompts);
             return updatedCategory;
           });
         } else {
           // Check for duplicate names (on the admitted name) before adding new category
-          const duplicateNameIndex = existingCategories.findIndex(
-            c => c.name.toLowerCase() === category.name.toLowerCase()
-          );
+          const byName = categoryNamed(storedCategories, category.name);
 
-          if (duplicateNameIndex >= 0) {
+          if (byName) {
             // First wins: the stored Category keeps its id and its name (names are unique ignoring
             // case, and the Library's Prompts name the stored spelling), and takes the other fields
             // (colour) from the Backup. importPrompt snaps the Backup's Prompts to the stored spelling.
-            const existing = existingCategories[duplicateNameIndex];
+            const { index, category: existing } = byName;
             const updatedCategory: Category = { ...category, id: existing.id, name: existing.name };
-            existingCategories[duplicateNameIndex] = updatedCategory;
-            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+            await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, replacedAt(storedCategories, index, updatedCategory));
             return updatedCategory;
           } else {
             // Add new category
-            const updatedCategories = [...existingCategories, category];
+            const updatedCategories = [...storedCategories, category];
             await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
             return category;
           }
@@ -491,19 +523,21 @@ export class StorageManager {
   }
 
   /**
-   * The stored Categories, writing the default Category first when it is absent. Caller holds
-   * CATEGORIES. The write is the stored list itself, every entry as it is and in its order, with the
-   * default Category before it: an entry that is not a Category is kept, as the upgrade pass, addPacks
-   * and importPrompt keep one; a stored value that is not a list holds none, and is written over.
+   * The stored entries under the categories key, writing the default Category first when it is
+   * absent. Caller holds CATEGORIES. They are returned and written as they are, in their order, with
+   * the default Category before them: an entry that is not a Category is kept, as the upgrade pass,
+   * addPacks and importPrompt keep one; a stored value that is not a list holds none, and is written
+   * over. The writers find and compare among them only the Categories (categoryWithId,
+   * categoryNamed) and write the other entries back as they are, in their place.
    */
-  private async readCategoriesWithDefault(): Promise<Category[]> {
+  private async readCategoriesWithDefault(): Promise<unknown[]> {
     const stored = await this.getStorageData<unknown>(this.STORAGE_KEYS.CATEGORIES);
-    // As they are: the writers that read through here take the stored entries as Categories
-    const categories = (Array.isArray(stored) ? stored : []) as Category[];
-    if (categories.some(entry => isNamed(entry) && entry.name === DEFAULT_CATEGORY)) {
-      return categories;
+    const entries: unknown[] = Array.isArray(stored) ? stored : [];
+    if (entries.some(entry => isCategory(entry) && entry.name === DEFAULT_CATEGORY)) {
+      return entries;
     }
-    const withDefault: Category[] = [{ id: uuidv4(), name: DEFAULT_CATEGORY }, ...categories];
+    const defaultCategory: Category = { id: uuidv4(), name: DEFAULT_CATEGORY };
+    const withDefault = [defaultCategory, ...entries];
     await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, withDefault);
     return withDefault;
   }
@@ -512,27 +546,21 @@ export class StorageManager {
     // Lock CATEGORIES first (always modified), then PROMPTS if name changes
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
-        const existingCategories = await this.readCategoriesWithDefault();
-        const categoryIndex = existingCategories.findIndex(c => c.id === id);
+        const storedCategories = await this.readCategoriesWithDefault();
+        const byId = categoryWithId(storedCategories, id);
 
-        if (categoryIndex === -1) {
+        if (!byId) {
           throw new Error(`Category with id ${id} not found`);
         }
 
-        const oldCategory = existingCategories[categoryIndex];
+        const { index: categoryIndex, category: oldCategory } = byId;
 
         // Admission: a new name is admitted like every other Category name
         const name = updates.name === undefined ? undefined : this.admitCategoryName(updates.name);
 
         // Check for duplicate names (excluding current category), on the admitted name
-        if (name !== undefined) {
-          const duplicateCategory = existingCategories.find(
-            (c, index) => index !== categoryIndex && c.name.toLowerCase() === name.toLowerCase()
-          );
-
-          if (duplicateCategory) {
-            throw new Error(`Category with name "${name}" already exists`);
-          }
+        if (name !== undefined && categoryNamed(storedCategories, name, categoryIndex)) {
+          throw new Error(`Category with name "${name}" already exists`);
         }
 
         const updatedCategory: Category = {
@@ -541,7 +569,7 @@ export class StorageManager {
           ...(name === undefined ? {} : { name })
         };
 
-        existingCategories[categoryIndex] = updatedCategory;
+        const updatedCategories = replacedAt(storedCategories, categoryIndex, updatedCategory);
 
         // If the category name changed, also lock PROMPTS to update references
         if (name !== undefined && name !== oldCategory.name) {
@@ -550,13 +578,13 @@ export class StorageManager {
             const updatedPrompts = this.moveCategoryPrompts(prompts, oldCategory.name, name);
 
             // Update both categories and prompts atomically with both locks held
-            await this.writeCategoriesAndPrompts(existingCategories, updatedPrompts);
+            await this.writeCategoriesAndPrompts(updatedCategories, updatedPrompts);
 
             return updatedCategory;
           });
         } else {
           // Only update categories if name hasn't changed (no need for PROMPTS lock)
-          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, existingCategories);
+          await this.setStorageData(this.STORAGE_KEYS.CATEGORIES, updatedCategories);
           return updatedCategory;
         }
       } catch (error) {
@@ -573,20 +601,23 @@ export class StorageManager {
     // Lock CATEGORIES first (always modified), then PROMPTS
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, async () => {
       try {
-        const existingCategories = await this.readCategoriesWithDefault();
-        const index = existingCategories.findIndex(c => c.id === id);
-        const categoryToDelete = index >= 0 ? existingCategories[index] : undefined;
+        const storedCategories = await this.readCategoriesWithDefault();
+        const byId = categoryWithId(storedCategories, id);
 
-        if (!categoryToDelete) {
+        if (!byId) {
           throw new Error(`Category with id ${id} not found`);
         }
+
+        // Its place among the stored entries, where restoreCategory puts it back
+        const { index, category: categoryToDelete } = byId;
 
         // Prevent deletion of default category
         if (categoryToDelete.name === DEFAULT_CATEGORY) {
           throw new Error('Cannot delete the default category');
         }
 
-        const filteredCategories = existingCategories.filter(c => c.id !== id);
+        // That Category alone: every other stored entry stays, an entry that carries the same id included
+        const filteredCategories = storedCategories.filter((_, at) => at !== index);
 
         return await this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
           const prompts = await this.getPrompts();
@@ -625,18 +656,18 @@ export class StorageManager {
     // CATEGORIES before PROMPTS (lock order)
     return this.mutex.withLock(this.STORAGE_KEYS.CATEGORIES, () => this.mutex.withLock(this.STORAGE_KEYS.PROMPTS, async () => {
       try {
-        const existingCategories = await this.readCategoriesWithDefault();
+        const storedCategories = await this.readCategoriesWithDefault();
         const name = this.admitCategoryName(deleted.category.name);
 
-        if (existingCategories.some(c => c.id === deleted.category.id)) {
+        if (categoryWithId(storedCategories, deleted.category.id)) {
           throw new Error(`Category "${name}" is already in the Library`);
         }
-        if (existingCategories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+        if (categoryNamed(storedCategories, name)) {
           throw new Error(`Category with name "${name}" already exists`);
         }
 
         const restored: Category = { ...deleted.category, name };
-        const updatedCategories = [...existingCategories];
+        const updatedCategories = [...storedCategories];
         updatedCategories.splice(Math.min(deleted.index, updatedCategories.length), 0, restored);
 
         const moved = new Map(deleted.movedPrompts.map(m => [m.id, m]));
@@ -729,7 +760,7 @@ export class StorageManager {
     prompts: readonly StoredPrompt[]
   ): PackPlan {
     const now = Date.now();
-    const defaultCategory: Category[] = categories.some(entry => isNamed(entry) && entry.name === DEFAULT_CATEGORY)
+    const defaultCategory: Category[] = categories.some(entry => isCategory(entry) && entry.name === DEFAULT_CATEGORY)
       ? []
       : [{ id: uuidv4(), name: DEFAULT_CATEGORY }];
 
@@ -755,7 +786,7 @@ export class StorageManager {
         return { ...plan, skipped };
       }
 
-      const created: Category[] = plan.categories.some(entry => isNamed(entry) && entry.name === category)
+      const created: Category[] = plan.categories.some(entry => isCategory(entry) && entry.name === category)
         ? []
         : [{ id: uuidv4(), name: category, ...(isValidHexColor(pack.color) && { color: pack.color }) }];
 
