@@ -20,3 +20,16 @@ body {
   max-width: none;
   max-height: none;
 }
+
+/*
+  The Notification read whole (Toast.whole: the exit of the Welcome, two lines high, 238px wide) comes
+  down to the height of the Library's close button, at the header's top right: 24px in from the edge
+  (the header's p-6), 36px wide. In the side panel, the one surface with that button, it keeps 8px clear
+  of it: centered while it can be (from about 374px wide), moved left by what it must, never nearer the
+  left edge than its 16px room, which wins at 320px and leaves 6px (My-Prompt-Manager-h1dh).
+  `translate` adds to the transform of its entrance (toast-in, which centers it by translateX(-50%)):
+  in it, 50% is half the pill's width and 50vw half the side panel's.
+*/
+.toast-clear-close {
+  translate: clamp(calc(16px - 50vw + 50%), calc(50vw - 68px - 50%), 0px) 0;
+}

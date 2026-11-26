@@ -188,6 +188,26 @@ describe('ToastContainer', () => {
       expect(sub).toHaveClass('min-w-0', 'text-on-inverse');
     });
 
+    // My-Prompt-Manager-h1dh: two lines high, it reached the side panel's close button. The class moves
+    // it off the button in the side panel only (src/sidepanel.css; the move itself is proven in
+    // tests/e2e/welcome/welcome-exit.spec.ts), and no other pill carries it, so none other moves
+    it('only the Notification read whole and floating keeps clear of the side panel\'s close button', () => {
+      const exit = createToast({ id: 'exit', message: '9 prompts added', sub: 'Open your AI chat and type //', whole: true });
+      const { rerender } = render(<ToastContainer toast={exit} onDismiss={onDismiss} />);
+      const pill = () => screen.getByTestId('toast');
+      expect(pill()).toHaveClass('toast-clear-close', 'fixed', 'left-1/2', '[transform:translateX(-50%)]');
+
+      rerender(<ToastContainer toast={createToast({ id: 'saved', sub: 'Weekly status update' })} onDismiss={onDismiss} />);
+      expect(pill()).not.toHaveClass('toast-clear-close');
+      rerender(<ToastContainer toast={failure} onDismiss={onDismiss} wrap />);
+      expect(pill()).not.toHaveClass('toast-clear-close');
+      rerender(<ToastContainer toast={failure} onDismiss={onDismiss} wrap inFlow />);
+      expect(pill()).not.toHaveClass('toast-clear-close');
+      // In the flow of a screen, it covers nothing to keep clear of
+      rerender(<ToastContainer toast={{ ...exit, id: 'exit-in-flow' }} onDismiss={onDismiss} wrap inFlow />);
+      expect(pill()).not.toHaveClass('toast-clear-close');
+    });
+
     it('the next Notification, not read whole, is one line again with its sub cut', () => {
       const { rerender } = render(<ToastContainer toast={createToast({ id: 'exit', sub: 'Open your AI chat and type //', whole: true })} onDismiss={onDismiss} />);
       rerender(<ToastContainer toast={createToast({ id: 'saved', sub: 'Weekly status update' })} onDismiss={onDismiss} />);
