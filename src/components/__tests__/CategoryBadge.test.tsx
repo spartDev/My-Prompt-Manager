@@ -6,7 +6,7 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getAccessibleTextColor, getSoftBadgeColors, PRESET_COLORS } from '../../constants/colors';
 import type { Category } from '../../types';
@@ -253,7 +253,7 @@ describe('CategoryBadge', () => {
         color: '#3B82F6'
       };
 
-      render(<CategoryBadge category={category} onClick={() => {}} />);
+      render(<CategoryBadge category={category} onClick={vi.fn()} />);
 
       const badge = screen.getByRole('button');
       expect(badge).toBeInTheDocument();
@@ -296,7 +296,8 @@ describe('CategoryBadge', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have aria-label', () => {
+    // ARIA 1.2 prohibits aria-label on a plain span, so screen readers would ignore one: the name is its text
+    it('should be read by its name when not clickable', () => {
       const category: Category = {
         id: '1',
         name: 'Test Category',
@@ -305,8 +306,33 @@ describe('CategoryBadge', () => {
 
       render(<CategoryBadge category={category} />);
 
-      const badge = screen.getByLabelText('Category: Test Category');
-      expect(badge).toBeInTheDocument();
+      const badge = screen.getByText('Test Category');
+      expect(badge).not.toHaveAttribute('aria-label');
+      expect(badge).not.toHaveAttribute('role');
+    });
+
+    it('should name a clickable badge with its Category', () => {
+      const category: Category = {
+        id: '1',
+        name: 'Test Category',
+        color: '#3B82F6'
+      };
+
+      render(<CategoryBadge category={category} onClick={vi.fn()} />);
+
+      expect(screen.getByRole('button', { name: 'Category: Test Category' })).toBeInTheDocument();
+    });
+
+    it('should show the dot variant as an image named by its Category', () => {
+      const category: Category = {
+        id: '1',
+        name: 'Test Category',
+        color: '#3B82F6'
+      };
+
+      render(<CategoryBadge category={category} variant="dot" />);
+
+      expect(screen.getByRole('img', { name: 'Category: Test Category' })).toBeInTheDocument();
     });
 
     it('should have title attribute for dot variant', () => {

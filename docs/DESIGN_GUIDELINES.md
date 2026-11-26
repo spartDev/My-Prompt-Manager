@@ -716,6 +716,23 @@ Cards are opaque `bg-card` with a `border-default` border, floating on `bg-app`.
 </article>
 ```
 
+The footer holds the Category, the Variables and the use count, then Copy and Share. The three wrap onto a second line rather than collide: the Category counts 6rem when the line breaks, then grows into the room left, never past its name, and the use count keeps to the right end of its line, beside Copy. A card keeps one line while its Category can show 6rem beside the rest; at 320px most cards with Variables take two:
+
+```tsx
+<div className="mt-3 flex items-center gap-2">
+  <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
+    <span className="flex min-w-0 max-w-max grow basis-24">
+      <CategoryBadge category={category} variant="soft" size="sm" className="min-w-0" />
+    </span>
+    <span className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold bg-subtle text-secondary">2 variables</span>
+    <span className="ml-auto max-w-full truncate text-xs text-tertiary">Never used</span>
+  </div>
+  {/* Copy and Share, h-10 w-10 */}
+</div>
+```
+
+`truncate` draws its ellipsis only in a block container: on a flex or inline-flex box it clips the text mid-letter with none, so a chip that may be cut is an `inline-block`, or a plain span in a flex row, which the row lays out as a block (an `inline-flex` one stays a flex box there).
+
 #### Form Card
 
 A form (Add and Edit Prompt) is one card on `bg-app`: its sections are split by `border-divider`, its fields take `bg-subtle`. The button bar below it stays on `bg-app`, with a line only while fields remain below (`scroll-edge-bottom`):
@@ -808,6 +825,8 @@ Category colors are user data, not tokens: use the component, which derives the 
 ```tsx
 <CategoryBadge category={category} variant="soft" />
 ```
+
+The soft badge is an `inline-block` with `max-w-full truncate`: a name longer than its room ends in an ellipsis, and its `title` gives it whole.
 
 #### Status Badge
 
