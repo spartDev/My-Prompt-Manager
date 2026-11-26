@@ -6,9 +6,9 @@ import {
   USAGE_STORAGE_KEY,
   type UsageEvent
 } from '../types';
-import { AsyncMutex } from '../utils/asyncMutex';
 import { ensureStorageAvailable } from '../utils/chromeStorage';
 import * as Logger from '../utils/logger';
+import { withUsageHistoryLock } from './usageHistoryLock';
 
 class UsageTrackerError extends Error implements AppError {
   public type: ErrorType;
@@ -46,10 +46,6 @@ function isRetained(entry: unknown, cutoff: number): entry is UsageEvent {
 export class UsageTracker {
   private static instance: UsageTracker | undefined;
 
-  // Shared by every context (popup, side panel, service worker) through the Web Locks API, so a
-  // removal of the older insertions in the service worker cannot write back a history cleared meanwhile
-  private readonly mutex = new AsyncMutex({ scope: 'UsageTracker' });
-
   // Storage quota protection limit, within the retention period
   // At ~100 bytes per event, 10,000 events = ~1MB (leaving plenty of buffer)
   private static readonly MAX_EVENTS = 10000;
@@ -70,7 +66,7 @@ export class UsageTracker {
    * @param categoryId - The category ID of the prompt (null if uncategorized)
    */
   record(promptId: string, platform: PlatformType, categoryId: string | null): Promise<void> {
-    return this.mutex.withLock(async () => {
+    return withUsageHistoryLock(async () => {
       try {
         const event: UsageEvent = {
           promptId,
@@ -139,7 +135,7 @@ export class UsageTracker {
    * Clear all usage history
    */
   clearHistory(): Promise<void> {
-    return this.mutex.withLock(async () => {
+    return withUsageHistoryLock(async () => {
       try {
         await this.setHistory([]);
       } catch (error) {
@@ -154,7 +150,7 @@ export class UsageTracker {
    * @returns How many entries it removed; it writes only when that is more than none
    */
   cleanup(): Promise<number> {
-    return this.mutex.withLock(async () => {
+    return withUsageHistoryLock(async () => {
       try {
         const history = await this.getRawHistory();
         const kept = this.retained(history);

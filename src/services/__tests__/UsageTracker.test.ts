@@ -533,7 +533,7 @@ describe('UsageTracker', () => {
   describe('across contexts', () => {
     let uninstall: () => void;
 
-    /** A UsageTracker of its own context: its own memory, the shared storage and the shared locks */
+    /** A UsageTracker of its own context: the shared storage and the shared locks */
     const context = (): UsageTracker => Reflect.construct(UsageTracker, []);
 
     /** Makes the next read of the usage history slow; resolves when that read has started */
@@ -551,9 +551,12 @@ describe('UsageTracker', () => {
       });
     };
 
+    let locks: FakeLockManager;
+
     beforeEach(() => {
       vi.useRealTimers();
-      uninstall = installNavigatorLocks(new FakeLockManager());
+      locks = new FakeLockManager();
+      uninstall = installNavigatorLocks(locks);
     });
 
     afterEach(() => {
@@ -579,6 +582,22 @@ describe('UsageTracker', () => {
       await removal;
 
       expect((await chrome.storage.local.get(USAGE_STORAGE_KEY))[USAGE_STORAGE_KEY]).toEqual([]);
+    });
+
+    // Two instances in one test share the module's lock in memory: what excludes another context is
+    // the Web Lock it asks for, under the name Clear All Data asks for too
+    it('asks the other contexts for the usage history lock, the one Clear All Data takes, on every write', async () => {
+      const tracker = context();
+
+      await tracker.record('prompt-1', 'claude', null);
+      await tracker.cleanup();
+      await tracker.clearHistory();
+
+      expect(locks.log.filter((entry) => entry.startsWith('acquire'))).toEqual([
+        'acquire UsageTracker:usageHistory',
+        'acquire UsageTracker:usageHistory',
+        'acquire UsageTracker:usageHistory'
+      ]);
     });
   });
 
