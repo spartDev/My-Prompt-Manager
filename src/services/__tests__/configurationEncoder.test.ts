@@ -126,6 +126,7 @@ describe('ConfigurationEncoder', () => {
     vi.unstubAllGlobals();
   });
 
+  // What a pick keeps since My-Prompt-Manager-je37: no page address, no text
   const sampleFingerprint: ElementFingerprint = {
     primary: {
       id: 'prompt-input',
@@ -136,9 +137,7 @@ describe('ConfigurationEncoder', () => {
       role: 'textbox',
       placeholder: 'Type your message'
     },
-    content: {
-      textHash: 'abc123'
-    },
+    content: {},
     context: {
       parentId: 'composer-root',
       siblingIndex: 2,
@@ -152,7 +151,6 @@ describe('ConfigurationEncoder', () => {
     classPatterns: ['composer', 'input'],
     meta: {
       generatedAt: 1700000000000,
-      url: 'https://example.com/chat',
       confidence: 'high'
     }
   };
@@ -316,5 +314,129 @@ describe('ConfigurationEncoder', () => {
 
     const decoded = await ConfigurationEncoder.decode(encodedWithoutWebCrypto);
     expect(decoded).toEqual(expectedConfiguration);
+  });
+
+  // My-Prompt-Manager-je37: a pick stored before the change, and a code made before it
+  describe('a Custom site picked before je37', () => {
+    const DRAFT = 'Draft: merger closes Friday';
+    const EMAIL = ['jane.doe', 'example.org'].join('@');
+    const OPAQUE = ['a8f3c2e1', 'b7d94e06'].join('');
+    const UUID = ['e5f6a7b8', '1c2d', '4e5f', '8a9b', '0c1d2e3f4a5b'].join('-');
+    const PAGE = `https://example.com/workspace/42?email=${encodeURIComponent(EMAIL)}#reply-7c1d`;
+    const PRIVATE = [PAGE, '/workspace/42', '?email', encodeURIComponent(EMAIL), EMAIL, '#reply-7c1d', DRAFT, 'merger', 'hello', OPAQUE, UUID];
+
+    /** The fingerprint 2.0.0 stored for a composer picked while it held a draft */
+    const storedFingerprint: ElementFingerprint = {
+      primary: { id: 'prompt-input', dataTestId: 'composer-input', dataId: OPAQUE, ariaLabel: 'Write a message' },
+      secondary: { tagName: 'textarea', placeholder: 'Type your message' },
+      content: { textContent: DRAFT, textHash: 'icuibp' },
+      context: { parentId: UUID, parentTagName: 'div', siblingIndex: 0, siblingCount: 1, depth: 4 },
+      attributes: { 'data-draft': 'hello', 'data-id': OPAQUE, 'data-testid': 'composer-input', 'aria-multiline': 'true' },
+      classPatterns: ['composer'],
+      meta: { generatedAt: 1_760_000_000_000, url: PAGE, confidence: 'high' }
+    };
+
+    /** What a configuration code keeps of it */
+    const keptFingerprint: ElementFingerprint = {
+      primary: { id: 'prompt-input', dataTestId: 'composer-input', ariaLabel: 'Write a message' },
+      secondary: { tagName: 'textarea', placeholder: 'Type your message' },
+      content: {},
+      context: { parentTagName: 'div', siblingIndex: 0, siblingCount: 1, depth: 4 },
+      attributes: { 'data-testid': 'composer-input', 'aria-multiline': 'true' },
+      classPatterns: ['composer'],
+      meta: { generatedAt: 1_760_000_000_000, confidence: 'high' }
+    };
+
+    const storedSite = (selector: string | undefined, fingerprint: ElementFingerprint | undefined): CustomSite => ({
+      hostname: 'example.com',
+      displayName: 'Example Site',
+      enabled: true,
+      dateAdded: 1_760_000_000_000,
+      positioning: {
+        mode: 'custom',
+        placement: 'before',
+        ...(selector === undefined ? {} : { selector }),
+        ...(fingerprint ? { fingerprint } : {})
+      }
+    });
+
+    const expectNoneOf = (serialized: string) => {
+      for (const value of PRIVATE) {
+        expect(serialized, `holds "${value}"`).not.toContain(value);
+      }
+    };
+
+    it('exports neither the page address, nor the text, nor a value a pick no longer keeps, and keeps the rest', async () => {
+      const encoded = await ConfigurationEncoder.encode(storedSite('#prompt-input', storedFingerprint));
+
+      expectNoneOf(decompressFromEncodedURIComponent(encoded) ?? '');
+      const decoded = await ConfigurationEncoder.decode(encoded);
+      expectNoneOf(JSON.stringify(decoded));
+      expect(decoded.positioning?.fingerprint).toEqual(keptFingerprint);
+      expect(decoded.positioning?.selector).toBe('#prompt-input');
+    });
+
+    it.each([
+      ['a draft copied into data-draft', 'textarea[data-draft="hello"]'],
+      ['a token in data-id', `textarea[data-id="${OPAQUE}"]`],
+      ["a session id on an ancestor", `#${UUID} > div > textarea`],
+      ['an e-mail address in an escaped id', `#${EMAIL.replace(/[.@]/g, (character) => `\\${character}`)}`]
+    ])('leaves out a selector that names %s, and the fingerprint places the button', async (_name, selector) => {
+      const encoded = await ConfigurationEncoder.encode(storedSite(selector, storedFingerprint));
+
+      expectNoneOf(decompressFromEncodedURIComponent(encoded) ?? '');
+      const decoded = await ConfigurationEncoder.decode(encoded);
+      expect(decoded.positioning?.selector).toBe('');
+      expect(decoded.positioning?.fingerprint).toEqual(keptFingerprint);
+    });
+
+    it('refuses to export a site whose only selector names such a value: there is nothing left to place the button by', async () => {
+      await expect(ConfigurationEncoder.encode(storedSite('textarea[data-draft="hello"]', undefined))).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        message: expect.stringContaining('positioning.selector')
+      });
+    });
+
+    /** A configuration code as an earlier release made it, its checksum included */
+    const codeOf = async (positioning: NonNullable<EncodedCustomSitePayloadV1['p']>): Promise<string> => {
+      const payload: Omit<EncodedCustomSitePayloadV1, 'c'> = { v: '1.0', h: 'example.com', n: 'Example Site', p: positioning };
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalizePayloadForTest(payload)));
+      const checksum = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('').slice(0, 16);
+      return compressToEncodedURIComponent(JSON.stringify({ ...payload, c: checksum }));
+    };
+
+    it('decodes a code made before je37, checksum included, and keeps neither the page address nor the text', async () => {
+      const decoded = await ConfigurationEncoder.decode(await codeOf({ pl: 'before', s: '#prompt-input', fp: storedFingerprint }));
+
+      expectNoneOf(JSON.stringify(decoded));
+      expect(decoded.positioning?.fingerprint).toEqual(keptFingerprint);
+      expect(decoded.positioning?.selector).toBe('#prompt-input');
+    });
+
+    // Releases up to 1.4.2 stored a selector and no fingerprint, and from 1.3.0 shared it so
+    it('refuses to import a code holding only a selector that names a value a pick no longer keeps', async () => {
+      const code = await codeOf({ pl: 'before', s: 'textarea[data-draft="hello"]' });
+
+      await expect(ConfigurationEncoder.decode(code)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        message: expect.stringContaining('Provide a CSS selector')
+      });
+    });
+
+    it('imports a code holding only a selector that names values a pick keeps', async () => {
+      const decoded = await ConfigurationEncoder.decode(await codeOf({ pl: 'before', s: 'textarea[data-testid="chat-input"]' }));
+
+      expect(decoded.positioning?.selector).toBe('textarea[data-testid="chat-input"]');
+    });
+
+    // Review of je37: a run of `[` made the rule backtrack, 14.5 s for 32,000 of them
+    it('refuses as unsafe, at once, a code whose selector is a run of 32,000 [', async () => {
+      const code = await codeOf({ pl: 'before', s: '['.repeat(32_000), fp: storedFingerprint });
+
+      await expect(ConfigurationEncoder.decode(code)).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        message: expect.stringContaining('Selector contains unsafe characters or patterns')
+      });
+    });
   });
 });

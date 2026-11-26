@@ -7,6 +7,8 @@ import type {
   SecurityWarning
 } from '../types';
 
+import { keepsAttribute, keepsIdentifier, keepsLabel, MAX_SELECTOR_LENGTH, selectorKeepsOnlyKeptValues } from './pickedValues';
+
 const MAX_OFFSET = 500;
 const MAX_Z_INDEX = 2147483647;
 export const HOSTNAME_PATTERN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i;
@@ -89,6 +91,12 @@ const sanitizeStringArray = (
   return Array.from(new Set(sanitized)).sort();
 };
 
+/**
+ * The fingerprint a configuration code holds, going out or coming in: only what a pick keeps now
+ * (src/utils/pickedValues.ts). A fingerprint stored or shared before ticket My-Prompt-Manager-je37
+ * can hold the page's address, the element's text (which can be the user's draft) and values that
+ * are not identifiers: none of them is kept.
+ */
 const sanitizeFingerprint = (fingerprint: unknown): ElementFingerprint | undefined => {
   if (!fingerprint || typeof fingerprint !== 'object' || Array.isArray(fingerprint)) {
     return undefined;
@@ -119,53 +127,50 @@ const sanitizeFingerprint = (fingerprint: unknown): ElementFingerprint | undefin
     attributes: {},
     meta: {
       generatedAt: Date.now(),
-      url: '',
       confidence: 'low'
     }
   };
 
   const primarySource: Partial<ElementFingerprint['primary']> = input.primary ?? {};
-  const primaryKeys = ['id', 'dataTestId', 'dataId', 'name', 'ariaLabel'] as const;
+  const primaryKeys = ['id', 'dataTestId', 'dataId', 'name'] as const;
   for (const key of primaryKeys) {
     const value = sanitizeTextValue(primarySource[key], 160);
-    if (value) {
+    if (keepsIdentifier(value)) {
       sanitized.primary[key] = value;
     }
   }
+  const ariaLabel = sanitizeTextValue(primarySource.ariaLabel, 160);
+  if (keepsLabel(ariaLabel)) {
+    sanitized.primary.ariaLabel = ariaLabel;
+  }
 
   const secondarySource: Partial<ElementFingerprint['secondary']> = input.secondary ?? {};
-  const secondaryKeys = ['type', 'role', 'placeholder'] as const;
+  const secondaryKeys = ['type', 'role'] as const;
   for (const key of secondaryKeys) {
     const value = sanitizeTextValue(secondarySource[key], 120);
     if (value) {
       sanitized.secondary[key] = value;
     }
   }
-
-  const contentSource: Partial<ElementFingerprint['content']> = input.content ?? {};
-  const contentEntries: Array<[keyof ElementFingerprint['content'], number]> = [
-    ['textContent', 200],
-    ['textHash', 128]
-  ];
-  for (const [key, maxLength] of contentEntries) {
-    const value = sanitizeTextValue(contentSource[key], maxLength);
-    if (value) {
-      sanitized.content[key] = value;
-    }
+  const placeholder = sanitizeTextValue(secondarySource.placeholder, 120);
+  if (keepsLabel(placeholder)) {
+    sanitized.secondary.placeholder = placeholder;
   }
+
+  // The element's text is never kept: `content` stays empty
 
   if (input.context) {
     const context: Partial<ElementFingerprint['context']> = input.context;
-    const contextStringEntries: Array<[Extract<keyof ElementFingerprint['context'], 'parentId' | 'parentDataTestId' | 'parentTagName'>, number]> = [
-      ['parentId', 160],
-      ['parentDataTestId', 160],
-      ['parentTagName', 40]
-    ];
-    for (const [key, maxLength] of contextStringEntries) {
-      const value = sanitizeTextValue(context[key], maxLength);
-      if (value) {
+    const contextIdentifierKeys = ['parentId', 'parentDataTestId'] as const;
+    for (const key of contextIdentifierKeys) {
+      const value = sanitizeTextValue(context[key], 160);
+      if (keepsIdentifier(value)) {
         sanitized.context[key] = value;
       }
+    }
+    const parentTagName = sanitizeTextValue(context.parentTagName, 40);
+    if (parentTagName) {
+      sanitized.context.parentTagName = parentTagName;
     }
 
     const contextNumberKeys = ['siblingIndex', 'siblingCount', 'depth'] as const;
@@ -177,11 +182,13 @@ const sanitizeFingerprint = (fingerprint: unknown): ElementFingerprint | undefin
     }
   }
 
-  sanitized.attributes = sanitizeStringRecord(input.attributes, {
-    maxEntries: 20,
-    maxKeyLength: 60,
-    maxValueLength: 160
-  });
+  sanitized.attributes = Object.fromEntries(
+    Object.entries(sanitizeStringRecord(input.attributes, {
+      maxEntries: 20,
+      maxKeyLength: 60,
+      maxValueLength: 160
+    })).filter(([name, value]) => keepsAttribute(name, value))
+  );
 
   const classPatterns = sanitizeStringArray(input.classPatterns, {
     maxEntries: 20,
@@ -191,14 +198,13 @@ const sanitizeFingerprint = (fingerprint: unknown): ElementFingerprint | undefin
     sanitized.classPatterns = classPatterns;
   }
 
+  // The page's address is never kept: `meta` holds no `url`
   const meta: Partial<ElementFingerprint['meta']> = input.meta ?? {};
   const generatedAt = sanitizeNumericValue(meta.generatedAt);
-  const metaUrl = sanitizeTextValue(meta.url, 2048);
   const confidence = meta.confidence;
 
   sanitized.meta = {
     generatedAt: generatedAt ?? Date.now(),
-    url: metaUrl ?? '',
     confidence: confidence === 'high' || confidence === 'medium' || confidence === 'low' ? confidence : 'low'
   };
 
@@ -213,7 +219,12 @@ const clampNumber = (value: number, min: number, max: number): number => {
 };
 
 const sanitizePositioning = (positioning: CustomSitePositioning): CustomSitePositioning => {
-  const selector = typeof positioning.selector === 'string' ? sanitizeText(positioning.selector) : '';
+  const typed = typeof positioning.selector === 'string' ? sanitizeText(positioning.selector) : '';
+  // A selector a pick stored before ticket My-Prompt-Manager-je37 can name a value of the page (an id
+  // that is a token, a draft copied into an attribute): it is left out, and only the fingerprint can
+  // place the button. With no fingerprint either, the configuration has no element and is refused.
+  // A selector longer than isSelectorSafe allows is kept as it is, unread, and refused as unsafe
+  const selector = typed.length > MAX_SELECTOR_LENGTH || selectorKeepsOnlyKeptValues(typed) ? typed : '';
   const sanitized: CustomSitePositioning = {
     mode: 'custom',
     selector,
@@ -252,7 +263,7 @@ export const isSelectorSafe = (selector: string): boolean => {
     return false;
   }
 
-  if (selector.length > 300) {
+  if (selector.length > MAX_SELECTOR_LENGTH) {
     return false;
   }
 

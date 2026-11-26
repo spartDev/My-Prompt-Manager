@@ -3,6 +3,7 @@
  * Provides visual element selection functionality for custom positioning
  */
 
+import { keepsAttribute, keepsIdentifier } from '../../utils/pickedValues';
 import { getElementFingerprintGenerator } from '../utils/element-fingerprint';
 import { debug, info, isDebugMode } from '../utils/logger';
 
@@ -902,24 +903,20 @@ export class ElementPicker {
   }
 
   /**
-   * Generate a unique selector for an element
+   * Generate a unique selector for an element. It names an id or a `data-` attribute only when the
+   * fingerprint would keep it (src/utils/pickedValues.ts), an ancestor's id included: a page's token,
+   * or a draft it copies into `data-draft`, never goes into the selector
    */
   private generateSelector(element: Element): string {
     // Try ID first
-    if (element.id) {
+    if (keepsIdentifier(element.id)) {
       // Escape special characters in ID
       return `#${this.escapeCSSIdentifier(element.id)}`;
     }
     
-    // Try data attributes as they're often more stable
+    // Try data attributes as they're often more stable: a test id, or a switch
     const dataAttrs = Array.from(element.attributes)
-      .filter(attr => attr.name.startsWith('data-'))
-      .filter(attr => {
-        // Skip data attributes that might contain sensitive information based on name only
-        // This avoids reading potentially sensitive values into memory
-        const sensitiveDataPattern = /token|key|secret|password|credential|private|session|auth|api|csrf|nonce/i;
-        return !sensitiveDataPattern.test(attr.name);
-      })
+      .filter(attr => attr.name.startsWith('data-') && keepsAttribute(attr.name, attr.value))
       .map(attr => `[${attr.name}="${attr.value}"]`);
     
     if (dataAttrs.length > 0) {
@@ -960,8 +957,8 @@ export class ElementPicker {
     while (current && current !== document.body && path.length < MAX_SELECTOR_PATH_DEPTH) { // Limit depth
       let selector = current.tagName.toLowerCase();
       
-      if (current.id && /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(current.id)) {
-        // Only use ID if it's a simple identifier
+      if (keepsIdentifier(current.id)) {
+        // Only an id the fingerprint would keep
         selector = `#${this.escapeCSSIdentifier(current.id)}`;
         path.unshift(selector);
         break;

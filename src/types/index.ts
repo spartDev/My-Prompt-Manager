@@ -220,7 +220,8 @@ export interface ElementFingerprint {
     placeholder?: string;
   };
   
-  // Content-based identifiers (for uniqueness)
+  // Content-based identifiers: empty since ticket My-Prompt-Manager-je37, as the element's text can be
+  // the user's draft. A fingerprint stored before can hold them; a configuration code never does
   content: {
     textContent?: string; // Normalized, trimmed, max 50 chars
     textHash?: string; // Hash of text content for quick comparison
@@ -247,7 +248,12 @@ export interface ElementFingerprint {
   // Metadata about fingerprint generation
   meta: {
     generatedAt: number; // Timestamp when fingerprint was created
-    url: string; // URL where element was selected
+    /**
+     * The address of the page the element was picked on, which a pick no longer keeps (ticket
+     * My-Prompt-Manager-je37): nothing that finds the element reads it. A fingerprint stored before
+     * can hold it; a configuration code never does
+     */
+    url?: string;
     confidence: 'high' | 'medium' | 'low'; // Estimated uniqueness
   };
 }

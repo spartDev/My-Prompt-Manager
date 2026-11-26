@@ -40,21 +40,18 @@ Instead of relying on brittle CSS selectors, we create a **unique fingerprint** 
     type: "submit",
     role: "button",
     
-    // Content-based (for uniqueness)
-    textContent: "Place Order",
-    textContentHash: "abc123", // First 20 chars, hashed
+    // No text, no page address: they can be the user's (ticket My-Prompt-Manager-je37)
     
     // Structural context (for disambiguation)
     parentId: "checkout-form",
-    parentDataAttr: "data-section='payment'",
     siblingCount: 3,
     siblingIndex: 2,
     
     // Attribute patterns
     classPatterns: ["btn", "primary"], // Stable class keywords
     stableAttributes: {
-      "name": "submit-button",
-      "data-action": "checkout"
+      "data-qa": "checkout-submit",
+      "aria-haspopup": "false"
     }
   },
   
@@ -71,15 +68,17 @@ Instead of relying on brittle CSS selectors, we create a **unique fingerprint** 
 
 **Priority Order**:
 1. **ID** (most stable)
-2. **Data attributes** (`data-*`)
-3. **ARIA attributes** (`aria-label`, `aria-*`)
+2. **Test ids** (`data-testid`, `data-id`, and the other test-id attributes of `keepsAttribute`)
+3. **ARIA attributes** (`aria-label`; another `aria-*` when it holds an ARIA token or element ids)
 4. **Name attribute**
 5. **Type attribute**
 6. **Role attribute**
-7. **Text content** (first 50 chars, trimmed)
+7. **Text content**: no longer kept (ticket My-Prompt-Manager-je37), as a chat box's text is the user's draft. A fingerprint stored before holds its first 50 characters, which the matcher still scores
 8. **Stable class patterns** (semantic classes like `btn-primary`, not `css-xyz123`)
-9. **Parent context** (parent ID, parent data attributes)
+9. **Parent context** (parent ID, parent `data-testid`)
 10. **Sibling context** (position among same-type siblings)
+
+A value is kept only as `src/utils/pickedValues.ts` says: an id shaped as an identifier, never a token, a UUID or an e-mail address, and the other attributes from an allow-list. The list, and what happens to a fingerprint stored before it: [ELEMENT_PICKER_SECURITY.md](./ELEMENT_PICKER_SECURITY.md), section 3.
 
 ### 2. Fingerprint Structure
 
@@ -102,11 +101,11 @@ interface ElementFingerprint {
     placeholder?: string;
   };
   
-  // Content-based (for uniqueness)
+  // Content-based: empty since ticket My-Prompt-Manager-je37, as the text can be the user's draft.
+  // A fingerprint stored before can hold them; a configuration code never does
   content: {
     textContent?: string; // Normalized, trimmed, first 50 chars
     textHash?: string; // Short hash for quick comparison
-    value?: string; // For inputs (only type, not actual value)
   };
   
   // Structural context (for disambiguation)
@@ -119,9 +118,9 @@ interface ElementFingerprint {
     depth?: number; // Depth in DOM tree
   };
   
-  // Stable attributes (framework/library specific)
+  // Other attributes: test ids, switches and ARIA tokens (keepsAttribute, src/utils/pickedValues.ts)
   attributes: {
-    [key: string]: string; // Only stable, non-sensitive attributes
+    [key: string]: string;
   };
   
   // Class patterns (semantic only)
@@ -130,7 +129,7 @@ interface ElementFingerprint {
   // Metadata
   meta: {
     generatedAt: number; // Timestamp
-    url: string; // Page URL where element was selected
+    url?: string; // Not kept since ticket My-Prompt-Manager-je37; a fingerprint stored before can hold the page's address
     confidence: 'high' | 'medium' | 'low'; // How unique is this fingerprint
   };
 }
@@ -348,17 +347,14 @@ if (referenceElement) {
       type: "submit",
       role: "button"
     },
-    content: {
-      textContent: "Place Order",
-      textHash: "d4f5g6h7"
-    },
+    content: {},
     context: {
       parentId: "payment-form",
       siblingIndex: 0,
       siblingCount: 2
     },
     attributes: {
-      "data-action": "submit-payment"
+      "data-qa": "submit-payment"
     }
   },
   fallbackSelector: "#submit-order-btn"
@@ -532,7 +528,7 @@ describe('ElementFingerprintGenerator', () => {
     
     expect(fingerprint.primary.id).toBe('submit-btn');
     expect(fingerprint.primary.dataTestId).toBe('submit');
-    expect(fingerprint.content.textContent).toBe('Submit');
+    expect(fingerprint.content).toEqual({}); // the text is never kept
   });
   
   it('finds element by fingerprint', () => {

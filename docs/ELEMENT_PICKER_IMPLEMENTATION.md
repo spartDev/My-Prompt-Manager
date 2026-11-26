@@ -28,7 +28,7 @@ Chrome closes the action popup when it loses focus, so the popup cannot stay ope
 
 - Highlights the element under the pointer: purple when it can be picked, red when it is blocked.
 - Shows the hovered element's information in a box.
-- On a click, builds the element's fingerprint (`src/content/utils/element-fingerprint.ts`), the identifier the content script places the button by, and a CSS selector as its fallback. The selector is the element's ID; else `tag[data-x="<value>"]` for its first `data-*` attribute whose name does not look sensitive, if that selector is unique (the later ones are not tried); else its first two simple class names, if they are unique; else a path of up to five levels with `:nth-of-type`.
+- On a click, builds the element's fingerprint (`src/content/utils/element-fingerprint.ts`), the identifier the content script places the button by, and a CSS selector as its fallback. The selector is the element's ID; else `tag[data-x="<value>"]` for its first `data-*` attribute the fingerprint keeps, a test id or a switch, if that selector is unique (the later ones are not tried); else its first two simple class names, if they are unique; else a path of up to five levels with `:nth-of-type`, which stops at the first ancestor whose ID it may use. An ID, the element's or an ancestor's, and a `data-*` attribute are used only when they pass the rules the fingerprint applies, so the selector holds no token, session id or draft the page copied into an attribute (`src/utils/pickedValues.ts`, and [ELEMENT_PICKER_SECURITY.md](./ELEMENT_PICKER_SECURITY.md), section 3).
 - Sends `ELEMENT_SELECTED` with the fingerprint, the selector, the element type, the element information and the hostname, then deactivates.
 
 ### Settings (`src/hooks/usePickerWindow.ts`)
@@ -59,4 +59,4 @@ Escape and `pagehide` send `PICKER_CANCELLED`; the service worker ends a picker 
 4. In Custom Positioning, click Pick Element. In the action popup, a window opens and the popup closes: open the form again in that window and click Pick Element there.
 5. Click an element of the page: the selector shows in the form, and the window stays open.
 
-Automated: `src/content/modules/__tests__/element-picker.test.ts`, `src/background/__tests__/background.placement.test.ts`, and `tests/e2e/content/element-picker.spec.ts` on the built extension.
+Automated: `src/content/modules/__tests__/element-picker.test.ts`, `src/background/__tests__/background.placement.test.ts`, and `tests/e2e/content/element-picker.spec.ts` on the built extension. What a pick keeps: `src/content/modules/__tests__/element-picker-privacy.test.ts`, and `tests/e2e/content/custom-site-pick-privacy.spec.ts`, which picks on a Custom site with the real picker, from Pick Element to Export.

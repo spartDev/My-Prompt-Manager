@@ -53,6 +53,7 @@
         "assets/promptAdmission-*.js",
         "assets/siteSettings-*.js",
         "assets/iconPlacementRepairs-*.js",
+        "assets/pickedValues-*.js",
         "assets/promptVariables-*.js",
         "assets/floating-ui.dom-*.js",
         "assets/categoryChip-*.js",

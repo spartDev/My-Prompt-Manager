@@ -18,7 +18,8 @@ import {
   parseSiteSettings,
   readSiteSettings,
   SITE_SETTINGS_KEY,
-  type SiteSettings
+  type SiteSettings,
+  upgradeStoredSiteSettings
 } from '../siteSettings';
 import { StorageManager } from '../storage';
 
@@ -340,6 +341,35 @@ describe('readSiteSettings', () => {
     vi.mocked(getChromeMock().storage.local.get).mockRejectedValueOnce(new Error('storage unavailable'));
 
     await expect(readSiteSettings()).rejects.toThrow('storage unavailable');
+  });
+
+  // My-Prompt-Manager-je37, AC3: a pick stored before the change is not rewritten. Its page address and
+  // text stay on the device, where nothing reads the address and only the matcher reads the text; a
+  // configuration code leaves both out (configurationEncoder.test.ts)
+  it('reads a Custom site picked before je37 as stored, through the upgrade pass too: its page address and text are kept', async () => {
+    const pickedBefore = customSite({
+      positioning: {
+        mode: 'custom',
+        placement: 'before',
+        selector: 'textarea[data-draft="Draft: merger closes Friday"]',
+        fingerprint: {
+          primary: { name: 'message' },
+          secondary: { tagName: 'textarea', placeholder: 'Write a note' },
+          content: { textContent: 'Draft: merger closes Friday', textHash: 'icuibp' },
+          context: { parentTagName: 'div', siblingIndex: 0, siblingCount: 1, depth: 4 },
+          attributes: { 'data-draft': 'Draft: merger closes Friday' },
+          meta: { generatedAt: 1_760_000_000_000, url: 'https://chat.example.com/notes/42?draft=1#reply', confidence: 'high' }
+        }
+      }
+    });
+    // As a release before the Platform choices stored it: the upgrade pass writes it back
+    await chrome.storage.local.set({ [SITE_SETTINGS_KEY]: { enabledSites: ['claude.ai'], customSites: [pickedBefore] } });
+
+    expect(await upgradeStoredSiteSettings()).toBe(true);
+
+    expect((await readSiteSettings()).customSites).toEqual([pickedBefore]);
+    const stored = (await chrome.storage.local.get(SITE_SETTINGS_KEY))[SITE_SETTINGS_KEY] as { customSites: CustomSite[] };
+    expect(stored.customSites).toEqual([pickedBefore]);
   });
 });
 

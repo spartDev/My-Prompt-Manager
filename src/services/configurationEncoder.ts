@@ -65,6 +65,11 @@ const CHECKSUM_LENGTH = 16;
 const LEGACY_CHECKSUM_LENGTH = 8;
 const MAX_FINGERPRINT_SIZE = 10000; // 10KB limit to prevent DOS attacks
 
+/**
+ * The fingerprint as the checksum reads it. A code made since ticket My-Prompt-Manager-je37 holds no
+ * `meta.url` and no `content`; one made before can, and its checksum covers them, so they stay here
+ * for that code to verify. `decode` then leaves them out (sanitizeFingerprint).
+ */
 const canonicalizeFingerprint = (fingerprint: ElementFingerprint): ElementFingerprint => {
   const canonical: ElementFingerprint = {
     primary: {},
@@ -214,10 +219,7 @@ const computeChecksumFromBytes = async (data: Uint8Array): Promise<string> => {
   return computeFallbackChecksum(data);
 };
 
-const computeChecksum = async (value: string): Promise<string> => {
-  const data = toUtf8Bytes(value);
-  return computeChecksumFromBytes(data);
-};
+const computeChecksum = (value: string): Promise<string> => computeChecksumFromBytes(toUtf8Bytes(value));
 
 const configToPayload = (config: CustomSiteConfiguration): NormalizedPayload => {
   const payload: NormalizedPayload = {

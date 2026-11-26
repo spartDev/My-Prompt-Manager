@@ -7,6 +7,7 @@
  */
 
 import type { ElementFingerprint } from '../../types';
+import { keepsAttribute, keepsIdentifier, keepsLabel } from '../../utils/pickedValues';
 
 import { debug, warn } from './logger';
 
@@ -38,8 +39,9 @@ import { debug, warn } from './logger';
  *    - `placeholder` (7 pts): Input hint text, moderately stable
  *    - `tagName` (5 pts): Must match - used for filtering, not scoring weight
  *
- * 3. CONTENT MATCHING (5-8 points): Variable stability
- *    - Text content can change but provides valuable context
+ * 3. CONTENT MATCHING (5-8 points): fingerprints stored before ticket My-Prompt-Manager-je37 only
+ *    - A pick no longer keeps the element's text, which can be a draft the user typed
+ *      (src/utils/pickedValues.ts); a fingerprint stored or shared before still holds it
  *    - `textContent` (8 pts): Exact text match - useful for buttons/labels
  *    - `textHash` (5 pts): Hash-based match - fuzzy matching fallback
  *
@@ -50,8 +52,8 @@ import { debug, warn } from './logger';
  *    - `siblingIndexMatch` (3 pts): Position among siblings - can shift
  *    - `siblingCountMatch` (2 pts): Total sibling count - weakest signal
  *
- * 5. FRAMEWORK ATTRIBUTES (5 points each): Stable in framework-driven apps
- *    - Attributes like data-*, ng-*, v-*, react-*
+ * 5. OTHER ATTRIBUTES (5 points each): test ids, switches and ARIA tokens
+ *    - The attributes `keepsAttribute` keeps (src/utils/pickedValues.ts)
  *    - Each match adds 5 points (up to MAX_STABLE_ATTRIBUTES)
  *
  * 6. CLASS PATTERNS (2 points each): Lowest weight due to CSS-in-JS
@@ -149,8 +151,7 @@ const HIGH_CONFIDENCE_SCORE = 50;
 // Maximum DOM depth to prevent infinite loops
 const MAX_DOM_DEPTH = 50;
 
-// Content extraction limits
-const MAX_TEXT_CONTENT_LENGTH = 200;
+// The text a fingerprint stored before ticket My-Prompt-Manager-je37 holds: its first 50 characters
 const MAX_NORMALIZED_TEXT_LENGTH = 50;
 
 // Attribute and class limits
@@ -162,16 +163,15 @@ const MAX_SEMANTIC_CLASS_LENGTH = 30;
 // Performance threshold for slow fingerprint matching (milliseconds)
 const SLOW_MATCHING_THRESHOLD_MS = 50;
 
-// Sensitive patterns to exclude from fingerprints
-const SENSITIVE_PATTERNS = /password|secret|token|key|credential|private|ssn|credit|card|cvv|pin|bank|account|session|auth|api|csrf|nonce/i;
-
 export class ElementFingerprintGenerator {
   /**
    * Generate a comprehensive fingerprint for an HTML element.
    *
    * The fingerprint captures multiple stable attributes including IDs, ARIA labels,
-   * data attributes, text content, and structural context. This multi-attribute
-   * approach provides robustness against DOM changes and A/B testing.
+   * data attributes, and structural context. This multi-attribute approach provides
+   * robustness against DOM changes and A/B testing. It keeps only what the rules of
+   * src/utils/pickedValues.ts keep: neither the page's address nor the element's text,
+   * which can be what the user typed, and no value that is not shaped as an identifier.
    *
    * @param element - The HTML element to fingerprint
    * @returns An ElementFingerprint object containing primary, secondary, content,
@@ -189,13 +189,15 @@ export class ElementFingerprintGenerator {
     const fingerprint: ElementFingerprint = {
       primary: this.extractPrimaryIdentifiers(element),
       secondary: this.extractSecondaryIdentifiers(element),
-      content: this.extractContentIdentifiers(element),
+      // The element's text is not kept: in a chat box, or around one, it is the user's draft
+      content: {},
       context: this.extractContextIdentifiers(element),
       attributes: this.extractStableAttributes(element),
       classPatterns: this.extractClassPatterns(element),
+      // The page's address is not kept: nothing that finds the element reads it, and its path,
+      // query and fragment can name the user, a conversation or a token
       meta: {
         generatedAt: Date.now(),
-        url: window.location.href,
         confidence: this.calculateConfidence(element)
       }
     };
@@ -302,31 +304,31 @@ export class ElementFingerprintGenerator {
     const primary: ElementFingerprint['primary'] = {};
 
     // ID
-    if (element.id && !SENSITIVE_PATTERNS.test(element.id)) {
+    if (keepsIdentifier(element.id)) {
       primary.id = element.id;
     }
 
     // data-testid (common in modern web apps)
     const dataTestId = element.getAttribute('data-testid');
-    if (dataTestId && !SENSITIVE_PATTERNS.test(dataTestId)) {
+    if (keepsIdentifier(dataTestId)) {
       primary.dataTestId = dataTestId;
     }
 
     // data-id
     const dataId = element.getAttribute('data-id');
-    if (dataId && !SENSITIVE_PATTERNS.test(dataId)) {
+    if (keepsIdentifier(dataId)) {
       primary.dataId = dataId;
     }
 
     // name attribute
     const name = element.getAttribute('name');
-    if (name && !SENSITIVE_PATTERNS.test(name)) {
+    if (keepsIdentifier(name)) {
       primary.name = name;
     }
 
     // aria-label
     const ariaLabel = element.getAttribute('aria-label');
-    if (ariaLabel && !SENSITIVE_PATTERNS.test(ariaLabel)) {
+    if (keepsLabel(ariaLabel)) {
       primary.ariaLabel = ariaLabel;
     }
 
@@ -355,33 +357,11 @@ export class ElementFingerprintGenerator {
 
     // placeholder (for inputs)
     const placeholder = element.getAttribute('placeholder');
-    if (placeholder && !SENSITIVE_PATTERNS.test(placeholder)) {
+    if (keepsLabel(placeholder)) {
       secondary.placeholder = placeholder;
     }
 
     return secondary;
-  }
-
-  /**
-   * Extract content-based identifiers
-   */
-  private extractContentIdentifiers(element: HTMLElement): ElementFingerprint['content'] {
-    const content: ElementFingerprint['content'] = {};
-
-    // Get visible text content
-    const textContent = element.textContent ? element.textContent.trim() : undefined;
-    if (textContent && textContent.length > 0 && textContent.length < MAX_TEXT_CONTENT_LENGTH) {
-      // Normalize whitespace and take first N chars
-      const normalized = textContent.replace(/\s+/g, ' ').substring(0, MAX_NORMALIZED_TEXT_LENGTH);
-      
-      // Only use if not sensitive
-      if (!SENSITIVE_PATTERNS.test(normalized)) {
-        content.textContent = normalized;
-        content.textHash = this.simpleHash(normalized);
-      }
-    }
-
-    return content;
   }
 
   /**
@@ -395,12 +375,12 @@ export class ElementFingerprintGenerator {
     if (parent) {
       context.parentTagName = parent.tagName.toLowerCase();
 
-      if (parent.id && !SENSITIVE_PATTERNS.test(parent.id)) {
+      if (keepsIdentifier(parent.id)) {
         context.parentId = parent.id;
       }
 
       const parentDataTestId = parent.getAttribute('data-testid');
-      if (parentDataTestId && !SENSITIVE_PATTERNS.test(parentDataTestId)) {
+      if (keepsIdentifier(parentDataTestId)) {
         context.parentDataTestId = parentDataTestId;
       }
 
@@ -419,30 +399,14 @@ export class ElementFingerprintGenerator {
   }
 
   /**
-   * Extract stable attributes (non-sensitive, framework-specific)
+   * Extract the other attributes a pick keeps: test ids, switches and ARIA tokens (keepsAttribute).
+   * An attribute where the page may copy what the user types, such as `data-draft`, is not one.
    */
   private extractStableAttributes(element: HTMLElement): { [key: string]: string } {
     const attributes: { [key: string]: string } = {};
 
-    // Common stable attribute patterns
-    const stablePatterns = [
-      /^data-(?!sensitive|private|password|token|key|secret)/i,
-      /^aria-(?!label$)/i, // aria-label already captured in primary
-      /^ng-/i,  // Angular
-      /^v-/i,   // Vue
-      /^react-/i, // React (sometimes)
-    ];
-
     for (const attr of element.attributes) {
-      // Skip if sensitive
-      if (SENSITIVE_PATTERNS.test(attr.name) || SENSITIVE_PATTERNS.test(attr.value)) {
-        continue;
-      }
-
-      // Check if matches stable patterns
-      const isStable = stablePatterns.some(pattern => pattern.test(attr.name));
-      
-      if (isStable) {
+      if (keepsAttribute(attr.name, attr.value)) {
         attributes[attr.name] = attr.value;
       }
     }

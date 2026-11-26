@@ -11,14 +11,14 @@ A summary of [the full privacy policy](./privacy-policy.md) for Release 2.0.0. W
 - **Read where it works, not kept:** the keys you press and the text in the chat box, to notice `//` and for Undo, and the page's structure, to place the Prompts button.
 - **Stored:** your Prompts, Categories and preferences, the Site settings and Custom sites, and the usage history that the Analytics section counts, in Chrome's local storage (`chrome.storage.local`), which Chrome does not sync. Short-lived state goes in `chrome.storage.session`, emptied when Chrome closes.
 - **Analytics is local:** it is computed on your device from the usage history (which Prompt, its Category, the site and the time of each insertion, never the Prompt's text) and shows the last 30 days. Older entries stay stored until an insertion made while the history holds 9,000 entries or more removes them, and the history never holds more than 10,000. From the version after 2.0.0, entries older than 30 days are removed at each insertion, at each Chrome start and on each update; between those moments an entry can stay past 30 days.
-- **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address, the element's identifiers and attributes, and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box.
+- **Element picker:** its description of the element you pick is stored with the site. It holds the page's full address, the element's identifiers and attributes, and, for an element with little text, its first 50 characters, which can be the start of a draft in the chat box. From the version after 2.0.0, it holds neither the page's address nor the element's text, and a configuration code leaves them out on Export and on import; a pick saved with 1.5.0 to 2.0.0 keeps them on your device, since there is no migration, until its element is picked again or the site is removed.
 
 ## What leaves your device
 
 The extension itself sends nothing. These leave only through you:
 
 - A Prompt you insert into a chat: the site then handles it as anything you type there.
-- A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted.
+- A Share code (one Prompt) or a configuration code (one Custom site, with the Element picker's description), made only when you click Share or Export, compressed but not encrypted. From the version after 2.0.0, a configuration code holds no page address and no text.
 - A Backup file of your Prompts and Categories, made only when you click Export in Settings.
 
 What the extension shows inside a site's page, such as the titles and Categories of your Prompts in the Prompt selector, can be read by that site's own scripts, and any website can tell that the extension is installed.
