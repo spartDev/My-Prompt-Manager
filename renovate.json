@@ -169,6 +169,15 @@
       "automergeType": "pr"
     },
     {
+      "description": "release.yml runs the Chrome Web Store jobs: its updates get their own PR and a human merge, see docs/RENOVATE_CONFIGURATION.md. After the GitHub Actions rule: a later rule wins",
+      "matchFileNames": [
+        ".github/workflows/release.yml"
+      ],
+      "groupName": "github actions (release.yml)",
+      "groupSlug": "github-actions-release",
+      "automerge": false
+    },
+    {
       "description": "Separate Husky and Git hooks",
       "matchPackageNames": [
         "husky",
