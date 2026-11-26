@@ -58,7 +58,7 @@ A failed read of the Library, its Prompts or its Categories, replaces the Sectio
 
 | Component | Job |
 |-----------|-----|
-| `src/components/PromptCard.tsx` | One Prompt in the Library: title, preview, Category, use count, copy and the actions menu. Memoized with its own props comparison. Its Copy button takes `copyButtonRef`, for the Library to give it the keyboard, draws its ring on `:focus-visible` only, and ignores a repeated Enter, so a held key copies once |
+| `src/components/PromptCard.tsx` | One Prompt in the Library: title, preview, Category, use count, copy and the actions menu. Its footer's Category, Variables and use count wrap onto a second line rather than collide: a card keeps one line while its Category can show 6rem of its name beside them, and a text still too long for its line is cut with an ellipsis (My-Prompt-Manager-n4bu). Memoized with its own props comparison. Its Copy button takes `copyButtonRef`, for the Library to give it the keyboard, draws its ring on `:focus-visible` only, and ignores a repeated Enter, so a held key copies once |
 | `src/components/PromptEditor.tsx` | The one editor for a Prompt: new (typed, or opened from a Share code) and edit. Header bar Cancel / heading / Save, Cmd/Ctrl+S saves, Escape asks before discarding changes. Save shows "Saved" for `MOTION.savedPause`, then closes; the title has the keyboard on open |
 | `src/components/editor/CategoryChips.tsx` | The Category of a Prompt as a radio group of chips, with "New category" to create one in place |
 | `src/components/editor/LookalikeCallout.tsx` | "This looks familiar": the Prompt of the Library the text being written looks like (60% alike or more), with the first lines of both and Keep both. Never blocks Save |

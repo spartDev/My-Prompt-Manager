@@ -48,6 +48,7 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
   if (variant === 'dot') {
     return (
       <span
+        role="img"
         className={cn('w-3 h-3 rounded-full shrink-0', className)}
         style={{ backgroundColor }}
         aria-label={`Category: ${category.name}`}
@@ -69,7 +70,9 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
     ? 'cursor-pointer hover:shadow-md active:scale-95'
     : '';
 
-  // Soft: pale tint background with colored text, AA-compliant in light and dark mode
+  // Soft: pale tint background with colored text, AA-compliant in light and dark mode.
+  // A block container (inline-block), not a flex one: a flex container never draws the ellipsis of
+  // `truncate`, so a long name was cut mid-letter (My-Prompt-Manager-n4bu)
   if (variant === 'soft') {
     const light = getSoftBadgeColors(backgroundColor, 'light');
     const dark = getSoftBadgeColors(backgroundColor, 'dark');
@@ -83,9 +86,9 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
     return (
       <span
         className={cn(
-          badgeBaseClasses,
+          'inline-block max-w-full truncate align-middle rounded-full font-semibold transition-all duration-200',
           size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3 py-1 text-sm',
-          'font-semibold max-w-full truncate bg-[var(--badge-bg)] text-[var(--badge-fg)] dark:bg-[var(--badge-bg-dark)] dark:text-[var(--badge-fg-dark)]',
+          'bg-[var(--badge-bg)] text-[var(--badge-fg)] dark:bg-[var(--badge-bg-dark)] dark:text-[var(--badge-fg-dark)]',
           className
         )}
         style={softStyle}
@@ -96,24 +99,33 @@ export const CategoryBadge: FC<CategoryBadgeProps> = ({
     );
   }
 
+  const badgeClasses = cn(badgeBaseClasses, sizeClasses, interactiveClasses, className);
+  const badgeStyle = { backgroundColor, color: textColor };
+
+  if (onClick) {
+    return (
+      <span
+        role="button"
+        tabIndex={0}
+        className={badgeClasses}
+        style={badgeStyle}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        aria-label={`Category: ${category.name}`}
+      >
+        {category.name}
+      </span>
+    );
+  }
+
+  // Read by its text: ARIA 1.2 prohibits aria-label on a plain span, which screen readers ignore
   return (
-    <span
-      className={cn(badgeBaseClasses, sizeClasses, interactiveClasses, className)}
-      style={{
-        backgroundColor,
-        color: textColor
-      }}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      } : undefined}
-      aria-label={`Category: ${category.name}`}
-    >
+    <span className={badgeClasses} style={badgeStyle}>
       {category.name}
     </span>
   );

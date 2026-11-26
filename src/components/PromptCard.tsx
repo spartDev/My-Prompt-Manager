@@ -159,26 +159,32 @@ const PromptCard: FC<PromptCardProps> = ({
         {highlightText(previewOf(prompt.content), searchQuery)}
       </p>
 
-      {/* Footer: category, usage and round actions */}
-      <div className="mt-3 flex items-center gap-2">
-        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+      {/* Footer: Category, Variables and use count, then the round actions. The three wrap onto a
+          second line rather than collide: a card keeps one line while its Category can show 6rem of
+          its name beside them (My-Prompt-Manager-n4bu). Each is cut with an ellipsis, never drawn
+          over the next, when its line is still too narrow */}
+      <div className="mt-3 flex items-center gap-2" data-testid="prompt-card-footer">
+        <div className="min-w-0 flex-1 flex flex-wrap items-center gap-1.5">
           {category ? (
-            <CategoryBadge category={category} variant="soft" size="sm" className="min-w-0" />
+            // Counts 6rem when the line breaks, then grows into the room left, never past its name
+            <span className="flex min-w-0 max-w-max grow basis-24">
+              <CategoryBadge category={category} variant="soft" size="sm" className="min-w-0" />
+            </span>
           ) : null}
           {variableCount > 0 ? (
             <span
               data-testid="prompt-variables-chip"
-              className="shrink-0 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold bg-subtle text-secondary"
+              className="max-w-full truncate rounded-full px-2.5 py-1 text-xs font-semibold bg-subtle text-secondary"
               title="Filled in when you insert this prompt on an AI site"
             >
               {formatVariableCount(variableCount)}
             </span>
           ) : null}
+          {/* At the right end of its line, beside Copy, as on a card of one line */}
+          <span className="ml-auto max-w-full truncate text-xs text-tertiary">
+            {formatUsage(usageCount)}
+          </span>
         </div>
-
-        <span className="shrink-0 text-xs text-tertiary">
-          {formatUsage(usageCount)}
-        </span>
 
         {/* Copy Button. Its ring is focus-interactive's, drawn on :focus-visible only: after the Welcome
             the Library gives it the keyboard by script, and Chrome shows that ring after a key press,
