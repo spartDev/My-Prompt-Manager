@@ -943,4 +943,62 @@ describe('App: leaving the Welcome for a ready Library', () => {
       expect(await stored(WHATS_NEW_KEY)).toEqual({ installedVersion: '1.9.0', lastSeenVersion: '1.9.0' });
     });
   });
+
+  // My-Prompt-Manager-h1dh, round 1 (Codex on PR #636): in the side panel the exit Notification stands
+  // left of center, off the close button, and so over the editor's Cancel. It leaves as the editor
+  // opens there; any other Notification, and the popup's, stay
+  describe('the exit Notification as the editor opens', () => {
+    /** From the Welcome's last step on `context`, the Packs added: the Library under "9 prompts added" */
+    const exitTo = async (context: 'popup' | 'sidepanel'): Promise<void> => {
+      await openingOver({ welcome: { status: 'pending', step: 2 } });
+      render(<App context={context} />);
+      expect(await screen.findByTestId('welcome')).toHaveAttribute('data-welcome-step', '2');
+      fireEvent.click(primary());
+      expect(await screen.findByTestId('toast')).toHaveTextContent(ADDED);
+    };
+
+    const openNewPrompt = async (): Promise<void> => {
+      fireEvent.click(screen.getByRole('button', { name: 'Add new prompt' }));
+      expect(await screen.findByRole('heading', { name: 'New prompt' })).toBeInTheDocument();
+    };
+
+    it('in the side panel, New: the exit Notification leaves as the editor opens', async () => {
+      await exitTo('sidepanel');
+
+      await openNewPrompt();
+
+      expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    });
+
+    it('in the side panel, Edit on a card: the exit Notification leaves as the editor opens', async () => {
+      await exitTo('sidepanel');
+
+      const card = screen.getAllByTestId('prompt-card')[0];
+      const title = within(card).getByRole('heading').textContent ?? '';
+      fireEvent.click(within(card).getByRole('button', { name: `Edit ${title}` }));
+      expect(await screen.findByRole('heading', { name: 'Edit prompt' })).toBeInTheDocument();
+
+      expect(screen.queryByTestId('toast')).not.toBeInTheDocument();
+    });
+
+    it('in the popup, which has no close button to keep clear of, the exit Notification stays over the editor', async () => {
+      await exitTo('popup');
+
+      await openNewPrompt();
+
+      expect(screen.getByTestId('toast')).toHaveTextContent(ADDED);
+    });
+
+    it('in the side panel, any other Notification stays as the editor opens', async () => {
+      await exitTo('sidepanel');
+      const card = screen.getAllByTestId('prompt-card')[0];
+      const title = within(card).getByRole('heading').textContent ?? '';
+      fireEvent.click(within(card).getByRole('button', { name: `Copy content of ${title} to clipboard` }));
+      await waitFor(() => { expect(screen.getByTestId('toast')).toHaveTextContent('Prompt copied'); });
+
+      await openNewPrompt();
+
+      expect(screen.getByTestId('toast')).toHaveTextContent('Prompt copied');
+    });
+  });
 });

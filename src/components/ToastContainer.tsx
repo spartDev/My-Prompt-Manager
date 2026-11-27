@@ -47,6 +47,8 @@ interface ToastContainerProps {
  * `wrap` and `inFlow` are opt-ins for one screen (the Welcome); without them nothing changes.
  * One Notification can ask to be read whole wherever it shows (`Toast.whole`, the exit of the Welcome
  * on the Library): the pill grows as with `wrap`, and the sub takes a line of its own, never cut.
+ * Two lines high, it reaches the side panel's close button, so there it keeps clear of it
+ * (`toast-clear-close`, in src/sidepanel.css, My-Prompt-Manager-h1dh).
  * One can ask its action to take the keyboard as it shows (`Toast.focusAction`, the Welcome's Try
  * again refused again): it does when the keyboard is on no element, the pressed action having left
  * with the Notification before; otherwise no Notification ever moves the keyboard.
@@ -148,7 +150,10 @@ const ToastContainer: FC<ToastContainerProps> = ({ toast, onDismiss, onPause, on
         // to the right, then half its own width back
         inFlow ? 'relative max-w-full' : 'fixed top-3 max-w-[calc(100%-32px)]',
         // Wrapped, the pill grows a line at a time: 40px for one line, as the default one, rounded the same
-        grows ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full'
+        grows ? 'w-max min-h-10 py-1.5 rounded-[20px]' : 'h-10 rounded-full',
+        // Read whole and floating, it is two lines high: in the side panel it moves left, by what it
+        // must, off the Library's close button (src/sidepanel.css). Every other pill stays centered
+        whole && !inFlow && 'toast-clear-close'
       )}
     >
       <span

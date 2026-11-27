@@ -6,11 +6,22 @@
  *   (My-Prompt-Manager-ojz.19); neither the Library's loading state nor its empty state ever shows
  *   on the way; the Prompts stored in their Packs' Categories and the Welcome recorded finished.
  * - The exit Notification read whole (My-Prompt-Manager-ojz.19): in the popup 400 x 500 and the side
- *   panel 360 x 600 and 320 x 500, light and dark, "Open your AI chat and type //" on a line of its
- *   own under the message, neither cut, the pill in its room, over none of the controls under the
- *   header, above the search field, off the first card's Copy, which has the keyboard; "Your library
- *   is ready" (a Debug replay over Packs already in) as well. Screenshots in WELCOME_EXIT_SCREENSHOTS
- *   (test-results/welcome-exit when unset).
+ *   panel 400 x 600, 360 x 600 and 320 x 500, light and dark, "Open your AI chat and type //" on a line
+ *   of its own under the message, neither cut, the pill in its room, over none of the controls, the
+ *   side panel's close button included, above the search field, off the first card's Copy, which has
+ *   the keyboard; centered in the popup, and in the side panel unless it must give way to the close
+ *   button (My-Prompt-Manager-h1dh); "Your library is ready" (a Debug replay over Packs already in) as
+ *   well. Screenshots in WELCOME_EXIT_SCREENSHOTS (test-results/welcome-exit when unset).
+ * - The side panel's close button free all along the exit Notification (My-Prompt-Manager-h1dh): at
+ *   320 x 600 and 360 x 600, light and dark, every pixel of the button's box is hit tested on every
+ *   frame the Notification is in the document, and none reaches the pill; each reaches the button
+ *   whenever it does with no Notification. A one-line Notification shown next stays centered. A click
+ *   on each corner, each edge and the centre of the button, while the Notification shows, reaches the
+ *   button's close and never the pill, the pointer resting there never holds its time, and a real
+ *   click on the corner the pill used to cover closes the side panel. The editor opened with New while
+ *   the Notification shows: the Notification leaves in the commit that puts the editor in, no pixel
+ *   of the editor's Cancel or Save is under it in any frame, both are whole once the editor rests, and
+ *   a click on Cancel where the pill used to lie closes the editor.
  * - The exit Notification stays 6 s (My-Prompt-Manager-syj): its 9 words take about 2.3 s to read and
  *   its `//` comes last. In the popup 400 x 500 and the side panel 320 x 600, light and dark, it is
  *   first drawn within 1 s of the click on "Add 9 prompts", still drawn 5.5 s after it, without a break
@@ -120,9 +131,13 @@ const welcome = (page: Page) => page.getByTestId('welcome');
 const primary = (page: Page) => page.getByTestId('welcome-primary');
 const cards = (page: Page) => page.getByTestId('prompt-card');
 
-/** Where the exit Notification is checked whole: the popup, and the side panel at its usual and narrowest widths */
+/**
+ * Where the exit Notification is checked whole: the popup, and the side panel wide enough for it to
+ * stay centered, at its usual width and at its narrowest
+ */
 const EXIT_SURFACES = [
   { file: 'popup', width: 400, height: 500 },
+  { file: 'sidepanel', width: 400, height: 600 },
   { file: 'sidepanel', width: 360, height: 600 },
   { file: 'sidepanel', width: 320, height: 500 }
 ] as const;
@@ -131,6 +146,16 @@ const EXIT_SCREENSHOTS_DIR = process.env.WELCOME_EXIT_SCREENSHOTS ?? 'test-resul
 
 /** The room a Notification leaves on each side of the screen (ToastContainer) */
 const NOTIFICATION_EDGE = 16;
+
+/** The Library's close button, which only the side panel has (ViewHeader's CloseButton), not the Welcome's */
+const LIBRARY_CLOSE = '[data-testid="close-modal"][aria-label="Close side panel"]';
+
+/**
+ * In the side panel, the room the exit Notification keeps from the Library's close button
+ * (My-Prompt-Manager-h1dh): centered while it can be, moved left by what it must, never nearer the left
+ * edge than NOTIFICATION_EDGE
+ */
+const CLOSE_CLEARANCE = 8;
 
 const firstCardCopy = (page: Page) => cards(page).first().getByRole('button', { name: /^Copy content of / });
 
@@ -184,16 +209,11 @@ interface ExitNotificationLayout {
   /** The first card's Copy and the search field (its rounded box), read where they rest */
   copy: Box;
   search: Box;
+  /** The Library's close button, in the side panel; none in the popup */
+  close: Box | null;
   /** The controls outside the Notification whose box meets the pill's */
   covered: (Box & { name: string })[];
 }
-
-/**
- * The one control a Notification may cover: the side panel's close button, at the header's top right,
- * which any Notification of a 320px side panel reaches, one line high or more, and which nobody needs
- * right after the Welcome; it is free again when the Notification leaves
- */
-const MAY_COVER = new Set(['Close side panel']);
 
 const boxOf = (box: { x: number; y: number; width: number; height: number } | null, what: string): Box => {
   if (!box) {
@@ -238,11 +258,23 @@ const exitNotificationLayout = async (page: Page, message: string): Promise<Exit
       .map((control) => ({ ...rect(control), name: control.getAttribute('aria-label') ?? control.textContent?.trim() ?? control.tagName }));
     return { pill: box, message: line('toast-message'), sub: line('toast-sub'), covered };
   });
+  const close = page.locator(LIBRARY_CLOSE);
   return {
     ...inPage,
     copy: boxOf(await firstCardCopy(page).boundingBox(), 'the first Copy'),
-    search: boxOf(await page.getByRole('searchbox', { name: 'Search prompts' }).locator('..').boundingBox(), 'the search field')
+    search: boxOf(await page.getByRole('searchbox', { name: 'Search prompts' }).locator('..').boundingBox(), 'the search field'),
+    close: (await close.count()) > 0 ? boxOf(await close.boundingBox(), 'the close button') : null
   };
+};
+
+/**
+ * Where the pill's left edge must be: centered on the screen; in the side panel, moved left from there
+ * by what keeps it CLOSE_CLEARANCE clear of the close button, never nearer the left edge than
+ * NOTIFICATION_EDGE (My-Prompt-Manager-h1dh)
+ */
+const expectedPillLeft = (pill: Box, width: number, close: Box | null): number => {
+  const centered = (width - pill.width) / 2;
+  return close === null ? centered : Math.max(NOTIFICATION_EDGE, Math.min(centered, close.left - CLOSE_CLEARANCE - pill.width));
 };
 
 /** The screenshot and the measures of a Notification, kept before they are judged, so a failure keeps them too */
@@ -471,6 +503,241 @@ const expectSixSeconds = async (page: Page, timeline: ExitTimeline): Promise<voi
   await expect(page.getByTestId('toast')).toHaveCount(0);
 };
 
+/** Where the side panel's close button is checked free all along the exit Notification (My-Prompt-Manager-h1dh) */
+const CLOSE_SURFACES = [
+  { width: 320, height: 600 },
+  { width: 360, height: 600 }
+] as const;
+
+/** A pixel of a control's box, hit tested at its centre */
+interface Pixel {
+  x: number;
+  y: number;
+}
+
+/**
+ * Hit tests every pixel of a control's box: how many reach the control, which reach the pill, and
+ * which reach another element than the control and its ancestors (the pill among them): a pixel at a
+ * rounded corner shows what the control stands on, any other is covered
+ */
+interface ControlHits {
+  box: Box;
+  pixels: number;
+  onControl: number;
+  underPill: Pixel[];
+  covered: Pixel[];
+}
+
+/** One control, over the frames the exit Notification is in the document */
+interface ControlWatch {
+  /** When it was first in the document, by the page's clock */
+  appearedAt?: number;
+  /** Frames where the control was not in the document */
+  framesWithout: number;
+  /** Each frame where it was: where its box stood, and how many of its pixels reached it */
+  frames: { left: number; top: number; onControl: number }[];
+  /** Frames where a pixel of its box reached the pill, and the first such pixels */
+  framesUnderPill: number;
+  underPill: (Pixel & { frame: number })[];
+  /** Frames where a pixel of its box was covered (ControlHits) */
+  framesCovered: number;
+  last?: ControlHits;
+}
+
+/**
+ * What the page notes while the exit Notification `message` is in the document, on each animation
+ * frame from the one it is put in to the one it leaves, its entrance included: a ControlWatch of each
+ * control named, and anything that held the pill's time
+ */
+interface NotificationWatch {
+  shownAt?: number;
+  goneAt?: number;
+  /** Frames sampled while the pill was in the document */
+  frames: number;
+  /** The pointer or the focus on the pill (mouseenter, focusin): either stops its time */
+  held: string[];
+  /** The pill's box at its farthest right, over every frame, and in the last frame */
+  pillRightmost: number | null;
+  lastPill?: Box;
+  controls: Record<string, ControlWatch>;
+}
+
+type NotificationWatchWindow = typeof globalThis & {
+  notificationWatch: NotificationWatch;
+  /** ControlHits of the control named, as the page stands, or null when it is not in the document */
+  controlHits: (name: string) => ControlHits | null;
+};
+
+/**
+ * Starts noting the NotificationWatch of the exit Notification `message` over `controls` (a name for
+ * each, and its selector), before the click on the primary button. Each pixel of a control's box is
+ * hit tested at its centre with elementFromPoint, which reads the page as drawn: the pill's transform
+ * during its entrance, the stacking of the pill and of what opens over the Library, and the rounded
+ * corners, are those Chrome hit tests a click with
+ */
+const watchControlsUnderTheNotification = (page: Page, message: string, controls: Record<string, string>): Promise<void> =>
+  page.evaluate(({ watched, selectors }) => {
+    const watch: NotificationWatch = { frames: 0, held: [], pillRightmost: null, controls: {} };
+    for (const name of Object.keys(selectors)) {
+      watch.controls[name] = { framesWithout: 0, frames: [], framesUnderPill: 0, underPill: [], framesCovered: 0 };
+    }
+    const box = (element: Element): Box => {
+      const { left, top, right, bottom, width, height } = element.getBoundingClientRect();
+      return { left, top, right, bottom, width, height };
+    };
+    let pill: HTMLElement | null = null;
+    const hits = (name: string): ControlHits | null => {
+      const control = document.querySelector(selectors[name]);
+      if (!control) {
+        return null;
+      }
+      const at = box(control);
+      const result: ControlHits = { box: at, pixels: 0, onControl: 0, underPill: [], covered: [] };
+      for (let row = Math.floor(at.top); row < at.bottom; row++) {
+        for (let column = Math.floor(at.left); column < at.right; column++) {
+          const x = column + 0.5;
+          const y = row + 0.5;
+          if (x < at.left || x >= at.right || y < at.top || y >= at.bottom) {
+            continue;
+          }
+          result.pixels++;
+          const hit = document.elementFromPoint(x, y);
+          if (hit !== null && control.contains(hit)) {
+            result.onControl++;
+            continue;
+          }
+          if (hit !== null && pill?.contains(hit) === true) {
+            result.underPill.push({ x, y });
+          }
+          if (hit === null || !hit.contains(control)) {
+            result.covered.push({ x, y });
+          }
+        }
+      }
+      return result;
+    };
+    (globalThis as NotificationWatchWindow).notificationWatch = watch;
+    (globalThis as NotificationWatchWindow).controlHits = hits;
+
+    const sample = (): void => {
+      if (!pill?.isConnected) {
+        return;
+      }
+      watch.frames++;
+      const pillBox = box(pill);
+      watch.pillRightmost = Math.max(watch.pillRightmost ?? pillBox.right, pillBox.right);
+      watch.lastPill = pillBox;
+      for (const [name, control] of Object.entries(watch.controls)) {
+        const frame = hits(name);
+        if (frame === null) {
+          control.framesWithout++;
+          continue;
+        }
+        control.frames.push({ left: frame.box.left, top: frame.box.top, onControl: frame.onControl });
+        if (frame.underPill.length > 0) {
+          control.framesUnderPill++;
+          control.underPill.push(...frame.underPill.slice(0, Math.max(0, 20 - control.underPill.length)).map((pixel) => ({ ...pixel, frame: watch.frames })));
+        }
+        control.framesCovered += frame.covered.length > 0 ? 1 : 0;
+        control.last = frame;
+      }
+      requestAnimationFrame(sample);
+    };
+
+    new MutationObserver(() => {
+      const now = performance.now();
+      if (pill?.isConnected === false && watch.goneAt === undefined) {
+        watch.goneAt = now;
+      }
+      for (const [name, control] of Object.entries(watch.controls)) {
+        if (control.appearedAt === undefined && document.querySelector(selectors[name]) !== null) {
+          control.appearedAt = now;
+        }
+      }
+      const found = document.querySelector<HTMLElement>('[data-testid="toast"]');
+      if (pill === null && found && (found.textContent ?? '').includes(watched)) {
+        watch.shownAt = now;
+        found.addEventListener('mouseenter', () => { watch.held.push('mouseenter'); });
+        found.addEventListener('focusin', () => { watch.held.push('focusin'); });
+        pill = found;
+        // The frame it is put in, then every frame until it leaves
+        sample();
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }, { watched: message, selectors: controls });
+
+const notificationWatchOf = (page: Page): Promise<NotificationWatch> => page.evaluate(() => (globalThis as NotificationWatchWindow).notificationWatch);
+
+/** ControlHits of each control named, once the exit Notification has left */
+const controlHitsAtRest = async (page: Page, names: readonly string[]): Promise<Record<string, ControlHits | null>> =>
+  page.evaluate((all) => Object.fromEntries(all.map((name) => [name, (globalThis as NotificationWatchWindow).controlHits(name)])), names);
+
+/**
+ * `name` whole with no Notification: each pixel of its box reaches it, or at its rounded corners what
+ * it stands on, and none another element; it is reached at all but those corners
+ */
+const expectWholeAtRest = (name: string, rest: ControlHits): void => {
+  expect(rest.covered, `pixels of ${name} covered, with no Notification`).toEqual([]);
+  expect(rest.onControl, `${name} reached at all but its rounded corners, with no Notification`).toBeGreaterThan(rest.pixels * 0.8);
+};
+
+/**
+ * `name` reachable whole all along the exit Notification: in no frame does a pixel of its box reach
+ * the pill, and in every frame where it stood where it rests, each pixel that reaches it with no
+ * Notification (all but its rounded corners) reaches it. A control moving in (the editor rising) is
+ * read at rest only for the count, as its box then falls on other pixel rows
+ */
+const expectReachableThroughout = (name: string, control: ControlWatch, rest: ControlHits | null): void => {
+  expect(rest, `${name}, with no Notification`).not.toBeNull();
+  if (rest === null) {
+    return;
+  }
+  expectWholeAtRest(name, rest);
+  expect(control.underPill, `pixels of ${name} under the Notification`).toEqual([]);
+  expect(control.framesUnderPill, `frames where a pixel of ${name} was under the Notification`).toBe(0);
+  expect(control.framesCovered, `frames where a pixel of ${name} was covered`).toBe(0);
+  const atRest = control.frames.filter((frame) => Math.abs(frame.left - rest.box.left) < 0.01 && Math.abs(frame.top - rest.box.top) < 0.01);
+  expect(atRest.length, `frames with ${name} at rest while the Notification was in the document`).toBeGreaterThan(0);
+  expect(atRest.filter((frame) => frame.onControl !== rest.onControl), `frames at rest where a pixel of ${name} did not reach it`).toEqual([]);
+};
+
+/** The Cancel and Save of the editor's bar (PromptEditor), both in the band of the exit Notification */
+const EDITOR_CONTROLS = {
+  Cancel: '[data-testid="editor-sheet"] header button[aria-keyshortcuts="Escape"]',
+  Save: '[data-testid="editor-sheet"] header button[type="submit"]'
+} as const;
+
+/**
+ * Each call of `window.close()`, from the page's first script on: where the click that made it was,
+ * and whether the exit Notification was in the document then
+ */
+interface CloseProbe {
+  calls: (Pixel & { toastShown: boolean })[];
+  /** Whether a call closes the page; until it does, each is only noted, so one test can click many points */
+  allow: boolean;
+}
+
+type CloseProbeWindow = typeof globalThis & { closeProbe: CloseProbe };
+
+const probeTheClose = async (page: Page): Promise<void> => {
+  await page.addInitScript(() => {
+    const probe: CloseProbe = { calls: [], allow: false };
+    (globalThis as CloseProbeWindow).closeProbe = probe;
+    // The click being dispatched, read by the close it calls
+    let click: Pixel = { x: Number.NaN, y: Number.NaN };
+    document.addEventListener('click', (event) => { click = { x: event.clientX, y: event.clientY }; }, { capture: true });
+    const close = window.close.bind(window);
+    window.close = () => {
+      probe.calls.push({ ...click, toastShown: document.querySelector('[data-testid="toast"]') !== null });
+      if (probe.allow) {
+        close();
+      }
+    };
+  });
+};
+
+const closeCallsOf = async (page: Page): Promise<CloseProbe['calls']> => page.evaluate(() => (globalThis as CloseProbeWindow).closeProbe.calls);
+
 const recordOf = async (storage: ExtensionStorage, key: string): Promise<unknown> => (await storage.get<Record<string, unknown>>(key))[key];
 
 const median = (values: readonly number[]): number => {
@@ -531,11 +798,15 @@ test.describe('Leaving the Welcome in the real extension', () => {
         const layout = await exitNotificationLayout(page, ADDED);
         await keepEvidence(page, `exit-notification-${file}-${String(width)}x${String(height)}-${theme}`, layout);
         expectWhole(layout, width);
-        // The first card's Copy has the keyboard, and the Notification is over none of the controls under the header
+        // The first card's Copy has the keyboard, and the Notification is over none of the controls,
+        // the side panel's close button included (My-Prompt-Manager-h1dh)
         await expect(firstCardCopy(page)).toBeFocused();
-        expect(layout.covered.map(({ name }) => name).filter((name) => !MAY_COVER.has(name)), 'controls under the Notification').toEqual([]);
+        expect(layout.covered.map(({ name }) => name), 'controls under the Notification').toEqual([]);
         expect(layout.pill.bottom, 'the Notification above the search field').toBeLessThanOrEqual(layout.search.top);
         expect(overlaps(layout.pill, layout.copy), 'the Notification over the first Copy').toBe(false);
+        // Centered in the popup, which has no close button; in the side panel, unless it must give way to it
+        expect(layout.close === null, 'no close button in the popup, one in the side panel').toBe(file === 'popup');
+        expect(layout.pill.left, 'the pill, centered unless it gives way to the close button').toBeCloseTo(expectedPillLeft(layout.pill, width, layout.close), 0);
       });
     }
 
@@ -586,6 +857,175 @@ test.describe('Leaving the Welcome in the real extension', () => {
         expect(timeline.copyLost, 'frames where the first Copy had lost the keyboard').toBe(0);
         expect(timeline.minGapToCard ?? Number.NaN, 'room between the Notification and the first card').toBeGreaterThan(0);
         await expect(firstCardCopy(page)).toBeFocused();
+      });
+    }
+  }
+
+  // My-Prompt-Manager-h1dh: in a 320px side panel the exit Notification, two lines high, covered the
+  // top-left corner of the Library's close button. A pointer resting there held the Notification's
+  // time, and a click there was lost. It keeps clear of the button now, every frame of its six seconds
+  for (const { width, height } of CLOSE_SURFACES) {
+    for (const theme of ['light', 'dark'] as const) {
+      test(`the side panel's close button stays free all along the exit Notification: no pixel of it under the pill in any frame, and a one-line Notification next stays centered (sidepanel ${String(width)} x ${String(height)}, ${theme})`, async ({ page, context, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+        await expectTheme(page, theme);
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+
+        await watchControlsUnderTheNotification(page, ADDED, { close: LIBRARY_CLOSE });
+        await primary(page).click();
+        await expect(page.getByTestId('toast').getByText(ADDED, { exact: true })).toBeVisible();
+        await animationsDone(page);
+        await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
+        await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `close-button-free-sidepanel-${String(width)}x${String(height)}-${theme}.png`) });
+        await expect.poll(async () => (await notificationWatchOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
+
+        // With no Notification, the pixels of the box that reach the button: all but its rounded corners
+        const { close: rest } = await controlHitsAtRest(page, ['close']);
+        const watch = await notificationWatchOf(page);
+        const report = { ...watch, rest, onScreenMs: (watch.goneAt ?? Number.NaN) - (watch.shownAt ?? Number.NaN) };
+        test.info().annotations.push({ type: 'close button under the exit Notification (px)', description: JSON.stringify({ ...report, controls: { close: { ...watch.controls.close, frames: watch.controls.close.frames.length } } }) });
+        await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `close-button-free-sidepanel-${String(width)}x${String(height)}-${theme}.json`), `${JSON.stringify(report, null, 2)}\n`);
+
+        expect(watch.held, 'nothing hovered or focused the Notification').toEqual([]);
+        expect(watch.frames, 'frames sampled while the Notification was in the document').toBeGreaterThan(0);
+        expect(watch.controls.close.framesWithout, 'frames with no close button').toBe(0);
+        // The button never moves: every frame is at rest, so each one reaches it whole
+        expect(watch.controls.close.frames.length, 'frames with the close button').toBe(watch.frames);
+        expectReachableThroughout('the close button', watch.controls.close, rest);
+
+        // No other Notification moves: a one-line one, the copy of the first card, stays centered
+        await firstCardCopy(page).click();
+        const copied = page.getByTestId('toast');
+        await expect(copied.getByText('Prompt copied', { exact: true })).toBeVisible();
+        await animationsDone(page);
+        const oneLine = boxOf(await copied.boundingBox(), 'the one-line Notification');
+        test.info().annotations.push({ type: 'one-line Notification (px)', description: JSON.stringify(oneLine) });
+        await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `close-button-free-sidepanel-${String(width)}x${String(height)}-${theme}.json`), `${JSON.stringify({ ...report, oneLine }, null, 2)}\n`);
+        expect(oneLine.height, 'one line high').toBe(40);
+        expect(oneLine.left, 'the one-line Notification, centered').toBeCloseTo(width - oneLine.right, 0);
+      });
+    }
+
+    test(`a click anywhere on the side panel's close button while the exit Notification shows closes the side panel, and the pointer resting on it never holds the Notification (sidepanel ${String(width)} x ${String(height)})`, async ({ page, storage, extensionId }) => {
+      await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 } });
+      await probeTheClose(page);
+      await page.setViewportSize({ width, height });
+      await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+      await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+
+      await watchControlsUnderTheNotification(page, ADDED, { close: LIBRARY_CLOSE });
+      await primary(page).click();
+      const notification = page.getByTestId('toast');
+      await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
+      await animationsDone(page);
+
+      // Its corners (3px in, inside their rounding), the middle of its edges (1px in) and its centre
+      const close = boxOf(await page.locator(LIBRARY_CLOSE).boundingBox(), 'the close button');
+      const middle = { x: (close.left + close.right) / 2, y: (close.top + close.bottom) / 2 };
+      const points = [
+        { name: 'top left', x: close.left + 3, y: close.top + 3 },
+        { name: 'top', x: middle.x, y: close.top + 1 },
+        { name: 'top right', x: close.right - 3, y: close.top + 3 },
+        { name: 'left', x: close.left + 1, y: middle.y },
+        { name: 'centre', ...middle },
+        { name: 'right', x: close.right - 1, y: middle.y },
+        { name: 'bottom left', x: close.left + 3, y: close.bottom - 3 },
+        { name: 'bottom', x: middle.x, y: close.bottom - 1 },
+        { name: 'bottom right', x: close.right - 3, y: close.bottom - 3 }
+      ];
+      for (const point of points) {
+        await page.mouse.click(point.x, point.y);
+      }
+      // The pointer rests on the corner the pill used to cover
+      await page.mouse.move(points[0].x, points[0].y);
+      const calls = await closeCallsOf(page);
+      const { held } = await notificationWatchOf(page);
+      // A click's clientX and clientY may be rounded to whole pixels
+      const closedBy = (point: Pixel) => calls.some((call) => Math.abs(call.x - point.x) < 1 && Math.abs(call.y - point.y) < 1);
+      const missed = points.filter((point) => !closedBy(point)).map(({ name }) => name);
+      test.info().annotations.push({ type: 'clicks on the close button', description: JSON.stringify({ close, points, missed, calls, held }) });
+
+      expect(missed, 'clicks that did not reach the close button').toEqual([]);
+      expect(calls.map(({ toastShown }) => toastShown), 'each click while the Notification showed').toEqual(points.map(() => true));
+      expect(held, 'the pointer on the close button held the Notification').toEqual([]);
+
+      // And for real, on that corner, while the Notification still shows: the side panel closes
+      await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
+      await page.evaluate(() => { (globalThis as CloseProbeWindow).closeProbe.allow = true; });
+      const closed = page.waitForEvent('close');
+      // The page may go before Chromium answers the mouse-up (tests/e2e/utils/closingClick.ts): the close is the proof
+      await page.mouse.click(points[0].x, points[0].y).catch(() => undefined);
+      await closed;
+      expect(page.isClosed(), 'the side panel closed').toBe(true);
+    });
+
+    // Round 1 of My-Prompt-Manager-h1dh (Codex on PR #636): moved left, the pill, over everything
+    // (z-50), covered nearly all of the Cancel of an editor opened while it showed, the editor's bar
+    // being in its band. In the side panel it now leaves as the editor opens: in no frame is a pixel of
+    // Cancel or Save under it, and once the editor rests both are whole
+    for (const theme of ['light', 'dark'] as const) {
+      test(`the editor opened while the exit Notification shows: the Notification leaves as it opens, and every pixel of its Cancel and Save is reachable (sidepanel ${String(width)} x ${String(height)}, ${theme})`, async ({ page, storage, extensionId }) => {
+        await storage.seed({ [WELCOME_KEY]: { status: 'pending', step: 2 }, settings: { ...DEFAULT_SETTINGS, theme } });
+        await page.setViewportSize({ width, height });
+        await page.goto(`chrome-extension://${extensionId}/src/sidepanel.html`);
+        await expectTheme(page, theme);
+        await expect(primary(page)).toHaveText(`Add ${String(DEFAULT_PROMPTS.length)} prompts`);
+
+        await watchControlsUnderTheNotification(page, ADDED, EDITOR_CONTROLS);
+        await primary(page).click();
+        const notification = page.getByTestId('toast');
+        await expect(notification.getByText(ADDED, { exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Add new prompt' }).click();
+        const editor = page.getByTestId('editor-sheet');
+        await expect(editor.getByRole('heading', { name: 'New prompt', exact: true })).toBeVisible();
+        await animationsDone(page);
+        await fs.mkdir(EXIT_SCREENSHOTS_DIR, { recursive: true });
+        await page.screenshot({ path: path.join(EXIT_SCREENSHOTS_DIR, `editor-after-exit-notification-sidepanel-${String(width)}x${String(height)}-${theme}.png`) });
+        // Gone with the editor, or, where it stays over the editor, at the end of its time
+        await expect.poll(async () => (await notificationWatchOf(page)).goneAt, { timeout: GONE_BY_MS * 2 }).toBeDefined();
+
+        const names = Object.keys(EDITOR_CONTROLS);
+        const rest = await controlHitsAtRest(page, names);
+        const watch = await notificationWatchOf(page);
+        const report = { ...watch, rest, onScreenMs: (watch.goneAt ?? Number.NaN) - (watch.shownAt ?? Number.NaN) };
+        test.info().annotations.push({
+          type: 'Cancel and Save and the exit Notification (px, ms)',
+          description: JSON.stringify({
+            shownAt: watch.shownAt,
+            goneAt: watch.goneAt,
+            controls: names.map((name) => ({ name, appearedAt: watch.controls[name].appearedAt, rest: rest[name], framesWithPill: watch.controls[name].frames.length, framesUnderPill: watch.controls[name].framesUnderPill, underPill: watch.controls[name].underPill.slice(0, 5) }))
+          })
+        });
+        await fs.writeFile(path.join(EXIT_SCREENSHOTS_DIR, `editor-after-exit-notification-sidepanel-${String(width)}x${String(height)}-${theme}.json`), `${JSON.stringify(report, null, 2)}\n`);
+
+        expect(watch.held, 'nothing hovered or focused the Notification').toEqual([]);
+        for (const name of names) {
+          const control = watch.controls[name];
+          // In every frame both were in the document with the Notification, none of their pixels under it
+          expect(control.underPill, `pixels of ${name} under the Notification`).toEqual([]);
+          expect(control.framesUnderPill, `frames where a pixel of ${name} was under the Notification`).toBe(0);
+          expect(control.framesCovered, `frames where a pixel of ${name} was covered`).toBe(0);
+          // The editor at rest: each pixel reaches the button, or at its rounded corners the editor's bar
+          const at = rest[name];
+          expect(at, `${name}, the editor at rest`).not.toBeNull();
+          if (at !== null) {
+            expectWholeAtRest(name, at);
+          }
+        }
+        // It left as the editor opened, in the same commit, long before its time ran out
+        const { shownAt = Number.NaN, goneAt = Number.NaN } = watch;
+        const editorAt = watch.controls.Cancel.appearedAt ?? Number.NaN;
+        expect(goneAt - editorAt, 'the Notification gone as the editor is put in the document (ms)').toBeLessThanOrEqual(1);
+        expect(goneAt - shownAt, 'the Notification gone before its time (ms)').toBeLessThan(STILL_THERE_MS);
+        await expect(notification).toHaveCount(0);
+
+        // A click on Cancel where the pill used to lie, 18px in from its left: the editor closes
+        const cancel = boxOf(await page.locator(EDITOR_CONTROLS.Cancel).boundingBox(), 'Cancel');
+        await page.mouse.click(cancel.left + 18, (cancel.top + cancel.bottom) / 2);
+        await expect(editor).toHaveCount(0);
       });
     }
   }

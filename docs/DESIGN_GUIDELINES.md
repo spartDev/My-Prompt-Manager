@@ -985,8 +985,22 @@ It is marked on the Notification itself (`whole` of `ToastOptions`), not on the 
 Notification of the Library keeps the one-line pill. The pill grows as with `wrap` (`w-max min-h-10
 py-1.5 rounded-[20px]`), and the sub takes a line of its own under the message (`flex-col
 items-start`), never cut: 238px wide and 48px high, whole from the 320px side panel to the popup. It
-ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel); in a
-320px side panel it reaches the side panel's close button, as the one-line pill does.
+ends 60px from the top, above the search field (96px in the popup, 124px in a 320px side panel).
+
+Two lines high, it comes down to the height of the side panel's close button, at the Library header's
+top right (24px in from the edge, 36px wide), so in the side panel it keeps 8px clear of it
+(`toast-clear-close`, in `src/sidepanel.css`, My-Prompt-Manager-h1dh): centered while it can be, from
+about 374px wide; narrower, moved left by what it must, never nearer the left edge than its 16px room,
+which wins at 320px. At 320px it stands from 16px to 254px, 6px from the button (260px to 296px); at
+360px from 54px to 292px; at 400px centered, as in the popup, which has no close button. No pixel of
+the button is under it in any frame, its entrance included, so a click anywhere on the button closes the
+side panel and a pointer resting there never holds its time. It moves sideways only (`translate`, which
+adds to the entrance's transform). Moved left, it would cover the Cancel of an editor opened while it
+shows (the editor's bar, Cancel at the left and Save at the right, is in its band), so in the side panel
+it leaves as the editor opens, New or Edit (App's `openEditor`): the user has moved on from the
+Library it was about. It stays over everything else (z-50), What's new of a Debug replay included. Every
+other Notification stays centered, and stays as the editor opens; in the popup the exit Notification
+stays too. A one-line pill as wide as its room still reaches the button's top 8px in a 320px side panel.
 
 It stays 6s, not a confirmation's 2.7s (My-Prompt-Manager-syj): its 9 words take about 2.3s to read
 and `//` comes last. `useWelcomeExit` passes `duration: 6000`, for "Your library is ready" (a Debug
