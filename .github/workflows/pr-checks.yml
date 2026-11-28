@@ -465,7 +465,7 @@ jobs:
       # The action pins the zizmor release it runs (1.32.0 at v0.8.1), so a bump
       # of the action is the bump of zizmor.
       - name: 🌈 Run zizmor (MANDATORY - ZERO FINDINGS)
-        uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
+        uses: zizmorcore/zizmor-action@1b4550e929643b8b26a62303c6bd64814271a4f1 # v0.9.2
         with:
           inputs: .github/workflows
           # Without the Advanced Security upload the action keeps zizmor's exit
