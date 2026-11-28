@@ -31,7 +31,7 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests/e2e/tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "devDependencies": {
-    "@axe-core/playwright": "4.14.0",
+    "@axe-core/playwright": "4.14.1",
     "@biomejs/biome": "2.6.8",
     "@crxjs/vite-plugin": "3.0.0",
     "@lexical/plain-text": "0.41.0",
